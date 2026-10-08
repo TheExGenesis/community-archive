@@ -23,7 +23,6 @@ import worker
 MAX_SECONDS = 900
 MAX_PAGES = 100
 MAX_CALLS = 400
-MAX_RESOLUTION_CHECKS = 200
 BATCH = {'disposition': 16, 'enrich': 3, 'value': 1}
 WINDOW_DAYS = 2
 
@@ -291,12 +290,15 @@ def _resolution_source_read(fn, run_id, started):
 
 
 def check_resolutions(db, run_id, counts, started, limit, key):
-    """Recheck current author reply evidence without reclassifying the seed."""
+    """Recheck current author reply evidence without reclassifying the seed.
+
+    Bounded by the run's time and call budgets, not a row count: the ready set
+    grows daily, and a fixed cap eventually outruns the unit's retry allowance.
+    """
     rows=db.execute('''SELECT * FROM bulletin.jev_items WHERE status='ready'
       AND (context_checked_at IS NULL OR context_checked_at<date_trunc('day',now()))
       AND (standing OR posted_at>=now()-interval '75 days')
-      ORDER BY context_checked_at ASC NULLS FIRST,tweet_id LIMIT %s''',
-      (MAX_RESOLUTION_CHECKS,)).fetchall()
+      ORDER BY context_checked_at ASC NULLS FIRST,tweet_id''').fetchall()
     checked=0
     for job in rows:
         if time.monotonic()-started>MAX_SECONDS or counts['calls']>=limit:

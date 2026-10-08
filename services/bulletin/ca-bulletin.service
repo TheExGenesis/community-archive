@@ -25,5 +25,5 @@ UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
 
-# ca-bulletin-daily.timer starts this unit at noon UTC, independently of
-# Autorefresh. A failed service retains its bounded restart policy.
+# Deliberately no timer: the Autorefresh cron wrapper starts this unit when the
+# pipeline completes. A failed service retains its bounded restart policy.

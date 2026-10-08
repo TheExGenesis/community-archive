@@ -160,6 +160,30 @@ class JevWorkerTests(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT count(*) n FROM bulletin.calls WHERE status='failed:RemoteDisconnected'").fetchone()['n'],1)
         self.assertIsNotNone(saved['context_digest'])
 
+    def test_daily_rechecks_cover_a_backlog_beyond_one_fixed_batch(self):
+        self.assertEqual(jev_worker.run(self.db,window=self.window,backfill_budget=.05)['status'],'ok')
+        columns=[r['column_name'] for r in self.db.execute("""SELECT column_name::text FROM information_schema.columns
+          WHERE table_schema='bulletin' AND table_name='jev_items'
+          AND column_name NOT IN ('tweet_id','posted_at','context_checked_at')""")]
+        self.db.execute(f"""INSERT INTO bulletin.jev_items(tweet_id,posted_at,{','.join(columns)})
+          SELECT n::text,now(),{','.join('j.'+c for c in columns)}
+          FROM bulletin.jev_items j,generate_series(1000,1249) n WHERE j.tweet_id='1'""")
+        self.db.execute('UPDATE bulletin.jev_items SET posted_at=now(),context_checked_at=NULL')
+        seed={**self.source,'username':'alice'}
+        context=PreparedContext('seed only',{'1':('10',self.source['content_hash'])},{'1':seed})
+        with patch.object(jev_worker,'_valid_sources',side_effect=lambda db,jobs:[(jobs[0],seed)]), \
+             patch.object(jev_worker.tweet_context,'prepare',return_value=context), \
+             patch.object(jev_worker.tweet_context,'still_current',return_value=True):
+            counts={'calls':0,'failed':0,'suppressed':0}
+            self.assertEqual(jev_worker.check_resolutions(self.db,1,counts,time.monotonic(),10,'test'),'ok')
+            self.assertEqual((counts['resolution_checked'],counts['resolution_pending']),(251,0))
+            # The run's time budget still bounds the work and leaves a retryable remainder.
+            self.db.execute('UPDATE bulletin.jev_items SET context_checked_at=NULL')
+            counts={'calls':0,'failed':0,'suppressed':0}
+            expired=time.monotonic()-jev_worker.MAX_SECONDS-1
+            self.assertEqual(jev_worker.check_resolutions(self.db,1,counts,expired,10,'test'),'resolution_backlog')
+            self.assertEqual((counts['resolution_checked'],counts['resolution_pending']),(0,251))
+
     def test_shadow_state_is_private_and_cutover_requires_database_owner(self):
         for role in ('anon','authenticated'):
             self.db.execute('SET ROLE '+role)

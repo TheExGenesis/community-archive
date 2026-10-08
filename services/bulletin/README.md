@@ -6,10 +6,9 @@ processor documented below remains active until the private pipeline switch is
 explicitly changed after shadow verification.
 
 Signed-in users with an active streaming opt-in use `/bulletin`; the existing
-admin allowlist controls `/admin/bulletin`. The worker starts daily at 12:00
-UTC, independently of whether Autorefresh succeeded. Recent successful
-Autorefresh runs finished between about 06:07 and 08:38 UTC; noon leaves a
-margin before the Bulletin scan.
+admin allowlist controls `/admin/bulletin`. The worker starts when the
+daily Autorefresh pipeline completes, whether or not it succeeded. Recent
+Autorefresh runs finished between about 06:00 and 08:40 UTC.
 
 ## Data and privacy
 
@@ -323,40 +322,34 @@ ownership; do not resume it with pending refresh-owned decisions until those
 requests have been reconciled. Never clear billing history to make a rerun fit.
 
 Owner: Community Archive backend. Existing worker host: `ca-autorefresh`
-(`95.217.12.23`), unit `ca-bulletin.service`, invoked by
-`ca-bulletin-daily.timer` at 12:00 UTC. The Autorefresh cron keeps its
-`after_autorefresh.py` entrypoint, but that wrapper now runs only the pipeline;
-it does not launch Bulletin. The PostgreSQL advisory lock prevents concurrent
-worker runs. Completed daily scans and unchanged decisions are reused.
-The timer starts a bounded pass over available serving data; it does not prove
-Autorefresh or ClickHouse ingestion is complete. The two-day window overlaps
-the following day, but older late arrivals still need an explicit replay.
-The existing recurring-job last-success alert still covers missed starts;
-inspect the timer's enabled state and next elapse when that alert fires.
-The timer never reruns scraping to retry Bulletin. Service failure invokes the
+(`95.217.12.23`), unit `ca-bulletin.service`, started by the Autorefresh cron wrapper
+`after_autorefresh.py` when the pipeline exits, whatever its exit status. The
+wrapper uses `systemctl start --no-block`, returns the pipeline's exit code, and
+does not hold the pipeline lock while Bulletin runs. There is no Bulletin
+timer: if the Autorefresh cron does not run, Bulletin does not run either, and
+the existing recurring-job last-success alert covers the missed day. The
+PostgreSQL advisory lock prevents concurrent worker runs. Completed daily scans
+and unchanged decisions are reused.
+The start does not prove ClickHouse ingestion of the final Autorefresh rows is
+complete. The two-day window overlaps the following day, but older late
+arrivals still need an explicit replay.
+The wrapper never reruns scraping to retry Bulletin. Service failure invokes the
 existing journal failure unit. Inspect unit status, last-success age, queue and
 run dashboard; investigate non-complete status or freshness older than 36 hours.
 During the delayed restart, systemd reports `activating/auto-restart`; the
 recurring-job dashboard currently displays that as RUNNING. Consult the saved
 failed run and retry state until the retry completes. At the start limit the
-unit stays FAILED. The independent timer starts Bulletin even when Autorefresh
-fails; service retries cover failures after a start.
+unit stays FAILED.
 
-To activate only the daily fallback, copy `ca-bulletin-daily.timer` to
-`/etc/systemd/system/` while the service is idle, run `systemd-analyze verify`
-on the timer, then `systemctl daemon-reload` and
-`systemctl enable --now ca-bulletin-daily.timer`. Verify its next 12:00 UTC
-elapse with `systemctl list-timers ca-bulletin-daily.timer`. `Persistent=true`
-can start the service immediately if noon UTC was missed before activation.
-Deploy the wrapper change together with the timer: verify the current cron
-still uses `after_autorefresh.py`, install the new immutable Bulletin release,
-then enable the timer. Keep the prior release and timer file for rollback.
-The worker code, service credentials, model budgets, and retry limits are
-unchanged.
-Rollback disables and stops the timer, restores the previous Bulletin release
-so the wrapper again starts the service after successful Autorefresh, removes
-the timer unit, and runs `systemctl daemon-reload`; leave the decision and cost
-ledger intact.
+Deploy the wrapper by installing the new immutable Bulletin release while the
+worker is idle and no Autorefresh run is in flight, after verifying the cron
+still uses `current/after_autorefresh.py`. Then
+`systemctl disable --now ca-bulletin-daily.timer` and remove that unit file from
+`/etc/systemd/system/`, followed by `systemctl daemon-reload`. Keep the prior
+release and a copy of the timer file for rollback.
+Rollback restores the previous Bulletin release, reinstalls and enables the
+saved `ca-bulletin-daily.timer`, and runs `systemctl daemon-reload`; leave the
+decision and cost ledger intact.
 
 Deploy the worker and updated `ca-bulletin.service` together while the worker
 is idle. Preserve the existing monitoring drop-in, credentials and previous

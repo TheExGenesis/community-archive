@@ -2198,6 +2198,12 @@ export type Database = {
         }
         Returns: Json
       }
+      get_bulletin_dismissals: {
+        Args: {
+          viewer_id: string
+        }
+        Returns: string[]
+      }
       get_bulletin_opportunities: {
         Args: {
           max_results?: number
@@ -2225,12 +2231,6 @@ export type Database = {
           before_id?: number
         }
         Returns: Json
-      }
-      get_bulletin_dismissals: {
-        Args: {
-          viewer_id: string
-        }
-        Returns: string[]
       }
       get_bulletin_refreshes: {
         Args: Record<PropertyKey, never>
@@ -2773,7 +2773,7 @@ export type Database = {
         Args: {
           viewer_id: string
           viewer_account_id: string
-          notice_tweet_id: string | null
+          notice_tweet_id: string
           dismissed: boolean
         }
         Returns: undefined

@@ -77,6 +77,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_search_runs: {
+        Row: {
+          account_id: string
+          answer: string | null
+          cited_tweet_ids: string[]
+          completed_at: string | null
+          cost_usd: number
+          error: string | null
+          id: string
+          input_tokens: number
+          invalid_citation_ids: string[]
+          model: string
+          output_tokens: number
+          question: string
+          started_at: string
+          status: string
+          tool_calls: Json
+        }
+        Insert: {
+          account_id: string
+          answer?: string | null
+          cited_tweet_ids?: string[]
+          completed_at?: string | null
+          cost_usd?: number
+          error?: string | null
+          id: string
+          input_tokens?: number
+          invalid_citation_ids?: string[]
+          model: string
+          output_tokens?: number
+          question: string
+          started_at?: string
+          status: string
+          tool_calls?: Json
+        }
+        Update: {
+          account_id?: string
+          answer?: string | null
+          cited_tweet_ids?: string[]
+          completed_at?: string | null
+          cost_usd?: number
+          error?: string | null
+          id?: string
+          input_tokens?: number
+          invalid_citation_ids?: string[]
+          model?: string
+          output_tokens?: number
+          question?: string
+          started_at?: string
+          status?: string
+          tool_calls?: Json
+        }
+        Relationships: []
+      }
       all_account: {
         Row: {
           account_display_name: string

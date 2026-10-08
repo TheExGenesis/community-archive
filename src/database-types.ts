@@ -248,6 +248,36 @@ export type Database = {
           },
         ]
       }
+      ca_tweet_likes: {
+        Row: {
+          account_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          tweet_id: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          tweet_id: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          tweet_id?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       community_project_comments: {
         Row: {
           content: string
@@ -1378,7 +1408,7 @@ export type Database = {
           kind: string
           model: string
           prompt_version: number
-          search_vector?: never
+          search_vector?: unknown | null
           subject_key: string
           title?: string | null
           tweet_ids: string[]
@@ -1391,7 +1421,7 @@ export type Database = {
           kind?: string
           model?: string
           prompt_version?: number
-          search_vector?: never
+          search_vector?: unknown | null
           subject_key?: string
           title?: string | null
           tweet_ids?: string[]
@@ -1975,6 +2005,17 @@ export type Database = {
           p_username: string
         }
         Returns: boolean
+      }
+      ca_tweet_like_summary: {
+        Args: {
+          p_tweet_ids: string[]
+          p_viewer_account_id: string
+        }
+        Returns: {
+          tweet_id: string
+          like_count: number
+          viewer_liked: boolean
+        }[]
       }
       community_archive_monitoring_digest: {
         Args: Record<PropertyKey, never>

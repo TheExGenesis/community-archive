@@ -150,6 +150,9 @@ CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
 CREATE INDEX IF NOT EXISTS "digest_edition_likes_edition_idx"
   ON "public"."digest_edition_likes" ("edition_id");
 
+CREATE INDEX IF NOT EXISTS "ca_tweet_likes_tweet_created_idx"
+  ON "public"."ca_tweet_likes" ("tweet_id", "created_at" DESC);
+
 -- Find the summary covering any tweet, and search summaries by topic.
 CREATE INDEX IF NOT EXISTS "tweet_page_summaries_tweet_ids_idx"
   ON "public"."tweet_page_summaries" USING gin ("tweet_ids");

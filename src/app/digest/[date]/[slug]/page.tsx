@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { DigestStoryView } from '@/components/digest/DigestStoryView'
 import { getPublishedDigest } from '@/lib/digest/data'
 import { markdownToPlainText } from '@/lib/digest/markdown'
+import { loadDigestQuotePosts } from '@/lib/digest/quotePosts'
 
 export const revalidate = 300
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -37,5 +38,8 @@ export default async function DigestStoryPage({
     (item) => item.slug === params.slug,
   )
   if (!edition || !story) notFound()
-  return <DigestStoryView edition={edition} story={story} />
+  const quotePosts = await loadDigestQuotePosts(story.bangers)
+  return (
+    <DigestStoryView edition={edition} story={story} quotePosts={quotePosts} />
+  )
 }

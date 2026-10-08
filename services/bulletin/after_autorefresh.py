@@ -1,12 +1,16 @@
-"""Retain the Autorefresh cron entrypoint; Bulletin has its own timer."""
+"""Run the Autorefresh pipeline, then start Bulletin once it has completed."""
 import argparse
 from pathlib import Path
 import subprocess
 
 
 def run(pipeline_root, invoke=subprocess.run):
-    return invoke(['uv','run','--env-file',str(pipeline_root/'.env.prod'),
+    code=invoke(['uv','run','--env-file',str(pipeline_root/'.env.prod'),
         str(pipeline_root/'run_pipeline.py')],cwd=pipeline_root).returncode
+    # Bulletin scans whatever reached serving data, so a failed pipeline still
+    # starts it. --no-block releases the pipeline lock; systemd owns the result.
+    invoke(['systemctl','start','--no-block','ca-bulletin.service'])
+    return code
 
 
 if __name__=='__main__':

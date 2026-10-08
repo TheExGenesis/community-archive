@@ -40,17 +40,14 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public,tes TO service_role;
 
 
 class WrapperTests(unittest.TestCase):
-    def test_cron_wrapper_runs_only_autorefresh(self):
-        calls=[]
-        def invoke(cmd,**kwargs):
-            calls.append(cmd)
-            return types.SimpleNamespace(returncode=1)
-        self.assertEqual(after_autorefresh.run(Path('/pipeline'),invoke),1)
-        self.assertEqual(len(calls),1)
-        calls.clear()
-        def success(cmd,**kwargs):
-            calls.append(cmd)
-            return types.SimpleNamespace(returncode=0)
-        self.assertEqual(after_autorefresh.run(Path('/pipeline'),success),0)
-        self.assertEqual(len(calls),1)
-        self.assertEqual(calls[0][-1],'/pipeline/run_pipeline.py')
+    def test_cron_wrapper_starts_bulletin_after_autorefresh_completes(self):
+        start=['systemctl','start','--no-block','ca-bulletin.service']
+        for pipeline_code in (1,0):
+            calls=[]
+            def invoke(cmd,**kwargs):
+                calls.append(cmd)
+                # A Bulletin start failure must not mask the pipeline result.
+                return types.SimpleNamespace(returncode=5 if cmd[0]=='systemctl' else pipeline_code)
+            self.assertEqual(after_autorefresh.run(Path('/pipeline'),invoke),pipeline_code)
+            self.assertEqual(calls[0][-1],'/pipeline/run_pipeline.py')
+            self.assertEqual(calls[1:],[start])

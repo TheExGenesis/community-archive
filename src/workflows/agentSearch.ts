@@ -1,5 +1,5 @@
 import { WorkflowAgent, type ModelCallStreamPart } from '@ai-sdk/workflow'
-import { convertToModelMessages, isStepCount, type UIMessage } from 'ai'
+import { isStepCount } from 'ai'
 import { getWorkflowMetadata, getWritable } from 'workflow'
 import {
   AGENT_SEARCH_MAX_STEPS,
@@ -13,6 +13,7 @@ import {
   collectToolTweetIds,
   validateCitations,
 } from '@/lib/agentSearch/citations'
+import { buildConversationContext } from '@/lib/agentSearch/context'
 import { buildRunParts } from '@/lib/agentSearch/history'
 import { agentSearchModel } from '@/lib/agentSearch/model'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
@@ -80,6 +81,22 @@ async function getTweetsStep(input: { tweetIds: string[] }) {
 }
 getTweetsStep.maxRetries = 1
 
+// Earlier turns come from the run store, never from the browser. Only the
+// asker's own runs count, though the route already refused anyone else's
+// conversation.
+async function loadContextStep(
+  conversationId: string,
+  accountId: string,
+  runId: string,
+) {
+  'use step'
+  const runs = await getAgentSearchRunStore().listConversation(conversationId)
+  return buildConversationContext(
+    runs.filter((run) => run.accountId === accountId),
+    runId,
+  )
+}
+
 interface RunSummary {
   runId: string
   accountId: string
@@ -90,6 +107,7 @@ interface RunSummary {
   text: string
   toolCalls: AgentSearchRun['toolCalls']
   toolOutputs: unknown[]
+  priorTweetIds: string[]
   error: string | null
 }
 
@@ -97,10 +115,12 @@ interface RunSummary {
 // has already added its own to the run (see usage.ts).
 async function recordRunStep(summary: RunSummary) {
   'use step'
-  const { cited, invalid } = validateCitations(
-    summary.text,
-    collectToolTweetIds(summary.toolOutputs),
-  )
+  // A citation is valid when a tool returned the tweet in this conversation:
+  // in this run, or in an earlier turn (see citations.ts).
+  const { cited, invalid } = validateCitations(summary.text, [
+    ...Array.from(collectToolTweetIds(summary.toolOutputs)),
+    ...summary.priorTweetIds,
+  ])
   const store = getAgentSearchRunStore()
   // The route stores the run right after start(); create it here if that
   // write has not landed (or failed) so the result is never lost.
@@ -148,11 +168,14 @@ function outputCount(output: unknown): number | undefined {
   return undefined
 }
 
+/**
+ * Only the new question crosses into the workflow (and its event log);
+ * earlier turns are rebuilt from the run store by loadContextStep.
+ */
 export interface AgentSearchWorkflowInput {
   accountId: string
-  conversationId: string | null
+  conversationId: string
   question: string
-  messages: UIMessage[]
   modelSpec: string
   date: string
 }
@@ -182,9 +205,19 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   const toolCalls: RunSummary['toolCalls'] = []
   const toolOutputs: unknown[] = []
   let parts: unknown[] = []
+  let priorTweetIds: string[] = []
   try {
+    const context = await loadContextStep(
+      input.conversationId,
+      input.accountId,
+      runId,
+    )
+    priorTweetIds = context.priorTweetIds
     const result = await agent.stream({
-      messages: await convertToModelMessages(input.messages),
+      messages: [
+        ...context.messages,
+        { role: 'user', content: input.question },
+      ],
       writable: getWritable<ModelCallStreamPart>(),
       stopWhen: isStepCount(AGENT_SEARCH_MAX_STEPS),
       prepareStep: agentSearchPrepareStep,
@@ -232,6 +265,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
     text,
     toolCalls,
     toolOutputs,
+    priorTweetIds,
     error,
   })
   if (error) throw new Error(error)

@@ -30,8 +30,9 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    are alternatives. Replies are scored with their parent's text. The result
    says when the limit cut the collection short.
 4. The answer cites tweets as `[[t:<id>]]`. A citation counts only if the id
-   came back from a tool in the same run (`citations.ts`); the page marks other
-   ids as unverified and the run record lists them.
+   came back from a tool in the same conversation, in this run or an earlier
+   turn (`citations.ts`); the page marks other ids as unverified and the run
+   record lists them. The page and the stored run apply the same rule.
 5. The last step stores the run (`runStore.ts`): question, answer, cited and
    invalid ids, and tool calls. The answer is the last model step's text. A
    run of up to 20 model steps may not call tools on its last step, so it
@@ -75,6 +76,17 @@ its id. Workflow keeps a run's own data only 7 days after it ends on Vercel Pro
   only handles, not bios. A run still answering is reconnected through its
   stream.
 - The start route refuses a conversation id that belongs to someone else.
+
+### Follow-up questions
+
+The page sends only `{ id, question }`. The server never takes earlier turns
+from the browser: the workflow's first step (`context.ts`) rebuilds them from
+the asker's stored runs of that conversation, fetching their tweets again
+through the gateway. Tool outputs are converted with the tool definitions, so
+each one is compacted by its `toModelOutput` as when the model first saw it,
+and a tool call left without a result by a Stop is ignored. The model sees the
+last 3 earlier turns (`MAX_CONTEXT_TURNS`); the page shows the whole
+conversation. Citations may use tweets from any earlier turn.
 
 Models cross Workflow step boundaries as `EnvLanguageModel`, which serializes
 only its `provider:model` spec. Provider models would otherwise serialize their

@@ -61,11 +61,12 @@ export default function AgentSearch({
     () =>
       new WorkflowChatTransport<UIMessage>({
         api: '/api/agent-search',
-        // The transport sends only messages by default; the server files the
-        // run under the chat id, which is the conversation id.
-        prepareSendMessagesRequest: ({ id, messages, body }) => ({
-          body: { ...body, id, messages },
-        }),
+        // Only the chat id (the conversation id) and the new question: the
+        // server rebuilds earlier turns from what it stored.
+        prepareSendMessagesRequest: ({ id, messages }) => {
+          const last = [...messages].reverse().find((m) => m.role === 'user')
+          return { body: { id, question: last ? messageText(last) : '' } }
+        },
         onChatSendMessage: (response, { chatId }) => {
           runIdRef.current = response.headers.get('x-workflow-run-id')
           // Only an accepted question makes the conversation worth linking to.

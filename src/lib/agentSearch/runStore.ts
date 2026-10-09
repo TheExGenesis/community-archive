@@ -13,6 +13,8 @@ import type { Database, Json } from '@/database-types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { AgentSearchRun } from './types'
 
+export const MAX_CONVERSATION_RUNS = 50
+
 /** Tokens and spend to add to a run; every field is an increment. */
 export interface RunUsageDelta {
   inputTokens?: number
@@ -40,7 +42,10 @@ export interface AgentSearchRunStore {
   costSince(sinceIso: string): Promise<number>
   /** The member's runs, newest first, for the history list. */
   listRecent(accountId: string, limit: number): Promise<AgentSearchRun[]>
-  /** One conversation's runs, oldest first, for any account. */
+  /**
+   * One conversation's newest MAX_CONVERSATION_RUNS runs, oldest first, for
+   * any account.
+   */
   listConversation(conversationId: string): Promise<AgentSearchRun[]>
 }
 
@@ -198,6 +203,7 @@ export function createFileRunStore(
       return (await readAll())
         .filter((run) => run.conversationId === conversationId)
         .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+        .slice(-MAX_CONVERSATION_RUNS)
     },
   }
 }
@@ -271,7 +277,6 @@ function fromRow(row: RunRow): AgentSearchRun {
 }
 
 const COST_PAGE_SIZE = 1000
-const MAX_CONVERSATION_RUNS = 50
 
 /** Production store on public.agent_search_runs, service role only. */
 export function createSupabaseRunStore(
@@ -376,16 +381,17 @@ export function createSupabaseRunStore(
       )
     },
     async listConversation(conversationId) {
+      // The newest runs, so a long conversation keeps its latest turns.
       const { data, error } = await table()
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('started_at', { ascending: true })
+        .order('started_at', { ascending: false })
         .limit(MAX_CONVERSATION_RUNS)
       if (error)
         throw new Error(
           `Agent search conversation read failed: ${error.message}`,
         )
-      return (data ?? []).map(fromRow)
+      return (data ?? []).map(fromRow).reverse()
     },
   }
 }

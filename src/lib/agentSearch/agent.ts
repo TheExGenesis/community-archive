@@ -106,8 +106,9 @@ function json(value: unknown) {
   return { type: 'json' as const, value: value as never }
 }
 
-const compactList = (tweets: Array<AgentTweet & { p?: number }> = []) =>
-  tweets.map(compactTweet)
+const compactList = (
+  tweets: Array<AgentTweet & { p?: number }> | null | undefined,
+) => (tweets ?? []).filter(Boolean).map(compactTweet)
 
 type Executors = Partial<AgentSearchToolExecutors>
 
@@ -124,12 +125,14 @@ export function createAgentSearchTools(
         'Look up archive members by name or handle. Returns matching members and, for an exact handle, that account with its top tweets.',
       inputSchema: z.object({ query: z.string().min(1).max(80) }),
       execute: run.find_people,
+      // Also compacts earlier turns rebuilt from storage (context.ts), where
+      // people keep only handles and gone tweets are dropped.
       toModelOutput: ({ output }) =>
         json({
           members: output.members,
           user: output.user && {
             ...output.user,
-            topTweets: output.user.topTweets.slice(0, 3),
+            topTweets: (output.user.topTweets ?? []).slice(0, 3),
           },
         }),
     }),
@@ -201,7 +204,8 @@ export function createAgentSearchTools(
         'notFound' in output
           ? json({ notFound: true })
           : json({
-              tweet: compactTweet(output.tweet),
+              // Null when a rebuilt earlier turn's tweet is gone.
+              tweet: output.tweet ? compactTweet(output.tweet) : null,
               conversation: compactList(output.conversation),
             }),
     }),

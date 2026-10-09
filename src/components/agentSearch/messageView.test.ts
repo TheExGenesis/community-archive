@@ -8,8 +8,10 @@ import {
   buildTurnView,
   collectToolTweets,
   describeChatError,
+  formatElapsed,
   progressLines,
   receiptSegments,
+  searchSubject,
   toolCalls,
 } from './messageView'
 
@@ -161,6 +163,52 @@ describe('progressLines', () => {
     ])
     expect(toolCalls(message)[0].name).toBe('get_thread')
     expect(progressLines(message)[0].text).toBe('Thread not found')
+  })
+})
+
+describe('searchSubject', () => {
+  test('includes date range, order and paging so repeated searches differ', () => {
+    expect(
+      searchSubject({ query: 'bluesky', since: '2023-01-01', until: '2023-12-31' }),
+    ).toBe('“bluesky”, 2023')
+    expect(
+      searchSubject({ query: 'bluesky', since: '2023-01-01', until: '2024-01-01' }),
+    ).toBe('“bluesky”, 2023')
+    expect(searchSubject({ query: 'bluesky', sort: 'oldest' })).toBe(
+      '“bluesky”, oldest first',
+    )
+    expect(
+      searchSubject({
+        query: 'bluesky',
+        anyOf: ['bsky', 'bluesky'],
+        fromUser: '@x',
+        since: '2024-03-05',
+        sort: 'likes',
+        offset: 50,
+      }),
+    ).toBe('“bluesky”, “bsky” from @x, since 5 Mar 2024, most liked, more results')
+    expect(
+      searchSubject({ query: 'a', since: '2024-03-05', until: '2024-06-01' }),
+    ).toBe('“a”, 5 Mar 2024 to 1 Jun 2024')
+    expect(searchSubject({ query: 'a', sort: 'newest' })).toBe('“a”')
+    expect(searchSubject({ fromUser: 'x' })).toBe('posts from @x')
+    expect(searchSubject({})).toBeNull()
+  })
+
+  test('names a search with no words or people as browsing', () => {
+    const message = assistant('a1', [
+      toolPart('search_tweets', {}, { tweets: [tweet('1')] }),
+      toolPart('search_tweets', { until: '2020-01-01' }),
+    ])
+    expect(progressLines(message).map((line) => line.text)).toEqual([
+      'Browsed recent posts · 1 tweet',
+      'Browsing posts, before 1 Jan 2020',
+    ])
+  })
+
+  test('formats elapsed time as minutes and seconds', () => {
+    expect(formatElapsed(7_400)).toBe('0:07')
+    expect(formatElapsed(92_000)).toBe('1:32')
   })
 })
 

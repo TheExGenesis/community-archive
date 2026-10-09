@@ -47,20 +47,11 @@ export function ProgressList({
 
   // While the agent works, progress is the main thing on screen; afterwards
   // the steps fold away behind the answer.
+  // The status row above says the run started; this lists what it did.
   if (active) {
     return (
       <div aria-live="polite" aria-label="Search progress">
-        {lines.length ? (
-          list
-        ) : (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2
-              aria-hidden="true"
-              className="h-4 w-4 animate-spin motion-reduce:animate-none"
-            />
-            Planning searches
-          </p>
-        )}
+        {lines.length > 0 && list}
       </div>
     )
   }
@@ -232,6 +223,7 @@ export function AgentSearchTurn({
           ref={citedRef}
           citations={answer.citations}
           active={active}
+          found={view.topFound}
         />
       </EvidenceBoundary>
 
@@ -263,17 +255,20 @@ const CitedTweets = forwardRef<
   {
     citations: TurnView['answer']['citations']
     active: boolean
+    /** Shown while the run is still searching and nothing is cited yet. */
+    found: TurnView['topFound']
   }
->(function CitedTweets({ citations, active }, ref) {
+>(function CitedTweets({ citations, active, found }, ref) {
   if (!citations.length && !active) return null
+  const showFound = active && !citations.length && found.length > 0
   return (
     <aside
       ref={ref}
-      aria-label="Cited tweets"
+      aria-label={showFound ? 'Posts found so far' : 'Cited tweets'}
       className="lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
     >
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        Cited tweets
+        {showFound ? 'Posts found so far' : 'Cited tweets'}
         {citations.length > 0 && (
           <span className="ml-1.5 font-normal normal-case tracking-normal">
             ({citations.length})
@@ -301,6 +296,14 @@ const CitedTweets = forwardRef<
             </li>
           ))}
         </ol>
+      ) : showFound ? (
+        <ul className="space-y-3">
+          {found.map((tweet) => (
+            <li key={tweet.id}>
+              <TweetCard tweet={tweet} compact collapsible showDate />
+            </li>
+          ))}
+        </ul>
       ) : (
         <p className="hidden text-sm text-muted-foreground lg:block">
           Tweets appear here as the answer cites them.

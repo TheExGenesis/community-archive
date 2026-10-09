@@ -85,6 +85,10 @@ export interface TurnView {
   groups: EvidenceGroup[] | null
   receipt: ReceiptView
   coverage: CoverageView
+  /** Distinct posts this turn's finished tool calls returned. */
+  foundSoFar: number
+  /** The best few of those, for the side column while the answer is written. */
+  topFound: PortalTweet[]
 }
 
 type LooseRecord = Record<string, unknown>
@@ -102,6 +106,12 @@ const asNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
 const quote = (value: string) => `“${value}”`
+
+/** 0:07, 1:32, 12:05. */
+export function formatElapsed(ms: number) {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
 
 const plural = (n: number, word: string) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? word : `${word}s`}`
@@ -136,14 +146,82 @@ export function toolCalls(message: UIMessage): ToolCallView[] {
   return calls
 }
 
-function searchSubject(input: LooseRecord): string {
-  const query = asString(input.query)
+const dayFormat = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function formatDay(value: string) {
+  const date = new Date(`${value}T00:00:00Z`)
+  return Number.isFinite(date.getTime()) ? dayFormat.format(date) : value
+}
+
+/** "2023", "since 3 Jan 2023", "3 Jan to 5 Mar 2023"-style ranges. */
+export function dateRangeLabel(
+  since: string | undefined,
+  until: string | undefined,
+): string | null {
+  const from = since && DATE_ONLY.test(since) ? since : undefined
+  const to = until && DATE_ONLY.test(until) ? until : undefined
+  if (from && to) {
+    const [, fromYear, fromMonth, fromDay] = DATE_ONLY.exec(from) ?? []
+    const [, toYear, toMonth, toDay] = DATE_ONLY.exec(to) ?? []
+    if (fromYear === toYear && fromMonth === '01' && fromDay === '01') {
+      if (toMonth === '12' && toDay === '31') return fromYear
+    }
+    // Searches often end on the first of the next year.
+    if (
+      fromMonth === '01' &&
+      fromDay === '01' &&
+      toMonth === '01' &&
+      toDay === '01' &&
+      Number(toYear) === Number(fromYear) + 1
+    ) {
+      return fromYear
+    }
+    return `${formatDay(from)} to ${formatDay(to)}`
+  }
+  if (from) return `since ${formatDay(from)}`
+  if (to) return `before ${formatDay(to)}`
+  return null
+}
+
+const SORT_LABELS: Record<string, string> = {
+  oldest: 'oldest first',
+  likes: 'most liked',
+  reposts: 'most reposted',
+}
+
+const handle = (value: string) => `@${value.replace(/^@/, '')}`
+
+/** Date range, order and paging, so repeated searches read as different. */
+function searchQualifiers(input: LooseRecord): string[] {
+  const qualifiers: string[] = []
+  const range = dateRangeLabel(asString(input.since), asString(input.until))
+  if (range) qualifiers.push(range)
+  const sort = asString(input.sort)
+  if (sort && SORT_LABELS[sort]) qualifiers.push(SORT_LABELS[sort])
+  if ((asNumber(input.offset) ?? 0) > 0) qualifiers.push('more results')
+  return qualifiers
+}
+
+/** Null when the search has neither words nor people: a plain browse. */
+export function searchSubject(input: LooseRecord): string | null {
+  const words = [asString(input.query), ...asArray(input.anyOf).map(asString)]
+    .filter((word): word is string => Boolean(word))
+    .filter((word, index, all) => all.indexOf(word) === index)
   const from = asString(input.fromUser)
   const replyTo = asString(input.replyToUser)
-  const parts = [query ? quote(query) : 'posts']
-  if (from) parts.push(`from @${from.replace(/^@/, '')}`)
-  if (replyTo) parts.push(`replying to @${replyTo.replace(/^@/, '')}`)
-  return parts.join(' ')
+  const people: string[] = []
+  if (from) people.push(`from ${handle(from)}`)
+  if (replyTo) people.push(`replying to ${handle(replyTo)}`)
+  if (!words.length && !people.length) return null
+  const head = [words.length ? words.map(quote).join(', ') : 'posts', ...people]
+  return [head.join(' '), ...searchQualifiers(input)].join(', ')
 }
 
 function termsSubject(input: LooseRecord): string {
@@ -152,7 +230,10 @@ function termsSubject(input: LooseRecord): string {
     .filter((term): term is string => Boolean(term))
   const from = asString(input.fromUser)
   const subject = terms.length ? terms.map(quote).join(', ') : 'posts'
-  return from ? `${subject} from @${from.replace(/^@/, '')}` : subject
+  const range = dateRangeLabel(asString(input.since), asString(input.until))
+  return [from ? `${subject} from ${handle(from)}` : subject, range]
+    .filter(Boolean)
+    .join(', ')
 }
 
 const CRITERION_LIMIT = 140
@@ -190,12 +271,20 @@ export function progressLine(call: ToolCallView): ProgressLine {
     }
     case 'search_tweets': {
       const subject = searchSubject(input)
-      running = `Searching ${subject}`
-      finished = `Searched ${subject} · ${plural(
-        asArray(out.tweets).length,
-        'tweet',
-      )}`
-      failure = `Search for ${subject} failed`
+      const tweets = plural(asArray(out.tweets).length, 'tweet')
+      if (subject) {
+        running = `Searching ${subject}`
+        finished = `Searched ${subject} · ${tweets}`
+        failure = `Search for ${subject} failed`
+      } else {
+        const qualifiers = searchQualifiers(input)
+        const what = qualifiers.length
+          ? `posts, ${qualifiers.join(', ')}`
+          : 'recent posts'
+        running = `Browsing ${what}`
+        finished = `Browsed ${what} · ${tweets}`
+        failure = `Browsing ${what} failed`
+      }
       break
     }
     case 'collect_and_score': {
@@ -415,7 +504,7 @@ export function buildCoverage(calls: ToolCallView[]): CoverageView {
     switch (call.name) {
       case 'search_tweets':
         coverage.searches.push({
-          label: searchSubject(call.input),
+          label: searchSubject(call.input) ?? 'recent posts',
           detail: plural(asArray(out.tweets).length, 'tweet'),
         })
         break
@@ -539,8 +628,14 @@ export function buildTurnView(
       cappedAt,
     },
     coverage: buildCoverage(calls),
+    foundSoFar: own.results.length,
+    topFound: orderByScore(own.results, own.scores)
+      .slice(0, TOP_FOUND)
+      .map(tweetFor),
   }
 }
+
+const TOP_FOUND = 3
 
 /**
  * Optional grouping the agent may attach as message metadata:

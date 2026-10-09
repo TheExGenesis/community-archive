@@ -3,13 +3,14 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, MessageSquareText, Plus, Square } from 'lucide-react'
+import { ArrowUp, MessageSquareText, Plus } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
 import { AgentSearchTurn } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
+import { RunStatus } from './RunStatus'
 import { buildTurnView, describeChatError, messageText } from './messageView'
 
 export const EXAMPLE_QUESTIONS = [
@@ -22,6 +23,8 @@ export const EXAMPLE_QUESTIONS = [
 const MAX_QUESTION_LENGTH = 1000
 
 const newConversationId = () => crypto.randomUUID()
+
+const questionAnchor = (messageId: string) => `ask-question-${messageId}`
 
 /** Points the address bar at a conversation (or none) without a navigation. */
 function showConversationInUrl(id: string | null) {
@@ -53,6 +56,9 @@ export default function AgentSearch({
   const [loading, setLoading] = useState(Boolean(initialConversationId))
   const [loadError, setLoadError] = useState<string | null>(null)
   const [recent, setRecent] = useState<ConversationSummary[] | null>(null)
+  // Client clock when the current answer was asked for (or reopened), for the
+  // status row's timer.
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
 
   // The run id of the answer in progress, so Stop can cancel the workflow
   // instead of only closing the stream, and a reopened conversation can
@@ -147,6 +153,7 @@ export default function AgentSearch({
     setMessages(conversation.pending)
     if (conversation.runningRunId) {
       runIdRef.current = conversation.runningRunId
+      setRunStartedAt(Date.now())
       void resumeStream()
     }
     setConversation((current) =>
@@ -171,6 +178,7 @@ export default function AgentSearch({
 
   const busy = status === 'submitted' || status === 'streaming'
   const errorMessage = describeChatError(error)
+  const scrollToQuestionRef = useRef(false)
 
   // A refused POST (limit, eligibility) leaves the question with no reply.
   // Drop it from the thread and put it back in the box so nothing is lost.
@@ -200,8 +208,24 @@ export default function AgentSearch({
     if (error) clearError()
     setLoadError(null)
     setInput('')
+    setRunStartedAt(Date.now())
+    // A follow-up sent from the bottom of a long answer would otherwise
+    // start below the fold.
+    scrollToQuestionRef.current = messages.length > 0
     void sendMessage({ text })
   }
+
+  // Bring the new question to the top once, right after it is sent; later
+  // scrolling is the member's.
+  useEffect(() => {
+    if (!scrollToQuestionRef.current) return
+    const last = messages[messages.length - 1]
+    if (last?.role !== 'user') return
+    scrollToQuestionRef.current = false
+    document
+      .getElementById(questionAnchor(last.id))
+      ?.scrollIntoView({ block: 'start' })
+  }, [messages])
 
   const startNewConversation = () => {
     if (busy) return
@@ -257,23 +281,18 @@ export default function AgentSearch({
           onKeyDown={onKeyDown}
           maxLength={MAX_QUESTION_LENGTH}
           rows={hasThread ? 2 : 3}
+          disabled={busy}
           placeholder={
-            hasThread
-              ? 'Ask a follow-up'
-              : 'Ask about what people in the archive have said'
+            busy
+              ? 'You can ask a follow-up when this answer finishes'
+              : hasThread
+                ? 'Ask a follow-up'
+                : 'Ask about what people in the archive have said'
           }
-          className="min-h-[3rem] flex-1 resize-y bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
+          className="min-h-[3rem] flex-1 resize-y bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
         />
-        {busy ? (
-          <button
-            type="button"
-            onClick={stopRun}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Square aria-hidden="true" className="h-3.5 w-3.5" />
-            Stop
-          </button>
-        ) : (
+        {/* Stop lives in the status row above the answer, not here. */}
+        {!busy && (
           <button
             type="submit"
             disabled={!input.trim()}
@@ -379,35 +398,51 @@ export default function AgentSearch({
           <div className="space-y-10">
             {messages.map((message, index) => {
               if (message.role === 'user') {
+                const waiting = busy && index === lastIndex
                 return (
-                  <h2
+                  <div
                     key={message.id}
-                    className="whitespace-pre-wrap break-words border-t border-border pt-6 text-xl font-semibold leading-snug text-foreground first:border-t-0 first:pt-0"
+                    className="space-y-5 border-t border-border pt-6 first:border-t-0 first:pt-0"
                   >
-                    {messageText(message)}
-                  </h2>
+                    <h2
+                      id={questionAnchor(message.id)}
+                      className="scroll-mt-24 whitespace-pre-wrap break-words text-xl font-semibold leading-snug text-foreground"
+                    >
+                      {messageText(message)}
+                    </h2>
+                    {waiting && (
+                      <RunStatus
+                        startedAt={runStartedAt ?? Date.now()}
+                        found={0}
+                        writing={false}
+                        onStop={stopRun}
+                      />
+                    )}
+                  </div>
                 )
               }
               if (message.role !== 'assistant') return null
               const active = busy && index === lastIndex
+              const view = buildTurnView(messages, index, { streaming: active })
               return (
-                <EvidenceBoundary
-                  key={message.id}
-                  label="turn"
-                  fallback="This answer could not be shown."
-                >
-                  <AgentSearchTurn
-                    view={buildTurnView(messages, index, { streaming: active })}
-                    active={active}
-                  />
-                </EvidenceBoundary>
+                <div key={message.id} className="space-y-5">
+                  {active && (
+                    <RunStatus
+                      startedAt={runStartedAt ?? Date.now()}
+                      found={view.foundSoFar}
+                      writing={Boolean(view.answer.markdown.trim())}
+                      onStop={stopRun}
+                    />
+                  )}
+                  <EvidenceBoundary
+                    label="turn"
+                    fallback="This answer could not be shown."
+                  >
+                    <AgentSearchTurn view={view} active={active} />
+                  </EvidenceBoundary>
+                </div>
               )
             })}
-            {status === 'submitted' && messages[lastIndex]?.role === 'user' && (
-              <p aria-live="polite" className="text-sm text-muted-foreground">
-                Starting the search
-              </p>
-            )}
           </div>
         )}
 

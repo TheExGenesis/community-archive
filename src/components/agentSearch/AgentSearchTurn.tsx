@@ -1,9 +1,10 @@
 'use client'
 
-import { forwardRef, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
-import TweetCard from '@/components/TweetCard'
 import { AnswerMarkdown } from './AnswerMarkdown'
+import { CitationContext, type CitationLinks } from './CitationContext'
+import { CitationRail } from './CitationRail'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { EvidenceTabs, type EvidenceTab } from './EvidenceTabs'
 import {
@@ -180,6 +181,67 @@ export function AgentSearchTurn({
   const tab = chosenTab ?? (view.receipt.relevant > 0 ? 'relevant' : 'other')
   const evidenceRef = useRef<HTMLElement>(null)
   const citedRef = useRef<HTMLElement>(null)
+  const answerRef = useRef<HTMLDivElement>(null)
+
+  const [selected, setSelected] = useState<CitationLinks['selected']>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
+  const [inView, setInView] = useState<ReadonlySet<string>>(new Set())
+  const links = useMemo<CitationLinks>(
+    () => ({
+      selected,
+      hovered,
+      inView,
+      select: (anchor) =>
+        setSelected((current) => ({ anchor, seq: (current?.seq ?? 0) + 1 })),
+      hover: setHovered,
+    }),
+    [selected, hovered, inView],
+  )
+
+  // The paragraph nearest the middle of the screen marks its citations, so
+  // the rail can follow the reader.
+  const answerKey = active ? '' : answer.markdown
+  useEffect(() => {
+    const root = answerRef.current
+    if (!root || !answerKey || typeof IntersectionObserver === 'undefined') {
+      return
+    }
+    const blocks = Array.from(
+      root.querySelectorAll<HTMLElement>('p, li'),
+    ).filter((block) => block.querySelector('a[href^="#ask-"]'))
+    const visible = new Set<HTMLElement>()
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const block = entry.target as HTMLElement
+          if (entry.isIntersecting) visible.add(block)
+          else visible.delete(block)
+        }
+        // The innermost visible block: a list item's paragraph, not the list.
+        const block = Array.from(visible).find(
+          (candidate) =>
+            !Array.from(visible).some(
+              (other) => other !== candidate && candidate.contains(other),
+            ),
+        )
+        const anchors = new Set(
+          Array.from(
+            block?.querySelectorAll<HTMLAnchorElement>('a[href^="#ask-"]') ??
+              [],
+          ).map((chip) => chip.getAttribute('href')!.slice(1)),
+        )
+        setInView((current) =>
+          current.size === anchors.size &&
+          Array.from(anchors).every((anchor) => current.has(anchor))
+            ? current
+            : anchors,
+        )
+      },
+      { rootMargin: '-45% 0px -45% 0px' },
+    )
+    blocks.forEach((block) => observer.observe(block))
+    return () => observer.disconnect()
+  }, [answerKey])
 
   const showTier = (target: ReceiptTarget) => {
     if (target === 'cited') {
@@ -200,120 +262,62 @@ export function AgentSearchTurn({
   // beside it so a citation and its tweet are both on screen. Narrow screens:
   // the cited tweets follow the answer.
   return (
-    <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
-      <div className="min-w-0 space-y-5 lg:col-start-1">
-        {!active && <Receipt receipt={view.receipt} onSelect={showTier} />}
-        <ProgressList lines={view.progress} active={active && !hasAnswer} />
+    <CitationContext.Provider value={links}>
+      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
+        <div className="min-w-0 space-y-5 lg:col-start-1">
+          {!active && <Receipt receipt={view.receipt} onSelect={showTier} />}
+          <ProgressList lines={view.progress} active={active && !hasAnswer} />
 
-        {hasAnswer && (
-          <div className="break-words text-base text-foreground">
-            <AnswerMarkdown>{answer.markdown}</AnswerMarkdown>
-          </div>
-        )}
+          {hasAnswer && (
+            <div
+              ref={answerRef}
+              className="break-words text-base text-foreground"
+            >
+              <AnswerMarkdown>{answer.markdown}</AnswerMarkdown>
+            </div>
+          )}
 
-        {!active && answer.unverified.length > 0 && (
-          <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-            {answer.unverified.length === 1
-              ? 'One citation points to a post the searches never returned, so it is marked unverified: '
-              : `${answer.unverified.length} citations point to posts the searches never returned, so they are marked unverified: `}
-            <span className="break-all font-mono text-xs">
-              {answer.unverified.join(', ')}
-            </span>
-          </p>
+          {!active && answer.unverified.length > 0 && (
+            <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              {answer.unverified.length === 1
+                ? 'One citation points to a post the searches never returned, so it is marked unverified: '
+                : `${answer.unverified.length} citations point to posts the searches never returned, so they are marked unverified: `}
+              <span className="break-all font-mono text-xs">
+                {answer.unverified.join(', ')}
+              </span>
+            </p>
+          )}
+        </div>
+
+        <EvidenceBoundary label="cited tweets">
+          <CitationRail
+            ref={citedRef}
+            citations={answer.citations}
+            active={active}
+            found={view.topFound}
+          />
+        </EvidenceBoundary>
+
+        {!active && (
+          <section
+            ref={evidenceRef}
+            aria-label="Evidence"
+            className="min-w-0 scroll-mt-24 lg:col-start-1"
+          >
+            <EvidenceBoundary label="evidence">
+              <EvidenceTabs
+                tab={tab}
+                onTabChange={setTab}
+                relevant={view.relevant}
+                relevantTotal={view.receipt.relevant}
+                otherMatches={view.otherMatches}
+                groups={view.groups}
+                footer={<SearchDetails coverage={view.coverage} />}
+              />
+            </EvidenceBoundary>
+          </section>
         )}
       </div>
-
-      <EvidenceBoundary label="cited tweets">
-        <CitedTweets
-          ref={citedRef}
-          citations={answer.citations}
-          active={active}
-          found={view.topFound}
-        />
-      </EvidenceBoundary>
-
-      {!active && (
-        <section
-          ref={evidenceRef}
-          aria-label="Evidence"
-          className="min-w-0 scroll-mt-24 lg:col-start-1"
-        >
-          <EvidenceBoundary label="evidence">
-            <EvidenceTabs
-              tab={tab}
-              onTabChange={setTab}
-              relevant={view.relevant}
-              relevantTotal={view.receipt.relevant}
-              otherMatches={view.otherMatches}
-              groups={view.groups}
-              footer={<SearchDetails coverage={view.coverage} />}
-            />
-          </EvidenceBoundary>
-        </section>
-      )}
-    </div>
+    </CitationContext.Provider>
   )
 }
-
-const CitedTweets = forwardRef<
-  HTMLElement,
-  {
-    citations: TurnView['answer']['citations']
-    active: boolean
-    /** Shown while the run is still searching and nothing is cited yet. */
-    found: TurnView['topFound']
-  }
->(function CitedTweets({ citations, active, found }, ref) {
-  if (!citations.length && !active) return null
-  const showFound = active && !citations.length && found.length > 0
-  return (
-    <aside
-      ref={ref}
-      aria-label={showFound ? 'Posts found so far' : 'Cited tweets'}
-      className="lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
-    >
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {showFound ? 'Posts found so far' : 'Cited tweets'}
-        {citations.length > 0 && (
-          <span className="ml-1.5 font-normal normal-case tracking-normal">
-            ({citations.length})
-          </span>
-        )}
-      </h3>
-      {citations.length ? (
-        <ol className="space-y-3">
-          {citations.map((citation) => (
-            <li
-              key={citation.id}
-              id={citation.anchor}
-              tabIndex={-1}
-              className="flex scroll-mt-4 gap-2 rounded-lg target:ring-2 target:ring-brand/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span
-                aria-label={`Citation ${citation.n}`}
-                className="min-w-5 mt-3 inline-flex h-5 shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold text-foreground"
-              >
-                {citation.n}
-              </span>
-              <div className="min-w-0 flex-1">
-                <TweetCard tweet={citation.tweet} showDate showExternalLink />
-              </div>
-            </li>
-          ))}
-        </ol>
-      ) : showFound ? (
-        <ul className="space-y-3">
-          {found.map((tweet) => (
-            <li key={tweet.id}>
-              <TweetCard tweet={tweet} compact collapsible showDate />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="hidden text-sm text-muted-foreground lg:block">
-          Tweets appear here as the answer cites them.
-        </p>
-      )}
-    </aside>
-  )
-})

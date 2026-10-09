@@ -9,6 +9,7 @@ import {
   collectToolTweets,
   describeChatError,
   progressLines,
+  receiptSegments,
   toolCalls,
 } from './messageView'
 
@@ -213,7 +214,8 @@ describe('collectToolTweets', () => {
     expect(found.byId.get('501')?.username).toBe('patio11')
 
     const view = buildTurnView(messages, 0)
-    expect(view.otherTweets.map((t) => t.id)).toEqual([])
+    expect(view.relevant).toEqual([])
+    expect(view.otherMatches).toEqual([])
     expect(view.answer.citations.map((c) => c.id)).toEqual(['501', '1'])
     expect(view.answer.unverified).toEqual([])
   })
@@ -333,8 +335,109 @@ describe('buildTurnView', () => {
     expect(answerText(messages[3])).toBe('Also [[t:3]] and earlier [[t:2]].')
     expect(view.answer.citations.map((c) => c.id)).toEqual(['3', '2'])
     expect(view.answer.unverified).toEqual([])
-    expect(view.otherTweets.map((t) => t.id)).toEqual(['4'])
+    expect(view.relevant.map((t) => t.id)).toEqual(['4'])
+    expect(view.otherMatches).toEqual([])
     expect(view.progress).toHaveLength(1)
+  })
+
+  test('splits uncited results into relevant and other matches by score', () => {
+    const messages: UIMessage[] = [
+      assistant('a1', [
+        toolPart(
+          'search_tweets',
+          { query: 'archive' },
+          {
+            tweets: [
+              scored('1', 0.9),
+              scored('2', 0.6),
+              scored('3', 0.2),
+              tweet('4'),
+              tweet('5'),
+              tweet('6'),
+            ],
+          },
+        ),
+        text('Answer [[t:6]]'),
+      ]),
+    ]
+    const view = buildTurnView(messages, 0)
+    expect(view.answer.citations.map((c) => c.id)).toEqual(['6'])
+    expect(view.relevant.map((t) => t.id)).toEqual(['1', '2'])
+    expect(view.otherMatches.map((t) => t.id)).toEqual(['3', '4', '5'])
+    expect(view.receipt).toEqual({
+      cited: 1,
+      relevant: 2,
+      other: 3,
+      searches: 1,
+      scorerRan: true,
+      cappedAt: null,
+    })
+  })
+
+  test('counts relevant posts a capped check did not return', () => {
+    const messages: UIMessage[] = [
+      assistant('a1', [
+        toolPart(
+          'collect_and_score',
+          { terms: ['bluesky'], criterion: 'c' },
+          {
+            collected: 300,
+            limit: 300,
+            capped: true,
+            scored: 300,
+            keptCount: 5,
+            kept: [scored('1', 0.9), scored('2', 0.8)],
+          },
+        ),
+        text('Answer [[t:1]]'),
+      ]),
+    ]
+    const view = buildTurnView(messages, 0)
+    expect(view.relevant.map((t) => t.id)).toEqual(['2'])
+    expect(view.relevantNotShown).toBe(3)
+    expect(receiptSegments(view.receipt).map((s) => s.text)).toEqual([
+      'Based on 1 cited post',
+      '4 more judged relevant',
+      'stopped at the 300-post limit',
+    ])
+  })
+
+  test('describes coverage without a scorer as matches from searches', () => {
+    expect(
+      receiptSegments({
+        cited: 22,
+        relevant: 0,
+        other: 130,
+        searches: 4,
+        scorerRan: false,
+        cappedAt: null,
+      }),
+    ).toEqual([
+      { text: 'Based on 22 cited posts', target: 'cited' },
+      { text: '130 other matches from 4 searches', target: 'other' },
+    ])
+  })
+
+  test('reads agent-chosen groups from message metadata', () => {
+    const messages: UIMessage[] = [
+      {
+        ...assistant('a1', [
+          toolPart('search_tweets', { query: 'x' }, { tweets: [tweet('1'), tweet('2')] }),
+          text('Answer'),
+        ]),
+        metadata: {
+          groups: [
+            { label: 'Moved early', tweetIds: ['1', '999'] },
+            { label: 'Unknown', tweetIds: ['998'] },
+          ],
+        },
+      },
+    ]
+    const view = buildTurnView(messages, 0)
+    expect(view.groups).toEqual([
+      { label: 'Moved early', tweets: [expect.objectContaining({ id: '1' })] },
+    ])
+    expect(buildTurnView([assistant('a2', [text('x')])], 0).groups).toBeNull()
   })
 })
 

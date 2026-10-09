@@ -1,18 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { forwardRef, useRef, useState } from 'react'
 import { Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { AnswerMarkdown } from './AnswerMarkdown'
 import { EvidenceBoundary } from './EvidenceBoundary'
+import { EvidenceTabs, type EvidenceTab } from './EvidenceTabs'
 import {
   NOT_SEARCHED_LINE,
+  receiptSegments,
   type CoverageView,
   type ProgressLine,
+  type ReceiptTarget,
   type TurnView,
 } from './messageView'
-
-const OTHER_PAGE_SIZE = 30
 
 export function ProgressList({
   lines,
@@ -126,43 +127,50 @@ export function CoverageBlock({ coverage }: { coverage: CoverageView }) {
   )
 }
 
-function OtherPosts({ tweets }: { tweets: TurnView['otherTweets'] }) {
-  const [open, setOpen] = useState(false)
-  const [shown, setShown] = useState(OTHER_PAGE_SIZE)
-  if (!tweets.length) return null
+/** One muted line under the question: what the answer rests on. */
+function Receipt({
+  receipt,
+  onSelect,
+}: {
+  receipt: TurnView['receipt']
+  onSelect: (target: ReceiptTarget) => void
+}) {
+  const segments = receiptSegments(receipt)
   return (
-    <details
-      className="group"
-      onToggle={(event) => setOpen(event.currentTarget.open)}
-    >
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm text-sm font-medium text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+    <p className="text-sm text-muted-foreground">
+      {segments.map((segment, index) => (
+        <span key={segment.text}>
+          {index > 0 && <span aria-hidden="true"> · </span>}
+          {segment.target ? (
+            <button
+              type="button"
+              onClick={() => onSelect(segment.target as ReceiptTarget)}
+              className="rounded-sm underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {segment.text}
+            </button>
+          ) : (
+            segment.text
+          )}
+        </span>
+      ))}
+    </p>
+  )
+}
+
+function SearchDetails({ coverage }: { coverage: CoverageView }) {
+  return (
+    <details className="group mt-4">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden="true"
           className="h-4 w-4 transition-transform group-open:rotate-90 motion-reduce:transition-none"
         />
-        Other posts the search found ({tweets.length.toLocaleString('en-US')})
+        How this was searched
       </summary>
-      {/* Cards mount only when opened: a run can return hundreds of posts. */}
-      {open && (
-        <div className="mt-3">
-          <ul className="space-y-3">
-            {tweets.slice(0, shown).map((tweet) => (
-              <li key={tweet.id}>
-                <TweetCard tweet={tweet} compact collapsible showDate />
-              </li>
-            ))}
-          </ul>
-          {shown < tweets.length && (
-            <button
-              type="button"
-              onClick={() => setShown((count) => count + OTHER_PAGE_SIZE)}
-              className="mt-3 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Show {Math.min(OTHER_PAGE_SIZE, tweets.length - shown)} more
-            </button>
-          )}
-        </div>
-      )}
+      <div className="mt-2">
+        <CoverageBlock coverage={coverage} />
+      </div>
     </details>
   )
 }
@@ -176,12 +184,29 @@ export function AgentSearchTurn({
 }) {
   const { answer } = view
   const hasAnswer = Boolean(answer.markdown.trim())
+  // Until the member picks a tab, open the strongest tier that has posts.
+  const [chosenTab, setTab] = useState<EvidenceTab | null>(null)
+  const tab =
+    chosenTab ?? (view.receipt.relevant > 0 ? 'relevant' : 'other')
+  const evidenceRef = useRef<HTMLElement>(null)
+  const citedRef = useRef<HTMLElement>(null)
+
+  const showTier = (target: ReceiptTarget) => {
+    if (target === 'cited') {
+      citedRef.current?.scrollIntoView({ block: 'start' })
+      return
+    }
+    setTab(target)
+    evidenceRef.current?.scrollIntoView({ block: 'start' })
+  }
+
   // Wide screens: the answer on the left, cited tweets in a sticky column
   // beside it so a citation and its tweet are both on screen. Narrow screens:
   // the cited tweets follow the answer.
   return (
     <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
       <div className="min-w-0 space-y-5 lg:col-start-1">
+        {!active && <Receipt receipt={view.receipt} onSelect={showTier} />}
         <ProgressList lines={view.progress} active={active && !hasAnswer} />
 
         {hasAnswer && (
@@ -203,31 +228,47 @@ export function AgentSearchTurn({
       </div>
 
       <EvidenceBoundary label="cited tweets">
-        <CitedTweets citations={answer.citations} active={active} />
+        <CitedTweets
+          ref={citedRef}
+          citations={answer.citations}
+          active={active}
+        />
       </EvidenceBoundary>
 
       {!active && (
-        <div className="min-w-0 space-y-5 lg:col-start-1">
-          <EvidenceBoundary label="other posts">
-            <OtherPosts tweets={view.otherTweets} />
+        <section
+          ref={evidenceRef}
+          aria-label="Evidence"
+          className="min-w-0 scroll-mt-24 lg:col-start-1"
+        >
+          <EvidenceBoundary label="evidence">
+            <EvidenceTabs
+              tab={tab}
+              onTabChange={setTab}
+              relevant={view.relevant}
+              relevantTotal={view.receipt.relevant}
+              otherMatches={view.otherMatches}
+              groups={view.groups}
+              footer={<SearchDetails coverage={view.coverage} />}
+            />
           </EvidenceBoundary>
-          <CoverageBlock coverage={view.coverage} />
-        </div>
+        </section>
       )}
     </div>
   )
 }
 
-function CitedTweets({
-  citations,
-  active,
-}: {
-  citations: TurnView['answer']['citations']
-  active: boolean
-}) {
+const CitedTweets = forwardRef<
+  HTMLElement,
+  {
+    citations: TurnView['answer']['citations']
+    active: boolean
+  }
+>(function CitedTweets({ citations, active }, ref) {
   if (!citations.length && !active) return null
   return (
     <aside
+      ref={ref}
       aria-label="Cited tweets"
       className="lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
     >
@@ -267,4 +308,4 @@ function CitedTweets({
       )}
     </aside>
   )
-}
+})

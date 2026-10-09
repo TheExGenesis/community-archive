@@ -54,10 +54,36 @@ export interface CoverageView {
   quotesRead: number
 }
 
+/** An agent-chosen heading over some of the posts it found. */
+export interface EvidenceGroup {
+  label: string
+  tweets: PortalTweet[]
+}
+
+/** The counts behind "Based on 16 cited posts · 99 more judged relevant". */
+export interface ReceiptView {
+  cited: number
+  /** Judged relevant and not cited, including posts the tools did not return. */
+  relevant: number
+  other: number
+  searches: number
+  scorerRan: boolean
+  /** The post limit a check stopped at, when one did. */
+  cappedAt: number | null
+}
+
 export interface TurnView {
   progress: ProgressLine[]
   answer: AnswerView
-  otherTweets: PortalTweet[]
+  /** Found posts judged relevant (p >= 0.5) that the answer does not cite. */
+  relevant: PortalTweet[]
+  /** Judged relevant but not returned to the page (each check returns 60). */
+  relevantNotShown: number
+  /** Every other search hit: not scored, or scored below the threshold. */
+  otherMatches: PortalTweet[]
+  /** Agent-chosen grouping of the relevant posts, when the run supplies one. */
+  groups: EvidenceGroup[] | null
+  receipt: ReceiptView
   coverage: CoverageView
 }
 
@@ -469,17 +495,113 @@ export function buildTurnView(
   const own = collectToolTweets(ownOutputs)
   const answer = buildAnswer(answerText(message), found, message.id, options)
   const cited = new Set(answer.citations.map((citation) => citation.id))
-  const otherTweets = orderByScore(
+  const uncited = orderByScore(
     own.results.filter((id) => !cited.has(id)),
     own.scores,
-  ).map((id) => own.byId.get(id) as PortalTweet)
+  )
+  const isRelevant = (id: string) => (own.scores.get(id) ?? 0) >= KEPT_P
+  const tweetFor = (id: string) => own.byId.get(id) as PortalTweet
+  const relevant = uncited.filter(isRelevant).map(tweetFor)
+  const otherMatches = uncited.filter((id) => !isRelevant(id)).map(tweetFor)
+
+  let relevantNotShown = 0
+  let searches = 0
+  let cappedAt: number | null = null
+  for (const call of calls) {
+    if (call.state !== 'output-available') continue
+    const out = isRecord(call.output) ? call.output : {}
+    if (call.name === 'search_tweets') searches += 1
+    if (call.name === 'collect_and_score') {
+      searches += 1
+      relevantNotShown += Math.max(
+        0,
+        collectKept(out) - asArray(out.kept).length,
+      )
+      if (out.capped) {
+        cappedAt = asNumber(out.limit) ?? asNumber(call.input.maxTweets) ?? DEFAULT_COLLECT
+      }
+    }
+  }
 
   return {
     progress: calls.map(progressLine),
     answer,
-    otherTweets,
+    relevant,
+    relevantNotShown,
+    otherMatches,
+    groups: evidenceGroups(message, found),
+    receipt: {
+      cited: answer.citations.length,
+      relevant: relevant.length + relevantNotShown,
+      other: otherMatches.length,
+      searches,
+      scorerRan: own.scores.size > 0,
+      cappedAt,
+    },
     coverage: buildCoverage(calls),
   }
+}
+
+/**
+ * Optional grouping the agent may attach as message metadata:
+ * `{ groups: [{ label, tweetIds }] }`. Ids the tools never returned are
+ * dropped, and an empty result means no grouping.
+ */
+function evidenceGroups(
+  message: UIMessage,
+  found: FoundTweets,
+): EvidenceGroup[] | null {
+  const metadata = isRecord(message.metadata) ? message.metadata : {}
+  const groups = asArray(metadata.groups).flatMap((group) => {
+    if (!isRecord(group)) return []
+    const label = asString(group.label)
+    if (!label) return []
+    const tweets = asArray(group.tweetIds)
+      .map((id) => (typeof id === 'string' ? found.byId.get(id) : undefined))
+      .filter((tweet): tweet is PortalTweet => Boolean(tweet))
+    return tweets.length ? [{ label, tweets }] : []
+  })
+  return groups.length ? groups : null
+}
+
+export type ReceiptTarget = 'cited' | 'relevant' | 'other'
+
+/** One line under the question; each count can link to its tier. */
+export function receiptSegments(
+  receipt: ReceiptView,
+): Array<{ text: string; target: ReceiptTarget | null }> {
+  const segments: Array<{ text: string; target: ReceiptTarget | null }> = [
+    receipt.cited
+      ? { text: `Based on ${plural(receipt.cited, 'cited post')}`, target: 'cited' }
+      : { text: 'No posts cited', target: null },
+  ]
+  if (receipt.scorerRan && receipt.relevant) {
+    segments.push({
+      text: `${receipt.relevant.toLocaleString('en-US')} more judged relevant`,
+      target: 'relevant',
+    })
+  }
+  if (receipt.other) {
+    const matches = `${receipt.other.toLocaleString('en-US')} other ${
+      receipt.other === 1 ? 'match' : 'matches'
+    }`
+    segments.push({
+      text:
+        !receipt.scorerRan && receipt.searches
+          ? `${matches} from ${receipt.searches} ${
+              receipt.searches === 1 ? 'search' : 'searches'
+            }`
+          : matches,
+      target: 'other',
+    })
+  }
+  if (receipt.cappedAt) {
+    segments.push({
+      text: `stopped at the ${receipt.cappedAt.toLocaleString('en-US')}-post limit`,
+      target: null,
+    })
+  }
+  return segments
 }
 
 /** Scored posts first, highest probability first; the rest keep search order. */

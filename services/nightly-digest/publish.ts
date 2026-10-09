@@ -630,17 +630,53 @@ export async function publishNightlyDigest(
   }
 }
 
+/** Retry infrastructure failures through the date-idempotent entry point. */
+export async function publishNightlyDigestWithRetries(
+  options: Parameters<typeof publishNightlyDigest>[0] = {},
+) {
+  // Resolve once so a delayed retry cannot switch to another editorial date.
+  const digestDate = options.digestDate ?? getLatestCompletedDigestDate()
+  const delays = options.dryRun ? [] : [60_000, 300_000]
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await publishNightlyDigest({ ...options, digestDate })
+    } catch (error) {
+      const message = describeError(error)
+      const transient =
+        /^(ClickHouse analytics|Supabase) request failed \((429|5\d\d)\)/.test(
+          message,
+        ) ||
+        (error instanceof Error &&
+          (error.name === 'TimeoutError' ||
+            /^(fetch failed|Failed to fetch|The socket connection was closed unexpectedly)/i.test(
+              message,
+            )))
+      const delayMs = delays[attempt]
+      if (!transient || delayMs === undefined) throw error
+      log('publisher retry scheduled', {
+        digestDate,
+        attempt: attempt + 1,
+        nextAttempt: attempt + 2,
+        delayMs,
+        error: message,
+      })
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+}
+
 if (process.argv[1]?.endsWith('/nightly-digest/publish.ts')) {
   const args = process.argv.slice(2)
   const dateIndex = args.indexOf('--date')
-  const digestDate = dateIndex >= 0 ? args[dateIndex + 1] : undefined
+  const digestDate =
+    dateIndex >= 0 ? args[dateIndex + 1] : getLatestCompletedDigestDate()
 
-  publishNightlyDigest({
+  publishNightlyDigestWithRetries({
     digestDate,
     dryRun: args.includes('--dry-run'),
   }).catch((error) => {
     log('publisher failed', {
-      digestDate: digestDate ?? null,
+      digestDate,
       error: describeError(error),
     })
     process.exitCode = 1

@@ -305,18 +305,18 @@ export function progressLine(call: ToolCallView): ProgressLine {
       running = `Checking up to ${plural(limit, 'post')} matching ${subject}${question}`
       finished = `Checked ${plural(asNumber(out.scored) ?? 0, 'post')} matching ${subject} · ${collectKept(
         out,
-      )} kept${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-post limit` : ''}`
+      )} relevant${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-post limit` : ''}`
       failure = `Checking posts matching ${subject} failed`
       break
     }
     case 'score_tweets': {
       const scored = asArray(out.scored)
       const count = asArray(input.tweetIds).length
-      running = count ? `Scoring ${plural(count, 'post')}` : 'Scoring posts'
-      finished = `Scored ${plural(scored.length, 'post')} · ${keptCount(
+      running = `Checking ${count ? plural(count, 'post') : 'posts'} against your question`
+      finished = `Checked ${plural(scored.length, 'post')} against your question · ${keptCount(
         scored,
-      )} kept`
-      failure = 'Scoring posts failed'
+      )} relevant`
+      failure = 'Checking posts against your question failed'
       break
     }
     case 'get_thread': {

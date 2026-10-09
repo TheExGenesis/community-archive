@@ -291,6 +291,31 @@ export default function AgentSearch({
     void sendMessage({ text })
   }
 
+  // A member waiting a minute switches tabs: say in the tab title that the
+  // answer is ready, and put the title back when they return.
+  const wasBusyRef = useRef(false)
+  useEffect(() => {
+    if (busy) {
+      wasBusyRef.current = true
+      return
+    }
+    if (!wasBusyRef.current) return
+    wasBusyRef.current = false
+    if (status !== 'ready' || !document.hidden) return
+    const original = document.title
+    document.title = 'Answer ready · Ask the archive'
+    const restore = () => {
+      if (document.hidden) return
+      document.title = original
+      document.removeEventListener('visibilitychange', restore)
+    }
+    document.addEventListener('visibilitychange', restore)
+    return () => {
+      document.removeEventListener('visibilitychange', restore)
+      document.title = original
+    }
+  }, [busy, status])
+
   // Bring the new question to the top once, right after it is sent; later
   // scrolling is the member's.
   useEffect(() => {

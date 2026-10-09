@@ -115,8 +115,8 @@ describe('progressLines', () => {
       progressLines(message).map((line) => [line.status, line.text]),
     ).toEqual([
       ['done', 'Searched “community archive” from @alice · 2 tweets'],
-      ['done', 'Checked 412 posts matching “archive”, “CA” · 31 kept'],
-      ['done', 'Scored 2 posts · 1 kept'],
+      ['done', 'Checked 412 posts matching “archive”, “CA” · 31 relevant'],
+      ['done', 'Checked 2 posts against your question · 1 relevant'],
       ['done', 'Read thread · 2 posts'],
       ['done', 'Read quotes · 1 post'],
       ['error', 'Could not fetch posts'],
@@ -146,7 +146,7 @@ describe('progressLines', () => {
       }),
     ])
     expect(progressLines(done)[0].text).toBe(
-      'Checked 300 posts matching “book” from @patio11 · 12 kept · stopped at the 300-post limit',
+      'Checked 300 posts matching “book” from @patio11 · 12 relevant · stopped at the 300-post limit',
     )
   })
 

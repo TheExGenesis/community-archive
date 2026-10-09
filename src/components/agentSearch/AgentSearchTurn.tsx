@@ -268,7 +268,7 @@ export function AgentSearchTurn({
           {hasAnswer && (
             <div
               ref={answerRef}
-              className="break-words text-base text-foreground"
+              className="max-w-[68ch] break-words text-base text-foreground"
             >
               <AnswerMarkdown>{answer.markdown}</AnswerMarkdown>
             </div>

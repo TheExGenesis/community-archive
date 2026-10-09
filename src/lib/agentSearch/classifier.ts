@@ -1,9 +1,10 @@
-import { generateText, Output } from 'ai'
+import { generateText, Output, type LanguageModelUsage } from 'ai'
 import { z } from 'zod'
 import {
   agentSearchScorerModelSpec,
   createProviderModel,
   estimateModelCostUsd,
+  scorerPriceEnv,
 } from './model'
 
 // Scores how well each tweet answers a criterion, as P(yes). The default is
@@ -47,23 +48,47 @@ const PREAMBLE =
   'Judge only what the author wrote; when a parent tweet is given, use it only ' +
   'to understand what the reply refers to.'
 
-async function inBatches<T, R>(
+/**
+ * A scoring failure that still cost money: `costUsd` is what the calls that
+ * succeeded before the failure spent, so the run can record it.
+ */
+export class ScoringError extends Error {
+  constructor(
+    message: string,
+    readonly costUsd: number,
+  ) {
+    super(message)
+    this.name = 'ScoringError'
+  }
+}
+
+/**
+ * Runs every batch, `concurrency` at a time, and waits for all of them even
+ * when one fails, so no paid call is still in flight (and uncounted) when
+ * the error is thrown. Rethrows the first failure.
+ */
+async function inBatches<T>(
   items: T[],
   size: number,
   concurrency: number,
-  run: (batch: T[]) => Promise<R>,
-): Promise<R[]> {
+  run: (batch: T[]) => Promise<void>,
+): Promise<void> {
   const batches: T[][] = []
   for (let i = 0; i < items.length; i += size)
     batches.push(items.slice(i, i + size))
-  const results: R[] = []
-  for (let i = 0; i < batches.length; i += concurrency) {
-    results.push(
-      ...(await Promise.all(batches.slice(i, i + concurrency).map(run))),
+  let failure: unknown = null
+  for (let i = 0; i < batches.length && !failure; i += concurrency) {
+    const settled = await Promise.allSettled(
+      batches.slice(i, i + concurrency).map(run),
     )
+    const rejected = settled.find((result) => result.status === 'rejected')
+    if (rejected) failure = (rejected as PromiseRejectedResult).reason
   }
-  return results
+  if (failure) throw failure
 }
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
 
 async function eachWithConcurrency<T>(
   items: T[],
@@ -118,13 +143,18 @@ async function scoreWithDecisions(
         return null
       })
       if (response?.ok) {
-        const body = (await response.json()) as {
+        // A body that fails to parse is a lost post, never a thrown error
+        // that would drop the batch's recorded cost.
+        const body = (await response.json().catch((error: unknown) => {
+          lastError = errorMessage(error)
+          return null
+        })) as {
           answers?: Array<{ name?: string; probability?: number }>
           usage?: { input_tokens?: number }
-        }
-        const p = body.answers?.find((a) => a.name === 'match')?.probability
+        } | null
+        const p = body?.answers?.find((a) => a.name === 'match')?.probability
         if (typeof p === 'number' && p >= 0 && p <= 1) scores.set(item.id, p)
-        inputTokens += body.usage?.input_tokens ?? 0
+        inputTokens += body?.usage?.input_tokens ?? 0
         return
       }
       if (response) lastError = `status ${response.status}`
@@ -140,18 +170,16 @@ async function scoreWithDecisions(
     }
     failures++
   })
+  const costUsd = (inputTokens / 1_000_000) * DECISIONS_USD_PER_MTOK
   // A few lost posts are acceptable; a mostly failed batch is an error the
   // agent should see rather than an empty result.
   if (failures > 0 && failures >= items.length / 10) {
-    throw new Error(
+    throw new ScoringError(
       `Decisions scoring failed for ${failures} of ${items.length} posts (${lastError})`,
+      costUsd,
     )
   }
-  return {
-    scores,
-    scorer: 'decisions',
-    costUsd: (inputTokens / 1_000_000) * DECISIONS_USD_PER_MTOK,
-  }
+  return { scores, scorer: 'decisions', costUsd }
 }
 
 async function scoreWithJev(
@@ -206,6 +234,8 @@ async function scoreWithJev(
       if (typeof p === 'number' && p >= 0 && p <= 1) scores.set(item.id, p)
     })
     costUsd += typeof body.usage?.cost === 'number' ? body.usage.cost : 0
+  }).catch((error: unknown) => {
+    throw new ScoringError(`Jev scoring failed: ${errorMessage(error)}`, costUsd)
   })
   return { scores, scorer: 'jev', costUsd }
 }
@@ -234,6 +264,17 @@ async function scoreWithLlm(
   const model = createProviderModel(spec)
   const scores = new Map<string, number>()
   let costUsd = 0
+  const charge = (usage: LanguageModelUsage | undefined) => {
+    costUsd += estimateModelCostUsd(
+      spec,
+      {
+        inputTokens: usage?.inputTokens,
+        cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens,
+        outputTokens: usage?.outputTokens,
+      },
+      scorerPriceEnv(),
+    )
+  }
   await inBatches(items, LLM_BATCH, LLM_CONCURRENCY, async (batch) => {
     const result = await generateText({
       model,
@@ -256,23 +297,18 @@ async function scoreWithLlm(
             : {}),
         })),
       }),
+    }).catch((error: unknown) => {
+      // An unparseable answer was still generated and billed.
+      charge((error as { usage?: LanguageModelUsage } | null)?.usage)
+      throw error
     })
-    costUsd += estimateModelCostUsd(
-      spec,
-      {
-        inputTokens: result.usage?.inputTokens,
-        cachedInputTokens: result.usage?.inputTokenDetails?.cacheReadTokens,
-        outputTokens: result.usage?.outputTokens,
-      },
-      {
-        input: process.env.AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK,
-        output: process.env.AGENT_SEARCH_SCORER_OUTPUT_USD_PER_MTOK,
-      },
-    )
+    charge(result.usage)
     const ids = new Set(batch.map((item) => item.id))
     for (const score of result.output?.scores ?? []) {
       if (ids.has(score.id)) scores.set(score.id, score.p)
     }
+  }).catch((error: unknown) => {
+    throw new ScoringError(`LLM scoring failed: ${errorMessage(error)}`, costUsd)
   })
   return { scores, scorer: 'llm', costUsd }
 }

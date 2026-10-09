@@ -245,6 +245,27 @@ type Modules = {
   ai: typeof import('ai')
 }
 
+/** Planner cost at list or env prices; NaN for a model with no price. */
+function plannerCost(
+  mods: Modules,
+  modelSpec: string,
+  usage: Partial<LanguageModelUsage>,
+): number {
+  try {
+    return mods.model.estimateModelCostUsd(
+      modelSpec,
+      {
+        inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens,
+        outputTokens: usage.outputTokens,
+      },
+      mods.model.plannerPriceEnv(),
+    )
+  } catch {
+    return Number.NaN
+  }
+}
+
 async function validateKey(
   mods: Modules,
   question: Question,
@@ -330,6 +351,7 @@ async function runQuestion(
   let steps = 0
   let usage: Partial<LanguageModelUsage> = {}
   let error: string | null = null
+  const toolErrors: unknown[] = []
 
   try {
     ;({ key, dropped: keyDropped } = await validateKey(
@@ -364,8 +386,10 @@ async function runQuestion(
         for (const part of step.content) {
           if (part.type === 'tool-result')
             settled.set(part.toolCallId, { output: part.output })
-          if (part.type === 'tool-error')
+          if (part.type === 'tool-error') {
             settled.set(part.toolCallId, { error: part.error })
+            toolErrors.push(part.error)
+          }
         }
         for (const call of step.toolCalls) {
           const outcome = settled.get(call.toolCallId) ?? {}
@@ -394,10 +418,14 @@ async function runQuestion(
   const allOutputs = outputsByCall.flat()
   const seen = mods.citations.collectToolTweetIds(allOutputs)
   const { cited, invalid } = mods.citations.validateCitations(answer, seen)
-  const classifierCostUsd = allOutputs.reduce<number>((sum, output) => {
-    const cost = (output as { costUsd?: unknown } | null)?.costUsd
-    return sum + (typeof cost === 'number' ? cost : 0)
-  }, 0)
+  // Failed scoring calls carry what they spent on the error (ScoringError).
+  const classifierCostUsd = [...allOutputs, ...toolErrors].reduce<number>(
+    (sum, value) => {
+      const cost = (value as { costUsd?: unknown } | null)?.costUsd
+      return sum + (typeof cost === 'number' ? cost : 0)
+    },
+    0,
+  )
 
   return {
     ...base,
@@ -412,11 +440,7 @@ async function runQuestion(
     toolCalls,
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,
-    plannerCostUsd: mods.model.estimateModelCostUsd(modelSpec, {
-      inputTokens: usage.inputTokens,
-      cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens,
-      outputTokens: usage.outputTokens,
-    }),
+    plannerCostUsd: plannerCost(mods, modelSpec, usage),
     classifierCostUsd,
     wallMs: Date.now() - started,
     error,

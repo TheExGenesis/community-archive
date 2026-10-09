@@ -2,7 +2,10 @@ import { createModelCallToUIChunkTransform } from '@ai-sdk/workflow'
 import { createUIMessageStreamResponse, type UIMessage } from 'ai'
 import { NextResponse } from 'next/server'
 import { start } from 'workflow/api'
-import { checkAgentSearchBudget } from '@/lib/agentSearch/budget'
+import {
+  agentSearchPricingProblem,
+  checkAgentSearchBudget,
+} from '@/lib/agentSearch/budget'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { agentSearchModelSpec } from '@/lib/agentSearch/model'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
@@ -81,6 +84,15 @@ export async function POST(request: Request) {
   }
 
   const modelSpec = agentSearchModelSpec()
+  // Unpriced spend would never reach the daily cap, so refuse to start.
+  const pricingProblem = agentSearchPricingProblem(modelSpec)
+  if (pricingProblem) {
+    console.error('[agent-search] not starting:', pricingProblem)
+    return NextResponse.json(
+      { error: 'unavailable' },
+      { status: 503, headers: noStore },
+    )
+  }
   let run: Awaited<ReturnType<typeof start>>
   try {
     run = await start(agentSearchWorkflow, [

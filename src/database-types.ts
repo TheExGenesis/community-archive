@@ -2017,6 +2017,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      agent_search_add_usage: {
+        Args: {
+          p_run_id: string
+          p_input_tokens: number
+          p_output_tokens: number
+          p_cost_usd: number
+        }
+        Returns: undefined
+      }
       apply_public_entities_rls_policies: {
         Args: {
           schema_name: string

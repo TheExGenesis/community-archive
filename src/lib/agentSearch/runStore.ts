@@ -13,9 +13,22 @@ import type { Database, Json } from '@/database-types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { AgentSearchRun } from './types'
 
+/** Tokens and spend to add to a run; every field is an increment. */
+export interface RunUsageDelta {
+  inputTokens?: number
+  outputTokens?: number
+  costUsd?: number
+}
+
+/** Fields only addUsage may change, so a status patch never resets spend. */
+type UsageFields = 'inputTokens' | 'outputTokens' | 'costUsd'
+export type RunPatch = Partial<Omit<AgentSearchRun, UsageFields | 'id'>>
+
 export interface AgentSearchRunStore {
   create(run: AgentSearchRun): Promise<void>
-  update(id: string, patch: Partial<AgentSearchRun>): Promise<void>
+  update(id: string, patch: RunPatch): Promise<void>
+  /** Adds to the run's tokens and cost in one atomic write. */
+  addUsage(id: string, delta: RunUsageDelta): Promise<void>
   get(id: string): Promise<AgentSearchRun | null>
   countSince(accountId: string, sinceIso: string): Promise<number>
   /** `now` defaults to the current time; budget checks pass their own clock. */
@@ -44,6 +57,12 @@ const RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/
 function assertRunId(id: string) {
   if (!RUN_ID_PATTERN.test(id)) throw new Error('Invalid agent search run id')
 }
+
+const usageInt = (value: number | undefined) =>
+  Number.isFinite(value) && (value as number) > 0 ? Math.round(value!) : 0
+const usageUsd = (value: number | undefined) =>
+  Number.isFinite(value) && (value as number) > 0 ? value! : 0
+const roundUsd = (value: number) => Math.round(value * 1e6) / 1e6
 
 const isRunning = (
   run: Pick<AgentSearchRun, 'accountId' | 'status' | 'startedAt'>,
@@ -132,7 +151,24 @@ export function createFileRunStore(
       withLock(id, async () => {
         const current = await read(id)
         if (!current) throw new Error(`Agent search run ${id} not found`)
-        await writeAtomic(id, { ...current, ...patch, id })
+        const {
+          inputTokens: _input,
+          outputTokens: _output,
+          costUsd: _cost,
+          ...fields
+        } = patch as Partial<AgentSearchRun>
+        await writeAtomic(id, { ...current, ...fields, id })
+      }),
+    addUsage: (id, delta) =>
+      withLock(id, async () => {
+        const current = await read(id)
+        if (!current) throw new Error(`Agent search run ${id} not found`)
+        await writeAtomic(id, {
+          ...current,
+          inputTokens: current.inputTokens + usageInt(delta.inputTokens),
+          outputTokens: current.outputTokens + usageInt(delta.outputTokens),
+          costUsd: roundUsd(current.costUsd + usageUsd(delta.costUsd)),
+        })
       }),
     get: (id) => read(id),
     async countSince(accountId, sinceIso) {
@@ -188,7 +224,7 @@ function toRow(run: AgentSearchRun): RunInsert {
   }
 }
 
-function toRowPatch(patch: Partial<AgentSearchRun>): RunUpdate {
+function toRowPatch(patch: RunPatch): RunUpdate {
   const row: RunUpdate = {}
   if (patch.accountId !== undefined) row.account_id = patch.accountId
   if (patch.question !== undefined) row.question = patch.question
@@ -202,9 +238,6 @@ function toRowPatch(patch: Partial<AgentSearchRun>): RunUpdate {
   if (patch.invalidCitationIds !== undefined)
     row.invalid_citation_ids = patch.invalidCitationIds
   if (patch.toolCalls !== undefined) row.tool_calls = patch.toolCalls as Json
-  if (patch.inputTokens !== undefined) row.input_tokens = patch.inputTokens
-  if (patch.outputTokens !== undefined) row.output_tokens = patch.outputTokens
-  if (patch.costUsd !== undefined) row.cost_usd = patch.costUsd
   if (patch.error !== undefined) row.error = patch.error
   if (patch.conversationId !== undefined)
     row.conversation_id = patch.conversationId
@@ -260,6 +293,16 @@ export function createSupabaseRunStore(
       const { error } = await table().update(row).eq('id', id)
       if (error)
         throw new Error(`Agent search run update failed: ${error.message}`)
+    },
+    async addUsage(id, delta) {
+      const { error } = await client.rpc('agent_search_add_usage', {
+        p_run_id: id,
+        p_input_tokens: usageInt(delta.inputTokens),
+        p_output_tokens: usageInt(delta.outputTokens),
+        p_cost_usd: usageUsd(delta.costUsd),
+      })
+      if (error)
+        throw new Error(`Agent search usage update failed: ${error.message}`)
     },
     async get(id) {
       const { data, error } = await table()

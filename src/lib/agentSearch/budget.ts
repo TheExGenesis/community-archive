@@ -1,4 +1,39 @@
+import { agentSearchScorer } from './classifier'
+import {
+  agentSearchScorerModelSpec,
+  plannerPriceEnv,
+  resolveModelPrice,
+  scorerPriceEnv,
+} from './model'
 import type { AgentSearchRunStore } from './runStore'
+
+/**
+ * Why no run may start with this configuration, or null when it may. Every
+ * model the run pays per token for needs a valid price, or its spend would
+ * count as $0 against the daily cap. Decisions is priced in code; Jev reports
+ * its own cost.
+ */
+export function agentSearchPricingProblem(
+  plannerSpec: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  try {
+    if (!resolveModelPrice(plannerSpec, plannerPriceEnv(env))) {
+      return `No price configured for planner model ${plannerSpec}`
+    }
+    if (agentSearchScorer(env) === 'llm') {
+      const scorerSpec = agentSearchScorerModelSpec(
+        env.AGENT_SEARCH_SCORER_MODEL,
+      )
+      if (!resolveModelPrice(scorerSpec, scorerPriceEnv(env))) {
+        return `No price configured for scorer model ${scorerSpec}`
+      }
+    }
+    return null
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+}
 
 export type AgentSearchBudgetResult =
   | { ok: true }

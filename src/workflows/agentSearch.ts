@@ -11,8 +11,10 @@ import {
   validateCitations,
 } from '@/lib/agentSearch/citations'
 import { buildRunParts } from '@/lib/agentSearch/history'
-import { agentSearchModel, estimateModelCostUsd } from '@/lib/agentSearch/model'
+import { agentSearchModel } from '@/lib/agentSearch/model'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
+import type { AgentSearchRun } from '@/lib/agentSearch/types'
+import { withRecordedCost } from '@/lib/agentSearch/usage'
 import {
   collectAndScoreImpl,
   findPeopleImpl,
@@ -27,43 +29,53 @@ import {
   type SearchTweetsToolInput,
 } from '@/lib/agentSearch/toolImpl'
 
-// Each tool runs as a durable step: retried on failure, recorded in the run's
-// event log, and never re-run once it has finished.
+// Each tool runs as a durable step, recorded in the run's event log and never
+// re-run once it has finished. Gateway reads are free and retried once. The
+// paid tools (they call the scorer) are never retried: a retry would pay for
+// all the scoring again. They add their own cost to the run before returning
+// or throwing, so a failed or stopped run still counts what they spent.
 
 async function findPeopleStep(input: FindPeopleInput) {
   'use step'
   return findPeopleImpl(input)
 }
+findPeopleStep.maxRetries = 1
 
 async function searchTweetsStep(input: SearchTweetsToolInput) {
   'use step'
   return searchTweetsImpl(input)
 }
+searchTweetsStep.maxRetries = 1
 
-async function collectAndScoreStep(input: CollectAndScoreInput) {
+async function collectAndScoreStep(input: CollectAndScoreInput, runId: string) {
   'use step'
-  return collectAndScoreImpl(input)
+  return withRecordedCost(runId, () => collectAndScoreImpl(input))
 }
+collectAndScoreStep.maxRetries = 0
 
-async function scoreTweetsStep(input: ScoreTweetsInput) {
+async function scoreTweetsStep(input: ScoreTweetsInput, runId: string) {
   'use step'
-  return scoreTweetsImpl(input)
+  return withRecordedCost(runId, () => scoreTweetsImpl(input))
 }
+scoreTweetsStep.maxRetries = 0
 
 async function getThreadStep(input: { tweetId: string }) {
   'use step'
   return getThreadImpl(input)
 }
+getThreadStep.maxRetries = 1
 
 async function getQuotePostsStep(input: { tweetId: string; limit?: number }) {
   'use step'
   return getQuotePostsImpl(input)
 }
+getQuotePostsStep.maxRetries = 1
 
 async function getTweetsStep(input: { tweetIds: string[] }) {
   'use step'
   return getTweetsImpl(input)
 }
+getTweetsStep.maxRetries = 1
 
 interface RunSummary {
   runId: string
@@ -73,32 +85,18 @@ interface RunSummary {
   question: string
   modelSpec: string
   text: string
-  toolCalls: Array<{ name: string; input: unknown; count?: number }>
+  toolCalls: AgentSearchRun['toolCalls']
   toolOutputs: unknown[]
-  inputTokens: number
-  cachedInputTokens: number
-  outputTokens: number
-  classifierCostUsd: number
   error: string | null
 }
 
+// Tokens and cost are not part of the summary: each model call and paid tool
+// has already added its own to the run (see usage.ts).
 async function recordRunStep(summary: RunSummary) {
   'use step'
   const { cited, invalid } = validateCitations(
     summary.text,
     collectToolTweetIds(summary.toolOutputs),
-  )
-  const modelCost = estimateModelCostUsd(
-    summary.modelSpec,
-    {
-      inputTokens: summary.inputTokens,
-      cachedInputTokens: summary.cachedInputTokens,
-      outputTokens: summary.outputTokens,
-    },
-    {
-      input: process.env.AGENT_SEARCH_INPUT_USD_PER_MTOK,
-      output: process.env.AGENT_SEARCH_OUTPUT_USD_PER_MTOK,
-    },
   )
   const store = getAgentSearchRunStore()
   // The route stores the run right after start(); create it here if that
@@ -131,12 +129,12 @@ async function recordRunStep(summary: RunSummary) {
     citedTweetIds: cited,
     invalidCitationIds: invalid,
     toolCalls: summary.toolCalls,
-    inputTokens: summary.inputTokens,
-    outputTokens: summary.outputTokens,
-    costUsd: Math.round((modelCost + summary.classifierCostUsd) * 1e6) / 1e6,
     error: summary.error,
   })
 }
+
+const errorText = (error: unknown) =>
+  (error instanceof Error ? error.message : String(error)).slice(0, 500)
 
 function outputCount(output: unknown): number | undefined {
   if (!output || typeof output !== 'object') return undefined
@@ -162,13 +160,14 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   // The workflow run id doubles as the search run id the route stored.
   const { workflowRunId: runId } = getWorkflowMetadata()
   const agent = new WorkflowAgent({
-    model: agentSearchModel(input.modelSpec),
+    // Each planner call records its own usage on this run.
+    model: agentSearchModel(input.modelSpec, runId),
     instructions: agentSearchInstructions(input.date),
     tools: createAgentSearchTools({
       find_people: findPeopleStep,
       search_tweets: searchTweetsStep,
-      collect_and_score: collectAndScoreStep,
-      score_tweets: scoreTweetsStep,
+      collect_and_score: (args) => collectAndScoreStep(args, runId),
+      score_tweets: (args) => scoreTweetsStep(args, runId),
       get_thread: getThreadStep,
       get_quote_posts: getQuotePostsStep,
       get_tweets: getTweetsStep,
@@ -179,10 +178,6 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   let text = ''
   const toolCalls: RunSummary['toolCalls'] = []
   const toolOutputs: unknown[] = []
-  let inputTokens = 0
-  let cachedInputTokens = 0
-  let outputTokens = 0
-  let classifierCostUsd = 0
   let parts: unknown[] = []
   try {
     const result = await agent.stream({
@@ -191,9 +186,12 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       stopWhen: isStepCount(AGENT_SEARCH_MAX_STEPS),
     })
     for (const step of result.steps) {
-      inputTokens += step.usage?.inputTokens ?? 0
-      cachedInputTokens += step.usage?.inputTokenDetails?.cacheReadTokens ?? 0
-      outputTokens += step.usage?.outputTokens ?? 0
+      // A tool that failed after its retries is missing from toolResults
+      // and appears in content as a tool-error.
+      const failed = new Map<string, unknown>()
+      for (const part of step.content) {
+        if (part.type === 'tool-error') failed.set(part.toolCallId, part.error)
+      }
       for (const call of step.toolCalls) {
         const output = step.toolResults.find(
           (r) => r.toolCallId === call.toolCallId,
@@ -202,19 +200,19 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
           name: call.toolName,
           input: call.input,
           count: outputCount(output),
+          ...(failed.has(call.toolCallId)
+            ? { error: errorText(failed.get(call.toolCallId)) }
+            : {}),
         })
       }
       for (const toolResult of step.toolResults) {
         toolOutputs.push(toolResult.output)
-        const cost = (toolResult.output as { costUsd?: unknown } | undefined)
-          ?.costUsd
-        if (typeof cost === 'number') classifierCostUsd += cost
       }
       if (step.text) text = step.text
     }
     parts = buildRunParts(result.steps, text)
   } catch (caught) {
-    error = caught instanceof Error ? caught.message : String(caught)
+    error = errorText(caught)
   }
 
   await recordRunStep({
@@ -227,10 +225,6 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
     text,
     toolCalls,
     toolOutputs,
-    inputTokens,
-    cachedInputTokens,
-    outputTokens,
-    classifierCostUsd,
     error,
   })
   if (error) throw new Error(error)

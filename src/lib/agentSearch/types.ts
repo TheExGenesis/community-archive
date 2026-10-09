@@ -70,6 +70,8 @@ export interface AgentSearchRun {
     input: unknown
     ms?: number
     count?: number
+    /** Set when the tool failed; its output is then missing. */
+    error?: string
   }>
   inputTokens: number
   outputTokens: number

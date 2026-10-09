@@ -33,7 +33,28 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    came back from a tool in the same run (`citations.ts`); the page marks other
    ids as unverified and the run record lists them.
 5. The last step stores the run (`runStore.ts`): question, answer, cited and
-   invalid ids, tool calls, tokens and estimated cost.
+   invalid ids, and tool calls.
+
+## Cost
+
+Spend is recorded as it happens, so the global daily cap counts runs still in
+progress and a stopped or failed run keeps what it spent (`usage.ts`):
+
+- Each planner call adds its tokens and estimated cost to the run inside the
+  model step, as soon as the provider reports usage (`EnvLanguageModel` with a
+  run id). A failed write fails the call.
+- `collect_and_score` and `score_tweets` add their scorer cost before they
+  return or throw. A scorer that fails part-way throws a `ScoringError`
+  carrying the cost of the calls that succeeded. These two steps are never
+  retried, since a retry pays for all the scoring again; gateway-only tools
+  retry once.
+- Writes are increments (`agent_search_add_usage`), so concurrent steps of one
+  run never overwrite each other, and status updates never touch spend.
+- A run does not start when the planner, or the `llm` scorer, has no price or
+  a malformed price override; the route answers 503.
+
+Prices are standard-tier, short-context list prices; long-context surcharges
+are not modelled.
 
 ## History
 
@@ -67,8 +88,8 @@ resolved headers, including the API key, into the event log.
 | `AGENT_SEARCH_DAILY_LIMIT` | `10` | Questions per member per UTC day |
 | `AGENT_SEARCH_GLOBAL_DAILY_USD` | `25` | Global daily spend kill switch |
 | `AGENT_SEARCH_STALE_RUN_MS` | `600000` | When a running run stops blocking a new one |
-| `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK` | price table | Planner prices for models not in `MODEL_PRICES_USD_PER_MTOK` |
-| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...` | price table | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens) |
+| `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set |
+| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...` | price table | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost) |
 | `AGENT_SEARCH_RUN_STORE` | file outside production | `file` forces the local JSON store |
 
 The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_URL`,

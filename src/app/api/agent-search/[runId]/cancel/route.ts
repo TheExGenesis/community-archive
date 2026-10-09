@@ -8,7 +8,9 @@ export const dynamic = 'force-dynamic'
 const noStore = { 'Cache-Control': 'private, no-store' }
 
 // Stops a running answer. Only the asker may stop it. The workflow's last step
-// never runs after a cancel, so the run record is closed here.
+// never runs after a cancel, so the run record is closed here. Its tokens and
+// cost stay as recorded: each model call and paid tool adds its own spend,
+// and steps still in flight add theirs when they finish.
 export async function POST(
   _request: Request,
   { params }: { params: { runId: string } },

@@ -54,7 +54,6 @@ describe('file run store', () => {
       answer: 'Some people said [[t:1]]',
       citedTweetIds: ['1'],
       toolCalls: [{ name: 'search_tweets', input: { query: 'archive' } }],
-      costUsd: 0.12,
     })
 
     expect(await store.get('wrun_01')).toEqual(
@@ -64,7 +63,6 @@ describe('file run store', () => {
         answer: 'Some people said [[t:1]]',
         citedTweetIds: ['1'],
         toolCalls: [{ name: 'search_tweets', input: { query: 'archive' } }],
-        costUsd: 0.12,
       }),
     )
     expect(await store.get('missing')).toBeNull()
@@ -72,19 +70,55 @@ describe('file run store', () => {
     expect(await readdir(dir)).toEqual(['wrun_01.json'])
   })
 
-  test('keeps every patch when updates overlap', async () => {
+  test('adds every usage increment when they overlap', async () => {
     const store = createFileRunStore(dir)
     await store.create(baseRun())
     await Promise.all([
-      store.update('wrun_01', { inputTokens: 10 }),
-      store.update('wrun_01', { outputTokens: 20 }),
-      store.update('wrun_01', { costUsd: 0.5 }),
+      store.addUsage('wrun_01', { inputTokens: 10, costUsd: 0.25 }),
+      store.addUsage('wrun_01', { outputTokens: 20 }),
+      store.addUsage('wrun_01', { costUsd: 0.5 }),
+      store.update('wrun_01', { answer: 'done' }),
     ])
     expect(await store.get('wrun_01')).toMatchObject({
+      answer: 'done',
       inputTokens: 10,
       outputTokens: 20,
-      costUsd: 0.5,
+      costUsd: 0.75,
     })
+  })
+
+  test('a status patch never resets recorded spend', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun())
+    await store.addUsage('wrun_01', { inputTokens: 5, costUsd: 0.1 })
+    await store.update('wrun_01', {
+      status: 'failed',
+      // A caller that still passes usage fields cannot overwrite them.
+      ...({ costUsd: 0, inputTokens: 0 } as object),
+    })
+    expect(await store.get('wrun_01')).toMatchObject({
+      status: 'failed',
+      inputTokens: 5,
+      costUsd: 0.1,
+    })
+  })
+
+  test('ignores negative or non-finite usage', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun())
+    await store.addUsage('wrun_01', {
+      inputTokens: -5,
+      outputTokens: Number.NaN,
+      costUsd: Number.POSITIVE_INFINITY,
+    })
+    expect(await store.get('wrun_01')).toMatchObject({
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+    })
+    await expect(store.addUsage('nope', { costUsd: 1 })).rejects.toThrow(
+      'not found',
+    )
   })
 
   test('refuses duplicate runs, unknown updates and unsafe ids', async () => {
@@ -240,6 +274,22 @@ describe('supabase run store', () => {
       completed_at: '2026-10-08T10:02:00.000Z',
     })
     expect(eq).toHaveBeenCalledWith('id', 'wrun_01')
+  })
+
+  test('adds usage through the increment function', async () => {
+    const rpc = jest.fn().mockResolvedValue({ error: null })
+    const store = createSupabaseRunStore({ rpc } as never)
+    await store.addUsage('wrun_01', { inputTokens: 1200.4, costUsd: 0.03 })
+    expect(rpc).toHaveBeenCalledWith('agent_search_add_usage', {
+      p_run_id: 'wrun_01',
+      p_input_tokens: 1200,
+      p_output_tokens: 0,
+      p_cost_usd: 0.03,
+    })
+    rpc.mockResolvedValueOnce({ error: { message: 'not found' } })
+    await expect(store.addUsage('x', { costUsd: 1 })).rejects.toThrow(
+      'usage update failed',
+    )
   })
 
   test('pages through every row when summing cost', async () => {

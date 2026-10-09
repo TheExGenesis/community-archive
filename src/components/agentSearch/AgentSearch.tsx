@@ -81,6 +81,7 @@ export default function AgentSearch({
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [quota, setQuota] = useState<Quota | null>(null)
   const [input, setInput] = useState('')
+  const [composerFocused, setComposerFocused] = useState(false)
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
   const [stopped, setStopped] = useState<Record<string, number | null>>({})
@@ -365,8 +366,12 @@ export default function AgentSearch({
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={onKeyDown}
+          onFocus={() => setComposerFocused(true)}
+          onBlur={() => setComposerFocused(false)}
           maxLength={MAX_QUESTION_LENGTH}
-          rows={hasThread ? 2 : 3}
+          // In a thread the box stays one row while idle, so the pinned
+          // composer covers little of the answer.
+          rows={hasThread ? (composerFocused || input ? 3 : 1) : 3}
           disabled={busy || outOfQuestions}
           placeholder={
             busy
@@ -377,7 +382,7 @@ export default function AgentSearch({
                   ? 'Ask a follow-up'
                   : 'Ask about what people in the archive have said'
           }
-          className="min-h-[3rem] flex-1 resize-y bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+          className="min-h-10 flex-1 resize-none bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
         />
         {/* Stop lives in the status row above the answer, not here. */}
         {!busy && !outOfQuestions && (
@@ -597,7 +602,13 @@ export default function AgentSearch({
           </div>
         )}
 
-        {hasThread && !loading && <div className="mt-10 max-w-3xl">{form}</div>}
+        {/* Pinned to the bottom of the screen while reading a thread; it
+            settles into place below the last turn. */}
+        {hasThread && !loading && (
+          <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-none">
+            {form}
+          </div>
+        )}
       </section>
     </main>
   )

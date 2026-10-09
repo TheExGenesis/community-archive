@@ -1,10 +1,12 @@
 import { createModelCallToUIChunkTransform } from '@ai-sdk/workflow'
-import { createUIMessageStreamResponse } from 'ai'
+import { createUIMessageStreamResponse, type UIMessageChunk } from 'ai'
 import { NextResponse } from 'next/server'
 import { getRun } from 'workflow/api'
+import { RunExpiredError } from 'workflow/errors'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { workflowRunIdOf } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
+import { endWithFinish, finishedStream } from '@/lib/agentSearch/stream'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -42,21 +44,37 @@ export async function GET(
       { status: 400, headers: noStore },
     )
   }
+  const headers = { ...noStore, 'x-workflow-run-id': runId }
   const workflowRunId = workflowRunIdOf(stored)
   if (!workflowRunId) {
+    // Closed before its workflow started: nothing to replay, and the page
+    // must stop waiting. Still starting: the page may try again shortly.
+    if (stored.status !== 'running') {
+      return createUIMessageStreamResponse({
+        stream: finishedStream(),
+        headers,
+      })
+    }
     return NextResponse.json(
       { error: 'not_started' },
       { status: 409, headers: noStore },
     )
   }
-  const run = getRun(workflowRunId)
-  const readable = run
-    .getReadable({ startIndex: 0 })
-    .pipeThrough(
-      createModelCallToUIChunkTransform({ uiStartIndex: startIndex }),
+  // The stream always ends with a finish chunk, even for a run that was
+  // cancelled elsewhere or whose stream has expired, so the page's
+  // reconnect loop ends.
+  let readable: ReadableStream<UIMessageChunk>
+  try {
+    readable = endWithFinish(
+      getRun(workflowRunId)
+        .getReadable({ startIndex: 0 })
+        .pipeThrough(
+          createModelCallToUIChunkTransform({ uiStartIndex: startIndex }),
+        ),
     )
-  return createUIMessageStreamResponse({
-    stream: readable,
-    headers: { ...noStore, 'x-workflow-run-id': runId },
-  })
+  } catch (error) {
+    if (!RunExpiredError.is(error)) throw error
+    readable = finishedStream()
+  }
+  return createUIMessageStreamResponse({ stream: readable, headers })
 }

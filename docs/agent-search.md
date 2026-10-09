@@ -24,7 +24,13 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    workflow and closes the run record; only the asker can read or stop a run.
    A Stop pressed before the page has the run id is held until the id
    arrives, and a run closed while it was starting is stopped by the start
-   route or by the workflow's first step.
+   route or by the workflow's first step. Both stream responses always end
+   with a `finish` chunk (`stream.ts`), even for a run cancelled from another
+   tab or one whose stream has passed Workflow's retention
+   (`RunExpiredError`), because the page's transport keeps reconnecting until
+   it sees one. `vercel.json` sets `supportsCancellation` on the reconnect
+   route so a closed tab ends its function; the start route is left without
+   it, since it must finish recording the workflow run once admitted.
 2. The workflow runs AI SDK 7's `WorkflowAgent`. Each tool call is a durable
    step. Tools (`src/lib/agentSearch/agent.ts`, implemented in `toolImpl.ts`):
    `find_people`, `search_tweets`, `collect_and_score`, `score_tweets`,

@@ -7,7 +7,10 @@ import {
   agentSearchPricingProblem,
 } from '@/lib/agentSearch/budget'
 import { agentSearchRunDeadlineMs } from '@/lib/agentSearch/deadline'
-import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import {
+  agentSearchAccessStatus,
+  getAgentSearchAccess,
+} from '@/lib/agentSearch/eligibility'
 import { agentSearchModelSpec } from '@/lib/agentSearch/model'
 import { parseAgentSearchRequest } from '@/lib/agentSearch/request'
 import { closeEndedRuns, newSearchRunId } from '@/lib/agentSearch/runs'
@@ -31,11 +34,11 @@ const workflowStatus = (workflowRunId: string) =>
   getRun(workflowRunId).status.catch(() => null)
 
 export async function POST(request: Request) {
-  const access = await getAgentSearchViewer()
+  const access = await getAgentSearchAccess()
   if (!access.ok) {
     return NextResponse.json(
       { error: access.reason },
-      { status: access.reason === 'signed_out' ? 401 : 403, headers: noStore },
+      { status: agentSearchAccessStatus(access.reason), headers: noStore },
     )
   }
   const accountId = access.viewer.accountId

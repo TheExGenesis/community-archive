@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getRun } from 'workflow/api'
-import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { getAgentSearchAccess } from '@/lib/agentSearch/eligibility'
 import { workflowRunIdOf } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 
@@ -16,11 +16,11 @@ export async function POST(
   _request: Request,
   { params }: { params: { runId: string } },
 ) {
-  const access = await getAgentSearchViewer()
+  const access = await getAgentSearchAccess()
   if (!access.ok) {
     return NextResponse.json(
       { error: access.reason },
-      { status: 401, headers: noStore },
+      { status: access.reason === 'unavailable' ? 503 : 401, headers: noStore },
     )
   }
   const runId = params.runId

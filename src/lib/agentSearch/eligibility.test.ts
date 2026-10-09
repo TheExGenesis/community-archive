@@ -26,7 +26,11 @@ jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: () => ({ from: mockServiceFrom }),
 }))
 
-import { getAgentSearchViewer } from './eligibility'
+import {
+  agentSearchAccessStatus,
+  getAgentSearchAccess,
+  getAgentSearchViewer,
+} from './eligibility'
 
 const member = {
   id: '00000000-0000-0000-0000-000000000001',
@@ -167,5 +171,21 @@ describe('getAgentSearchViewer', () => {
     })
 
     await expect(getAgentSearchViewer()).rejects.toThrow('Opt-out check failed')
+  })
+
+  test('routes see a failed lookup as unavailable, answered with 503', async () => {
+    signedIn(member)
+    mockUploadsResult.mockResolvedValue({ count: 1, error: null })
+    mockOptOutResult.mockResolvedValue({
+      data: null,
+      error: { message: 'timeout' },
+    })
+    jest.spyOn(console, 'error').mockImplementation(() => {})
+
+    const access = await getAgentSearchAccess()
+    expect(access).toEqual({ ok: false, reason: 'unavailable' })
+    expect(agentSearchAccessStatus('unavailable')).toBe(503)
+    expect(agentSearchAccessStatus('signed_out')).toBe(401)
+    expect(agentSearchAccessStatus('not_eligible')).toBe(403)
   })
 })

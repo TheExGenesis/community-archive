@@ -191,6 +191,12 @@ export function AgentSearchTurn({
     evidenceRef.current?.scrollIntoView({ block: 'start' })
   }
 
+  // A run stopped or failed before any search: the note above says so, and
+  // there is nothing else to show.
+  if (view.outcome !== 'done' && !active && view.progress.length === 0) {
+    return null
+  }
+
   // Wide screens: the answer on the left, cited tweets in a sticky column
   // beside it so a citation and its tweet are both on screen. Narrow screens:
   // the cited tweets follow the answer.

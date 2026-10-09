@@ -466,6 +466,26 @@ describe('buildTurnView', () => {
     ])
   })
 
+  test('reads a saved stopped or failed run as an outcome, not as answer text', () => {
+    const stoppedTurn = assistant('a1', [
+      toolPart('search_tweets', { query: 'x' }, { tweets: [tweet('1')] }),
+      text('_This answer was stopped before it finished._'),
+    ])
+    const view = buildTurnView([stoppedTurn], 0)
+    expect(view.outcome).toBe('stopped')
+    expect(view.answer.markdown).toBe('')
+    expect(view.foundSoFar).toBe(1)
+    expect(
+      buildTurnView(
+        [assistant('a2', [text('_This answer failed before it finished._')])],
+        0,
+      ).outcome,
+    ).toBe('failed')
+    expect(buildTurnView([assistant('a3', [text('Answer')])], 0).outcome).toBe(
+      'done',
+    )
+  })
+
   test('reads agent-chosen groups from message metadata', () => {
     const messages: UIMessage[] = [
       {
@@ -508,5 +528,14 @@ describe('describeChatError', () => {
     )
     expect(describeChatError(failed(503, 'upstream'))).toMatch(/not responding/)
     expect(describeChatError(undefined)).toBeNull()
+  })
+
+  test('names the configured limit and reset time when the page knows them', () => {
+    expect(
+      describeChatError(failed(429, '{"error":"daily_limit"}'), {
+        limit: 4,
+        resetLabel: '4:00 AM',
+      }),
+    ).toBe('You’ve used today’s 4 questions. You can ask again at 4:00 AM.')
   })
 })

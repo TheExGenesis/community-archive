@@ -72,7 +72,11 @@ export interface ReceiptView {
   cappedAt: number | null
 }
 
+/** How a saved turn ended; a live stop is tracked by the page instead. */
+export type TurnOutcome = 'done' | 'stopped' | 'failed'
+
 export interface TurnView {
+  outcome: TurnOutcome
   progress: ProgressLine[]
   answer: AnswerView
   /** Found posts judged relevant (p >= 0.5) that the answer does not cite. */
@@ -582,7 +586,14 @@ export function buildTurnView(
   const ownOutputs = calls.map((call) => call.output)
   const found = collectToolTweets([...ownOutputs, ...priorOutputs])
   const own = collectToolTweets(ownOutputs)
-  const answer = buildAnswer(answerText(message), found, message.id, options)
+  const text = answerText(message)
+  const outcome = turnOutcome(text)
+  const answer = buildAnswer(
+    outcome === 'done' ? text : '',
+    found,
+    message.id,
+    options,
+  )
   const cited = new Set(answer.citations.map((citation) => citation.id))
   const uncited = orderByScore(
     own.results.filter((id) => !cited.has(id)),
@@ -613,6 +624,7 @@ export function buildTurnView(
   }
 
   return {
+    outcome,
     progress: calls.map(progressLine),
     answer,
     relevant,
@@ -636,6 +648,18 @@ export function buildTurnView(
 }
 
 const TOP_FOUND = 3
+
+// A saved run that ended without an answer is closed with one of these
+// lines (history.ts); the page shows its own banner instead.
+const STOPPED_CLOSING = /^_?This answer was stopped before it finished\._?$/
+const FAILED_CLOSING = /^_?This answer failed before it finished\._?$/
+
+function turnOutcome(text: string): TurnOutcome {
+  const trimmed = text.trim()
+  if (STOPPED_CLOSING.test(trimmed)) return 'stopped'
+  if (FAILED_CLOSING.test(trimmed)) return 'failed'
+  return 'done'
+}
 
 /**
  * Optional grouping the agent may attach as message metadata:
@@ -728,7 +752,10 @@ const ERROR_MESSAGES: Record<string, string> = {
  * WorkflowChatTransport throws `Failed to fetch chat: <status> <body>` for a
  * non-2xx POST, so the status and JSON error code are parsed from the message.
  */
-export function describeChatError(error: Error | undefined): string | null {
+export function describeChatError(
+  error: Error | undefined,
+  quota?: { limit: number; resetLabel: string },
+): string | null {
   if (!error) return null
   const match = /Failed to fetch chat: (\d{3}) ?([\s\S]*)$/.exec(error.message)
   if (!match) {
@@ -741,6 +768,9 @@ export function describeChatError(error: Error | undefined): string | null {
     if (isRecord(body)) code = asString(body.error)
   } catch {
     code = undefined
+  }
+  if (code === 'daily_limit' && quota) {
+    return `You’ve used today’s ${quota.limit} questions. You can ask again at ${quota.resetLabel}.`
   }
   if (code && ERROR_MESSAGES[code]) return ERROR_MESSAGES[code]
   if (status === 401) return 'Sign in to ask a question.'

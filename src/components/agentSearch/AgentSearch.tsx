@@ -11,12 +11,18 @@ import { AgentSearchTurn } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
 import { RunStatus } from './RunStatus'
-import { buildTurnView, describeChatError, messageText } from './messageView'
+import { InterruptedNote } from './InterruptedNote'
+import {
+  buildTurnView,
+  describeChatError,
+  messageText,
+  type TurnView,
+} from './messageView'
 
 export const EXAMPLE_QUESTIONS = [
+  'What has @patio11 said about stablecoins?',
   'Who has complained or criticized the community archive?',
   'What do people here say about burnout and recovery?',
-  'Which books get recommended most in members’ threads?',
   'How have people described the move from Twitter to Bluesky?',
 ]
 
@@ -33,6 +39,16 @@ function showConversationInUrl(id: string | null) {
   else url.searchParams.delete('c')
   window.history.replaceState(window.history.state, '', url)
 }
+
+interface Quota {
+  limit: number
+  remaining: number
+  /** ISO time the daily count starts over (UTC midnight). */
+  resetsAt: string
+}
+
+const resetTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
 interface Conversation {
   /** Also the chat id the server stores runs under. */
@@ -59,6 +75,11 @@ export default function AgentSearch({
   // Client clock when the current answer was asked for (or reopened), for the
   // status row's timer.
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
+  const [quota, setQuota] = useState<Quota | null>(null)
+  const [input, setInput] = useState('')
+  // Questions stopped in this visit, by question message id, with how long
+  // they had run (null when the start time is unknown).
+  const [stopped, setStopped] = useState<Record<string, number | null>>({})
 
   // The run id of the answer in progress, so Stop can cancel the workflow
   // instead of only closing the stream, and a reopened conversation can
@@ -108,8 +129,22 @@ export default function AgentSearch({
       if (!response.ok) return
       const body = (await response.json()) as {
         conversations?: ConversationSummary[]
+        dailyLimit?: number
+        remainingToday?: number
+        resetsAt?: string
       }
       setRecent(body.conversations ?? [])
+      if (
+        typeof body.dailyLimit === 'number' &&
+        typeof body.remainingToday === 'number' &&
+        typeof body.resetsAt === 'string'
+      ) {
+        setQuota({
+          limit: body.dailyLimit,
+          remaining: body.remainingToday,
+          resetsAt: body.resetsAt,
+        })
+      }
     } catch {
       // The list is a convenience; the page works without it.
     }
@@ -133,6 +168,8 @@ export default function AgentSearch({
         pending: body.messages,
         runningRunId: body.runningRunId,
       })
+      // A draft from another conversation would be sent into this one.
+      setInput('')
       showConversationInUrl(id)
     } catch {
       setLoadError('That conversation could not be opened.')
@@ -167,18 +204,33 @@ export default function AgentSearch({
     if (initialConversationId) void openConversation(initialConversationId)
   }, [initialConversationId, openConversation])
 
-  // Refresh the list on arrival and whenever an answer finishes.
+  // Refresh the list and the quota on arrival, whenever an answer finishes,
+  // and after a refusal.
   useEffect(() => {
-    if (status === 'ready') void loadRecent()
+    if (status === 'ready' || status === 'error') void loadRecent()
   }, [status, loadRecent])
-  const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputId = useId()
   const hintId = useId()
 
   const busy = status === 'submitted' || status === 'streaming'
-  const errorMessage = describeChatError(error)
   const scrollToQuestionRef = useRef(false)
+  const outOfQuestions =
+    quota !== null &&
+    quota.remaining <= 0 &&
+    Date.now() < Date.parse(quota.resetsAt)
+  // A stream that breaks after the answer began is shown on its turn, with
+  // Ask again; only a refused question is reported under the composer.
+  const lastMessage = messages[messages.length - 1]
+  const answerFailed = Boolean(error) && lastMessage?.role === 'assistant'
+  const errorMessage = answerFailed
+    ? null
+    : describeChatError(
+        error,
+        quota
+          ? { limit: quota.limit, resetLabel: resetTime(quota.resetsAt) }
+          : undefined,
+      )
 
   // A refused POST (limit, eligibility) leaves the question with no reply.
   // Drop it from the thread and put it back in the box so nothing is lost.
@@ -202,6 +254,19 @@ export default function AgentSearch({
     void stop()
   }
 
+  // Stop as the member sees it: remember when and on which question, then
+  // cancel the run.
+  const stopFromStatus = () => {
+    const question = [...messages].reverse().find((m) => m.role === 'user')
+    if (question) {
+      setStopped((current) => ({
+        ...current,
+        [question.id]: runStartedAt === null ? null : Date.now() - runStartedAt,
+      }))
+    }
+    stopRun()
+  }
+
   const ask = (question: string) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
     if (!text || busy || loading) return
@@ -209,6 +274,10 @@ export default function AgentSearch({
     setLoadError(null)
     setInput('')
     setRunStartedAt(Date.now())
+    // Shown at once; the next refresh replaces it with the stored count.
+    setQuota((current) =>
+      current ? { ...current, remaining: Math.max(0, current.remaining - 1) } : current,
+    )
     // A follow-up sent from the bottom of a long answer would otherwise
     // start below the fold.
     scrollToQuestionRef.current = messages.length > 0
@@ -258,6 +327,17 @@ export default function AgentSearch({
 
   const hasThread = messages.length > 0
   const lastIndex = messages.length - 1
+  // Each answer's view, by message index; a question needs its reply's.
+  const views = new Map<number, TurnView>()
+  messages.forEach((message, index) => {
+    if (message.role !== 'assistant') return
+    views.set(
+      index,
+      buildTurnView(messages, index, {
+        streaming: busy && index === lastIndex,
+      }),
+    )
+  })
 
   const form = (
     <form onSubmit={onSubmit} className="w-full">
@@ -281,18 +361,20 @@ export default function AgentSearch({
           onKeyDown={onKeyDown}
           maxLength={MAX_QUESTION_LENGTH}
           rows={hasThread ? 2 : 3}
-          disabled={busy}
+          disabled={busy || outOfQuestions}
           placeholder={
             busy
               ? 'You can ask a follow-up when this answer finishes'
-              : hasThread
-                ? 'Ask a follow-up'
-                : 'Ask about what people in the archive have said'
+              : outOfQuestions && quota
+                ? `You’ve used today’s ${quota.limit} questions. More at ${resetTime(quota.resetsAt)}`
+                : hasThread
+                  ? 'Ask a follow-up'
+                  : 'Ask about what people in the archive have said'
           }
           className="min-h-[3rem] flex-1 resize-y bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
         />
         {/* Stop lives in the status row above the answer, not here. */}
-        {!busy && (
+        {!busy && !outOfQuestions && (
           <button
             type="submit"
             disabled={!input.trim()}
@@ -304,8 +386,27 @@ export default function AgentSearch({
         )}
       </div>
       <p id={hintId} className="mt-1.5 text-xs text-muted-foreground">
-        Enter to send, Shift+Enter for a new line. Answers are private to you.
+        {quota && (
+          <span className={outOfQuestions ? 'text-foreground' : undefined}>
+            {quota.remaining} of {quota.limit}{' '}
+            {quota.limit === 1 ? 'question' : 'questions'} left today ·{' '}
+          </span>
+        )}
+        Answers are private to you.
+        {/* Touch keyboards have no Shift+Enter habit to explain. */}
+        <span className="[@media(pointer:coarse)]:hidden">
+          {' '}
+          Enter to send, Shift+Enter for a new line.
+        </span>
       </p>
+      {errorMessage && (
+        <p
+          role="alert"
+          className="mt-3 rounded-md border border-destructive/40 px-3 py-2 text-sm text-foreground"
+        >
+          {errorMessage}
+        </p>
+      )}
     </form>
   )
 
@@ -370,14 +471,19 @@ export default function AgentSearch({
             {form}
             <div className="mt-6">
               <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-                Try a question
+                Try one of these
               </h2>
               <ul className="flex flex-wrap gap-2">
                 {EXAMPLE_QUESTIONS.map((question) => (
                   <li key={question}>
+                    {/* Fills the box rather than sending: one tap should not
+                        spend one of the day's questions. */}
                     <button
                       type="button"
-                      onClick={() => ask(question)}
+                      onClick={() => {
+                        setInput(question)
+                        textareaRef.current?.focus()
+                      }}
                       disabled={busy}
                       className="rounded-full border border-border bg-background px-3.5 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                     >
@@ -399,6 +505,20 @@ export default function AgentSearch({
             {messages.map((message, index) => {
               if (message.role === 'user') {
                 const waiting = busy && index === lastIndex
+                const reply =
+                  messages[index + 1]?.role === 'assistant' ? index + 1 : null
+                const replyView = reply === null ? null : views.get(reply)
+                const stoppedHere = message.id in stopped
+                const failedHere =
+                  answerFailed && reply === lastIndex && !stoppedHere
+                const interrupted: 'stopped' | 'failed' | null = waiting
+                  ? null
+                  : stoppedHere || replyView?.outcome === 'stopped'
+                    ? 'stopped'
+                    : failedHere || replyView?.outcome === 'failed'
+                      ? 'failed'
+                      : null
+                const question = messageText(message)
                 return (
                   <div
                     key={message.id}
@@ -408,14 +528,24 @@ export default function AgentSearch({
                       id={questionAnchor(message.id)}
                       className="scroll-mt-24 whitespace-pre-wrap break-words text-xl font-semibold leading-snug text-foreground"
                     >
-                      {messageText(message)}
+                      {question}
                     </h2>
                     {waiting && (
                       <RunStatus
                         startedAt={runStartedAt ?? Date.now()}
                         found={0}
                         writing={false}
-                        onStop={stopRun}
+                        onStop={stopFromStatus}
+                      />
+                    )}
+                    {interrupted && (
+                      <InterruptedNote
+                        kind={interrupted}
+                        elapsedMs={stopped[message.id] ?? null}
+                        found={replyView?.foundSoFar ?? 0}
+                        dailyLimit={quota?.limit ?? null}
+                        canAskAgain={!busy && !loading && !outOfQuestions}
+                        onAskAgain={() => ask(question)}
                       />
                     )}
                   </div>
@@ -423,7 +553,7 @@ export default function AgentSearch({
               }
               if (message.role !== 'assistant') return null
               const active = busy && index === lastIndex
-              const view = buildTurnView(messages, index, { streaming: active })
+              const view = views.get(index) as TurnView
               return (
                 <div key={message.id} className="space-y-5">
                   {active && (
@@ -431,7 +561,7 @@ export default function AgentSearch({
                       startedAt={runStartedAt ?? Date.now()}
                       found={view.foundSoFar}
                       writing={Boolean(view.answer.markdown.trim())}
-                      onStop={stopRun}
+                      onStop={stopFromStatus}
                     />
                   )}
                   <EvidenceBoundary
@@ -446,16 +576,7 @@ export default function AgentSearch({
           </div>
         )}
 
-        {errorMessage && (
-          <p
-            role="alert"
-            className="mt-6 rounded-md border border-destructive/40 px-3 py-2 text-sm text-foreground"
-          >
-            {errorMessage}
-          </p>
-        )}
-
-        {hasThread && <div className="mt-10 max-w-3xl">{form}</div>}
+        {hasThread &&<div className="mt-10 max-w-3xl">{form}</div>}
       </section>
     </main>
   )

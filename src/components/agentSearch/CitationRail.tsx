@@ -17,10 +17,13 @@ function CitationItem({
   citation,
   expanded,
   onToggle,
+  linkTarget = false,
 }: {
   citation: Citation
   expanded: boolean
   onToggle: () => void
+  /** Carries the citation's anchor id; only one list on the page may. */
+  linkTarget?: boolean
 }) {
   const links = useCitationLinks()
   const lit =
@@ -37,7 +40,7 @@ function CitationItem({
 
   return (
     <li
-      id={citation.anchor}
+      id={linkTarget ? citation.anchor : undefined}
       data-anchor={citation.anchor}
       tabIndex={-1}
       onClick={onClick}
@@ -56,7 +59,7 @@ function CitationItem({
         onClick={onToggle}
         aria-expanded={expanded}
         aria-label={`Citation ${citation.n}: ${expanded ? 'show less' : 'show the full post'}`}
-        className={`min-w-6 absolute right-3 top-3 z-10 inline-flex h-6 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        className={`absolute right-3 top-3 z-10 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           lit
             ? 'bg-brand text-brand-foreground'
             : 'bg-muted text-foreground hover:bg-accent'
@@ -70,6 +73,30 @@ function CitationItem({
         <TweetCard tweet={citation.tweet} stacked compact showDate />
       )}
     </li>
+  )
+}
+
+/** Cited posts as compact rows that open in full; the phone Cited tab. */
+export function CitationList({ citations }: { citations: Citation[] }) {
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
+  return (
+    <ol className="divide-y divide-border border-y border-border">
+      {citations.map((citation) => (
+        <CitationItem
+          key={citation.id}
+          citation={citation}
+          expanded={opened.has(citation.anchor)}
+          onToggle={() =>
+            setOpened((current) => {
+              const next = new Set(current)
+              if (next.has(citation.anchor)) next.delete(citation.anchor)
+              else next.add(citation.anchor)
+              return next
+            })
+          }
+        />
+      ))}
+    </ol>
   )
 }
 
@@ -92,6 +119,9 @@ export const CitationRail = forwardRef<
   const railRef = useRef<HTMLElement | null>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const pointerInside = useRef(false)
+  // While the rail scrolls to a chosen post, the position shows that post,
+  // even if the list ends before it can reach the top.
+  const holdPositionUntil = useRef(0)
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   const [position, setPosition] = useState(1)
 
@@ -135,6 +165,7 @@ export const CitationRail = forwardRef<
     if (!citation) return
     setOpened((current) => new Set(current).add(selected.anchor))
     setPosition(citation.n)
+    holdPositionUntil.current = Date.now() + 1000
     // After the card has grown to its full size.
     requestAnimationFrame(() => scrollToAnchor(selected.anchor, false))
   }, [selected, citations, scrollToAnchor])
@@ -150,6 +181,7 @@ export const CitationRail = forwardRef<
   }, [firstInView, scrollToAnchor])
 
   const onScroll = () => {
+    if (Date.now() < holdPositionUntil.current) return
     const rail = railRef.current
     if (!rail) return
     const top = rail.scrollTop + (headerRef.current?.offsetHeight ?? 0)
@@ -174,8 +206,12 @@ export const CitationRail = forwardRef<
       return next
     })
 
+  // Phones show the rail only while a run is going; once answered, cited
+  // posts move into the Cited tab under the answer.
   return (
-    <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-stretch lg:border-l lg:border-border lg:bg-muted/20">
+    <div
+      className={`${active ? '' : 'hidden'} lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:self-stretch lg:border-l lg:border-border lg:bg-muted/20`}
+    >
       <aside
         ref={setRefs}
         aria-label={showFound ? 'Posts found so far' : 'Cited tweets'}
@@ -213,6 +249,7 @@ export const CitationRail = forwardRef<
                 citation={citation}
                 expanded={opened.has(citation.anchor)}
                 onToggle={() => toggle(citation.anchor)}
+                linkTarget
               />
             ))}
           </ol>

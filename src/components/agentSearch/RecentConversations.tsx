@@ -62,7 +62,7 @@ export function RecentConversations({
               aria-current={current ? 'page' : undefined}
               className={`flex w-full items-baseline justify-between gap-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
                 compact
-                  ? 'min-h-11 rounded-md px-3 py-2.5'
+                  ? 'min-h-[2.75rem] rounded-md px-3 py-2.5'
                   : 'px-4 py-3 first:rounded-t-lg last:rounded-b-lg'
               } ${current ? 'bg-muted' : ''}`}
             >

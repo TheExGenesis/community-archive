@@ -3,8 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import { AnswerMarkdown } from './AnswerMarkdown'
-import { CitationContext, type CitationLinks } from './CitationContext'
-import { CitationRail } from './CitationRail'
+import {
+  CitationContext,
+  RAIL_MEDIA,
+  type CitationLinks,
+} from './CitationContext'
+import { CitationList, CitationRail } from './CitationRail'
+import { CitationSheet } from './CitationSheet'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { EvidenceTabs, type EvidenceTab } from './EvidenceTabs'
 import {
@@ -183,6 +188,8 @@ export function AgentSearchTurn({
   const [selected, setSelected] = useState<CitationLinks['selected']>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [inView, setInView] = useState<ReadonlySet<string>>(new Set())
+  const [sheetAnchor, setSheetAnchor] = useState<string | null>(null)
+  const sheetChipRef = useRef<HTMLElement | null>(null)
   const links = useMemo<CitationLinks>(
     () => ({
       selected,
@@ -191,6 +198,10 @@ export function AgentSearchTurn({
       select: (anchor) =>
         setSelected((current) => ({ anchor, seq: (current?.seq ?? 0) + 1 })),
       hover: setHovered,
+      openSheet: (anchor, chip) => {
+        sheetChipRef.current = chip
+        setSheetAnchor(anchor)
+      },
     }),
     [selected, hovered, inView],
   )
@@ -241,7 +252,8 @@ export function AgentSearchTurn({
   }, [answerKey])
 
   const showTier = (target: ReceiptTarget) => {
-    if (target === 'cited') {
+    // Cited posts are in the rail on wide screens and a tab on phones.
+    if (target === 'cited' && window.matchMedia(RAIL_MEDIA).matches) {
       citedRef.current?.scrollIntoView({ block: 'start' })
       return
     }
@@ -309,12 +321,23 @@ export function AgentSearchTurn({
                 relevantTotal={view.receipt.relevant}
                 otherMatches={view.otherMatches}
                 groups={view.groups}
+                cited={{
+                  count: answer.citations.length,
+                  content: <CitationList citations={answer.citations} />,
+                }}
                 footer={<SearchDetails coverage={view.coverage} />}
               />
             </EvidenceBoundary>
           </section>
         )}
       </div>
+      <CitationSheet
+        citations={answer.citations}
+        anchor={sheetAnchor}
+        onNavigate={setSheetAnchor}
+        onClose={() => setSheetAnchor(null)}
+        returnFocusTo={sheetChipRef.current}
+      />
     </CitationContext.Provider>
   )
 }

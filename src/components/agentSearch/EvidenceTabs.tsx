@@ -57,7 +57,7 @@ function TweetPages({
 }
 
 const chipClass = (selected: boolean) =>
-  `inline-flex min-h-8 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+  `inline-flex min-h-[2rem] items-center gap-1 rounded-full border px-2.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
     selected
       ? 'border-foreground bg-foreground text-background'
       : 'border-border bg-background text-foreground hover:bg-accent'
@@ -122,7 +122,7 @@ function FilteredPosts({
               type="button"
               aria-pressed={byDate === option.value}
               onClick={() => setByDate(option.value)}
-              className={`min-h-7 rounded px-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`min-h-[1.75rem] rounded px-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 byDate === option.value
                   ? 'bg-muted font-medium text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -209,19 +209,30 @@ export function EvidenceTabs({
       onValueChange={(value) => onTabChange(value as EvidenceTab)}
       className="space-y-3"
     >
-      <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
+      <TabsList
+        className={`h-auto w-full justify-start overflow-x-auto sm:w-auto ${
+          // Wide screens show cited posts in the rail, not as a tab.
+          !hasRelevant && !hasOther ? 'lg:hidden' : ''
+        }`}
+      >
         {hasCited && cited && (
-          <TabsTrigger value="cited" className="min-h-9 lg:hidden">
+          <TabsTrigger value="cited" className="min-h-[2.75rem] lg:hidden">
             Cited ({count(cited.count)})
           </TabsTrigger>
         )}
         {hasRelevant && (
-          <TabsTrigger value="relevant" className="min-h-9">
+          <TabsTrigger
+            value="relevant"
+            className="min-h-[2.75rem] lg:min-h-[2.25rem]"
+          >
             Also relevant ({count(relevantTotal)})
           </TabsTrigger>
         )}
         {hasOther && (
-          <TabsTrigger value="other" className="min-h-9">
+          <TabsTrigger
+            value="other"
+            className="min-h-[2.75rem] lg:min-h-[2.25rem]"
+          >
             Other matches ({count(otherMatches.length)})
           </TabsTrigger>
         )}

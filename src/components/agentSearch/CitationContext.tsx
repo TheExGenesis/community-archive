@@ -18,6 +18,8 @@ export interface CitationLinks {
   inView: ReadonlySet<string>
   select: (anchor: string) => void
   hover: (anchor: string | null) => void
+  /** Narrow screens: open the post in a sheet; focus returns to `chip`. */
+  openSheet: (anchor: string, chip: HTMLElement) => void
 }
 
 export const CitationContext = createContext<CitationLinks | null>(null)

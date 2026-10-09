@@ -27,7 +27,13 @@ const ALLOWED_ELEMENTS = [
 ]
 
 const CHIP =
-  'ml-0.5 inline-flex h-5 min-w-5 -translate-y-px items-center justify-center rounded-full px-1.5 align-middle text-[11px] font-semibold leading-none no-underline'
+  'ml-0.5 inline-flex h-5 min-w-[1.25rem] -translate-y-px items-center justify-center rounded-full px-1.5 align-middle text-[11px] font-semibold leading-none no-underline'
+
+// The chip stays 20px to read as a footnote, but takes taps over 32px of
+// height. On touch screens chips sit 6px apart so neighbours' areas don't
+// overlap.
+const CHIP_HIT_AREA =
+  "relative after:absolute after:-inset-x-[3px] after:-inset-y-1.5 after:content-[''] [@media(pointer:coarse)]:ml-1.5"
 
 /**
  * A numbered citation. With the rail beside the answer, a click brings the
@@ -48,15 +54,17 @@ function CitationChip({
       href={href}
       aria-label={`Citation ${String(children)}`}
       onClick={(event) => {
-        if (!links || !window.matchMedia(RAIL_MEDIA).matches) return
+        if (!links) return
+        // Neither path follows the #anchor, so the page never jumps.
         event.preventDefault()
-        links.select(anchor)
+        if (window.matchMedia(RAIL_MEDIA).matches) links.select(anchor)
+        else links.openSheet(anchor, event.currentTarget)
       }}
       onMouseEnter={() => links?.hover(anchor)}
       onMouseLeave={() => links?.hover(null)}
       onFocus={() => links?.hover(anchor)}
       onBlur={() => links?.hover(null)}
-      className={`${CHIP} transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`${CHIP} ${CHIP_HIT_AREA} transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         lit ? 'bg-brand text-brand-foreground' : 'bg-muted text-foreground'
       }`}
     >

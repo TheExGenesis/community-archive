@@ -407,7 +407,7 @@ export default function AgentSearch({
                   ? 'Ask a follow-up'
                   : 'Ask about what people in the archive have said'
           }
-          className="min-h-10 flex-1 resize-none bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+          className="min-h-[2.5rem] flex-1 resize-none bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
         />
         {/* Stop lives in the status row above the answer, not here. */}
         {!busy && !outOfQuestions && (

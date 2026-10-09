@@ -15,6 +15,8 @@ export type MissingAccountsResponse = {
   data: {
     needsOptIn: MissingAccount[]
     needsArchive: MissingAccount[]
+    // Absent from gateway releases that predate the ranking.
+    topRepliers?: MissingAccount[]
   }
   query: {
     limit: number

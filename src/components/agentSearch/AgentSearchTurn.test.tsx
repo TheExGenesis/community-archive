@@ -16,6 +16,11 @@ jest.mock('./AnswerMarkdown', () => ({
   AnswerMarkdown: ({ children }: { children: string }) => <div>{children}</div>,
 }))
 
+// jsdom does not lay out, so it has no scrollIntoView.
+beforeAll(() => {
+  Element.prototype.scrollIntoView = jest.fn()
+})
+
 const tweet = (id: string) => ({
   id,
   username: `user${id}`,
@@ -55,17 +60,17 @@ test('shows live progress while the agent is still searching', () => {
     'polite',
   )
   expect(screen.getByText('Searching “community archive”')).toBeInTheDocument()
-  expect(screen.queryByText('Coverage')).not.toBeInTheDocument()
+  expect(screen.queryByText('How this was searched')).not.toBeInTheDocument()
 })
 
-test('renders cited tweets, unverified note, other posts and coverage when done', () => {
+test('renders the receipt, cited tweets, unverified note, evidence tabs and coverage when done', () => {
   const messages: UIMessage[] = [
     {
       id: 'a1',
       role: 'assistant',
       parts: [
         search('output-available', {
-          tweets: [tweet('1'), tweet('2')],
+          tweets: [tweet('1'), { ...tweet('2'), p: 0.8 }, tweet('3')],
           nextOffset: null,
         }),
         { type: 'text', text: 'People said things [[t:1]] [[t:777]]' },
@@ -74,21 +79,44 @@ test('renders cited tweets, unverified note, other posts and coverage when done'
   ]
   render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
 
+  expect(
+    screen.getByRole('button', { name: 'Based on 1 cited post' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('button', { name: '1 more judged relevant' }),
+  ).toBeInTheDocument()
+
   const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
   expect(cited).toHaveTextContent('Post 1')
   expect(document.getElementById('ask-a1-tweet-1')).toBeInTheDocument()
   expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
 
-  const other = screen.getByText(/Other posts the search found \(1\)/)
-  expect(screen.queryByText('Post 2')).not.toBeInTheDocument()
-  fireEvent.click(other)
-  const details = other.closest('details') as HTMLDetailsElement
-  details.open = true
-  fireEvent(details, new Event('toggle'))
+  // Relevant posts show by default; other matches mount when their tab opens.
+  expect(
+    screen.getByRole('tab', { name: 'Also relevant (1)' }),
+  ).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByText('Post 2')).toBeInTheDocument()
+  expect(screen.queryByText('Post 3')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '1 other match' }))
+  expect(screen.getByText('Post 3')).toBeInTheDocument()
 
-  const coverage = screen.getByRole('region', { name: 'Coverage' })
-  expect(coverage).toHaveTextContent('“community archive” · 2 tweets')
+  // One note says how it searched; the step list is gone once answered.
+  const coverage = screen.getByRole('region', { name: 'How this was searched' })
+  expect(coverage).toHaveTextContent('“community archive” · 3 tweets')
   expect(coverage).toHaveTextContent('Not searched: live X')
-  expect(screen.getByText('1 research step')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Search progress')).not.toBeInTheDocument()
+})
+
+test('says a follow-up with no new searches used the earlier posts', () => {
+  const messages: UIMessage[] = [
+    {
+      id: 'a2',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'From before.' }],
+    },
+  ]
+  render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
+  expect(
+    screen.getByRole('region', { name: 'How this was searched' }),
+  ).toHaveTextContent('Answered from the posts found for the earlier question.')
 })

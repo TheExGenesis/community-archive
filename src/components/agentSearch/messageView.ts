@@ -49,16 +49,55 @@ export interface CoverageSearch {
 export interface CoverageView {
   searches: CoverageSearch[]
   scored: number
+  /** Judged relevant (p >= 0.5). */
   kept: number
+  /** A check stopped at its post limit, so more matching posts exist. */
+  capped: boolean
   threadsRead: number
   quotesRead: number
+  /** Names or handles looked up. */
+  people: string[]
 }
 
+/** An agent-chosen heading over some of the posts it found. */
+export interface EvidenceGroup {
+  label: string
+  tweets: PortalTweet[]
+}
+
+/** The counts behind "Based on 16 cited posts · 99 more judged relevant". */
+export interface ReceiptView {
+  cited: number
+  /** Judged relevant and not cited, including posts the tools did not return. */
+  relevant: number
+  other: number
+  searches: number
+  scorerRan: boolean
+  /** The post limit a check stopped at, when one did. */
+  cappedAt: number | null
+}
+
+/** How a saved turn ended; a live stop is tracked by the page instead. */
+export type TurnOutcome = 'done' | 'stopped' | 'failed'
+
 export interface TurnView {
+  outcome: TurnOutcome
   progress: ProgressLine[]
   answer: AnswerView
-  otherTweets: PortalTweet[]
+  /** Found posts judged relevant (p >= 0.5) that the answer does not cite. */
+  relevant: PortalTweet[]
+  /** Judged relevant but not returned to the page (each check returns 60). */
+  relevantNotShown: number
+  /** Every other search hit: not scored, or scored below the threshold. */
+  otherMatches: PortalTweet[]
+  /** Agent-chosen grouping of the relevant posts, when the run supplies one. */
+  groups: EvidenceGroup[] | null
+  receipt: ReceiptView
   coverage: CoverageView
+  /** Distinct posts this turn's finished tool calls returned. */
+  foundSoFar: number
+  /** The best few of those, for the side column while the answer is written. */
+  topFound: PortalTweet[]
 }
 
 type LooseRecord = Record<string, unknown>
@@ -76,6 +115,12 @@ const asNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
 const quote = (value: string) => `“${value}”`
+
+/** 0:07, 1:32, 12:05. */
+export function formatElapsed(ms: number) {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
 
 const plural = (n: number, word: string) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? word : `${word}s`}`
@@ -110,14 +155,82 @@ export function toolCalls(message: UIMessage): ToolCallView[] {
   return calls
 }
 
-function searchSubject(input: LooseRecord): string {
-  const query = asString(input.query)
+const dayFormat = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function formatDay(value: string) {
+  const date = new Date(`${value}T00:00:00Z`)
+  return Number.isFinite(date.getTime()) ? dayFormat.format(date) : value
+}
+
+/** "2023", "since 3 Jan 2023", "3 Jan to 5 Mar 2023"-style ranges. */
+export function dateRangeLabel(
+  since: string | undefined,
+  until: string | undefined,
+): string | null {
+  const from = since && DATE_ONLY.test(since) ? since : undefined
+  const to = until && DATE_ONLY.test(until) ? until : undefined
+  if (from && to) {
+    const [, fromYear, fromMonth, fromDay] = DATE_ONLY.exec(from) ?? []
+    const [, toYear, toMonth, toDay] = DATE_ONLY.exec(to) ?? []
+    if (fromYear === toYear && fromMonth === '01' && fromDay === '01') {
+      if (toMonth === '12' && toDay === '31') return fromYear
+    }
+    // Searches often end on the first of the next year.
+    if (
+      fromMonth === '01' &&
+      fromDay === '01' &&
+      toMonth === '01' &&
+      toDay === '01' &&
+      Number(toYear) === Number(fromYear) + 1
+    ) {
+      return fromYear
+    }
+    return `${formatDay(from)} to ${formatDay(to)}`
+  }
+  if (from) return `since ${formatDay(from)}`
+  if (to) return `before ${formatDay(to)}`
+  return null
+}
+
+const SORT_LABELS: Record<string, string> = {
+  oldest: 'oldest first',
+  likes: 'most liked',
+  reposts: 'most reposted',
+}
+
+const handle = (value: string) => `@${value.replace(/^@/, '')}`
+
+/** Date range, order and paging, so repeated searches read as different. */
+function searchQualifiers(input: LooseRecord): string[] {
+  const qualifiers: string[] = []
+  const range = dateRangeLabel(asString(input.since), asString(input.until))
+  if (range) qualifiers.push(range)
+  const sort = asString(input.sort)
+  if (sort && SORT_LABELS[sort]) qualifiers.push(SORT_LABELS[sort])
+  if ((asNumber(input.offset) ?? 0) > 0) qualifiers.push('more results')
+  return qualifiers
+}
+
+/** Null when the search has neither words nor people: a plain browse. */
+export function searchSubject(input: LooseRecord): string | null {
+  const words = [asString(input.query), ...asArray(input.anyOf).map(asString)]
+    .filter((word): word is string => Boolean(word))
+    .filter((word, index, all) => all.indexOf(word) === index)
   const from = asString(input.fromUser)
   const replyTo = asString(input.replyToUser)
-  const parts = [query ? quote(query) : 'posts']
-  if (from) parts.push(`from @${from.replace(/^@/, '')}`)
-  if (replyTo) parts.push(`replying to @${replyTo.replace(/^@/, '')}`)
-  return parts.join(' ')
+  const people: string[] = []
+  if (from) people.push(`from ${handle(from)}`)
+  if (replyTo) people.push(`replying to ${handle(replyTo)}`)
+  if (!words.length && !people.length) return null
+  const head = [words.length ? words.map(quote).join(', ') : 'posts', ...people]
+  return [head.join(' '), ...searchQualifiers(input)].join(', ')
 }
 
 function termsSubject(input: LooseRecord): string {
@@ -126,7 +239,10 @@ function termsSubject(input: LooseRecord): string {
     .filter((term): term is string => Boolean(term))
   const from = asString(input.fromUser)
   const subject = terms.length ? terms.map(quote).join(', ') : 'posts'
-  return from ? `${subject} from @${from.replace(/^@/, '')}` : subject
+  const range = dateRangeLabel(asString(input.since), asString(input.until))
+  return [from ? `${subject} from ${handle(from)}` : subject, range]
+    .filter(Boolean)
+    .join(', ')
 }
 
 const CRITERION_LIMIT = 140
@@ -164,12 +280,20 @@ export function progressLine(call: ToolCallView): ProgressLine {
     }
     case 'search_tweets': {
       const subject = searchSubject(input)
-      running = `Searching ${subject}`
-      finished = `Searched ${subject} · ${plural(
-        asArray(out.tweets).length,
-        'tweet',
-      )}`
-      failure = `Search for ${subject} failed`
+      const tweets = plural(asArray(out.tweets).length, 'tweet')
+      if (subject) {
+        running = `Searching ${subject}`
+        finished = `Searched ${subject} · ${tweets}`
+        failure = `Search for ${subject} failed`
+      } else {
+        const qualifiers = searchQualifiers(input)
+        const what = qualifiers.length
+          ? `posts, ${qualifiers.join(', ')}`
+          : 'recent posts'
+        running = `Browsing ${what}`
+        finished = `Browsed ${what} · ${tweets}`
+        failure = `Browsing ${what} failed`
+      }
       break
     }
     case 'collect_and_score': {
@@ -181,18 +305,18 @@ export function progressLine(call: ToolCallView): ProgressLine {
       running = `Checking up to ${plural(limit, 'post')} matching ${subject}${question}`
       finished = `Checked ${plural(asNumber(out.scored) ?? 0, 'post')} matching ${subject} · ${collectKept(
         out,
-      )} kept${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-post limit` : ''}`
+      )} relevant${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-post limit` : ''}`
       failure = `Checking posts matching ${subject} failed`
       break
     }
     case 'score_tweets': {
       const scored = asArray(out.scored)
       const count = asArray(input.tweetIds).length
-      running = count ? `Scoring ${plural(count, 'post')}` : 'Scoring posts'
-      finished = `Scored ${plural(scored.length, 'post')} · ${keptCount(
+      running = `Checking ${count ? plural(count, 'post') : 'posts'} against your question`
+      finished = `Checked ${plural(scored.length, 'post')} against your question · ${keptCount(
         scored,
-      )} kept`
-      failure = 'Scoring posts failed'
+      )} relevant`
+      failure = 'Checking posts against your question failed'
       break
     }
     case 'get_thread': {
@@ -245,6 +369,31 @@ function quotedAsPortal(tweet: PortalQuotedTweet): PortalTweet {
   return { ...tweet, observedAt: tweet.createdAt }
 }
 
+/** find_people top tweets carry only id, date, text and likes. */
+function profileTweets(profile: LooseRecord, items: unknown): PortalTweet[] {
+  const username = asString(profile.username)
+  if (!username) return []
+  return asArray(items).flatMap((item) => {
+    if (!isRecord(item) || typeof item.id !== 'string') return []
+    if (typeof item.text !== 'string') return []
+    const createdAt = asString(item.createdAt) ?? ''
+    return [
+      {
+        id: item.id,
+        username,
+        name: asString(profile.displayName) ?? username,
+        avatar: null,
+        text: item.text,
+        observedAt: createdAt,
+        createdAt,
+        likes: asNumber(item.likes) ?? 0,
+        rts: 0,
+        retweetCountAvailable: false,
+      },
+    ]
+  })
+}
+
 /**
  * Same traversal as collectToolTweetIds, but keeps the objects so the page can
  * render cited tweets without another fetch. Full tweets win over quoted embeds.
@@ -264,7 +413,8 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
     if (
       typeof value.id === 'string' &&
       /^\d{1,20}$/.test(value.id) &&
-      typeof value.text === 'string'
+      typeof value.text === 'string' &&
+      typeof value.username === 'string'
     ) {
       const id = value.id
       const isFull = typeof value.observedAt === 'string'
@@ -284,6 +434,12 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
       if (p !== undefined) scores.set(id, Math.max(p, scores.get(id) ?? 0))
     }
     for (const [key, child] of Object.entries(value)) {
+      if (key === 'topTweets') {
+        // A profile's all-time top tweets are context, not search results,
+        // and arrive without author fields. Keep them citable, never listed.
+        visit(profileTweets(value, child), true)
+        continue
+      }
       visit(child, embedded || key === 'quotedTweet')
     }
   }
@@ -343,34 +499,80 @@ export function buildAnswer(
   return { markdown, citations, unverified }
 }
 
+/**
+ * What was searched, for people: one line per distinct search (paging of the
+ * same search is summed into one line), the scoring totals, and what else
+ * was read.
+ */
 export function buildCoverage(calls: ToolCallView[]): CoverageView {
   const coverage: CoverageView = {
     searches: [],
     scored: 0,
     kept: 0,
+    capped: false,
     threadsRead: 0,
     quotesRead: 0,
+    people: [],
+  }
+  interface Tally {
+    label: string
+    scoring: boolean
+    runs: number
+    tweets: number
+    checked: number
+    kept: number
+    capped: boolean
+  }
+  // Keyed by kind and label: a keyword search and a scoring check over the
+  // same words are different lines.
+  const searches = new Map<string, Tally>()
+  const tally = (label: string, scoring: boolean) => {
+    const key = `${scoring ? 'check' : 'search'}:${label}`
+    let entry = searches.get(key)
+    if (!entry) {
+      entry = {
+        label,
+        scoring,
+        runs: 0,
+        tweets: 0,
+        checked: 0,
+        kept: 0,
+        capped: false,
+      }
+      searches.set(key, entry)
+    }
+    entry.runs += 1
+    return entry
   }
   for (const call of calls) {
     if (call.state !== 'output-available') continue
     const out = isRecord(call.output) ? call.output : {}
     switch (call.name) {
-      case 'search_tweets':
-        coverage.searches.push({
-          label: searchSubject(call.input),
-          detail: plural(asArray(out.tweets).length, 'tweet'),
-        })
+      case 'find_people': {
+        const query = asString(call.input.query)
+        if (query && !coverage.people.includes(query))
+          coverage.people.push(query)
         break
+      }
+      case 'search_tweets': {
+        // Further pages of one search read as that search.
+        const input = { ...call.input }
+        delete input.offset
+        tally(searchSubject(input) ?? 'recent posts', false).tweets += asArray(
+          out.tweets,
+        ).length
+        break
+      }
       case 'collect_and_score': {
-        const collected = asNumber(out.collected) ?? 0
         const scored = asNumber(out.scored) ?? 0
         const kept = collectKept(out)
-        coverage.searches.push({
-          label: termsSubject(call.input),
-          detail: `${plural(collected, 'post')} checked${
-            out.capped ? ' (stopped at the limit, more exist)' : ''
-          }, ${kept} kept`,
-        })
+        const entry = tally(termsSubject(call.input), true)
+        entry.checked += asNumber(out.collected) ?? 0
+        entry.kept += kept
+        if (out.capped) {
+          entry.capped = true
+          coverage.capped = true
+        }
         coverage.scored += scored
         coverage.kept += kept
         break
@@ -389,6 +591,17 @@ export function buildCoverage(calls: ToolCallView[]): CoverageView {
         break
     }
   }
+  coverage.searches = Array.from(searches.values()).map((entry) => {
+    const times = entry.runs > 1 ? ` from ${entry.runs} searches` : ''
+    return {
+      label: entry.label,
+      detail: entry.scoring
+        ? `${plural(entry.checked, 'post')} checked, ${entry.kept.toLocaleString('en-US')} relevant${
+            entry.capped ? ', stopped at the limit' : ''
+          }`
+        : `${plural(entry.tweets, 'tweet')}${times}`,
+    }
+  })
   return coverage
 }
 
@@ -435,19 +648,147 @@ export function buildTurnView(
   const ownOutputs = calls.map((call) => call.output)
   const found = collectToolTweets([...ownOutputs, ...priorOutputs])
   const own = collectToolTweets(ownOutputs)
-  const answer = buildAnswer(answerText(message), found, message.id, options)
+  const text = answerText(message)
+  const outcome = turnOutcome(text)
+  const answer = buildAnswer(
+    outcome === 'done' ? text : '',
+    found,
+    message.id,
+    options,
+  )
   const cited = new Set(answer.citations.map((citation) => citation.id))
-  const otherTweets = orderByScore(
+  const uncited = orderByScore(
     own.results.filter((id) => !cited.has(id)),
     own.scores,
-  ).map((id) => own.byId.get(id) as PortalTweet)
+  )
+  const isRelevant = (id: string) => (own.scores.get(id) ?? 0) >= KEPT_P
+  const tweetFor = (id: string) => own.byId.get(id) as PortalTweet
+  const relevant = uncited.filter(isRelevant).map(tweetFor)
+  const otherMatches = uncited.filter((id) => !isRelevant(id)).map(tweetFor)
+
+  let relevantNotShown = 0
+  let searches = 0
+  let cappedAt: number | null = null
+  for (const call of calls) {
+    if (call.state !== 'output-available') continue
+    const out = isRecord(call.output) ? call.output : {}
+    if (call.name === 'search_tweets') searches += 1
+    if (call.name === 'collect_and_score') {
+      searches += 1
+      relevantNotShown += Math.max(
+        0,
+        collectKept(out) - asArray(out.kept).length,
+      )
+      if (out.capped) {
+        cappedAt =
+          asNumber(out.limit) ??
+          asNumber(call.input.maxTweets) ??
+          DEFAULT_COLLECT
+      }
+    }
+  }
 
   return {
+    outcome,
     progress: calls.map(progressLine),
     answer,
-    otherTweets,
+    relevant,
+    relevantNotShown,
+    otherMatches,
+    groups: evidenceGroups(message, found),
+    receipt: {
+      cited: answer.citations.length,
+      relevant: relevant.length + relevantNotShown,
+      other: otherMatches.length,
+      searches,
+      scorerRan: own.scores.size > 0,
+      cappedAt,
+    },
     coverage: buildCoverage(calls),
+    foundSoFar: own.results.length,
+    topFound: orderByScore(own.results, own.scores)
+      .slice(0, TOP_FOUND)
+      .map(tweetFor),
   }
+}
+
+const TOP_FOUND = 3
+
+// A saved run that ended without an answer is closed with one of these
+// lines (history.ts); the page shows its own banner instead.
+const STOPPED_CLOSING = /^_?This answer was stopped before it finished\._?$/
+const FAILED_CLOSING = /^_?This answer failed before it finished\._?$/
+
+function turnOutcome(text: string): TurnOutcome {
+  const trimmed = text.trim()
+  if (STOPPED_CLOSING.test(trimmed)) return 'stopped'
+  if (FAILED_CLOSING.test(trimmed)) return 'failed'
+  return 'done'
+}
+
+/**
+ * Optional grouping the agent may attach as message metadata:
+ * `{ groups: [{ label, tweetIds }] }`. Ids the tools never returned are
+ * dropped, and an empty result means no grouping.
+ */
+function evidenceGroups(
+  message: UIMessage,
+  found: FoundTweets,
+): EvidenceGroup[] | null {
+  const metadata = isRecord(message.metadata) ? message.metadata : {}
+  const groups = asArray(metadata.groups).flatMap((group) => {
+    if (!isRecord(group)) return []
+    const label = asString(group.label)
+    if (!label) return []
+    const tweets = asArray(group.tweetIds)
+      .map((id) => (typeof id === 'string' ? found.byId.get(id) : undefined))
+      .filter((tweet): tweet is PortalTweet => Boolean(tweet))
+    return tweets.length ? [{ label, tweets }] : []
+  })
+  return groups.length ? groups : null
+}
+
+export type ReceiptTarget = 'cited' | 'relevant' | 'other'
+
+/** One line under the question; each count can link to its tier. */
+export function receiptSegments(
+  receipt: ReceiptView,
+): Array<{ text: string; target: ReceiptTarget | null }> {
+  const segments: Array<{ text: string; target: ReceiptTarget | null }> = [
+    receipt.cited
+      ? {
+          text: `Based on ${plural(receipt.cited, 'cited post')}`,
+          target: 'cited',
+        }
+      : { text: 'No posts cited', target: null },
+  ]
+  if (receipt.scorerRan && receipt.relevant) {
+    segments.push({
+      text: `${receipt.relevant.toLocaleString('en-US')} more judged relevant`,
+      target: 'relevant',
+    })
+  }
+  if (receipt.other) {
+    const matches = `${receipt.other.toLocaleString('en-US')} other ${
+      receipt.other === 1 ? 'match' : 'matches'
+    }`
+    segments.push({
+      text:
+        !receipt.scorerRan && receipt.searches
+          ? `${matches} from ${receipt.searches} ${
+              receipt.searches === 1 ? 'search' : 'searches'
+            }`
+          : matches,
+      target: 'other',
+    })
+  }
+  if (receipt.cappedAt) {
+    segments.push({
+      text: `stopped at the ${receipt.cappedAt.toLocaleString('en-US')}-post limit`,
+      target: null,
+    })
+  }
+  return segments
 }
 
 /** Scored posts first, highest probability first; the rest keep search order. */
@@ -479,7 +820,10 @@ const ERROR_MESSAGES: Record<string, string> = {
  * WorkflowChatTransport throws `Failed to fetch chat: <status> <body>` for a
  * non-2xx POST, so the status and JSON error code are parsed from the message.
  */
-export function describeChatError(error: Error | undefined): string | null {
+export function describeChatError(
+  error: Error | undefined,
+  quota?: { limit: number; resetLabel: string },
+): string | null {
   if (!error) return null
   const match = /Failed to fetch chat: (\d{3}) ?([\s\S]*)$/.exec(error.message)
   if (!match) {
@@ -492,6 +836,9 @@ export function describeChatError(error: Error | undefined): string | null {
     if (isRecord(body)) code = asString(body.error)
   } catch {
     code = undefined
+  }
+  if (code === 'daily_limit' && quota) {
+    return `You’ve used today’s ${quota.limit} questions. You can ask again at ${quota.resetLabel}.`
   }
   if (code && ERROR_MESSAGES[code]) return ERROR_MESSAGES[code]
   if (status === 401) return 'Sign in to ask a question.'

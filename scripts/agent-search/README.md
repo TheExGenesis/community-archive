@@ -66,11 +66,15 @@ drops any that no longer resolve, so opt-outs leave the key; dropped ids are rep
 - **recall cited**: share of key ids the answer cites.
 - **recall found**: share of key ids that appeared in any tool result, whether or not
   cited. The gap between the two is what the agent saw but left out.
-- **precision**: share of cited ids that are in the key. Exact keys only; for partial
-  keys the cited-outside-key count is shown instead, because those ids are unjudged.
-- **invalid**: citation markers whose id never appeared in a tool result
-  (`validateCitations` against `collectToolTweetIds` of all tool outputs). The by-class
-  table reports them as a rate of all markers.
+- **precision**: share of cited ids that are in the key, with invalid ids counted as
+  misses. Exact keys only; for partial keys the cited-outside-key count is shown
+  instead, because those ids are unjudged.
+- **invalid**: citations whose id never appeared in a tool result (`validateCitations`
+  against `collectToolTweetIds` of all tool outputs). The per-question table shows
+  distinct ids; the by-class table reports invalid markers, repeats included, as a rate
+  of all markers.
+- A run whose model failed, was cut off at the token limit or filtered, or returned no
+  answer, is reported as an error, not scored as an answer (`agentRunFailure`).
 - **call N** (recall-a-tweet): which tool call first returned the target tweet.
 - **asked** (ambiguous-term): whether the last paragraph ends in a question. A rough
   flag; read the answer against `expect` and the notes.

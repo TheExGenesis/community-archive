@@ -1,4 +1,5 @@
 import { scoreTweets } from './classifier'
+import type { RunLimits } from './deadline'
 import {
   findMembers,
   getQuotePosts,
@@ -13,7 +14,9 @@ import {
 import type { AgentTweet, ScoredTweet } from './types'
 
 // Plain implementations of the agent's tools. The workflow wraps each one in a
-// 'use step' function; scripts call them directly.
+// 'use step' function; scripts call them directly. The second argument carries
+// the run's deadline (and, from the AI SDK in scripts, an abort signal); every
+// gateway and scorer call below honours it.
 
 /** Drops '' / null / [] values that models send for unused optional fields. */
 function present<T extends object>(input: T): T {
@@ -40,12 +43,15 @@ export interface FindPeopleInput {
   query: string
 }
 
-export async function findPeopleImpl({ query }: FindPeopleInput) {
+export async function findPeopleImpl(
+  { query }: FindPeopleInput,
+  limits: RunLimits = {},
+) {
   const handle = query.trim().replace(/^@/, '')
   const [members, user] = await Promise.all([
-    findMembers(handle, 10),
+    findMembers(handle, 10, limits),
     /^[A-Za-z0-9_]{1,15}$/.test(handle)
-      ? getUser(handle)
+      ? getUser(handle, limits)
       : Promise.resolve(null),
   ])
   return { query, members, user }
@@ -68,7 +74,10 @@ function newestFirst(a: AgentTweet, b: AgentTweet) {
   return b.createdAt.localeCompare(a.createdAt)
 }
 
-export async function searchTweetsImpl(raw: SearchTweetsToolInput) {
+export async function searchTweetsImpl(
+  raw: SearchTweetsToolInput,
+  limits: RunLimits = {},
+) {
   const input = present(raw)
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 50)
   const filters = {
@@ -87,7 +96,9 @@ export async function searchTweetsImpl(raw: SearchTweetsToolInput) {
       ),
     ).slice(0, 9)
     const pages = await Promise.all(
-      terms.map((term) => searchTweets({ ...filters, query: term, limit })),
+      terms.map((term) =>
+        searchTweets({ ...filters, query: term, limit }, limits),
+      ),
     )
     const merged = new Map<string, AgentTweet>()
     for (const page of pages)
@@ -100,13 +111,16 @@ export async function searchTweetsImpl(raw: SearchTweetsToolInput) {
       nextOffset: null,
     }
   }
-  const page = await searchTweets({
-    ...filters,
-    query: input.query,
-    mode: input.mode,
-    limit,
-    offset: input.offset,
-  })
+  const page = await searchTweets(
+    {
+      ...filters,
+      query: input.query,
+      mode: input.mode,
+      limit,
+      offset: input.offset,
+    },
+    limits,
+  )
   return {
     query: input.query,
     tweets: page.tweets,
@@ -114,7 +128,10 @@ export async function searchTweetsImpl(raw: SearchTweetsToolInput) {
   }
 }
 
-async function parentTexts(tweets: AgentTweet[]): Promise<Map<string, string>> {
+async function parentTexts(
+  tweets: AgentTweet[],
+  limits: RunLimits,
+): Promise<Map<string, string>> {
   const parentIds = Array.from(
     new Set(
       tweets.map((t) => t.replyToTweetId).filter((id): id is string => !!id),
@@ -122,7 +139,7 @@ async function parentTexts(tweets: AgentTweet[]): Promise<Map<string, string>> {
   )
   const texts = new Map<string, string>()
   for (let i = 0; i < parentIds.length; i += 100) {
-    const parents = await getTweetsByIds(parentIds.slice(i, i + 100))
+    const parents = await getTweetsByIds(parentIds.slice(i, i + 100), limits)
     for (const parent of parents) texts.set(parent.id, parent.text)
   }
   return texts
@@ -132,9 +149,10 @@ async function scoreWithParents(
   criterion: string,
   tweets: AgentTweet[],
   withParent: boolean,
+  limits: RunLimits,
 ) {
   const parents = withParent
-    ? await parentTexts(tweets)
+    ? await parentTexts(tweets, limits)
     : new Map<string, string>()
   const result = await scoreTweets(
     criterion,
@@ -145,6 +163,7 @@ async function scoreWithParents(
         ? parents.get(tweet.replyToTweetId)
         : null,
     })),
+    limits,
   )
   const scored: ScoredTweet[] = tweets
     .filter((tweet) => result.scores.has(tweet.id))
@@ -163,6 +182,7 @@ async function collectAcrossTerms(
   terms: string[],
   max: number,
   filters: { since?: string; until?: string; fromUser?: string },
+  limits: RunLimits,
 ) {
   const collected = new Map<string, AgentTweet>()
   const offsets = new Map<string, number | null>(terms.map((t) => [t, 0]))
@@ -177,12 +197,15 @@ async function collectAcrossTerms(
         let offset = offsets.get(term) ?? null
         while (offset !== null && tweets.length < share) {
           const page: { tweets: AgentTweet[]; nextOffset: number | null } =
-            await searchTweets({
-              ...filters,
-              query: term,
-              limit: Math.min(PAGE, share - tweets.length),
-              offset,
-            })
+            await searchTweets(
+              {
+                ...filters,
+                query: term,
+                limit: Math.min(PAGE, share - tweets.length),
+                offset,
+              },
+              limits,
+            )
           tweets.push(...page.tweets)
           offset = page.tweets.length ? page.nextOffset : null
         }
@@ -213,7 +236,10 @@ export interface CollectAndScoreInput {
   maxTweets?: number
 }
 
-export async function collectAndScoreImpl(raw: CollectAndScoreInput) {
+export async function collectAndScoreImpl(
+  raw: CollectAndScoreInput,
+  limits: RunLimits = {},
+) {
   const input = present(raw)
   const terms = Array.from(
     new Set(input.terms.map((t) => t.trim()).filter(Boolean)),
@@ -222,15 +248,21 @@ export async function collectAndScoreImpl(raw: CollectAndScoreInput) {
     Math.max(input.maxTweets ?? DEFAULT_COLLECT, 1),
     MAX_COLLECT,
   )
-  const { collected, capped } = await collectAcrossTerms(terms, max, {
-    since: input.since,
-    until: input.until,
-    fromUser: input.fromUser,
-  })
+  const { collected, capped } = await collectAcrossTerms(
+    terms,
+    max,
+    {
+      since: input.since,
+      until: input.until,
+      fromUser: input.fromUser,
+    },
+    limits,
+  )
   const { scored, scorer, costUsd } = await scoreWithParents(
     input.criterion,
     Array.from(collected.values()),
     true,
+    limits,
   )
   const kept = scored.filter((t) => t.p >= KEEP_THRESHOLD)
   const borderline = scored.filter(
@@ -258,37 +290,57 @@ export interface ScoreTweetsInput {
   withParent?: boolean
 }
 
-export async function scoreTweetsImpl(input: ScoreTweetsInput) {
-  const tweets = await getTweetsByIds(input.tweetIds.slice(0, 100))
+export async function scoreTweetsImpl(
+  input: ScoreTweetsInput,
+  limits: RunLimits = {},
+) {
+  const tweets = await getTweetsByIds(input.tweetIds.slice(0, 100), limits)
   const result = await scoreWithParents(
     input.criterion,
     tweets,
     input.withParent ?? true,
+    limits,
   )
   return { criterion: input.criterion, ...result }
 }
 
-export async function getThreadImpl({ tweetId }: { tweetId: string }) {
-  const thread = await getTweetThread(tweetId, 80)
+export async function getThreadImpl(
+  { tweetId }: { tweetId: string },
+  limits: RunLimits = {},
+) {
+  const thread = await getTweetThread(tweetId, 80, limits)
   return thread ?? { notFound: true as const, tweetId }
 }
 
-export async function getQuotePostsImpl({
-  tweetId,
-  limit,
-}: {
-  tweetId: string
-  limit?: number
-}) {
-  const result = await getQuotePosts(tweetId, Math.min(limit ?? 25, 50))
+export async function getQuotePostsImpl(
+  {
+    tweetId,
+    limit,
+  }: {
+    tweetId: string
+    limit?: number
+  },
+  limits: RunLimits = {},
+) {
+  const result = await getQuotePosts(
+    tweetId,
+    Math.min(limit ?? 25, 50),
+    0,
+    limits,
+  )
   return { tweetId, ...result }
 }
 
-export async function getTweetsImpl({ tweetIds }: { tweetIds: string[] }) {
+export async function getTweetsImpl(
+  { tweetIds }: { tweetIds: string[] },
+  limits: RunLimits = {},
+) {
   const ids = tweetIds.slice(0, 100)
   // Small sets get full cards (counts, media); large sets use the batch lookup.
   const tweets =
-    ids.length <= 30 ? await getTweetDetails(ids) : await getTweetsByIds(ids)
+    ids.length <= 30
+      ? await getTweetDetails(ids, limits)
+      : await getTweetsByIds(ids, limits)
   return { tweets }
 }
 

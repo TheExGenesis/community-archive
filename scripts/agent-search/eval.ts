@@ -75,11 +75,18 @@ interface Score {
   recallCited: number | null
   /** Share of key ids that appeared in any tool result. */
   recallFound: number | null
-  /** Share of cited ids inside the key; exact keys only. */
+  /**
+   * Share of distinct cited ids inside the key, counting invalid citations
+   * as misses; exact keys only.
+   */
   precisionCited: number | null
   citedInKey: number
   citedOutsideKey: number
-  /** Invalid citations / all citation markers. */
+  /** Every [[t:…]] marker in the answer, repeats included. */
+  citationMarkers: number
+  /** Markers whose id no tool returned. */
+  invalidMarkers: number
+  /** Invalid citation markers / all citation markers. */
   invalidRate: number | null
   /** recall-a-tweet: 1-based index of the first tool call that returned the id. */
   firstFoundAtCall: number | null
@@ -245,6 +252,27 @@ type Modules = {
   ai: typeof import('ai')
 }
 
+/** Planner cost at list or env prices; NaN for a model with no price. */
+function plannerCost(
+  mods: Modules,
+  modelSpec: string,
+  usage: Partial<LanguageModelUsage>,
+): number {
+  try {
+    return mods.model.estimateModelCostUsd(
+      modelSpec,
+      {
+        inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens,
+        outputTokens: usage.outputTokens,
+      },
+      mods.model.plannerPriceEnv(),
+    )
+  } catch {
+    return Number.NaN
+  }
+}
+
 async function validateKey(
   mods: Modules,
   question: Question,
@@ -276,6 +304,7 @@ function score(
   seen: Set<string>,
   answer: string,
   collectIds: Modules['citations']['collectToolTweetIds'],
+  citationPattern: RegExp,
 ): Score {
   const keySet = new Set(key)
   const citedInKey = cited.filter((id) => keySet.has(id)).length
@@ -293,14 +322,21 @@ function score(
       .trim()
       .split(/\n\s*\n/)
       .pop() ?? ''
+  const invalidIds = new Set(invalid)
+  const markers = Array.from(answer.matchAll(citationPattern), (m) => m[1])
+  const invalidMarkers = markers.filter((id) => invalidIds.has(id)).length
   return {
     recallCited: ratio(citedInKey, key.length),
     recallFound: ratio(foundInKey, key.length),
     precisionCited:
-      question.keyType === 'exact' ? ratio(citedInKey, cited.length) : null,
+      question.keyType === 'exact'
+        ? ratio(citedInKey, cited.length + invalid.length)
+        : null,
     citedInKey,
     citedOutsideKey: cited.length - citedInKey,
-    invalidRate: ratio(invalid.length, cited.length + invalid.length),
+    citationMarkers: markers.length,
+    invalidMarkers,
+    invalidRate: ratio(invalidMarkers, markers.length),
     firstFoundAtCall,
     askedClarifyingQuestion:
       question.class === 'ambiguous-term' ? /\?\s*$/.test(tail) : null,
@@ -330,6 +366,7 @@ async function runQuestion(
   let steps = 0
   let usage: Partial<LanguageModelUsage> = {}
   let error: string | null = null
+  const toolErrors: unknown[] = []
 
   try {
     ;({ key, dropped: keyDropped } = await validateKey(
@@ -349,13 +386,17 @@ async function runQuestion(
         instructions: mods.agent.AGENT_SEARCH_INSTRUCTIONS,
         tools,
         stopWhen: mods.ai.isStepCount(mods.agent.AGENT_SEARCH_MAX_STEPS),
+        prepareStep: mods.agent.agentSearchPrepareStep(),
       })
       const result = await agent.generate({
         prompt: question.question,
         abortSignal: AbortSignal.timeout(args.timeoutMs),
       })
-      answer = result.text
+      answer = mods.agent.finalAnswerText(result.steps)
       finishReason = result.finishReason
+      // As in the workflow: a cut-off, filtered or empty answer is an error,
+      // not an answer to score.
+      error = mods.agent.agentRunFailure(result)
       steps = result.steps.length
       usage = result.usage
       for (const step of result.steps) {
@@ -364,8 +405,10 @@ async function runQuestion(
         for (const part of step.content) {
           if (part.type === 'tool-result')
             settled.set(part.toolCallId, { output: part.output })
-          if (part.type === 'tool-error')
+          if (part.type === 'tool-error') {
             settled.set(part.toolCallId, { error: part.error })
+            toolErrors.push(part.error)
+          }
         }
         for (const call of step.toolCalls) {
           const outcome = settled.get(call.toolCallId) ?? {}
@@ -394,10 +437,14 @@ async function runQuestion(
   const allOutputs = outputsByCall.flat()
   const seen = mods.citations.collectToolTweetIds(allOutputs)
   const { cited, invalid } = mods.citations.validateCitations(answer, seen)
-  const classifierCostUsd = allOutputs.reduce<number>((sum, output) => {
-    const cost = (output as { costUsd?: unknown } | null)?.costUsd
-    return sum + (typeof cost === 'number' ? cost : 0)
-  }, 0)
+  // Failed scoring calls carry what they spent on the error (ScoringError).
+  const classifierCostUsd = [...allOutputs, ...toolErrors].reduce<number>(
+    (sum, value) => {
+      const cost = (value as { costUsd?: unknown } | null)?.costUsd
+      return sum + (typeof cost === 'number' ? cost : 0)
+    },
+    0,
+  )
 
   return {
     ...base,
@@ -412,11 +459,7 @@ async function runQuestion(
     toolCalls,
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,
-    plannerCostUsd: mods.model.estimateModelCostUsd(modelSpec, {
-      inputTokens: usage.inputTokens,
-      cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens,
-      outputTokens: usage.outputTokens,
-    }),
+    plannerCostUsd: plannerCost(mods, modelSpec, usage),
     classifierCostUsd,
     wallMs: Date.now() - started,
     error,
@@ -429,6 +472,7 @@ async function runQuestion(
       seen,
       answer,
       mods.citations.collectToolTweetIds,
+      mods.citations.CITATION_PATTERN,
     ),
   }
 }
@@ -473,11 +517,9 @@ function markdownReport(
   const classes = Array.from(new Set(results.map((r) => r.class)))
   for (const cls of classes) {
     const rs = results.filter((r) => r.class === cls)
-    const invalid = rs.reduce((n, r) => n + r.invalidCitationIds.length, 0)
-    const markers = rs.reduce(
-      (n, r) => n + r.invalidCitationIds.length + r.citedIds.length,
-      0,
-    )
+    // Counted per marker, so an invalid id cited three times counts three.
+    const invalid = rs.reduce((n, r) => n + r.score.invalidMarkers, 0)
+    const markers = rs.reduce((n, r) => n + r.score.citationMarkers, 0)
     lines.push(
       `| ${cls} | ${rs.length} | ${pct(mean(rs.map((r) => r.score.recallCited)))} | ` +
         `${pct(mean(rs.map((r) => r.score.recallFound)))} | ${pct(mean(rs.map((r) => r.score.precisionCited)))} | ` +

@@ -87,7 +87,9 @@ export interface StepLike {
 
 /**
  * People lookups keep only handles: the page shows just how many matched, and
- * profile text (bios) should not outlive a member's opt-out.
+ * profile text (bios) should not outlive a member's opt-out. The looked-up
+ * account's top tweets stay, as references like every other tweet, so an
+ * answer that cites one still verifies when the conversation is reopened.
  */
 function slimPeople(output: unknown): unknown {
   if (!isRecord(output)) return output
@@ -95,10 +97,16 @@ function slimPeople(output: unknown): unknown {
     isRecord(person)
       ? { accountId: person.accountId, username: person.username }
       : person
+  const user = output.user
   return {
     query: output.query,
     members: Array.isArray(output.members) ? output.members.map(slim) : [],
-    user: output.user ? slim(output.user) : null,
+    user: isRecord(user)
+      ? {
+          ...(slim(user) as LooseRecord),
+          topTweets: Array.isArray(user.topTweets) ? user.topTweets : [],
+        }
+      : null,
   }
 }
 
@@ -201,13 +209,15 @@ export function conversationMessages(
       : run.answer
         ? ([{ type: 'text', text: run.answer }] as UIMessage['parts'])
         : []
+    // A failed run may still have stored a partial answer; say it is one.
     const hasText = stored.some((part) => part.type === 'text')
-    const closing =
-      run.status === 'failed' && !hasText
+    const note =
+      run.status === 'failed'
         ? run.error?.startsWith('Stopped')
           ? STOPPED_TEXT
           : FAILED_TEXT
         : null
+    const closing = note && (hasText ? `\n\n${note}` : note)
     messages.push({
       id: run.id,
       role: 'assistant',

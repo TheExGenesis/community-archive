@@ -1,9 +1,17 @@
-import { generateText, Output } from 'ai'
+import { generateText, Output, type LanguageModelUsage } from 'ai'
 import { z } from 'zod'
+import {
+  boundedTimeoutMs,
+  callTimeoutMs,
+  deadlinePassed,
+  RunDeadlineError,
+  type RunLimits,
+} from './deadline'
 import {
   agentSearchScorerModelSpec,
   createProviderModel,
   estimateModelCostUsd,
+  scorerPriceEnv,
 } from './model'
 
 // Scores how well each tweet answers a criterion, as P(yes). The default is
@@ -26,6 +34,7 @@ const LLM_BATCH = 40
 // lowest paid tier) can take more parallel batches. 1,000 posts = 25 batches.
 const JEV_CONCURRENCY = 4
 const LLM_CONCURRENCY = 12
+const LLM_TIMEOUT_MS = 120_000
 const TEXT_LIMIT = 1500
 
 export interface ScoreItem {
@@ -47,23 +56,47 @@ const PREAMBLE =
   'Judge only what the author wrote; when a parent tweet is given, use it only ' +
   'to understand what the reply refers to.'
 
-async function inBatches<T, R>(
+/**
+ * A scoring failure that still cost money: `costUsd` is what the calls that
+ * succeeded before the failure spent, so the run can record it.
+ */
+export class ScoringError extends Error {
+  constructor(
+    message: string,
+    readonly costUsd: number,
+  ) {
+    super(message)
+    this.name = 'ScoringError'
+  }
+}
+
+/**
+ * Runs every batch, `concurrency` at a time, and waits for all of them even
+ * when one fails, so no paid call is still in flight (and uncounted) when
+ * the error is thrown. Rethrows the first failure.
+ */
+async function inBatches<T>(
   items: T[],
   size: number,
   concurrency: number,
-  run: (batch: T[]) => Promise<R>,
-): Promise<R[]> {
+  run: (batch: T[]) => Promise<void>,
+): Promise<void> {
   const batches: T[][] = []
   for (let i = 0; i < items.length; i += size)
     batches.push(items.slice(i, i + size))
-  const results: R[] = []
-  for (let i = 0; i < batches.length; i += concurrency) {
-    results.push(
-      ...(await Promise.all(batches.slice(i, i + concurrency).map(run))),
+  let failure: unknown = null
+  for (let i = 0; i < batches.length && !failure; i += concurrency) {
+    const settled = await Promise.allSettled(
+      batches.slice(i, i + concurrency).map(run),
     )
+    const rejected = settled.find((result) => result.status === 'rejected')
+    if (rejected) failure = (rejected as PromiseRejectedResult).reason
   }
-  return results
+  if (failure) throw failure
 }
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
 
 async function eachWithConcurrency<T>(
   items: T[],
@@ -92,6 +125,7 @@ async function scoreWithDecisions(
   criterion: string,
   items: ScoreItem[],
   apiKey: string,
+  limits: RunLimits,
 ): Promise<ScoreResult> {
   const scores = new Map<string, number>()
   let inputTokens = 0
@@ -99,6 +133,11 @@ async function scoreWithDecisions(
   let lastError = ''
   await eachWithConcurrency(items, DECISIONS_CONCURRENCY, async (item) => {
     for (let attempt = 1; attempt <= DECISIONS_ATTEMPTS; attempt++) {
+      // Past the run's deadline no new call starts; the post counts as lost.
+      if (deadlinePassed(limits)) {
+        lastError = new RunDeadlineError().message
+        break
+      }
       const response = await fetch('https://api.openai.com/v1/decisions', {
         method: 'POST',
         headers: {
@@ -112,19 +151,24 @@ async function scoreWithDecisions(
             { type: 'predicate', name: 'match', instructions: criterion },
           ],
         }),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(boundedTimeoutMs(limits, 30_000)),
       }).catch((error: unknown) => {
         lastError = error instanceof Error ? error.message : String(error)
         return null
       })
       if (response?.ok) {
-        const body = (await response.json()) as {
+        // A body that fails to parse is a lost post, never a thrown error
+        // that would drop the batch's recorded cost.
+        const body = (await response.json().catch((error: unknown) => {
+          lastError = errorMessage(error)
+          return null
+        })) as {
           answers?: Array<{ name?: string; probability?: number }>
           usage?: { input_tokens?: number }
-        }
-        const p = body.answers?.find((a) => a.name === 'match')?.probability
+        } | null
+        const p = body?.answers?.find((a) => a.name === 'match')?.probability
         if (typeof p === 'number' && p >= 0 && p <= 1) scores.set(item.id, p)
-        inputTokens += body.usage?.input_tokens ?? 0
+        inputTokens += body?.usage?.input_tokens ?? 0
         return
       }
       if (response) lastError = `status ${response.status}`
@@ -132,36 +176,39 @@ async function scoreWithDecisions(
         !response || response.status === 429 || response.status >= 500
       if (!retryable || attempt === DECISIONS_ATTEMPTS) break
       const retryAfter = Number(response?.headers.get('retry-after'))
-      await sleep(
+      const wait =
         Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 10_000)
-          : 500 * 2 ** attempt,
-      )
+          : 500 * 2 ** attempt
+      // No retry that would only start after the deadline.
+      if (deadlinePassed(limits, Date.now() + wait)) break
+      await sleep(wait)
     }
     failures++
   })
+  const costUsd = (inputTokens / 1_000_000) * DECISIONS_USD_PER_MTOK
   // A few lost posts are acceptable; a mostly failed batch is an error the
   // agent should see rather than an empty result.
   if (failures > 0 && failures >= items.length / 10) {
-    throw new Error(
+    throw new ScoringError(
       `Decisions scoring failed for ${failures} of ${items.length} posts (${lastError})`,
+      costUsd,
     )
   }
-  return {
-    scores,
-    scorer: 'decisions',
-    costUsd: (inputTokens / 1_000_000) * DECISIONS_USD_PER_MTOK,
-  }
+  return { scores, scorer: 'decisions', costUsd }
 }
 
 async function scoreWithJev(
   criterion: string,
   items: ScoreItem[],
   apiKey: string,
+  limits: RunLimits,
 ): Promise<ScoreResult> {
   const scores = new Map<string, number>()
   let costUsd = 0
   await inBatches(items, JEV_BATCH, JEV_CONCURRENCY, async (batch) => {
+    // Throws past the run's deadline, so no new batch starts.
+    const timeoutMs = callTimeoutMs(limits, 60_000)
     const records = batch.map((item, i) => ({
       id: `r${i}`,
       text: item.text.slice(0, TEXT_LIMIT),
@@ -192,7 +239,7 @@ async function scoreWithJev(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!response.ok) {
       throw new Error(`Jev request failed (${response.status})`)
@@ -206,6 +253,8 @@ async function scoreWithJev(
       if (typeof p === 'number' && p >= 0 && p <= 1) scores.set(item.id, p)
     })
     costUsd += typeof body.usage?.cost === 'number' ? body.usage.cost : 0
+  }).catch((error: unknown) => {
+    throw new ScoringError(`Jev scoring failed: ${errorMessage(error)}`, costUsd)
   })
   return { scores, scorer: 'jev', costUsd }
 }
@@ -229,14 +278,29 @@ function scorerReasoning(): (typeof REASONING_LEVELS)[number] {
 async function scoreWithLlm(
   criterion: string,
   items: ScoreItem[],
+  limits: RunLimits,
 ): Promise<ScoreResult> {
   const spec = agentSearchScorerModelSpec()
   const model = createProviderModel(spec)
   const scores = new Map<string, number>()
   let costUsd = 0
+  const charge = (usage: LanguageModelUsage | undefined) => {
+    costUsd += estimateModelCostUsd(
+      spec,
+      {
+        inputTokens: usage?.inputTokens,
+        cachedInputTokens: usage?.inputTokenDetails?.cacheReadTokens,
+        outputTokens: usage?.outputTokens,
+      },
+      scorerPriceEnv(),
+    )
+  }
   await inBatches(items, LLM_BATCH, LLM_CONCURRENCY, async (batch) => {
+    // Throws past the run's deadline, so no new batch starts.
+    const timeoutMs = callTimeoutMs(limits, LLM_TIMEOUT_MS)
     const result = await generateText({
       model,
+      abortSignal: AbortSignal.timeout(timeoutMs),
       // Measured on 40 real posts: none 7.8 s, low 9.1 s, medium 10.3 s, with
       // the same posts kept at none and low. Low is cheap insurance.
       reasoning: scorerReasoning(),
@@ -256,30 +320,27 @@ async function scoreWithLlm(
             : {}),
         })),
       }),
+    }).catch((error: unknown) => {
+      // An unparseable answer was still generated and billed.
+      charge((error as { usage?: LanguageModelUsage } | null)?.usage)
+      throw error
     })
-    costUsd += estimateModelCostUsd(
-      spec,
-      {
-        inputTokens: result.usage?.inputTokens,
-        cachedInputTokens: result.usage?.inputTokenDetails?.cacheReadTokens,
-        outputTokens: result.usage?.outputTokens,
-      },
-      {
-        input: process.env.AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK,
-        output: process.env.AGENT_SEARCH_SCORER_OUTPUT_USD_PER_MTOK,
-      },
-    )
+    charge(result.usage)
     const ids = new Set(batch.map((item) => item.id))
     for (const score of result.output?.scores ?? []) {
       if (ids.has(score.id)) scores.set(score.id, score.p)
     }
+  }).catch((error: unknown) => {
+    throw new ScoringError(`LLM scoring failed: ${errorMessage(error)}`, costUsd)
   })
   return { scores, scorer: 'llm', costUsd }
 }
 
+/** Scores the items; no call starts after the run's deadline in `limits`. */
 export async function scoreTweets(
   criterion: string,
   items: ScoreItem[],
+  limits: RunLimits = {},
 ): Promise<ScoreResult> {
   const unique = Array.from(
     new Map(items.map((item) => [item.id, item])).values(),
@@ -288,10 +349,20 @@ export async function scoreTweets(
     return { scores: new Map(), scorer: agentSearchScorer(), costUsd: 0 }
   const scorer = agentSearchScorer()
   if (scorer === 'decisions')
-    return scoreWithDecisions(criterion, unique, process.env.OPENAI_API_KEY!)
+    return scoreWithDecisions(
+      criterion,
+      unique,
+      process.env.OPENAI_API_KEY!,
+      limits,
+    )
   if (scorer === 'jev')
-    return scoreWithJev(criterion, unique, process.env.OPENROUTER_API_KEY!)
-  return scoreWithLlm(criterion, unique)
+    return scoreWithJev(
+      criterion,
+      unique,
+      process.env.OPENROUTER_API_KEY!,
+      limits,
+    )
+  return scoreWithLlm(criterion, unique, limits)
 }
 
 /**

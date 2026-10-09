@@ -118,7 +118,7 @@ describe('buildRunParts', () => {
   })
 })
 
-test('people lookups keep only handles', () => {
+test('people lookups keep only handles, and top tweets as references', () => {
   const [part] = buildRunParts(
     [
       {
@@ -147,8 +147,10 @@ test('people lookups keep only handles', () => {
   expect(part.output).toEqual({
     query: 'a',
     members: [{ accountId: '1', username: 'a' }],
-    user: { accountId: '1', username: 'a' },
+    user: { accountId: '1', username: 'a', topTweets: [{ $t: '9' }] },
   })
+  // So a citation of that top tweet is fetched and verifies on reopen.
+  expect(Array.from(collectRefs([part]))).toEqual(['9'])
 })
 
 describe('summarizeConversations', () => {
@@ -225,6 +227,23 @@ describe('conversationMessages', () => {
     })
     expect(messages[3].parts).toEqual([
       { type: 'text', text: '_This answer was stopped before it finished._' },
+    ])
+  })
+
+  test('marks a failed run’s partial answer as unfinished', () => {
+    const [, answer] = conversationMessages(
+      [
+        run({
+          answer: 'Half an answer',
+          status: 'failed',
+          error: 'The answer was cut off at the output token limit',
+        }),
+      ],
+      new Map(),
+    )
+    expect(answer.parts).toEqual([
+      { type: 'text', text: 'Half an answer' },
+      { type: 'text', text: '\n\n_This answer failed before it finished._' },
     ])
   })
 

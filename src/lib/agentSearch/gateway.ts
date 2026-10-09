@@ -3,10 +3,13 @@ import {
   fetchAnalyticsGatewayJson,
 } from '@/lib/clickhouseGateway'
 import type { PortalMedia, PortalQuotedTweet } from '@/lib/portal/types'
+import { callTimeoutMs, type RunLimits } from './deadline'
 import type { AgentTweet } from './types'
 
 // Tool backends. Every read goes through the ClickHouse gateway, which applies
 // opt-outs; nothing here falls back to Supabase corpus reads (AGENTS.md).
+// Each call's timeout is cut to the run's remaining time (deadline.ts), and
+// no call starts after the deadline.
 
 const GATEWAY_TIMEOUT_MS = 20_000
 const ID = /^\d{1,20}$/
@@ -108,6 +111,7 @@ export interface SearchTweetsInput {
 
 export async function searchTweets(
   input: SearchTweetsInput,
+  limits: RunLimits = {},
 ): Promise<{ tweets: AgentTweet[]; nextOffset: number | null }> {
   const params = new URLSearchParams({
     q: input.query.trim(),
@@ -127,7 +131,7 @@ export async function searchTweets(
     data: { tweets: GatewayTweet[]; nextOffset: number | null }
   }>(['search'], params, {
     baseUrl: clickHouseSearchGatewayBaseUrl(),
-    timeoutMs: GATEWAY_TIMEOUT_MS,
+    timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
   })
   if (!Array.isArray(response.data?.tweets)) {
     throw new Error('Gateway search returned an invalid payload')
@@ -141,6 +145,7 @@ export async function searchTweets(
 export async function getTweetThread(
   tweetId: string,
   limit = 60,
+  limits: RunLimits = {},
 ): Promise<{ tweet: AgentTweet; conversation: AgentTweet[] } | null> {
   if (!ID.test(tweetId)) throw new Error('Invalid tweet id')
   const response = await fetchAnalyticsGatewayJson<{
@@ -148,7 +153,7 @@ export async function getTweetThread(
   }>(
     ['tweet', tweetId, 'thread'],
     new URLSearchParams({ limit: String(limit) }),
-    { timeoutMs: GATEWAY_TIMEOUT_MS },
+    { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
   ).catch((error: { status?: number }) => {
     if (error?.status === 404) return { data: undefined }
     throw error
@@ -164,6 +169,7 @@ export async function getQuotePosts(
   tweetId: string,
   limit = 25,
   offset = 0,
+  limits: RunLimits = {},
 ): Promise<{ tweets: AgentTweet[]; total: number }> {
   if (!ID.test(tweetId)) throw new Error('Invalid tweet id')
   const response = await fetchAnalyticsGatewayJson<{
@@ -188,7 +194,7 @@ export async function getQuotePosts(
       exclude_self: 'true',
       quote_ca_users_only: 'true',
     }),
-    { timeoutMs: GATEWAY_TIMEOUT_MS },
+    { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
   )
   if (!Array.isArray(response.data)) {
     throw new Error('Gateway quote-posts returned an invalid payload')
@@ -215,7 +221,10 @@ export async function getQuotePosts(
   }
 }
 
-export async function getTweetsByIds(ids: string[]): Promise<AgentTweet[]> {
+export async function getTweetsByIds(
+  ids: string[],
+  limits: RunLimits = {},
+): Promise<AgentTweet[]> {
   const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
     0,
     100,
@@ -235,7 +244,7 @@ export async function getTweetsByIds(ids: string[]): Promise<AgentTweet[]> {
   }>(
     ['bulletin-sources'],
     new URLSearchParams({ ids: valid.join(','), enrich: 'true' }),
-    { timeoutMs: GATEWAY_TIMEOUT_MS },
+    { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
   )
   if (!Array.isArray(response.data)) {
     throw new Error('Gateway bulletin-sources returned an invalid payload')
@@ -271,7 +280,10 @@ export interface AgentUser {
   }>
 }
 
-export async function getUser(identifier: string): Promise<AgentUser | null> {
+export async function getUser(
+  identifier: string,
+  limits: RunLimits = {},
+): Promise<AgentUser | null> {
   const clean = identifier.trim().replace(/^@/, '')
   if (!/^[A-Za-z0-9_]{1,80}$/.test(clean)) return null
   const response = await fetchAnalyticsGatewayJson<{
@@ -282,7 +294,7 @@ export async function getUser(identifier: string): Promise<AgentUser | null> {
   }>(
     ['user', clean],
     new URLSearchParams({ limit: '5', include_interactions: 'false' }),
-    { timeoutMs: GATEWAY_TIMEOUT_MS },
+    { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
   ).catch((error: { status?: number }) => {
     if (error?.status === 404) return { data: undefined }
     throw error
@@ -308,6 +320,7 @@ export async function getUser(identifier: string): Promise<AgentUser | null> {
 export async function findMembers(
   search: string,
   limit = 10,
+  limits: RunLimits = {},
 ): Promise<
   Array<{ accountId: string | null; username: string; displayName: string }>
 > {
@@ -328,7 +341,7 @@ export async function findMembers(
       sort_order: 'desc',
       search: search.trim().replace(/^@/, '').slice(0, 40),
     }),
-    { timeoutMs: GATEWAY_TIMEOUT_MS },
+    { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
   )
   return (response.data?.users ?? []).map((user) => ({
     accountId: user.accountId,
@@ -338,7 +351,10 @@ export async function findMembers(
 }
 
 /** Full detail (counts, media, quoted tweet) for a few ids, in parallel. */
-export async function getTweetDetails(ids: string[]): Promise<AgentTweet[]> {
+export async function getTweetDetails(
+  ids: string[],
+  limits: RunLimits = {},
+): Promise<AgentTweet[]> {
   const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
     0,
     30,
@@ -350,7 +366,7 @@ export async function getTweetDetails(ids: string[]): Promise<AgentTweet[]> {
         const response = await fetchAnalyticsGatewayJson<{
           data?: { tweet: GatewayTweet; quotedTweet: GatewayTweet | null }
         }>(['tweet', id], new URLSearchParams(), {
-          timeoutMs: GATEWAY_TIMEOUT_MS,
+          timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
         }).catch((error: { status?: number }) => {
           if (error?.status === 404) return { data: undefined }
           throw error

@@ -17,6 +17,30 @@ export type AgentSearchViewerResult =
   | { ok: true; viewer: AgentSearchViewer }
   | { ok: false; reason: 'signed_out' | 'not_eligible' }
 
+export type AgentSearchAccess =
+  | AgentSearchViewerResult
+  | { ok: false; reason: 'unavailable' }
+
+/** The HTTP status for a refused viewer. */
+export function agentSearchAccessStatus(
+  reason: 'signed_out' | 'not_eligible' | 'unavailable',
+): number {
+  return reason === 'signed_out' ? 401 : reason === 'unavailable' ? 503 : 403
+}
+
+/**
+ * getAgentSearchViewer for routes: a failed eligibility query becomes
+ * 'unavailable' (503) instead of an unhandled 500, and never a wrong refusal.
+ */
+export async function getAgentSearchAccess(): Promise<AgentSearchAccess> {
+  try {
+    return await getAgentSearchViewer()
+  } catch (error) {
+    console.error('[agent-search] eligibility check failed', error)
+    return { ok: false, reason: 'unavailable' }
+  }
+}
+
 const ACCOUNT_ID_PATTERN = /^\d{1,20}$/
 
 // Trusted identity only: app_metadata comes from the X provider, while

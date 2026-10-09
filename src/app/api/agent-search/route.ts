@@ -1,131 +1,155 @@
 import { createModelCallToUIChunkTransform } from '@ai-sdk/workflow'
-import { createUIMessageStreamResponse, type UIMessage } from 'ai'
+import { createUIMessageStreamResponse } from 'ai'
 import { NextResponse } from 'next/server'
-import { start } from 'workflow/api'
-import { checkAgentSearchBudget } from '@/lib/agentSearch/budget'
-import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { getRun, start } from 'workflow/api'
+import {
+  admitAgentSearchRun,
+  agentSearchPricingProblem,
+} from '@/lib/agentSearch/budget'
+import { agentSearchRunDeadlineMs } from '@/lib/agentSearch/deadline'
+import {
+  agentSearchAccessStatus,
+  getAgentSearchAccess,
+} from '@/lib/agentSearch/eligibility'
 import { agentSearchModelSpec } from '@/lib/agentSearch/model'
+import { parseAgentSearchRequest } from '@/lib/agentSearch/request'
+import { closeEndedRuns, newSearchRunId } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
+import { endWithFinish, isTerminalStatus } from '@/lib/agentSearch/stream'
 import { agentSearchWorkflow } from '@/workflows/agentSearch'
 
 // Runs stream for up to a few minutes; the repo default is 15 s (vercel.json).
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-const MAX_QUESTION_CHARS = 1000
-const MAX_MESSAGES = 20
-// The page's chat id, which groups a question with its follow-ups.
-const CONVERSATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,100}$/
-
 const noStore = { 'Cache-Control': 'private, no-store' }
 
-function lastUserText(messages: UIMessage[]): string {
-  const last = [...messages].reverse().find((m) => m.role === 'user')
-  return (last?.parts ?? [])
-    .map((part) => (part.type === 'text' ? part.text : ''))
-    .join(' ')
-    .trim()
-}
+const unavailable = () =>
+  NextResponse.json(
+    { error: 'unavailable' },
+    { status: 503, headers: noStore },
+  )
+
+const workflowStatus = (workflowRunId: string) =>
+  getRun(workflowRunId).status.catch(() => null)
 
 export async function POST(request: Request) {
-  const access = await getAgentSearchViewer()
+  const access = await getAgentSearchAccess()
   if (!access.ok) {
     return NextResponse.json(
       { error: access.reason },
-      { status: access.reason === 'signed_out' ? 401 : 403, headers: noStore },
+      { status: agentSearchAccessStatus(access.reason), headers: noStore },
     )
   }
+  const accountId = access.viewer.accountId
 
-  const body = (await request.json().catch(() => null)) as {
-    id?: unknown
-    messages?: UIMessage[]
-  } | null
-  const messages = Array.isArray(body?.messages) ? body!.messages! : null
-  const question = messages ? lastUserText(messages) : ''
-  if (
-    !messages ||
-    messages.length === 0 ||
-    messages.length > MAX_MESSAGES ||
-    !question ||
-    question.length > MAX_QUESTION_CHARS
-  ) {
+  const parsed = parseAgentSearchRequest(
+    await request.json().catch(() => null),
+  )
+  if (!parsed) {
     return NextResponse.json(
       { error: 'invalid_request' },
       { status: 400, headers: noStore },
     )
   }
+  const { conversationId, question } = parsed
 
-  const conversationId =
-    typeof body?.id === 'string' && CONVERSATION_ID_PATTERN.test(body.id)
-      ? body.id
-      : null
-
-  const store = getAgentSearchRunStore()
-  // A conversation belongs to whoever started it; nobody else may add to it.
-  if (conversationId) {
-    const earlier = await store.listConversation(conversationId)
-    if (earlier.some((run) => run.accountId !== access.viewer.accountId)) {
-      return NextResponse.json(
-        { error: 'not_found' },
-        { status: 404, headers: noStore },
-      )
-    }
+  const modelSpec = agentSearchModelSpec()
+  // Unpriced spend would never reach the daily cap, so refuse to start.
+  const pricingProblem = agentSearchPricingProblem(modelSpec)
+  if (pricingProblem) {
+    console.error('[agent-search] not starting:', pricingProblem)
+    return unavailable()
   }
 
-  const budget = await checkAgentSearchBudget(store, access.viewer.accountId)
-  if (!budget.ok) {
+  const store = getAgentSearchRunStore()
+  // A run whose workflow already ended no longer holds the member's slot.
+  await closeEndedRuns(store, accountId, workflowStatus).catch((error) =>
+    console.error('[agent-search] failed to close ended runs', error),
+  )
+
+  // Admission checks ownership and every limit and stores the run as
+  // running, in one step, before anything is paid for. Fail closed: when
+  // the store cannot answer, no run starts.
+  const runId = newSearchRunId()
+  let admission: Awaited<ReturnType<typeof admitAgentSearchRun>>
+  try {
+    admission = await admitAgentSearchRun(store, {
+      runId,
+      accountId,
+      conversationId,
+      question,
+      model: modelSpec,
+    })
+  } catch (error) {
+    console.error('[agent-search] admission failed', error)
+    return unavailable()
+  }
+  if (!admission.ok) {
+    // A conversation belongs to whoever started it; nobody else may add to it.
     return NextResponse.json(
-      { error: budget.reason },
-      { status: 429, headers: noStore },
+      { error: admission.reason },
+      {
+        status: admission.reason === 'not_found' ? 404 : 429,
+        headers: noStore,
+      },
     )
   }
 
-  const modelSpec = agentSearchModelSpec()
+  const closeRun = (error: string) =>
+    store
+      .update(runId, {
+        status: 'failed',
+        error,
+        completedAt: new Date().toISOString(),
+      })
+      .catch((cause) =>
+        console.error('[agent-search] failed to close run', cause),
+      )
+
   let run: Awaited<ReturnType<typeof start>>
   try {
     run = await start(agentSearchWorkflow, [
       {
-        accountId: access.viewer.accountId,
+        runId,
+        accountId,
         conversationId,
         question,
-        messages,
         modelSpec,
         date: new Date().toISOString().slice(0, 10),
+        deadlineAt: Date.now() + agentSearchRunDeadlineMs(),
       },
     ])
   } catch (error) {
     console.error('[agent-search] failed to start run', error)
-    return NextResponse.json(
-      { error: 'unavailable' },
-      { status: 503, headers: noStore },
-    )
+    await closeRun('The run could not start')
+    return unavailable()
   }
 
-  await store
-    .create({
-      id: run.runId,
-      accountId: access.viewer.accountId,
-      conversationId,
-      question,
-      status: 'running',
-      model: modelSpec,
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-      answer: null,
-      citedTweetIds: [],
-      invalidCitationIds: [],
-      toolCalls: [],
-      inputTokens: 0,
-      outputTokens: 0,
-      costUsd: 0,
-      error: null,
-    })
-    .catch((error) =>
-      console.error('[agent-search] failed to store run', error),
-    )
+  // Cancel and reconnect need the workflow run; without it on record the
+  // run could not be stopped, so stop it now.
+  try {
+    await store.update(runId, { workflowRunId: run.runId })
+  } catch (error) {
+    console.error('[agent-search] failed to record workflow run', error)
+    await run.cancel({ cancelReason: 'Run record failed' }).catch(() => {})
+    await closeRun('The run could not be recorded')
+    return unavailable()
+  }
+  // A Stop from another tab may have closed the run while it started.
+  const current = await store.get(runId).catch(() => null)
+  if (current && current.status !== 'running') {
+    await run.cancel({ cancelReason: 'Stopped by the member' }).catch(() => {})
+  }
 
+  // The page addresses the run (stream, cancel) by its search run id. A run
+  // stopped (here or from another tab) does not end this stream with a
+  // finish chunk; endWithFinish adds one so the page stops waiting.
   return createUIMessageStreamResponse({
-    stream: run.readable.pipeThrough(createModelCallToUIChunkTransform()),
-    headers: { ...noStore, 'x-workflow-run-id': run.runId },
+    stream: endWithFinish(
+      run.readable.pipeThrough(createModelCallToUIChunkTransform()),
+      () => run.status.then(isTerminalStatus),
+    ),
+    headers: { ...noStore, 'x-workflow-run-id': runId },
   })
 }

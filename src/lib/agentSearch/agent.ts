@@ -37,6 +37,66 @@ How to answer:
 
 export const AGENT_SEARCH_INSTRUCTIONS = agentSearchInstructions()
 
+/**
+ * Per-step settings: the last allowed step, and any step after the run's
+ * deadline, may not call tools, so the run still ends with an answer. In a
+ * workflow, `now` is the replayed event time, so this stays deterministic.
+ */
+export function agentSearchPrepareStep(
+  deadlineAt?: number,
+  now: () => number = Date.now,
+) {
+  return ({ stepNumber }: { stepNumber: number }): { toolChoice?: 'none' } =>
+    stepNumber >= AGENT_SEARCH_MAX_STEPS - 1 ||
+    (deadlineAt !== undefined && now() >= deadlineAt)
+      ? { toolChoice: 'none' }
+      : {}
+}
+
+/**
+ * The answer is the last step's text. Text from earlier steps is the model
+ * thinking aloud between tool calls, never the answer.
+ */
+export function finalAnswerText(steps: Array<{ text?: string }>): string {
+  return steps[steps.length - 1]?.text ?? ''
+}
+
+const FINISH_FAILURES: Record<string, string> = {
+  length: 'The answer was cut off at the output token limit',
+  'content-filter': 'The model’s content filter stopped the answer',
+  error: 'The model failed while answering',
+  'tool-calls': 'The run reached the step limit before answering',
+}
+
+/**
+ * Why a finished agent run did not produce a usable answer, or null when it
+ * did. WorkflowAgent does not throw for a model stream error or for an
+ * unusual finish reason; it returns them, so they must be checked here.
+ */
+export function agentRunFailure(result: {
+  error?: unknown
+  finishReason?: string
+  steps: Array<{ text?: string }>
+}): string | null {
+  if (result.error !== undefined && result.error !== null) {
+    const message =
+      result.error instanceof Error
+        ? result.error.message
+        : typeof result.error === 'string'
+          ? result.error
+          : JSON.stringify(result.error)
+    return `The model failed: ${message}`.slice(0, 500)
+  }
+  const reason = result.finishReason ?? 'unknown'
+  if (reason !== 'stop') {
+    return FINISH_FAILURES[reason] ?? `The model stopped early (${reason})`
+  }
+  if (!finalAnswerText(result.steps).trim()) {
+    return 'The model returned no answer'
+  }
+  return null
+}
+
 const mode = z.enum(['phrase', 'all']).optional()
 // Models often send '' for optional fields they don't use; the tools treat
 // empty values as absent.
@@ -50,8 +110,9 @@ function json(value: unknown) {
   return { type: 'json' as const, value: value as never }
 }
 
-const compactList = (tweets: Array<AgentTweet & { p?: number }> = []) =>
-  tweets.map(compactTweet)
+const compactList = (
+  tweets: Array<AgentTweet & { p?: number }> | null | undefined,
+) => (tweets ?? []).filter(Boolean).map(compactTweet)
 
 type Executors = Partial<AgentSearchToolExecutors>
 
@@ -68,12 +129,14 @@ export function createAgentSearchTools(
         'Look up archive members by name or handle. Returns matching members and, for an exact handle, that account with its top tweets.',
       inputSchema: z.object({ query: z.string().min(1).max(80) }),
       execute: run.find_people,
+      // Also compacts earlier turns rebuilt from storage (context.ts), where
+      // people keep only handles and gone tweets are dropped.
       toModelOutput: ({ output }) =>
         json({
           members: output.members,
           user: output.user && {
             ...output.user,
-            topTweets: output.user.topTweets.slice(0, 3),
+            topTweets: (output.user.topTweets ?? []).slice(0, 3),
           },
         }),
     }),
@@ -145,7 +208,8 @@ export function createAgentSearchTools(
         'notFound' in output
           ? json({ notFound: true })
           : json({
-              tweet: compactTweet(output.tweet),
+              // Null when a rebuilt earlier turn's tweet is gone.
+              tweet: output.tweet ? compactTweet(output.tweet) : null,
               conversation: compactList(output.conversation),
             }),
     }),

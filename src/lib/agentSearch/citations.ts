@@ -1,6 +1,10 @@
 // The agent cites tweets inline as [[t:<tweet id>]]. Code, not the model,
 // decides whether a citation is valid: the id must appear in a tool result
-// from the same run (the digest's numbered-corpus rule, keyed by tweet id).
+// from the same conversation, in this run or an earlier turn (the digest's
+// numbered-corpus rule, keyed by tweet id). A follow-up may cite a tweet an
+// earlier turn found. The stored run (src/workflows/agentSearch.ts, with the
+// earlier turns' ids from context.ts) and the page (messageView.ts, from the
+// earlier messages it holds) apply the same rule.
 
 export const CITATION_PATTERN = /\[\[t:(\d{1,20})\]\]/g
 

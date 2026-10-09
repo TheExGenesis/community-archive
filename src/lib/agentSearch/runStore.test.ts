@@ -10,6 +10,7 @@ jest.mock('@/utils/supabase', () => ({
 }))
 
 import {
+  admissionDecision,
   createFileRunStore,
   createSupabaseRunStore,
   getAgentSearchRunStore,
@@ -54,7 +55,6 @@ describe('file run store', () => {
       answer: 'Some people said [[t:1]]',
       citedTweetIds: ['1'],
       toolCalls: [{ name: 'search_tweets', input: { query: 'archive' } }],
-      costUsd: 0.12,
     })
 
     expect(await store.get('wrun_01')).toEqual(
@@ -64,7 +64,6 @@ describe('file run store', () => {
         answer: 'Some people said [[t:1]]',
         citedTweetIds: ['1'],
         toolCalls: [{ name: 'search_tweets', input: { query: 'archive' } }],
-        costUsd: 0.12,
       }),
     )
     expect(await store.get('missing')).toBeNull()
@@ -72,19 +71,55 @@ describe('file run store', () => {
     expect(await readdir(dir)).toEqual(['wrun_01.json'])
   })
 
-  test('keeps every patch when updates overlap', async () => {
+  test('adds every usage increment when they overlap', async () => {
     const store = createFileRunStore(dir)
     await store.create(baseRun())
     await Promise.all([
-      store.update('wrun_01', { inputTokens: 10 }),
-      store.update('wrun_01', { outputTokens: 20 }),
-      store.update('wrun_01', { costUsd: 0.5 }),
+      store.addUsage('wrun_01', { inputTokens: 10, costUsd: 0.25 }),
+      store.addUsage('wrun_01', { outputTokens: 20 }),
+      store.addUsage('wrun_01', { costUsd: 0.5 }),
+      store.update('wrun_01', { answer: 'done' }),
     ])
     expect(await store.get('wrun_01')).toMatchObject({
+      answer: 'done',
       inputTokens: 10,
       outputTokens: 20,
-      costUsd: 0.5,
+      costUsd: 0.75,
     })
+  })
+
+  test('a status patch never resets recorded spend', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun())
+    await store.addUsage('wrun_01', { inputTokens: 5, costUsd: 0.1 })
+    await store.update('wrun_01', {
+      status: 'failed',
+      // A caller that still passes usage fields cannot overwrite them.
+      ...({ costUsd: 0, inputTokens: 0 } as object),
+    })
+    expect(await store.get('wrun_01')).toMatchObject({
+      status: 'failed',
+      inputTokens: 5,
+      costUsd: 0.1,
+    })
+  })
+
+  test('ignores negative or non-finite usage', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun())
+    await store.addUsage('wrun_01', {
+      inputTokens: -5,
+      outputTokens: Number.NaN,
+      costUsd: Number.POSITIVE_INFINITY,
+    })
+    expect(await store.get('wrun_01')).toMatchObject({
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+    })
+    await expect(store.addUsage('nope', { costUsd: 1 })).rejects.toThrow(
+      'not found',
+    )
   })
 
   test('refuses duplicate runs, unknown updates and unsafe ids', async () => {
@@ -119,13 +154,85 @@ describe('file run store', () => {
       }),
     )
     const since = '2026-10-08T00:00:00.000Z'
-    const now = new Date('2026-10-08T10:00:00.000Z')
 
     expect(await store.countSince('42', since)).toBe(1)
     expect(await store.costSince(since)).toBeCloseTo(2)
-    // Account 42's only running run started 11 hours ago: stale.
-    expect(await store.hasRunning('42', 600_000, now)).toBe(false)
-    expect(await store.hasRunning('7', 600_000, now)).toBe(true)
+    expect((await store.listRunning('42')).map((run) => run.id)).toEqual([
+      'old',
+    ])
+    expect((await store.listRunning('7')).map((run) => run.id)).toEqual([
+      'other',
+    ])
+  })
+
+  describe('admission', () => {
+    const now = new Date('2026-10-08T10:00:00.000Z')
+    const request = (overrides: Record<string, unknown> = {}) => ({
+      runId: 'asr_new',
+      accountId: '42',
+      conversationId: 'conv-1234',
+      question: 'Who?',
+      model: 'openai:gpt-6.1-sol',
+      dailyLimit: 3,
+      globalDailyUsd: 25,
+      staleRunMs: 600_000,
+      now,
+      ...overrides,
+    })
+
+    test('admits and stores the run as running before anything starts', async () => {
+      const store = createFileRunStore(dir)
+      expect(await store.admit(request())).toBe('ok')
+      expect(await store.get('asr_new')).toMatchObject({
+        status: 'running',
+        workflowRunId: null,
+        conversationId: 'conv-1234',
+        startedAt: now.toISOString(),
+        costUsd: 0,
+      })
+    })
+
+    test('lets only one of several simultaneous requests take the last slot', async () => {
+      const store = createFileRunStore(dir)
+      await store.create(
+        baseRun({ id: 'r1', status: 'completed', startedAt: '2026-10-08T08:00:00.000Z' }),
+      )
+      await store.create(
+        baseRun({ id: 'r2', status: 'completed', startedAt: '2026-10-08T09:00:00.000Z' }),
+      )
+      const results = await Promise.all(
+        ['a', 'b', 'c', 'd'].map((id) =>
+          store.admit(request({ runId: `asr_${id}` })),
+        ),
+      )
+      expect(results.filter((result) => result === 'ok')).toHaveLength(1)
+      expect(await store.countSince('42', '2026-10-08T00:00:00.000Z')).toBe(3)
+    })
+
+    test('refuses in the same order as the database function', () => {
+      const runs = (list: Array<Partial<AgentSearchRun>>) =>
+        list.map((overrides, i) =>
+          baseRun({ id: `r${i}`, status: 'completed', ...overrides }),
+        )
+      const decide = (list: Array<Partial<AgentSearchRun>>, extra = {}) =>
+        admissionDecision(runs(list), request(extra), now)
+
+      expect(decide([{ conversationId: 'conv-1234', accountId: '7' }])).toBe(
+        'not_found',
+      )
+      expect(decide([{}, {}, {}])).toBe('daily_limit')
+      // Yesterday's runs do not count.
+      expect(decide([{ startedAt: '2026-10-07T23:59:59.000Z' }])).toBe('ok')
+      expect(
+        decide([{ status: 'running', startedAt: '2026-10-08T09:55:00.000Z' }]),
+      ).toBe('run_in_progress')
+      // A running run past the stale window no longer blocks.
+      expect(
+        decide([{ status: 'running', startedAt: '2026-10-08T09:00:00.000Z' }]),
+      ).toBe('ok')
+      // Anyone's spend today counts toward the global cap.
+      expect(decide([{ accountId: '7', costUsd: 25 }])).toBe('global_budget')
+    })
   })
 
   test('lists a member’s recent runs and one conversation’s runs', async () => {
@@ -199,6 +306,7 @@ describe('supabase run store', () => {
     expect(client.from).toHaveBeenCalledWith('agent_search_runs')
     expect(insert).toHaveBeenCalledWith({
       id: 'wrun_01',
+      workflow_run_id: null,
       account_id: '42',
       conversation_id: null,
       question: 'Who has criticized the community archive?',
@@ -240,6 +348,53 @@ describe('supabase run store', () => {
       completed_at: '2026-10-08T10:02:00.000Z',
     })
     expect(eq).toHaveBeenCalledWith('id', 'wrun_01')
+  })
+
+  test('admits through the database function and fails closed', async () => {
+    const rpc = jest.fn().mockResolvedValue({ data: 'ok', error: null })
+    const store = createSupabaseRunStore({ rpc } as never)
+    await expect(
+      store.admit({
+        runId: 'asr_1',
+        accountId: '42',
+        conversationId: 'conv-1234',
+        question: 'Who?',
+        model: 'openai:gpt-6.1-sol',
+        dailyLimit: 10,
+        globalDailyUsd: 25,
+        staleRunMs: 600_000,
+      }),
+    ).resolves.toBe('ok')
+    expect(rpc).toHaveBeenCalledWith('agent_search_admit', {
+      p_run_id: 'asr_1',
+      p_account_id: '42',
+      p_conversation_id: 'conv-1234',
+      p_question: 'Who?',
+      p_model: 'openai:gpt-6.1-sol',
+      p_daily_limit: 10,
+      p_global_daily_usd: 25,
+      p_stale_after_seconds: 600,
+    })
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'down' } })
+    await expect(store.admit({} as never)).rejects.toThrow('admission failed')
+    rpc.mockResolvedValueOnce({ data: 'maybe', error: null })
+    await expect(store.admit({} as never)).rejects.toThrow('returned maybe')
+  })
+
+  test('adds usage through the increment function', async () => {
+    const rpc = jest.fn().mockResolvedValue({ error: null })
+    const store = createSupabaseRunStore({ rpc } as never)
+    await store.addUsage('wrun_01', { inputTokens: 1200.4, costUsd: 0.03 })
+    expect(rpc).toHaveBeenCalledWith('agent_search_add_usage', {
+      p_run_id: 'wrun_01',
+      p_input_tokens: 1200,
+      p_output_tokens: 0,
+      p_cost_usd: 0.03,
+    })
+    rpc.mockResolvedValueOnce({ error: { message: 'not found' } })
+    await expect(store.addUsage('x', { costUsd: 1 })).rejects.toThrow(
+      'usage update failed',
+    )
   })
 
   test('pages through every row when summing cost', async () => {

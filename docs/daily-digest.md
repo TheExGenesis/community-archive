@@ -232,9 +232,10 @@ digest tweet cards label community-authored posts as `Community author`.
 
 ## Nightly schedule and recovery
 
-`community-archive-nightly-digest.timer` runs on `prod-firehose` at `06:15 UTC`
-every day. That is 10:15 PM PST or 11:15 PM PDT, fifteen minutes after the
-Community Archive editorial day closes. The oneshot Bun process ingests the
+`community-archive-nightly-digest.timer` runs on `prod-firehose` at `07:30 UTC`
+every day. That is 11:30 PM PST or 12:30 AM PDT, ninety minutes after the
+Community Archive editorial day closes, so that the 03:00 UTC Autorefresh run
+has normally finished inserting first. The oneshot Bun process ingests the
 candidate snapshot, sends one Opus 5.5 request, performs one repair request only
 when deterministic validation rejects the first response, and stages and
 publishes the validated edition through Supabase.

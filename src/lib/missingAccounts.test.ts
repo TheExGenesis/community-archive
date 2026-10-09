@@ -11,9 +11,9 @@ const fetchAnalyticsGatewayJsonMock =
   >
 
 describe('getMissingAccounts', () => {
-  test('requests the two bounded public rankings from the analytics gateway', async () => {
+  test('requests the bounded public rankings from the analytics gateway', async () => {
     const response: MissingAccountsResponse = {
-      data: { needsOptIn: [], needsArchive: [] },
+      data: { needsOptIn: [], needsArchive: [], topRepliers: [] },
       query: {
         limit: 100,
         countMode: 'unique_reply_tweets',

@@ -7,6 +7,7 @@ import {
   AtSign,
   MessageCircle,
   Radio,
+  Reply,
 } from 'lucide-react'
 
 import { getSmallAvatarUrl } from '@/lib/avatar'
@@ -18,10 +19,54 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Missing accounts | Community Archive',
   description:
-    'See the accounts mentioned most often in the Community Archive that have not opted in or uploaded their archive yet.',
+    'See the accounts replied to most in the Community Archive, and the ones replying most, that have not opted in or uploaded their archive yet.',
 }
 
-type View = 'opt-in' | 'archive'
+type View = 'opt-in' | 'archive' | 'repliers'
+
+const viewCopy: Record<
+  View,
+  {
+    title: string
+    introduction: string
+    description: string
+    caption: string
+    order: string
+    unit: string
+  }
+> = {
+  'opt-in': {
+    title: 'Not opted in yet',
+    introduction:
+      'These are the accounts mentioned most often in the Community Archive that haven’t opted in yet.',
+    description:
+      'Opting in would let the community start preserving their new public posts.',
+    caption: 'Accounts ordered by how often archived posts reply to them',
+    order: 'Most replied to first',
+    unit: 'posts',
+  },
+  archive: {
+    title: 'Opted in, no archive yet',
+    introduction:
+      'These are the opted-in accounts mentioned most often in the Community Archive that haven’t uploaded an archive yet.',
+    description:
+      'Uploading their X archive would bring in the older posts from before they opted in.',
+    caption: 'Accounts ordered by how often archived posts reply to them',
+    order: 'Most replied to first',
+    unit: 'posts',
+  },
+  repliers: {
+    title: 'Replying most, not a member yet',
+    introduction:
+      'These are the accounts the Community Archive has seen replying to its members most often that haven’t joined yet.',
+    description:
+      'They’re already part of the conversation. The archive has only seen some of their replies, so these counts are a minimum and the order is approximate.',
+    caption:
+      'Accounts ordered by the replies to archive members that the archive has seen',
+    order: 'Most replies first',
+    unit: 'replies',
+  },
+}
 
 const supportedAvatarHosts = new Set([
   'pbs.twimg.com',
@@ -115,9 +160,7 @@ function AccountRanking({
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse text-left">
-          <caption className="sr-only">
-            Accounts ordered by how often archived posts reply to them
-          </caption>
+          <caption className="sr-only">{viewCopy[view].caption}</caption>
           <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th scope="col" className="w-16 px-4 py-3 text-right font-medium">
@@ -146,7 +189,7 @@ function AccountRanking({
                 <td className="px-4 py-4 text-right font-semibold tabular-nums text-foreground">
                   {numberFormatter.format(Number(account.replyCount))}
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    posts
+                    {viewCopy[view].unit}
                   </span>
                 </td>
               </tr>
@@ -175,13 +218,13 @@ function ViewTab({
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className={`flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none ${
+      className={`flex min-w-0 flex-1 flex-col items-center justify-between gap-1 rounded-md px-1 py-2.5 text-center text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none sm:flex-row sm:justify-center sm:gap-2 sm:px-4 sm:py-3 ${
         active
           ? 'bg-background text-foreground'
           : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
       }`}
     >
-      {icon}
+      <span className="hidden sm:inline-flex">{icon}</span>
       <span>{label}</span>
       <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
         {count}
@@ -193,33 +236,33 @@ function ViewTab({
 export default async function MissingAccountsPage({
   searchParams,
 }: {
-  searchParams?: { view?: string }
+  searchParams?: { view?: string | string[] }
 }) {
-  const view: View = searchParams?.view === 'archive' ? 'archive' : 'opt-in'
+  const view: View =
+    searchParams?.view === 'archive' || searchParams?.view === 'repliers'
+      ? searchParams.view
+      : 'opt-in'
   let needsOptIn: MissingAccount[] = []
   let needsArchive: MissingAccount[] = []
+  let topRepliers: MissingAccount[] = []
   let unavailable = false
 
   try {
     const response = await getMissingAccounts()
     needsOptIn = response.data.needsOptIn
     needsArchive = response.data.needsArchive
+    topRepliers = response.data.topRepliers ?? []
   } catch (error) {
     unavailable = true
     console.error('Unable to load missing-account rankings:', error)
   }
 
-  const accounts = view === 'archive' ? needsArchive : needsOptIn
-  const title =
-    view === 'archive' ? 'Opted in, no archive yet' : 'Not opted in yet'
-  const introduction =
-    view === 'archive'
-      ? 'These are the opted-in accounts mentioned most often in the Community Archive that haven’t uploaded an archive yet.'
-      : 'These are the accounts mentioned most often in the Community Archive that haven’t opted in yet.'
-  const description =
-    view === 'archive'
-      ? 'Uploading their X archive would bring in the older posts from before they opted in.'
-      : 'Opting in would let the community start preserving their new public posts.'
+  const accounts = {
+    'opt-in': needsOptIn,
+    archive: needsArchive,
+    repliers: topRepliers,
+  }[view]
+  const { title, introduction, description, order } = viewCopy[view]
 
   return (
     <main className="min-h-screen bg-background py-12 md:py-16">
@@ -255,6 +298,13 @@ export default async function MissingAccountsPage({
             label="No archive yet"
             count={needsArchive.length}
           />
+          <ViewTab
+            href="/missing-accounts?view=repliers"
+            active={view === 'repliers'}
+            icon={<Reply aria-hidden="true" className="h-4 w-4" />}
+            label="Top repliers"
+            count={topRepliers.length}
+          />
         </nav>
 
         <section aria-labelledby="ranking-title" className="mt-8">
@@ -272,7 +322,7 @@ export default async function MissingAccountsPage({
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               <MessageCircle aria-hidden="true" className="h-4 w-4" />
-              Most replied to first
+              {order}
             </div>
           </div>
 

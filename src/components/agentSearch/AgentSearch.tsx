@@ -37,7 +37,9 @@ function showConversationInUrl(id: string | null) {
   const url = new URL(window.location.href)
   if (id) url.searchParams.set('c', id)
   else url.searchParams.delete('c')
-  window.history.replaceState(window.history.state, '', url)
+  // Null state, not window.history.state: Next's router skips entries that
+  // carry its own marker, then puts its old URL back on the next render.
+  window.history.replaceState(null, '', url)
 }
 
 interface Quota {

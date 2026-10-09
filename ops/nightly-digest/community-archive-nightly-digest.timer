@@ -1,8 +1,10 @@
 [Unit]
-Description=Run the Community Archive digest after the Pacific editorial day closes
+Description=Run the Community Archive digest after the nightly Autorefresh has landed
 
 [Timer]
-OnCalendar=*-*-* 06:15:00 UTC
+# The 03:00 UTC Autorefresh has finished between 05:54 and 07:04 UTC on normal
+# nights; its tweets must be in before the 06:00 UTC window is summarized.
+OnCalendar=*-*-* 07:30:00 UTC
 Persistent=true
 AccuracySec=1min
 RandomizedDelaySec=0

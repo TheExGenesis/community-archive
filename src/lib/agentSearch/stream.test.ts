@@ -76,6 +76,40 @@ describe('agent search streams', () => {
     ).rejects.toThrow('network')
   })
 
+  test('a stream left open after its run ended, as on cancel, still finishes', async () => {
+    const open = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: 'start' })
+      },
+    })
+    let checks = 0
+    const ended = async () => ++checks >= 2
+    expect(await read(endWithFinish(open, ended, 5))).toEqual([
+      'start',
+      'finish',
+    ])
+    expect(checks).toBe(2)
+  })
+
+  test('keeps chunks that arrive while it checks whether the run ended', async () => {
+    let push: (chunk: UIMessageChunk) => void = () => {}
+    const slow = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: 'start' })
+        push = (chunk) => controller.enqueue(chunk)
+      },
+    })
+    // The run is over, but its last chunk lands just after the first check.
+    const ended = async () => {
+      setTimeout(() => push({ type: 'finish' }), 1)
+      return true
+    }
+    expect(await read(endWithFinish(slow, ended, 5))).toEqual([
+      'start',
+      'finish',
+    ])
+  })
+
   test('a run with nothing to replay is just a finish', async () => {
     expect(await read(finishedStream())).toEqual(['finish'])
   })

@@ -25,10 +25,12 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    A Stop pressed before the page has the run id is held until the id
    arrives, and a run closed while it was starting is stopped by the start
    route or by the workflow's first step. Both stream responses always end
-   with a `finish` chunk (`stream.ts`), even for a run cancelled from another
-   tab or one whose stream has passed Workflow's retention
-   (`RunExpiredError`), because the page's transport keeps reconnecting until
-   it sees one. `vercel.json` sets `supportsCancellation` on the reconnect
+   with a `finish` chunk (`stream.ts`), because the page's transport keeps
+   reconnecting until it sees one: a cancelled run's stream is never closed
+   (seen locally: the start route's stream stayed open until its 300 s limit
+   after a Stop), so while a read waits the route checks the workflow's
+   status every 5 s and finishes once the run is over; a cancelled or expired
+   run (`RunExpiredError`) answers a reconnect with a finish alone. `vercel.json` sets `supportsCancellation` on the reconnect
    route so a closed tab ends its function; the start route is left without
    it, since it must finish recording the workflow run once admitted.
 2. The workflow runs AI SDK 7's `WorkflowAgent`. Each tool call is a durable

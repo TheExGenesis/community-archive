@@ -562,9 +562,11 @@ CREATE TABLE IF NOT EXISTS "public"."tweet_page_summaries" (
 );
 ALTER TABLE "public"."tweet_page_summaries" OWNER TO "postgres";
 
--- One row per agentic search question, keyed by its workflow run id. Private
--- to the asker: only the server's service-role client reads or writes it, and
--- route code checks ownership. Also backs the per-member and global budgets.
+-- One row per agentic search question, keyed by a search run id the server
+-- picks before the workflow starts (older rows use their workflow run id).
+-- Private to the asker: only the server's service-role client reads or writes
+-- it, and route code checks ownership. Also backs the per-member and global
+-- budgets.
 CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
     "id" text PRIMARY KEY,
     "account_id" text NOT NULL,
@@ -584,7 +586,9 @@ CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
     "error" text,
     -- The answer's message parts with tweets reduced to ids; tweets are
     -- fetched again through the gateway when a past answer is opened.
-    "parts" jsonb
+    "parts" jsonb,
+    -- The Workflow run executing it; null until the workflow has started.
+    "workflow_run_id" text
 );
 ALTER TABLE "public"."agent_search_runs" OWNER TO "postgres";
 

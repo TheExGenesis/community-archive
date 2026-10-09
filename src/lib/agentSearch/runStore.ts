@@ -11,6 +11,7 @@ import {
 import path from 'path'
 import type { Database, Json } from '@/database-types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { startOfUtcDay } from './day'
 import type { AgentSearchRun } from './types'
 
 export const MAX_CONVERSATION_RUNS = 50
@@ -26,19 +27,43 @@ export interface RunUsageDelta {
 type UsageFields = 'inputTokens' | 'outputTokens' | 'costUsd'
 export type RunPatch = Partial<Omit<AgentSearchRun, UsageFields | 'id'>>
 
+/** A question asking to start, with the limits it must fit under. */
+export interface AdmissionRequest {
+  runId: string
+  accountId: string
+  conversationId: string
+  question: string
+  model: string
+  dailyLimit: number
+  globalDailyUsd: number
+  /** A running run older than this no longer blocks a new one. */
+  staleRunMs: number
+  /** The file store's clock; the Supabase store uses the database's. */
+  now?: Date
+}
+
+export type AdmissionResult =
+  | 'ok'
+  | 'not_found'
+  | 'daily_limit'
+  | 'run_in_progress'
+  | 'global_budget'
+
 export interface AgentSearchRunStore {
   create(run: AgentSearchRun): Promise<void>
   update(id: string, patch: RunPatch): Promise<void>
   /** Adds to the run's tokens and cost in one atomic write. */
   addUsage(id: string, delta: RunUsageDelta): Promise<void>
+  /**
+   * Checks the conversation's owner, the member's daily count and running
+   * run, and the global daily spend, and on 'ok' inserts the run as running,
+   * all as one step: two requests can never both take the last slot.
+   */
+  admit(request: AdmissionRequest): Promise<AdmissionResult>
   get(id: string): Promise<AgentSearchRun | null>
   countSince(accountId: string, sinceIso: string): Promise<number>
-  /** `now` defaults to the current time; budget checks pass their own clock. */
-  hasRunning(
-    accountId: string,
-    staleAfterMs: number,
-    now?: Date,
-  ): Promise<boolean>
+  /** The member's runs still marked running, whatever their age. */
+  listRunning(accountId: string): Promise<AgentSearchRun[]>
   costSince(sinceIso: string): Promise<number>
   /** The member's runs, newest first, for the history list. */
   listRecent(accountId: string, limit: number): Promise<AgentSearchRun[]>
@@ -69,14 +94,71 @@ const usageUsd = (value: number | undefined) =>
   Number.isFinite(value) && (value as number) > 0 ? value! : 0
 const roundUsd = (value: number) => Math.round(value * 1e6) / 1e6
 
-const isRunning = (
-  run: Pick<AgentSearchRun, 'accountId' | 'status' | 'startedAt'>,
-  accountId: string,
-  cutoffMs: number,
-) =>
-  run.accountId === accountId &&
-  run.status === 'running' &&
-  Date.parse(run.startedAt) > cutoffMs
+// Not a valid run id, so it can never collide with a run's own lock.
+const ADMISSION_LOCK = ':admission'
+
+/** A new run as admission inserts it. */
+export function newRunRecord(
+  request: AdmissionRequest,
+  startedAt: string,
+): AgentSearchRun {
+  return {
+    id: request.runId,
+    workflowRunId: null,
+    accountId: request.accountId,
+    conversationId: request.conversationId,
+    question: request.question,
+    status: 'running',
+    model: request.model,
+    startedAt,
+    completedAt: null,
+    answer: null,
+    citedTweetIds: [],
+    invalidCitationIds: [],
+    toolCalls: [],
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+    error: null,
+  }
+}
+
+/** The admission rules, shared by the file store and its tests. */
+export function admissionDecision(
+  runs: AgentSearchRun[],
+  request: AdmissionRequest,
+  now: Date,
+): AdmissionResult {
+  const since = Date.parse(startOfUtcDay(now))
+  const staleCutoff = now.getTime() - request.staleRunMs
+  const own = runs.filter((run) => run.accountId === request.accountId)
+  if (
+    runs.some(
+      (run) =>
+        run.conversationId === request.conversationId &&
+        run.accountId !== request.accountId,
+    )
+  ) {
+    return 'not_found'
+  }
+  if (own.filter((run) => Date.parse(run.startedAt) >= since).length >=
+    request.dailyLimit) {
+    return 'daily_limit'
+  }
+  if (
+    own.some(
+      (run) =>
+        run.status === 'running' && Date.parse(run.startedAt) > staleCutoff,
+    )
+  ) {
+    return 'run_in_progress'
+  }
+  const spent = runs
+    .filter((run) => Date.parse(run.startedAt) >= since)
+    .reduce((sum, run) => sum + (Number(run.costUsd) || 0), 0)
+  if (spent >= request.globalDailyUsd) return 'global_budget'
+  return 'ok'
+}
 
 /**
  * One JSON file per run. Used in development and tests so local work never
@@ -183,9 +265,26 @@ export function createFileRunStore(
           run.accountId === accountId && Date.parse(run.startedAt) >= since,
       ).length
     },
-    async hasRunning(accountId, staleAfterMs, now = new Date()) {
-      const cutoff = now.getTime() - staleAfterMs
-      return (await readAll()).some((run) => isRunning(run, accountId, cutoff))
+    // One admission at a time in this process, like the database function's
+    // lock. (The file store serves one local process.)
+    admit: (request) =>
+      withLock(ADMISSION_LOCK, async () => {
+        const now = request.now ?? new Date()
+        const decision = admissionDecision(await readAll(), request, now)
+        if (decision !== 'ok') return decision
+        if (await read(request.runId)) {
+          throw new Error(`Agent search run ${request.runId} already exists`)
+        }
+        await writeAtomic(
+          request.runId,
+          newRunRecord(request, now.toISOString()),
+        )
+        return decision
+      }),
+    async listRunning(accountId) {
+      return (await readAll()).filter(
+        (run) => run.accountId === accountId && run.status === 'running',
+      )
     },
     async costSince(sinceIso) {
       const since = Date.parse(sinceIso)
@@ -211,6 +310,7 @@ export function createFileRunStore(
 function toRow(run: AgentSearchRun): RunInsert {
   return {
     id: run.id,
+    workflow_run_id: run.workflowRunId ?? null,
     account_id: run.accountId,
     conversation_id: run.conversationId ?? null,
     question: run.question,
@@ -232,6 +332,8 @@ function toRow(run: AgentSearchRun): RunInsert {
 
 function toRowPatch(patch: RunPatch): RunUpdate {
   const row: RunUpdate = {}
+  if (patch.workflowRunId !== undefined)
+    row.workflow_run_id = patch.workflowRunId
   if (patch.accountId !== undefined) row.account_id = patch.accountId
   if (patch.question !== undefined) row.question = patch.question
   if (patch.status !== undefined) row.status = patch.status
@@ -254,6 +356,7 @@ function toRowPatch(patch: RunPatch): RunUpdate {
 function fromRow(row: RunRow): AgentSearchRun {
   return {
     id: row.id,
+    workflowRunId: row.workflow_run_id,
     accountId: row.account_id,
     conversationId: row.conversation_id,
     parts: Array.isArray(row.parts) ? (row.parts as unknown[]) : null,
@@ -277,6 +380,44 @@ function fromRow(row: RunRow): AgentSearchRun {
 }
 
 const COST_PAGE_SIZE = 1000
+
+const ADMISSION_RESULTS: AdmissionResult[] = [
+  'ok',
+  'not_found',
+  'daily_limit',
+  'run_in_progress',
+  'global_budget',
+]
+
+// Lists need no answer bodies, message parts or usage.
+const SUMMARY_COLUMNS =
+  'id, workflow_run_id, account_id, conversation_id, question, status, model, started_at, completed_at, error'
+
+type SummaryRow = Pick<
+  RunRow,
+  | 'id'
+  | 'workflow_run_id'
+  | 'account_id'
+  | 'conversation_id'
+  | 'question'
+  | 'status'
+  | 'model'
+  | 'started_at'
+  | 'completed_at'
+  | 'error'
+>
+
+const withoutBodies = (row: SummaryRow): RunRow => ({
+  ...row,
+  answer: null,
+  cited_tweet_ids: [],
+  invalid_citation_ids: [],
+  tool_calls: [],
+  input_tokens: 0,
+  output_tokens: 0,
+  cost_usd: 0,
+  parts: null,
+})
 
 /** Production store on public.agent_search_runs, service role only. */
 export function createSupabaseRunStore(
@@ -327,16 +468,34 @@ export function createSupabaseRunStore(
         throw new Error(`Agent search run count failed: ${error.message}`)
       return count ?? 0
     },
-    async hasRunning(accountId, staleAfterMs, now = new Date()) {
-      const cutoff = new Date(now.getTime() - staleAfterMs).toISOString()
-      const { count, error } = await table()
-        .select('id', { count: 'exact', head: true })
+    async admit(request) {
+      const { data, error } = await client.rpc('agent_search_admit', {
+        p_run_id: request.runId,
+        p_account_id: request.accountId,
+        p_conversation_id: request.conversationId,
+        p_question: request.question,
+        p_model: request.model,
+        p_daily_limit: Math.floor(request.dailyLimit),
+        p_global_daily_usd: request.globalDailyUsd,
+        p_stale_after_seconds: Math.ceil(request.staleRunMs / 1000),
+      })
+      if (error)
+        throw new Error(`Agent search admission failed: ${error.message}`)
+      if (!ADMISSION_RESULTS.includes(data as AdmissionResult)) {
+        throw new Error(`Agent search admission returned ${String(data)}`)
+      }
+      return data as AdmissionResult
+    },
+    async listRunning(accountId) {
+      const { data, error } = await table()
+        .select(SUMMARY_COLUMNS)
         .eq('account_id', accountId)
         .eq('status', 'running')
-        .gt('started_at', cutoff)
+        .order('started_at', { ascending: true })
+        .limit(20)
       if (error)
         throw new Error(`Agent search run check failed: ${error.message}`)
-      return (count ?? 0) > 0
+      return (data ?? []).map((row) => fromRow(withoutBodies(row)))
     },
     async costSince(sinceIso) {
       // PostgREST caps result sets, so page through with a stable order
@@ -358,27 +517,13 @@ export function createSupabaseRunStore(
     async listRecent(accountId, limit) {
       // The list needs no answer bodies or message parts.
       const { data, error } = await table()
-        .select(
-          'id, account_id, conversation_id, question, status, model, started_at, completed_at, error',
-        )
+        .select(SUMMARY_COLUMNS)
         .eq('account_id', accountId)
         .order('started_at', { ascending: false })
         .limit(limit)
       if (error)
         throw new Error(`Agent search history read failed: ${error.message}`)
-      return (data ?? []).map((row) =>
-        fromRow({
-          ...row,
-          answer: null,
-          cited_tweet_ids: [],
-          invalid_citation_ids: [],
-          tool_calls: [],
-          input_tokens: 0,
-          output_tokens: 0,
-          cost_usd: 0,
-          parts: null,
-        }),
-      )
+      return (data ?? []).map((row) => fromRow(withoutBodies(row)))
     },
     async listConversation(conversationId) {
       // The newest runs, so a long conversation keeps its latest turns.

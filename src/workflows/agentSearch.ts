@@ -1,6 +1,6 @@
 import { WorkflowAgent, type ModelCallStreamPart } from '@ai-sdk/workflow'
 import { isStepCount } from 'ai'
-import { getWorkflowMetadata, getWritable } from 'workflow'
+import { getWritable } from 'workflow'
 import {
   AGENT_SEARCH_MAX_STEPS,
   agentRunFailure,
@@ -84,26 +84,29 @@ getTweetsStep.maxRetries = 1
 // Earlier turns come from the run store, never from the browser. Only the
 // asker's own runs count, though the route already refused anyone else's
 // conversation.
+// It also reports a run that was stopped before the workflow got going.
 async function loadContextStep(
   conversationId: string,
   accountId: string,
   runId: string,
 ) {
   'use step'
-  const runs = await getAgentSearchRunStore().listConversation(conversationId)
-  return buildConversationContext(
+  const store = getAgentSearchRunStore()
+  const current = await store.get(runId)
+  if (current?.status !== 'running') {
+    return { stopped: true, messages: [], priorTweetIds: [] }
+  }
+  const runs = await store.listConversation(conversationId)
+  const context = await buildConversationContext(
     runs.filter((run) => run.accountId === accountId),
     runId,
   )
+  return { stopped: false, ...context }
 }
 
 interface RunSummary {
   runId: string
-  accountId: string
-  conversationId: string | null
   parts: unknown[]
-  question: string
-  modelSpec: string
   text: string
   toolCalls: AgentSearchRun['toolCalls']
   toolOutputs: unknown[]
@@ -122,28 +125,11 @@ async function recordRunStep(summary: RunSummary) {
     ...summary.priorTweetIds,
   ])
   const store = getAgentSearchRunStore()
-  // The route stores the run right after start(); create it here if that
-  // write has not landed (or failed) so the result is never lost.
-  if (!(await store.get(summary.runId))) {
-    await store.create({
-      id: summary.runId,
-      accountId: summary.accountId,
-      conversationId: summary.conversationId,
-      question: summary.question,
-      status: 'running',
-      model: summary.modelSpec,
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-      answer: null,
-      citedTweetIds: [],
-      invalidCitationIds: [],
-      toolCalls: [],
-      inputTokens: 0,
-      outputTokens: 0,
-      costUsd: 0,
-      error: null,
-    })
-  }
+  // Admission stored the run before the workflow started. A run the member
+  // stopped meanwhile stays stopped; its spend is already recorded.
+  const current = await store.get(summary.runId)
+  if (!current) throw new Error(`Agent search run ${summary.runId} is missing`)
+  if (current.status !== 'running') return
   await store.update(summary.runId, {
     status: summary.error ? 'failed' : 'completed',
     completedAt: new Date().toISOString(),
@@ -173,6 +159,8 @@ function outputCount(output: unknown): number | undefined {
  * earlier turns are rebuilt from the run store by loadContextStep.
  */
 export interface AgentSearchWorkflowInput {
+  /** The search run id admission stored before starting the workflow. */
+  runId: string
   accountId: string
   conversationId: string
   question: string
@@ -183,8 +171,7 @@ export interface AgentSearchWorkflowInput {
 export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   'use workflow'
 
-  // The workflow run id doubles as the search run id the route stored.
-  const { workflowRunId: runId } = getWorkflowMetadata()
+  const { runId } = input
   const agent = new WorkflowAgent({
     // Each planner call records its own usage on this run.
     model: agentSearchModel(input.modelSpec, runId),
@@ -212,6 +199,8 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       input.accountId,
       runId,
     )
+    // Stopped before it began: nothing was spent and nothing is recorded.
+    if (context.stopped) return { runId }
     priorTweetIds = context.priorTweetIds
     const result = await agent.stream({
       messages: [
@@ -257,11 +246,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
 
   await recordRunStep({
     runId,
-    accountId: input.accountId,
-    conversationId: input.conversationId,
     parts,
-    question: input.question,
-    modelSpec: input.modelSpec,
     text,
     toolCalls,
     toolOutputs,

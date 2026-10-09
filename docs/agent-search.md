@@ -8,13 +8,23 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
 
 ## How a question runs
 
-1. `POST /api/agent-search` checks the viewer (`src/lib/agentSearch/eligibility.ts`)
-   and the budget (`budget.ts`), then starts the `agentSearchWorkflow`
-   (`src/workflows/agentSearch.ts`) and streams it back with an
-   `x-workflow-run-id` header. `GET /api/agent-search/{runId}/stream` lets a
-   refreshed page reconnect, and `POST /api/agent-search/{runId}/cancel` (the
-   page's Stop button) cancels the workflow and closes the run record; only the
-   asker can read or stop a run.
+1. `POST /api/agent-search` checks the viewer (`src/lib/agentSearch/eligibility.ts`),
+   then admits the question (`budget.ts`, `runStore.ts`): one database call
+   (`agent_search_admit`) checks that nobody else owns the conversation, the
+   member's daily count and running run, and the global daily spend, and
+   stores the run as `running` under a search run id (`asr_…`) the server
+   picked. Two requests can never both take the last slot, and a store error
+   refuses the question. Only then does the route start the
+   `agentSearchWorkflow` (`src/workflows/agentSearch.ts`), record its workflow
+   run id on the row, and stream it back with the search run id in the
+   `x-workflow-run-id` header. Before admission it closes the member's runs
+   whose workflow already ended without recording a result (`runs.ts`).
+   `GET /api/agent-search/{runId}/stream` lets a refreshed page reconnect, and
+   `POST /api/agent-search/{runId}/cancel` (the page's Stop button) cancels the
+   workflow and closes the run record; only the asker can read or stop a run.
+   A Stop pressed before the page has the run id is held until the id
+   arrives, and a run closed while it was starting is stopped by the start
+   route or by the workflow's first step.
 2. The workflow runs AI SDK 7's `WorkflowAgent`. Each tool call is a durable
    step. Tools (`src/lib/agentSearch/agent.ts`, implemented in `toolImpl.ts`):
    `find_people`, `search_tweets`, `collect_and_score`, `score_tweets`,
@@ -116,9 +126,13 @@ The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_UR
 
 Production stores runs in `public.agent_search_runs`
 (`supabase/migrations/20261008120000_agent_search_runs.sql`), written with the
-service-role client; RLS is on with no user grants. Outside production the store
-is JSON files under `.agent-search-runs/` (git-ignored), so local development
-never writes production Supabase. The migration must be applied to production
+service-role client; RLS is on with no user grants. Two functions, also
+service role only, do the writes that must be atomic:
+`agent_search_add_usage` (`20261009120000_agent_search_usage.sql`) and
+`agent_search_admit` (`20261009130000_agent_search_admission.sql`, which also
+adds `workflow_run_id`). Outside production the store is JSON files under
+`.agent-search-runs/` (git-ignored) with the same rules, so local development
+never writes production Supabase. The migrations must be applied to production
 by hand before release (see AGENTS.md).
 
 ## Local development

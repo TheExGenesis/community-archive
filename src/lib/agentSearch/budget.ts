@@ -5,7 +5,7 @@ import {
   resolveModelPrice,
   scorerPriceEnv,
 } from './model'
-import type { AgentSearchRunStore } from './runStore'
+import type { AdmissionRequest, AgentSearchRunStore } from './runStore'
 
 /**
  * Why no run may start with this configuration, or null when it may. Every
@@ -37,7 +37,10 @@ export function agentSearchPricingProblem(
 
 export type AgentSearchBudgetResult =
   | { ok: true }
-  | { ok: false; reason: 'daily_limit' | 'run_in_progress' | 'global_budget' }
+  | {
+      ok: false
+      reason: 'not_found' | 'daily_limit' | 'run_in_progress' | 'global_budget'
+    }
 
 export interface AgentSearchBudgetLimits {
   dailyLimit: number
@@ -78,34 +81,23 @@ export function agentSearchBudgetLimits(
   }
 }
 
-export function startOfUtcDay(now: Date): string {
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  ).toISOString()
-}
+export { startOfUtcDay } from './day'
 
 /**
- * Whether this account may start another question now. Every account obeys
- * the caps, including the development preview account 'dev'. A running run
- * older than the stale window no longer blocks, so a crashed run cannot lock
- * a member out for the day.
+ * Admits a question or says why not, and on admission stores the run as
+ * running under `runId` before any workflow starts. Every account obeys the
+ * caps, including the development preview account 'dev'. A running run older
+ * than the stale window no longer blocks, so a lost run cannot lock a member
+ * out for the day; the start route first closes runs whose workflow ended
+ * (runs.ts). Store errors propagate: the caller must refuse to start.
  */
-export async function checkAgentSearchBudget(
-  store: Pick<AgentSearchRunStore, 'countSince' | 'hasRunning' | 'costSince'>,
-  accountId: string,
-  now: Date = new Date(),
+export async function admitAgentSearchRun(
+  store: Pick<AgentSearchRunStore, 'admit'>,
+  request: Omit<AdmissionRequest, keyof AgentSearchBudgetLimits>,
 ): Promise<AgentSearchBudgetResult> {
-  const limits = agentSearchBudgetLimits()
-  const since = startOfUtcDay(now)
-  const [count, running, cost] = await Promise.all([
-    store.countSince(accountId, since),
-    store.hasRunning(accountId, limits.staleRunMs, now),
-    store.costSince(since),
-  ])
-  if (count >= limits.dailyLimit) return { ok: false, reason: 'daily_limit' }
-  if (running) return { ok: false, reason: 'run_in_progress' }
-  if (cost >= limits.globalDailyUsd) {
-    return { ok: false, reason: 'global_budget' }
-  }
-  return { ok: true }
+  const result = await store.admit({
+    ...request,
+    ...agentSearchBudgetLimits(),
+  })
+  return result === 'ok' ? { ok: true } : { ok: false, reason: result }
 }

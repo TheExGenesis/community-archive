@@ -47,7 +47,13 @@ export function compactTweet(tweet: AgentTweet & { p?: number }): CompactTweet {
 export type AgentSearchRunStatus = 'running' | 'completed' | 'failed'
 
 export interface AgentSearchRun {
+  /**
+   * The search run id, chosen by the server before the workflow starts. Runs
+   * stored before admission existed use the workflow run id here.
+   */
   id: string
+  /** The Workflow run executing it; null until the workflow has started. */
+  workflowRunId?: string | null
   accountId: string
   /** Groups a question with its follow-ups; the page's chat id. */
   conversationId?: string | null

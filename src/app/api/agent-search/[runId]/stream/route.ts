@@ -3,6 +3,7 @@ import { createUIMessageStreamResponse } from 'ai'
 import { NextResponse } from 'next/server'
 import { getRun } from 'workflow/api'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { workflowRunIdOf } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 
 export const maxDuration = 300
@@ -41,7 +42,14 @@ export async function GET(
       { status: 400, headers: noStore },
     )
   }
-  const run = getRun(runId)
+  const workflowRunId = workflowRunIdOf(stored)
+  if (!workflowRunId) {
+    return NextResponse.json(
+      { error: 'not_started' },
+      { status: 409, headers: noStore },
+    )
+  }
+  const run = getRun(workflowRunId)
   const readable = run
     .getReadable({ startIndex: 0 })
     .pipeThrough(

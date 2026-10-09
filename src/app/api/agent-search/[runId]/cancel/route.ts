@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getRun } from 'workflow/api'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { workflowRunIdOf } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,24 @@ export async function POST(
   if (stored.status !== 'running') {
     return NextResponse.json({ status: stored.status }, { headers: noStore })
   }
-  await getRun(runId).cancel({ cancelReason: 'Stopped by the member' })
+  // Without a workflow run yet, the run is still starting: closing the record
+  // is enough, since the start route and the workflow's first step both stop
+  // a run that is no longer marked running. A failed cancel leaves the run
+  // running, so the page can try again.
+  const workflowRunId = workflowRunIdOf(stored)
+  if (workflowRunId) {
+    try {
+      await getRun(workflowRunId).cancel({
+        cancelReason: 'Stopped by the member',
+      })
+    } catch (error) {
+      console.error('[agent-search] cancel failed', error)
+      return NextResponse.json(
+        { error: 'unavailable' },
+        { status: 503, headers: noStore },
+      )
+    }
+  }
   await store.update(runId, {
     status: 'failed',
     error: 'Stopped by the member',

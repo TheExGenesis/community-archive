@@ -57,6 +57,10 @@ export default function AgentSearch({
   // instead of only closing the stream, and a reopened conversation can
   // reconnect to an answer that is still being written.
   const runIdRef = useRef<string | null>(null)
+  // Stop pressed before the server returned the run id: cancel as soon as it
+  // arrives (stopRun reads this when onChatSendMessage calls it).
+  const stopPendingRef = useRef(false)
+  const stopRunRef = useRef<() => void>(() => {})
   const transport = useMemo(
     () =>
       new WorkflowChatTransport<UIMessage>({
@@ -64,6 +68,7 @@ export default function AgentSearch({
         // Only the chat id (the conversation id) and the new question: the
         // server rebuilds earlier turns from what it stored.
         prepareSendMessagesRequest: ({ id, messages }) => {
+          stopPendingRef.current = false
           const last = [...messages].reverse().find((m) => m.role === 'user')
           return { body: { id, question: last ? messageText(last) : '' } }
         },
@@ -71,6 +76,7 @@ export default function AgentSearch({
           runIdRef.current = response.headers.get('x-workflow-run-id')
           // Only an accepted question makes the conversation worth linking to.
           if (response.ok) showConversationInUrl(chatId)
+          if (stopPendingRef.current) stopRunRef.current()
         },
         onChatEnd: () => {
           runIdRef.current = null
@@ -183,16 +189,31 @@ export default function AgentSearch({
     textareaRef.current?.focus()
   }, [error, messages, setMessages])
 
+  // Stop cancels the workflow, not just the stream. Until the server has
+  // returned the run id, aborting the request would leave the run going with
+  // no way to cancel it, so Stop is remembered and runs again when the id
+  // arrives. A cancel that fails keeps the id, so Stop can be pressed again.
   const stopRun = () => {
     const runId = runIdRef.current
-    runIdRef.current = null
+    if (!runId && status === 'submitted') {
+      stopPendingRef.current = true
+      return
+    }
+    stopPendingRef.current = false
     if (runId) {
       void fetch(`/api/agent-search/${encodeURIComponent(runId)}/cancel`, {
         method: 'POST',
-      }).catch(() => undefined)
+      })
+        .then((response) => {
+          if (response.ok && runIdRef.current === runId) {
+            runIdRef.current = null
+          }
+        })
+        .catch(() => undefined)
     }
     void stop()
   }
+  stopRunRef.current = stopRun
 
   const ask = (question: string) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)

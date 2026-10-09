@@ -245,6 +245,31 @@ function quotedAsPortal(tweet: PortalQuotedTweet): PortalTweet {
   return { ...tweet, observedAt: tweet.createdAt }
 }
 
+/** find_people top tweets carry only id, date, text and likes. */
+function profileTweets(profile: LooseRecord, items: unknown): PortalTweet[] {
+  const username = asString(profile.username)
+  if (!username) return []
+  return asArray(items).flatMap((item) => {
+    if (!isRecord(item) || typeof item.id !== 'string') return []
+    if (typeof item.text !== 'string') return []
+    const createdAt = asString(item.createdAt) ?? ''
+    return [
+      {
+        id: item.id,
+        username,
+        name: asString(profile.displayName) ?? username,
+        avatar: null,
+        text: item.text,
+        observedAt: createdAt,
+        createdAt,
+        likes: asNumber(item.likes) ?? 0,
+        rts: 0,
+        retweetCountAvailable: false,
+      },
+    ]
+  })
+}
+
 /**
  * Same traversal as collectToolTweetIds, but keeps the objects so the page can
  * render cited tweets without another fetch. Full tweets win over quoted embeds.
@@ -264,7 +289,8 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
     if (
       typeof value.id === 'string' &&
       /^\d{1,20}$/.test(value.id) &&
-      typeof value.text === 'string'
+      typeof value.text === 'string' &&
+      typeof value.username === 'string'
     ) {
       const id = value.id
       const isFull = typeof value.observedAt === 'string'
@@ -284,6 +310,12 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
       if (p !== undefined) scores.set(id, Math.max(p, scores.get(id) ?? 0))
     }
     for (const [key, child] of Object.entries(value)) {
+      if (key === 'topTweets') {
+        // A profile's all-time top tweets are context, not search results,
+        // and arrive without author fields. Keep them citable, never listed.
+        visit(profileTweets(value, child), true)
+        continue
+      }
       visit(child, embedded || key === 'quotedTweet')
     }
   }

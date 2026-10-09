@@ -8,6 +8,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
 import { AgentSearchTurn } from './AgentSearchTurn'
+import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
 import { buildTurnView, describeChatError, messageText } from './messageView'
 
@@ -390,11 +391,16 @@ export default function AgentSearch({
               if (message.role !== 'assistant') return null
               const active = busy && index === lastIndex
               return (
-                <AgentSearchTurn
+                <EvidenceBoundary
                   key={message.id}
-                  view={buildTurnView(messages, index, { streaming: active })}
-                  active={active}
-                />
+                  label="turn"
+                  fallback="This answer could not be shown."
+                >
+                  <AgentSearchTurn
+                    view={buildTurnView(messages, index, { streaming: active })}
+                    active={active}
+                  />
+                </EvidenceBoundary>
               )
             })}
             {status === 'submitted' && messages[lastIndex]?.role === 'user' && (

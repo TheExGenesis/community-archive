@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { AnswerMarkdown } from './AnswerMarkdown'
+import { EvidenceBoundary } from './EvidenceBoundary'
 import {
   NOT_SEARCHED_LINE,
   type CoverageView,
@@ -201,11 +202,15 @@ export function AgentSearchTurn({
         )}
       </div>
 
-      <CitedTweets citations={answer.citations} active={active} />
+      <EvidenceBoundary label="cited tweets">
+        <CitedTweets citations={answer.citations} active={active} />
+      </EvidenceBoundary>
 
       {!active && (
         <div className="min-w-0 space-y-5 lg:col-start-1">
-          <OtherPosts tweets={view.otherTweets} />
+          <EvidenceBoundary label="other posts">
+            <OtherPosts tweets={view.otherTweets} />
+          </EvidenceBoundary>
           <CoverageBlock coverage={view.coverage} />
         </div>
       )}

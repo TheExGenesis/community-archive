@@ -184,6 +184,47 @@ describe('collectToolTweets', () => {
     expect(found.byId.get('7')?.observedAt).toBe(quoted.createdAt)
     expect(found.scores.get('2')).toBe(0.8)
   })
+
+  test('keeps find_people top tweets out of results and gives them an author', () => {
+    const peopleOutput = {
+      members: [{ username: 'patio11', displayName: 'Patrick' }],
+      user: {
+        accountId: '1',
+        username: 'patio11',
+        displayName: 'Patrick',
+        bio: null,
+        followers: 10,
+        tweets: 20,
+        topTweets: [
+          { id: '501', createdAt: '2020-01-01T00:00:00.000Z', text: 'Top', likes: 9 },
+          { id: '502', createdAt: '2020-01-02T00:00:00.000Z', text: 'Next', likes: 3 },
+        ],
+      },
+    }
+    const messages: UIMessage[] = [
+      assistant('a1', [
+        toolPart('find_people', { query: 'patio11' }, peopleOutput),
+        toolPart('search_tweets', { query: 'x' }, { tweets: [tweet('1')] }),
+        text('Answer [[t:501]] and [[t:1]]'),
+      ]),
+    ]
+    const found = collectToolTweets([peopleOutput, { tweets: [tweet('1')] }])
+    expect(found.results).toEqual(['1'])
+    expect(found.byId.get('501')?.username).toBe('patio11')
+
+    const view = buildTurnView(messages, 0)
+    expect(view.otherTweets.map((t) => t.id)).toEqual([])
+    expect(view.answer.citations.map((c) => c.id)).toEqual(['501', '1'])
+    expect(view.answer.unverified).toEqual([])
+  })
+
+  test('ignores tweet-like objects without a username', () => {
+    const found = collectToolTweets([
+      { tweets: [{ id: '9', text: 'no author' }, tweet('1')] },
+    ])
+    expect(found.results).toEqual(['1'])
+    expect(found.byId.has('9')).toBe(false)
+  })
 })
 
 describe('buildAnswer', () => {

@@ -177,8 +177,7 @@ export function AgentSearchTurn({
   const hasAnswer = Boolean(answer.markdown.trim())
   // Until the member picks a tab, open the strongest tier that has posts.
   const [chosenTab, setTab] = useState<EvidenceTab | null>(null)
-  const tab =
-    chosenTab ?? (view.receipt.relevant > 0 ? 'relevant' : 'other')
+  const tab = chosenTab ?? (view.receipt.relevant > 0 ? 'relevant' : 'other')
   const evidenceRef = useRef<HTMLElement>(null)
   const citedRef = useRef<HTMLElement>(null)
 

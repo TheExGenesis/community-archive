@@ -169,10 +169,18 @@ describe('progressLines', () => {
 describe('searchSubject', () => {
   test('includes date range, order and paging so repeated searches differ', () => {
     expect(
-      searchSubject({ query: 'bluesky', since: '2023-01-01', until: '2023-12-31' }),
+      searchSubject({
+        query: 'bluesky',
+        since: '2023-01-01',
+        until: '2023-12-31',
+      }),
     ).toBe('“bluesky”, 2023')
     expect(
-      searchSubject({ query: 'bluesky', since: '2023-01-01', until: '2024-01-01' }),
+      searchSubject({
+        query: 'bluesky',
+        since: '2023-01-01',
+        until: '2024-01-01',
+      }),
     ).toBe('“bluesky”, 2023')
     expect(searchSubject({ query: 'bluesky', sort: 'oldest' })).toBe(
       '“bluesky”, oldest first',
@@ -186,7 +194,9 @@ describe('searchSubject', () => {
         sort: 'likes',
         offset: 50,
       }),
-    ).toBe('“bluesky”, “bsky” from @x, since 5 Mar 2024, most liked, more results')
+    ).toBe(
+      '“bluesky”, “bsky” from @x, since 5 Mar 2024, most liked, more results',
+    )
     expect(
       searchSubject({ query: 'a', since: '2024-03-05', until: '2024-06-01' }),
     ).toBe('“a”, 5 Mar 2024 to 1 Jun 2024')
@@ -245,8 +255,18 @@ describe('collectToolTweets', () => {
         followers: 10,
         tweets: 20,
         topTweets: [
-          { id: '501', createdAt: '2020-01-01T00:00:00.000Z', text: 'Top', likes: 9 },
-          { id: '502', createdAt: '2020-01-02T00:00:00.000Z', text: 'Next', likes: 3 },
+          {
+            id: '501',
+            createdAt: '2020-01-01T00:00:00.000Z',
+            text: 'Top',
+            likes: 9,
+          },
+          {
+            id: '502',
+            createdAt: '2020-01-02T00:00:00.000Z',
+            text: 'Next',
+            likes: 3,
+          },
         ],
       },
     }
@@ -490,7 +510,11 @@ describe('buildTurnView', () => {
     const messages: UIMessage[] = [
       {
         ...assistant('a1', [
-          toolPart('search_tweets', { query: 'x' }, { tweets: [tweet('1'), tweet('2')] }),
+          toolPart(
+            'search_tweets',
+            { query: 'x' },
+            { tweets: [tweet('1'), tweet('2')] },
+          ),
           text('Answer'),
         ]),
         metadata: {

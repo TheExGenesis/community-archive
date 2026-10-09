@@ -22,7 +22,13 @@ const time = (tweet: PortalTweet) => {
 }
 
 /** Compact cards, five at first, then thirty more per press. */
-function TweetPages({ tweets, label }: { tweets: PortalTweet[]; label: string }) {
+function TweetPages({
+  tweets,
+  label,
+}: {
+  tweets: PortalTweet[]
+  label: string
+}) {
   const [shown, setShown] = useState(FIRST_PAGE)
   if (!tweets.length) return null
   const left = tweets.length - shown
@@ -58,7 +64,13 @@ const chipClass = (selected: boolean) =>
   }`
 
 /** Author chips and a sort toggle over one list of posts. */
-function FilteredPosts({ tweets, label }: { tweets: PortalTweet[]; label: string }) {
+function FilteredPosts({
+  tweets,
+  label,
+}: {
+  tweets: PortalTweet[]
+  label: string
+}) {
   const [author, setAuthor] = useState<string | null>(null)
   const [byDate, setByDate] = useState(false)
 
@@ -77,9 +89,7 @@ function FilteredPosts({ tweets, label }: { tweets: PortalTweet[]; label: string
     const filtered = author
       ? tweets.filter((tweet) => tweet.username === author)
       : tweets
-    return byDate
-      ? [...filtered].sort((a, b) => time(b) - time(a))
-      : filtered
+    return byDate ? [...filtered].sort((a, b) => time(b) - time(a)) : filtered
   }, [tweets, author, byDate])
 
   return (
@@ -140,9 +150,13 @@ function GroupedPosts({
   groups: EvidenceGroup[]
   relevant: PortalTweet[]
 }) {
-  const grouped = new Set(groups.flatMap((group) => group.tweets.map((t) => t.id)))
+  const grouped = new Set(
+    groups.flatMap((group) => group.tweets.map((t) => t.id)),
+  )
   const rest = relevant.filter((tweet) => !grouped.has(tweet.id))
-  const all = rest.length ? [...groups, { label: 'More relevant posts', tweets: rest }] : groups
+  const all = rest.length
+    ? [...groups, { label: 'More relevant posts', tweets: rest }]
+    : groups
   return (
     <div className="space-y-6">
       {all.map((group) => (

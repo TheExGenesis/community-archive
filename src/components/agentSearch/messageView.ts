@@ -618,7 +618,10 @@ export function buildTurnView(
         collectKept(out) - asArray(out.kept).length,
       )
       if (out.capped) {
-        cappedAt = asNumber(out.limit) ?? asNumber(call.input.maxTweets) ?? DEFAULT_COLLECT
+        cappedAt =
+          asNumber(out.limit) ??
+          asNumber(call.input.maxTweets) ??
+          DEFAULT_COLLECT
       }
     }
   }
@@ -691,7 +694,10 @@ export function receiptSegments(
 ): Array<{ text: string; target: ReceiptTarget | null }> {
   const segments: Array<{ text: string; target: ReceiptTarget | null }> = [
     receipt.cited
-      ? { text: `Based on ${plural(receipt.cited, 'cited post')}`, target: 'cited' }
+      ? {
+          text: `Based on ${plural(receipt.cited, 'cited post')}`,
+          target: 'cited',
+        }
       : { text: 'No posts cited', target: null },
   ]
   if (receipt.scorerRan && receipt.relevant) {

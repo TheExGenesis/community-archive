@@ -79,8 +79,12 @@ test('renders the receipt, cited tweets, unverified note, evidence tabs and cove
   ]
   render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
 
-  expect(screen.getByRole('button', { name: 'Based on 1 cited post' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '1 more judged relevant' })).toBeInTheDocument()
+  expect(
+    screen.getByRole('button', { name: 'Based on 1 cited post' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByRole('button', { name: '1 more judged relevant' }),
+  ).toBeInTheDocument()
 
   const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
   expect(cited).toHaveTextContent('Post 1')
@@ -88,10 +92,9 @@ test('renders the receipt, cited tweets, unverified note, evidence tabs and cove
   expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
 
   // Relevant posts show by default; other matches mount when their tab opens.
-  expect(screen.getByRole('tab', { name: 'Also relevant (1)' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
+  expect(
+    screen.getByRole('tab', { name: 'Also relevant (1)' }),
+  ).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByText('Post 2')).toBeInTheDocument()
   expect(screen.queryByText('Post 3')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: '1 other match' }))

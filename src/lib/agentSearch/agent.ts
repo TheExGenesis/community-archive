@@ -38,15 +38,19 @@ How to answer:
 export const AGENT_SEARCH_INSTRUCTIONS = agentSearchInstructions()
 
 /**
- * Per-step settings: the last allowed step may not call tools, so a run that
- * reaches the step limit still ends with an answer.
+ * Per-step settings: the last allowed step, and any step after the run's
+ * deadline, may not call tools, so the run still ends with an answer. In a
+ * workflow, `now` is the replayed event time, so this stays deterministic.
  */
-export function agentSearchPrepareStep({
-  stepNumber,
-}: {
-  stepNumber: number
-}): { toolChoice?: 'none' } {
-  return stepNumber >= AGENT_SEARCH_MAX_STEPS - 1 ? { toolChoice: 'none' } : {}
+export function agentSearchPrepareStep(
+  deadlineAt?: number,
+  now: () => number = Date.now,
+) {
+  return ({ stepNumber }: { stepNumber: number }): { toolChoice?: 'none' } =>
+    stepNumber >= AGENT_SEARCH_MAX_STEPS - 1 ||
+    (deadlineAt !== undefined && now() >= deadlineAt)
+      ? { toolChoice: 'none' }
+      : {}
 }
 
 /**

@@ -44,6 +44,18 @@ describe('Decisions scoring cost', () => {
     expect(error.costUsd).toBeCloseTo(0.0008)
   })
 
+  test('starts no Decisions call after the run’s deadline', async () => {
+    const fetchMock = fetchAnsweringFirst(100)
+    global.fetch = fetchMock as never
+    const error = await scoreTweets('criterion', items(10), {
+      deadlineAt: Date.now() - 1,
+    }).catch((e) => e)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(error).toBeInstanceOf(ScoringError)
+    expect(error.message).toContain('time limit')
+    expect(error.costUsd).toBe(0)
+  })
+
   test('a batch with few failures returns its cost', async () => {
     global.fetch = fetchAnsweringFirst(100) as never
     const result = await scoreTweets('criterion', items(10))

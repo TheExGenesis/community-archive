@@ -7,6 +7,7 @@ jest.mock('@ai-sdk/openai-compatible', () => ({
 
 import {
   admitAgentSearchRun,
+  agentSearchBudgetLimits,
   agentSearchPricingProblem,
   startOfUtcDay,
 } from './budget'
@@ -144,7 +145,7 @@ describe('admitAgentSearchRun', () => {
   test('reads limits from the environment and ignores bad values', async () => {
     process.env.AGENT_SEARCH_DAILY_LIMIT = '2'
     process.env.AGENT_SEARCH_GLOBAL_DAILY_USD = 'lots'
-    process.env.AGENT_SEARCH_STALE_RUN_MS = '1000'
+    process.env.AGENT_SEARCH_STALE_RUN_MS = '900000'
     const store = storeAnswering('ok')
     await admitAgentSearchRun(store, request)
     // The bad USD value falls back to $25 rather than disabling the cap.
@@ -152,9 +153,20 @@ describe('admitAgentSearchRun', () => {
       expect.objectContaining({
         dailyLimit: 2,
         globalDailyUsd: 25,
-        staleRunMs: 1000,
+        staleRunMs: 900_000,
       }),
     )
+  })
+
+  test('a running run blocks at least until its deadline has passed', () => {
+    expect(
+      agentSearchBudgetLimits(
+        env({
+          AGENT_SEARCH_STALE_RUN_MS: '1000',
+          AGENT_SEARCH_RUN_DEADLINE_MS: '300000',
+        }),
+      ).staleRunMs,
+    ).toBe(420_000)
   })
 })
 

@@ -113,7 +113,8 @@ resolved headers, including the API key, into the event log.
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true` |
 | `AGENT_SEARCH_DAILY_LIMIT` | `10` | Questions per member per UTC day |
 | `AGENT_SEARCH_GLOBAL_DAILY_USD` | `25` | Global daily spend kill switch |
-| `AGENT_SEARCH_STALE_RUN_MS` | `600000` | When a running run stops blocking a new one |
+| `AGENT_SEARCH_RUN_DEADLINE_MS` | `300000` | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools |
+| `AGENT_SEARCH_STALE_RUN_MS` | `600000` | When a running run stops blocking a new one; never less than the deadline plus 2 minutes. A run whose workflow has ended stops blocking at once |
 | `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set |
 | `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...` | price table | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost) |
 | `AGENT_SEARCH_RUN_STORE` | file outside production | `file` forces the local JSON store |

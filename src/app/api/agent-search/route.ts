@@ -6,6 +6,7 @@ import {
   admitAgentSearchRun,
   agentSearchPricingProblem,
 } from '@/lib/agentSearch/budget'
+import { agentSearchRunDeadlineMs } from '@/lib/agentSearch/deadline'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { agentSearchModelSpec } from '@/lib/agentSearch/model'
 import { parseAgentSearchRequest } from '@/lib/agentSearch/request'
@@ -112,6 +113,7 @@ export async function POST(request: Request) {
         question,
         modelSpec,
         date: new Date().toISOString().slice(0, 10),
+        deadlineAt: Date.now() + agentSearchRunDeadlineMs(),
       },
     ])
   } catch (error) {

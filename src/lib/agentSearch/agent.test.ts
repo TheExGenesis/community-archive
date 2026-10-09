@@ -11,16 +11,23 @@ import {
 
 describe('agentSearchPrepareStep', () => {
   test('lets the model call tools until the last allowed step', () => {
-    expect(agentSearchPrepareStep({ stepNumber: 0 })).toEqual({})
-    expect(
-      agentSearchPrepareStep({ stepNumber: AGENT_SEARCH_MAX_STEPS - 2 }),
-    ).toEqual({})
+    const prepare = agentSearchPrepareStep()
+    expect(prepare({ stepNumber: 0 })).toEqual({})
+    expect(prepare({ stepNumber: AGENT_SEARCH_MAX_STEPS - 2 })).toEqual({})
   })
 
   test('forces a written answer on the last allowed step', () => {
     expect(
-      agentSearchPrepareStep({ stepNumber: AGENT_SEARCH_MAX_STEPS - 1 }),
+      agentSearchPrepareStep()({ stepNumber: AGENT_SEARCH_MAX_STEPS - 1 }),
     ).toEqual({ toolChoice: 'none' })
+  })
+
+  test('forces a written answer once the run’s deadline has passed', () => {
+    let now = 1_000
+    const prepare = agentSearchPrepareStep(2_000, () => now)
+    expect(prepare({ stepNumber: 3 })).toEqual({})
+    now = 2_000
+    expect(prepare({ stepNumber: 3 })).toEqual({ toolChoice: 'none' })
   })
 })
 

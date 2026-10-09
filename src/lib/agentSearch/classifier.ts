@@ -1,6 +1,13 @@
 import { generateText, Output, type LanguageModelUsage } from 'ai'
 import { z } from 'zod'
 import {
+  boundedTimeoutMs,
+  callTimeoutMs,
+  deadlinePassed,
+  RunDeadlineError,
+  type RunLimits,
+} from './deadline'
+import {
   agentSearchScorerModelSpec,
   createProviderModel,
   estimateModelCostUsd,
@@ -27,6 +34,7 @@ const LLM_BATCH = 40
 // lowest paid tier) can take more parallel batches. 1,000 posts = 25 batches.
 const JEV_CONCURRENCY = 4
 const LLM_CONCURRENCY = 12
+const LLM_TIMEOUT_MS = 120_000
 const TEXT_LIMIT = 1500
 
 export interface ScoreItem {
@@ -117,6 +125,7 @@ async function scoreWithDecisions(
   criterion: string,
   items: ScoreItem[],
   apiKey: string,
+  limits: RunLimits,
 ): Promise<ScoreResult> {
   const scores = new Map<string, number>()
   let inputTokens = 0
@@ -124,6 +133,11 @@ async function scoreWithDecisions(
   let lastError = ''
   await eachWithConcurrency(items, DECISIONS_CONCURRENCY, async (item) => {
     for (let attempt = 1; attempt <= DECISIONS_ATTEMPTS; attempt++) {
+      // Past the run's deadline no new call starts; the post counts as lost.
+      if (deadlinePassed(limits)) {
+        lastError = new RunDeadlineError().message
+        break
+      }
       const response = await fetch('https://api.openai.com/v1/decisions', {
         method: 'POST',
         headers: {
@@ -137,7 +151,7 @@ async function scoreWithDecisions(
             { type: 'predicate', name: 'match', instructions: criterion },
           ],
         }),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(boundedTimeoutMs(limits, 30_000)),
       }).catch((error: unknown) => {
         lastError = error instanceof Error ? error.message : String(error)
         return null
@@ -162,11 +176,13 @@ async function scoreWithDecisions(
         !response || response.status === 429 || response.status >= 500
       if (!retryable || attempt === DECISIONS_ATTEMPTS) break
       const retryAfter = Number(response?.headers.get('retry-after'))
-      await sleep(
+      const wait =
         Number.isFinite(retryAfter) && retryAfter > 0
           ? Math.min(retryAfter * 1000, 10_000)
-          : 500 * 2 ** attempt,
-      )
+          : 500 * 2 ** attempt
+      // No retry that would only start after the deadline.
+      if (deadlinePassed(limits, Date.now() + wait)) break
+      await sleep(wait)
     }
     failures++
   })
@@ -186,10 +202,13 @@ async function scoreWithJev(
   criterion: string,
   items: ScoreItem[],
   apiKey: string,
+  limits: RunLimits,
 ): Promise<ScoreResult> {
   const scores = new Map<string, number>()
   let costUsd = 0
   await inBatches(items, JEV_BATCH, JEV_CONCURRENCY, async (batch) => {
+    // Throws past the run's deadline, so no new batch starts.
+    const timeoutMs = callTimeoutMs(limits, 60_000)
     const records = batch.map((item, i) => ({
       id: `r${i}`,
       text: item.text.slice(0, TEXT_LIMIT),
@@ -220,7 +239,7 @@ async function scoreWithJev(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!response.ok) {
       throw new Error(`Jev request failed (${response.status})`)
@@ -259,6 +278,7 @@ function scorerReasoning(): (typeof REASONING_LEVELS)[number] {
 async function scoreWithLlm(
   criterion: string,
   items: ScoreItem[],
+  limits: RunLimits,
 ): Promise<ScoreResult> {
   const spec = agentSearchScorerModelSpec()
   const model = createProviderModel(spec)
@@ -276,8 +296,11 @@ async function scoreWithLlm(
     )
   }
   await inBatches(items, LLM_BATCH, LLM_CONCURRENCY, async (batch) => {
+    // Throws past the run's deadline, so no new batch starts.
+    const timeoutMs = callTimeoutMs(limits, LLM_TIMEOUT_MS)
     const result = await generateText({
       model,
+      abortSignal: AbortSignal.timeout(timeoutMs),
       // Measured on 40 real posts: none 7.8 s, low 9.1 s, medium 10.3 s, with
       // the same posts kept at none and low. Low is cheap insurance.
       reasoning: scorerReasoning(),
@@ -313,9 +336,11 @@ async function scoreWithLlm(
   return { scores, scorer: 'llm', costUsd }
 }
 
+/** Scores the items; no call starts after the run's deadline in `limits`. */
 export async function scoreTweets(
   criterion: string,
   items: ScoreItem[],
+  limits: RunLimits = {},
 ): Promise<ScoreResult> {
   const unique = Array.from(
     new Map(items.map((item) => [item.id, item])).values(),
@@ -324,10 +349,20 @@ export async function scoreTweets(
     return { scores: new Map(), scorer: agentSearchScorer(), costUsd: 0 }
   const scorer = agentSearchScorer()
   if (scorer === 'decisions')
-    return scoreWithDecisions(criterion, unique, process.env.OPENAI_API_KEY!)
+    return scoreWithDecisions(
+      criterion,
+      unique,
+      process.env.OPENAI_API_KEY!,
+      limits,
+    )
   if (scorer === 'jev')
-    return scoreWithJev(criterion, unique, process.env.OPENROUTER_API_KEY!)
-  return scoreWithLlm(criterion, unique)
+    return scoreWithJev(
+      criterion,
+      unique,
+      process.env.OPENROUTER_API_KEY!,
+      limits,
+    )
+  return scoreWithLlm(criterion, unique, limits)
 }
 
 /**

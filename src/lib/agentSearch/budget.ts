@@ -1,4 +1,5 @@
 import { agentSearchScorer } from './classifier'
+import { agentSearchRunDeadlineMs } from './deadline'
 import {
   agentSearchScorerModelSpec,
   plannerPriceEnv,
@@ -54,6 +55,8 @@ const DEFAULT_LIMITS: AgentSearchBudgetLimits = {
   staleRunMs: 600_000,
 }
 
+const LAST_CALL_GRACE_MS = 120_000
+
 // A malformed or negative value falls back to the default instead of
 // silently disabling a cap.
 function readLimit(value: string | undefined, fallback: number) {
@@ -74,9 +77,11 @@ export function agentSearchBudgetLimits(
       env.AGENT_SEARCH_GLOBAL_DAILY_USD,
       DEFAULT_LIMITS.globalDailyUsd,
     ),
-    staleRunMs: readLimit(
-      env.AGENT_SEARCH_STALE_RUN_MS,
-      DEFAULT_LIMITS.staleRunMs,
+    // A run may not stop blocking while it can still spend: never shorter
+    // than the run deadline plus time for its last model call.
+    staleRunMs: Math.max(
+      readLimit(env.AGENT_SEARCH_STALE_RUN_MS, DEFAULT_LIMITS.staleRunMs),
+      agentSearchRunDeadlineMs(env) + LAST_CALL_GRACE_MS,
     ),
   }
 }

@@ -371,7 +371,7 @@ async function runQuestion(
         instructions: mods.agent.AGENT_SEARCH_INSTRUCTIONS,
         tools,
         stopWhen: mods.ai.isStepCount(mods.agent.AGENT_SEARCH_MAX_STEPS),
-        prepareStep: mods.agent.agentSearchPrepareStep,
+        prepareStep: mods.agent.agentSearchPrepareStep(),
       })
       const result = await agent.generate({
         prompt: question.question,

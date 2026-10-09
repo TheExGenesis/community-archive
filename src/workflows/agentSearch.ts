@@ -39,45 +39,64 @@ import {
 // all the scoring again. They add their own cost to the run before returning
 // or throwing, so a failed or stopped run still counts what they spent.
 
-async function findPeopleStep(input: FindPeopleInput) {
+// Every tool gets the run's deadline: no gateway or scorer call starts after
+// it, and each call's timeout is cut to the time left (deadline.ts).
+
+async function findPeopleStep(input: FindPeopleInput, deadlineAt: number) {
   'use step'
-  return findPeopleImpl(input)
+  return findPeopleImpl(input, { deadlineAt })
 }
 findPeopleStep.maxRetries = 1
 
-async function searchTweetsStep(input: SearchTweetsToolInput) {
+async function searchTweetsStep(
+  input: SearchTweetsToolInput,
+  deadlineAt: number,
+) {
   'use step'
-  return searchTweetsImpl(input)
+  return searchTweetsImpl(input, { deadlineAt })
 }
 searchTweetsStep.maxRetries = 1
 
-async function collectAndScoreStep(input: CollectAndScoreInput, runId: string) {
+async function collectAndScoreStep(
+  input: CollectAndScoreInput,
+  runId: string,
+  deadlineAt: number,
+) {
   'use step'
-  return withRecordedCost(runId, () => collectAndScoreImpl(input))
+  return withRecordedCost(runId, () =>
+    collectAndScoreImpl(input, { deadlineAt }),
+  )
 }
 collectAndScoreStep.maxRetries = 0
 
-async function scoreTweetsStep(input: ScoreTweetsInput, runId: string) {
+async function scoreTweetsStep(
+  input: ScoreTweetsInput,
+  runId: string,
+  deadlineAt: number,
+) {
   'use step'
-  return withRecordedCost(runId, () => scoreTweetsImpl(input))
+  return withRecordedCost(runId, () => scoreTweetsImpl(input, { deadlineAt }))
 }
 scoreTweetsStep.maxRetries = 0
 
-async function getThreadStep(input: { tweetId: string }) {
+async function getThreadStep(input: { tweetId: string }, deadlineAt: number) {
   'use step'
-  return getThreadImpl(input)
+  return getThreadImpl(input, { deadlineAt })
 }
 getThreadStep.maxRetries = 1
 
-async function getQuotePostsStep(input: { tweetId: string; limit?: number }) {
+async function getQuotePostsStep(
+  input: { tweetId: string; limit?: number },
+  deadlineAt: number,
+) {
   'use step'
-  return getQuotePostsImpl(input)
+  return getQuotePostsImpl(input, { deadlineAt })
 }
 getQuotePostsStep.maxRetries = 1
 
-async function getTweetsStep(input: { tweetIds: string[] }) {
+async function getTweetsStep(input: { tweetIds: string[] }, deadlineAt: number) {
   'use step'
-  return getTweetsImpl(input)
+  return getTweetsImpl(input, { deadlineAt })
 }
 getTweetsStep.maxRetries = 1
 
@@ -166,24 +185,27 @@ export interface AgentSearchWorkflowInput {
   question: string
   modelSpec: string
   date: string
+  /** Epoch ms; after it no tool call starts and the model must answer. */
+  deadlineAt: number
 }
 
 export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   'use workflow'
 
-  const { runId } = input
+  const { runId, deadlineAt } = input
   const agent = new WorkflowAgent({
     // Each planner call records its own usage on this run.
     model: agentSearchModel(input.modelSpec, runId),
     instructions: agentSearchInstructions(input.date),
     tools: createAgentSearchTools({
-      find_people: findPeopleStep,
-      search_tweets: searchTweetsStep,
-      collect_and_score: (args) => collectAndScoreStep(args, runId),
-      score_tweets: (args) => scoreTweetsStep(args, runId),
-      get_thread: getThreadStep,
-      get_quote_posts: getQuotePostsStep,
-      get_tweets: getTweetsStep,
+      find_people: (args) => findPeopleStep(args, deadlineAt),
+      search_tweets: (args) => searchTweetsStep(args, deadlineAt),
+      collect_and_score: (args) =>
+        collectAndScoreStep(args, runId, deadlineAt),
+      score_tweets: (args) => scoreTweetsStep(args, runId, deadlineAt),
+      get_thread: (args) => getThreadStep(args, deadlineAt),
+      get_quote_posts: (args) => getQuotePostsStep(args, deadlineAt),
+      get_tweets: (args) => getTweetsStep(args, deadlineAt),
     }),
   })
 
@@ -209,7 +231,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       ],
       writable: getWritable<ModelCallStreamPart>(),
       stopWhen: isStepCount(AGENT_SEARCH_MAX_STEPS),
-      prepareStep: agentSearchPrepareStep,
+      prepareStep: agentSearchPrepareStep(deadlineAt),
     })
     for (const step of result.steps) {
       // A tool that failed after its retries is missing from toolResults

@@ -37,6 +37,62 @@ How to answer:
 
 export const AGENT_SEARCH_INSTRUCTIONS = agentSearchInstructions()
 
+/**
+ * Per-step settings: the last allowed step may not call tools, so a run that
+ * reaches the step limit still ends with an answer.
+ */
+export function agentSearchPrepareStep({
+  stepNumber,
+}: {
+  stepNumber: number
+}): { toolChoice?: 'none' } {
+  return stepNumber >= AGENT_SEARCH_MAX_STEPS - 1 ? { toolChoice: 'none' } : {}
+}
+
+/**
+ * The answer is the last step's text. Text from earlier steps is the model
+ * thinking aloud between tool calls, never the answer.
+ */
+export function finalAnswerText(steps: Array<{ text?: string }>): string {
+  return steps[steps.length - 1]?.text ?? ''
+}
+
+const FINISH_FAILURES: Record<string, string> = {
+  length: 'The answer was cut off at the output token limit',
+  'content-filter': 'The model’s content filter stopped the answer',
+  error: 'The model failed while answering',
+  'tool-calls': 'The run reached the step limit before answering',
+}
+
+/**
+ * Why a finished agent run did not produce a usable answer, or null when it
+ * did. WorkflowAgent does not throw for a model stream error or for an
+ * unusual finish reason; it returns them, so they must be checked here.
+ */
+export function agentRunFailure(result: {
+  error?: unknown
+  finishReason?: string
+  steps: Array<{ text?: string }>
+}): string | null {
+  if (result.error !== undefined && result.error !== null) {
+    const message =
+      result.error instanceof Error
+        ? result.error.message
+        : typeof result.error === 'string'
+          ? result.error
+          : JSON.stringify(result.error)
+    return `The model failed: ${message}`.slice(0, 500)
+  }
+  const reason = result.finishReason ?? 'unknown'
+  if (reason !== 'stop') {
+    return FINISH_FAILURES[reason] ?? `The model stopped early (${reason})`
+  }
+  if (!finalAnswerText(result.steps).trim()) {
+    return 'The model returned no answer'
+  }
+  return null
+}
+
 const mode = z.enum(['phrase', 'all']).optional()
 // Models often send '' for optional fields they don't use; the tools treat
 // empty values as absent.

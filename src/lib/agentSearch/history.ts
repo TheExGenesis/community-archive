@@ -201,13 +201,15 @@ export function conversationMessages(
       : run.answer
         ? ([{ type: 'text', text: run.answer }] as UIMessage['parts'])
         : []
+    // A failed run may still have stored a partial answer; say it is one.
     const hasText = stored.some((part) => part.type === 'text')
-    const closing =
-      run.status === 'failed' && !hasText
+    const note =
+      run.status === 'failed'
         ? run.error?.startsWith('Stopped')
           ? STOPPED_TEXT
           : FAILED_TEXT
         : null
+    const closing = note && (hasText ? `\n\n${note}` : note)
     messages.push({
       id: run.id,
       role: 'assistant',

@@ -228,6 +228,23 @@ describe('conversationMessages', () => {
     ])
   })
 
+  test('marks a failed run’s partial answer as unfinished', () => {
+    const [, answer] = conversationMessages(
+      [
+        run({
+          answer: 'Half an answer',
+          status: 'failed',
+          error: 'The answer was cut off at the output token limit',
+        }),
+      ],
+      new Map(),
+    )
+    expect(answer.parts).toEqual([
+      { type: 'text', text: 'Half an answer' },
+      { type: 'text', text: '\n\n_This answer failed before it finished._' },
+    ])
+  })
+
   test('falls back to the stored answer text for runs without parts', () => {
     const [, answer] = conversationMessages(
       [run({ answer: 'Plain answer' })],

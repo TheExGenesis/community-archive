@@ -33,7 +33,11 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    came back from a tool in the same run (`citations.ts`); the page marks other
    ids as unverified and the run record lists them.
 5. The last step stores the run (`runStore.ts`): question, answer, cited and
-   invalid ids, and tool calls.
+   invalid ids, and tool calls. The answer is the last model step's text. A
+   run of up to 20 model steps may not call tools on its last step, so it
+   always ends with an answer. A model error, or a finish other than `stop`
+   (cut off at the token limit, content filter), marks the run `failed` with
+   the reason in `error`; any partial answer is kept and shown as unfinished.
 
 ## Cost
 

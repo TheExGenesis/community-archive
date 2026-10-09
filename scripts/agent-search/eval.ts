@@ -371,13 +371,17 @@ async function runQuestion(
         instructions: mods.agent.AGENT_SEARCH_INSTRUCTIONS,
         tools,
         stopWhen: mods.ai.isStepCount(mods.agent.AGENT_SEARCH_MAX_STEPS),
+        prepareStep: mods.agent.agentSearchPrepareStep,
       })
       const result = await agent.generate({
         prompt: question.question,
         abortSignal: AbortSignal.timeout(args.timeoutMs),
       })
-      answer = result.text
+      answer = mods.agent.finalAnswerText(result.steps)
       finishReason = result.finishReason
+      // As in the workflow: a cut-off, filtered or empty answer is an error,
+      // not an answer to score.
+      error = mods.agent.agentRunFailure(result)
       steps = result.steps.length
       usage = result.usage
       for (const step of result.steps) {

@@ -3,8 +3,11 @@ import { convertToModelMessages, isStepCount, type UIMessage } from 'ai'
 import { getWorkflowMetadata, getWritable } from 'workflow'
 import {
   AGENT_SEARCH_MAX_STEPS,
+  agentRunFailure,
   agentSearchInstructions,
+  agentSearchPrepareStep,
   createAgentSearchTools,
+  finalAnswerText,
 } from '@/lib/agentSearch/agent'
 import {
   collectToolTweetIds,
@@ -184,6 +187,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       messages: await convertToModelMessages(input.messages),
       writable: getWritable<ModelCallStreamPart>(),
       stopWhen: isStepCount(AGENT_SEARCH_MAX_STEPS),
+      prepareStep: agentSearchPrepareStep,
     })
     for (const step of result.steps) {
       // A tool that failed after its retries is missing from toolResults
@@ -208,9 +212,12 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       for (const toolResult of step.toolResults) {
         toolOutputs.push(toolResult.output)
       }
-      if (step.text) text = step.text
     }
+    text = finalAnswerText(result.steps)
     parts = buildRunParts(result.steps, text)
+    // A model error or an unusual finish comes back in the result, not as a
+    // throw. The partial answer is kept, but the run is a failure.
+    error = agentRunFailure(result)
   } catch (caught) {
     error = errorText(caught)
   }

@@ -357,20 +357,27 @@ describe('buildCoverage', () => {
         { tweet: tweet('1'), conversation: [] },
       ),
       toolPart('search_tweets', { query: 'pending' }),
+      toolPart('find_people', { query: 'patio11' }, { members: [] }),
+      toolPart(
+        'search_tweets',
+        { query: 'archive', offset: 50 },
+        { tweets: [tweet('2'), tweet('3')] },
+      ),
     ])
     expect(buildCoverage(toolCalls(message))).toEqual({
       searches: [
-        { label: '“archive”', detail: '1 tweet' },
+        { label: '“archive”', detail: '3 tweets from 2 searches' },
         {
           label: '“archive”',
-          detail:
-            '1,000 posts checked (stopped at the limit, more exist), 70 kept',
+          detail: '1,000 posts checked, 70 relevant, stopped at the limit',
         },
       ],
       scored: 1001,
       kept: 71,
+      capped: true,
       threadsRead: 1,
       quotesRead: 0,
+      people: ['patio11'],
     })
     expect(NOT_SEARCHED_LINE).toMatch(/^Not searched: live X/)
   })

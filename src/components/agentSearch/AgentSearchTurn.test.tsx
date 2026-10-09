@@ -60,7 +60,7 @@ test('shows live progress while the agent is still searching', () => {
     'polite',
   )
   expect(screen.getByText('Searching “community archive”')).toBeInTheDocument()
-  expect(screen.queryByText('Coverage')).not.toBeInTheDocument()
+  expect(screen.queryByText('How this was searched')).not.toBeInTheDocument()
 })
 
 test('renders the receipt, cited tweets, unverified note, evidence tabs and coverage when done', () => {
@@ -100,8 +100,23 @@ test('renders the receipt, cited tweets, unverified note, evidence tabs and cove
   fireEvent.click(screen.getByRole('button', { name: '1 other match' }))
   expect(screen.getByText('Post 3')).toBeInTheDocument()
 
-  const coverage = screen.getByRole('region', { name: 'Coverage' })
+  // One note says how it searched; the step list is gone once answered.
+  const coverage = screen.getByRole('region', { name: 'How this was searched' })
   expect(coverage).toHaveTextContent('“community archive” · 3 tweets')
   expect(coverage).toHaveTextContent('Not searched: live X')
-  expect(screen.getByText('1 research step')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Search progress')).not.toBeInTheDocument()
+})
+
+test('says a follow-up with no new searches used the earlier posts', () => {
+  const messages: UIMessage[] = [
+    {
+      id: 'a2',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'From before.' }],
+    },
+  ]
+  render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
+  expect(
+    screen.getByRole('region', { name: 'How this was searched' }),
+  ).toHaveTextContent('Answered from the posts found for the earlier question.')
 })

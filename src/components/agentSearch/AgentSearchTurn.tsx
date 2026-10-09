@@ -46,75 +46,72 @@ export function ProgressList({
     </ol>
   )
 
-  // While the agent works, progress is the main thing on screen; afterwards
-  // the steps fold away behind the answer.
-  // The status row above says the run started; this lists what it did.
-  if (active) {
-    return (
-      <div aria-live="polite" aria-label="Search progress">
-        {lines.length > 0 && list}
-      </div>
-    )
-  }
-  if (!lines.length) return null
+  // While the agent works, this lists what it did; afterwards the same
+  // ground is covered by How this was searched under the evidence.
+  if (!active) return null
   return (
-    <details className="group">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        <ChevronRight
-          aria-hidden="true"
-          className="h-4 w-4 transition-transform group-open:rotate-90 motion-reduce:transition-none"
-        />
-        {lines.length === 1
-          ? '1 research step'
-          : `${lines.length} research steps`}
-      </summary>
-      <div className="mt-2 pl-5">{list}</div>
-    </details>
+    <div aria-live="polite" aria-label="Search progress">
+      {lines.length > 0 && list}
+    </div>
   )
 }
 
 export function CoverageBlock({ coverage }: { coverage: CoverageView }) {
+  const nothingRan =
+    !coverage.searches.length &&
+    !coverage.scored &&
+    !coverage.threadsRead &&
+    !coverage.quotesRead &&
+    !coverage.people.length
   return (
     <section
-      aria-label="Coverage"
-      className="rounded-lg border border-border bg-muted px-4 py-3 text-sm"
+      aria-label="How this was searched"
+      className="space-y-2 border-l-2 border-border pl-4 text-sm text-muted-foreground"
     >
-      <h3 className="font-semibold text-foreground">Coverage</h3>
-      {coverage.searches.length ? (
-        <ul className="mt-2 space-y-1 text-muted-foreground">
-          {coverage.searches.map((search, index) => (
-            <li key={`${search.label}-${index}`} className="break-words">
-              <span className="text-foreground">{search.label}</span>
-              {' · '}
-              {search.detail}
-            </li>
-          ))}
-        </ul>
+      {nothingRan ? (
+        <p>Answered from the posts found for the earlier question.</p>
       ) : (
-        <p className="mt-2 text-muted-foreground">No searches ran.</p>
+        coverage.searches.length > 0 && (
+          <ul className="space-y-1">
+            {coverage.searches.map((search) => (
+              <li key={search.label} className="break-words">
+                <span className="text-foreground">{search.label}</span>
+                {' · '}
+                {search.detail}
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+      {coverage.people.length > 0 && (
+        <p>
+          Looked up {coverage.people.map((name) => `“${name}”`).join(', ')}.
+        </p>
       )}
       {coverage.scored > 0 && (
-        <p className="mt-2 text-muted-foreground">
-          {coverage.scored.toLocaleString('en-US')} posts scored for relevance,{' '}
-          {coverage.kept.toLocaleString('en-US')} kept.
+        <p>
+          Checked {coverage.scored.toLocaleString('en-US')} posts against your
+          question: {coverage.kept.toLocaleString('en-US')} relevant
+          {coverage.capped ? ', stopped at the limit, so more exist' : ''}.
         </p>
       )}
       {(coverage.threadsRead > 0 || coverage.quotesRead > 0) && (
-        <p className="mt-1 text-muted-foreground">
+        <p>
+          Read{' '}
           {[
             coverage.threadsRead
-              ? `${coverage.threadsRead} ${coverage.threadsRead === 1 ? 'thread' : 'threads'} read`
+              ? `${coverage.threadsRead} ${coverage.threadsRead === 1 ? 'thread' : 'threads'}`
               : null,
             coverage.quotesRead
-              ? `quotes read for ${coverage.quotesRead} ${coverage.quotesRead === 1 ? 'post' : 'posts'}`
+              ? `the quotes of ${coverage.quotesRead} ${coverage.quotesRead === 1 ? 'post' : 'posts'}`
               : null,
           ]
             .filter(Boolean)
-            .join(', ')}
+            .join(' and ')}
           .
         </p>
       )}
-      <p className="mt-2 text-muted-foreground">{NOT_SEARCHED_LINE}.</p>
+      <p>{NOT_SEARCHED_LINE}.</p>
     </section>
   )
 }

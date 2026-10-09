@@ -49,9 +49,14 @@ export interface CoverageSearch {
 export interface CoverageView {
   searches: CoverageSearch[]
   scored: number
+  /** Judged relevant (p >= 0.5). */
   kept: number
+  /** A check stopped at its post limit, so more matching posts exist. */
+  capped: boolean
   threadsRead: number
   quotesRead: number
+  /** Names or handles looked up. */
+  people: string[]
 }
 
 /** An agent-chosen heading over some of the posts it found. */
@@ -494,34 +499,80 @@ export function buildAnswer(
   return { markdown, citations, unverified }
 }
 
+/**
+ * What was searched, for people: one line per distinct search (paging of the
+ * same search is summed into one line), the scoring totals, and what else
+ * was read.
+ */
 export function buildCoverage(calls: ToolCallView[]): CoverageView {
   const coverage: CoverageView = {
     searches: [],
     scored: 0,
     kept: 0,
+    capped: false,
     threadsRead: 0,
     quotesRead: 0,
+    people: [],
+  }
+  interface Tally {
+    label: string
+    scoring: boolean
+    runs: number
+    tweets: number
+    checked: number
+    kept: number
+    capped: boolean
+  }
+  // Keyed by kind and label: a keyword search and a scoring check over the
+  // same words are different lines.
+  const searches = new Map<string, Tally>()
+  const tally = (label: string, scoring: boolean) => {
+    const key = `${scoring ? 'check' : 'search'}:${label}`
+    let entry = searches.get(key)
+    if (!entry) {
+      entry = {
+        label,
+        scoring,
+        runs: 0,
+        tweets: 0,
+        checked: 0,
+        kept: 0,
+        capped: false,
+      }
+      searches.set(key, entry)
+    }
+    entry.runs += 1
+    return entry
   }
   for (const call of calls) {
     if (call.state !== 'output-available') continue
     const out = isRecord(call.output) ? call.output : {}
     switch (call.name) {
-      case 'search_tweets':
-        coverage.searches.push({
-          label: searchSubject(call.input) ?? 'recent posts',
-          detail: plural(asArray(out.tweets).length, 'tweet'),
-        })
+      case 'find_people': {
+        const query = asString(call.input.query)
+        if (query && !coverage.people.includes(query))
+          coverage.people.push(query)
         break
+      }
+      case 'search_tweets': {
+        // Further pages of one search read as that search.
+        const input = { ...call.input }
+        delete input.offset
+        tally(searchSubject(input) ?? 'recent posts', false).tweets += asArray(
+          out.tweets,
+        ).length
+        break
+      }
       case 'collect_and_score': {
-        const collected = asNumber(out.collected) ?? 0
         const scored = asNumber(out.scored) ?? 0
         const kept = collectKept(out)
-        coverage.searches.push({
-          label: termsSubject(call.input),
-          detail: `${plural(collected, 'post')} checked${
-            out.capped ? ' (stopped at the limit, more exist)' : ''
-          }, ${kept} kept`,
-        })
+        const entry = tally(termsSubject(call.input), true)
+        entry.checked += asNumber(out.collected) ?? 0
+        entry.kept += kept
+        if (out.capped) {
+          entry.capped = true
+          coverage.capped = true
+        }
         coverage.scored += scored
         coverage.kept += kept
         break
@@ -540,6 +591,17 @@ export function buildCoverage(calls: ToolCallView[]): CoverageView {
         break
     }
   }
+  coverage.searches = Array.from(searches.values()).map((entry) => {
+    const times = entry.runs > 1 ? ` from ${entry.runs} searches` : ''
+    return {
+      label: entry.label,
+      detail: entry.scoring
+        ? `${plural(entry.checked, 'post')} checked, ${entry.kept.toLocaleString('en-US')} relevant${
+            entry.capped ? ', stopped at the limit' : ''
+          }`
+        : `${plural(entry.tweets, 'tweet')}${times}`,
+    }
+  })
   return coverage
 }
 

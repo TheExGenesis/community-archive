@@ -11,6 +11,8 @@ import { AgentSearchTurn } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
 import { RunStatus } from './RunStatus'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ConversationHistory } from './ConversationHistory'
 import { InterruptedNote } from './InterruptedNote'
 import {
   buildTurnView,
@@ -278,7 +280,9 @@ export default function AgentSearch({
     setRunStartedAt(Date.now())
     // Shown at once; the next refresh replaces it with the stored count.
     setQuota((current) =>
-      current ? { ...current, remaining: Math.max(0, current.remaining - 1) } : current,
+      current
+        ? { ...current, remaining: Math.max(0, current.remaining - 1) }
+        : current,
     )
     // A follow-up sent from the bottom of a long answer would otherwise
     // start below the fold.
@@ -433,18 +437,26 @@ export default function AgentSearch({
               Ask the archive
             </h1>
             {hasThread && (
-              <button
-                type="button"
-                onClick={startNewConversation}
-                disabled={busy}
-                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                New question
-              </button>
+              <div className="flex items-center gap-2">
+                <ConversationHistory
+                  conversations={recent}
+                  currentId={conversation.id}
+                  onOpen={(id) => void openConversation(id)}
+                  disabled={busy || loading}
+                />
+                <button
+                  type="button"
+                  onClick={startNewConversation}
+                  disabled={busy}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus aria-hidden="true" className="h-4 w-4" />
+                  New question
+                </button>
+              </div>
             )}
           </div>
-          {!hasThread && (
+          {!hasThread && !loading && (
             <p className="mt-3 text-base leading-7 text-muted-foreground sm:text-lg">
               An agent searches members’ tweets, follows threads and quotes, and
               writes a short answer. Every claim links to the tweet it came
@@ -462,10 +474,17 @@ export default function AgentSearch({
           </p>
         )}
 
-        {!hasThread && loading && (
-          <p aria-live="polite" className="text-sm text-muted-foreground">
-            Opening the conversation
-          </p>
+        {loading && (
+          <div
+            role="status"
+            aria-label="Opening the conversation"
+            className="max-w-3xl space-y-4"
+          >
+            <Skeleton className="h-7 w-2/3" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-4/5" />
+          </div>
         )}
 
         {!hasThread && !loading && (
@@ -502,7 +521,7 @@ export default function AgentSearch({
           </>
         )}
 
-        {hasThread && (
+        {hasThread && !loading && (
           <div className="space-y-10">
             {messages.map((message, index) => {
               if (message.role === 'user') {
@@ -578,7 +597,7 @@ export default function AgentSearch({
           </div>
         )}
 
-        {hasThread &&<div className="mt-10 max-w-3xl">{form}</div>}
+        {hasThread && !loading && <div className="mt-10 max-w-3xl">{form}</div>}
       </section>
     </main>
   )

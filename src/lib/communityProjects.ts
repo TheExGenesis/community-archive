@@ -246,6 +246,43 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-09-24',
   },
   {
+    slug: 'prolifica',
+    name: 'Prolifica',
+    creator: 'Joshua',
+    creatorHandle: 'workflowsauce',
+    summary: 'See fifty Community Archive voices placed on one remixable map.',
+    description:
+      'Prolifica hosts “isles”: small data tools an agent builds from your data and anyone can remix with theirs. “Fifty voices from the Community Archive” maps 200 tweets by what each one is about and how it says it.',
+    archiveUse:
+      'Takes four of the most-liked text posts from each of the 50 most-followed accounts in the archive, places them by topic and tone, and sizes them by likes.',
+    category: 'Tools',
+    tags: ['Visualization', 'Remixable', 'Topics'],
+    projectUrl: 'https://prolifica.app/i/zwzuq5noc6',
+    image: '/images/community/prolifica-card.webp',
+    coverClass: 'from-[#f6f4ef] via-[#cfe6e1] to-[#0f6b61]',
+    featured: false,
+    publishedAt: '2026-10-09',
+  },
+  {
+    slug: 'moots',
+    name: 'Moots',
+    creator: 'Joshua',
+    creatorHandle: 'workflowsauce',
+    summary: 'See everyone you talk to on Twitter as a zoomable constellation.',
+    description:
+      'Drop in a Twitter archive to map the people you talk to: closer stars are people you interact with more, and color shows how recently. Everything is parsed in your browser.',
+    archiveUse:
+      'Reads a Community Archive archive.json, or loads an account straight from the archive, and draws its replies and mentions as a constellation.',
+    category: 'Tools',
+    tags: ['Social graph', 'Visualization', 'Personal archive'],
+    projectUrl: 'https://moots.fyi/',
+    sourceUrl: 'https://github.com/huttj/moots',
+    image: '/images/community/moots-card.webp',
+    coverClass: 'from-[#0a0a12] via-[#6a2fb0] to-[#ffd166]',
+    featured: false,
+    publishedAt: '2026-10-09',
+  },
+  {
     slug: 'vector-search',
     name: 'Semantic Search',
     creator: 'Corbin',

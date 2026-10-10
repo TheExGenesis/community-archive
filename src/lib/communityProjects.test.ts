@@ -7,7 +7,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(17)
+    expect(COMMUNITY_PROJECTS).toHaveLength(19)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -31,6 +31,14 @@ describe('community project catalog', () => {
       } else if (project.slug === 'tpot-trust') {
         expect(project.projectUrl).toBe('https://tpot.uptrusthq.com/')
         expect(project.creator).toBe('UpTrust HQ')
+        expect(project.sourceTweetId).toBeUndefined()
+      } else if (project.slug === 'prolifica') {
+        expect(project.projectUrl).toBe('https://prolifica.app/i/zwzuq5noc6')
+        expect(project.image).toBe('/images/community/prolifica-card.webp')
+        expect(project.sourceTweetId).toBeUndefined()
+      } else if (project.slug === 'moots') {
+        expect(project.projectUrl).toBe('https://moots.fyi/')
+        expect(project.sourceUrl).toBe('https://github.com/huttj/moots')
         expect(project.sourceTweetId).toBeUndefined()
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
@@ -102,7 +110,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Model Behavior Reports')
+    expect(newest[0].name).toBe('Prolifica')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,
@@ -164,6 +172,8 @@ describe('community project catalog', () => {
       'Birdseye',
       'Bangers.page',
       'Tweet Harvest',
+      'Prolifica',
+      'Moots',
       'Semantic Search',
       "Malcolm Ocean's Links",
       'Distill',

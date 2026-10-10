@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { TweetLikeButton } from '@/components/TweetLikeButton'
 import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
+import AnimatedGif from '@/components/AnimatedGif'
 import ImageLightbox from '@/components/ImageLightbox'
 import { TweetAvatar } from '@/components/TweetAvatar'
 export { TweetAvatar, avatarHue } from '@/components/TweetAvatar'
@@ -23,6 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
+import { animatedGifVideoUrl } from '@/lib/portal/animatedGif'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
 import { AddToProfileButton } from './AddToProfileButton'
@@ -82,7 +84,70 @@ function imageMedia(media: PortalMedia[] | undefined): PortalMedia[] {
     (item) =>
       item.type === 'photo' ||
       item.type === 'video' ||
+      item.type === 'animated_gif' ||
       item.type.startsWith('image/'),
+  )
+}
+
+/** Marks a still frame as coming from a GIF or a video. */
+function MediaKindBadge({ kind }: { kind: 'GIF' | 'Video' }) {
+  return (
+    <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-[3px] bg-black/70 px-1 py-0.5 text-[10px] font-bold leading-none tracking-wide text-white">
+      {kind}
+    </span>
+  )
+}
+
+function TweetMediaItem({
+  item,
+  alt,
+  sizes,
+  className,
+  imageClassName,
+}: {
+  item: PortalMedia
+  alt: string
+  sizes: string
+  className: string
+  imageClassName: string
+}) {
+  const gifVideoUrl = animatedGifVideoUrl(item)
+  if (gifVideoUrl) {
+    return (
+      <div
+        className={`relative overflow-hidden ${className}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <AnimatedGif
+          videoUrl={gifVideoUrl}
+          poster={item.url}
+          alt={alt}
+          width={item.width || 1200}
+          height={item.height || 800}
+          className={imageClassName}
+        />
+        <MediaKindBadge kind="GIF" />
+      </div>
+    )
+  }
+
+  return (
+    <ImageLightbox
+      src={item.url}
+      alt={alt}
+      width={item.width || 1200}
+      height={item.height || 800}
+      sizes={sizes}
+      className={className}
+      imageClassName={imageClassName}
+      badge={
+        item.type === 'animated_gif' ? (
+          <MediaKindBadge kind="GIF" />
+        ) : item.type === 'video' ? (
+          <MediaKindBadge kind="Video" />
+        ) : undefined
+      }
+    />
   )
 }
 
@@ -106,12 +171,10 @@ function TweetImages({
     return (
       <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
         {images.slice(0, 4).map((item, index) => (
-          <ImageLightbox
+          <TweetMediaItem
             key={`${item.url}-${index}`}
-            src={item.url}
+            item={item}
             alt={`${label} ${index + 1}`}
-            width={item.width || 1200}
-            height={item.height || 800}
             sizes="6rem"
             className="h-16 w-24 flex-none rounded-[4px] border border-zinc-200 bg-zinc-100 dark:border-[#303036] dark:bg-[#202023]"
             imageClassName="h-full w-full object-cover transition-transform hover:scale-[1.02]"
@@ -128,12 +191,10 @@ function TweetImages({
       className={`mt-2 grid gap-1.5 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${constrainMedia ? 'h-[25svh] max-h-[240px] auto-rows-fr' : ''}`}
     >
       {images.slice(0, 4).map((item, index) => (
-        <ImageLightbox
+        <TweetMediaItem
           key={`${item.url}-${index}`}
-          src={item.url}
+          item={item}
           alt={`${label} ${index + 1}`}
-          width={item.width || 1200}
-          height={item.height || 800}
           sizes={
             images.length > 1
               ? '(max-width: 640px) 50vw, 320px'

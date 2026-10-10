@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import type { ReactNode } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,8 @@ interface ImageLightboxProps {
   className?: string
   imageClassName?: string
   sizes?: string
+  /** Overlay drawn on the thumbnail only, e.g. a media-kind label. */
+  badge?: ReactNode
 }
 
 export default function ImageLightbox({
@@ -28,6 +31,7 @@ export default function ImageLightbox({
   className,
   imageClassName,
   sizes,
+  badge,
 }: ImageLightboxProps) {
   return (
     <div className="contents" onClick={(event) => event.stopPropagation()}>
@@ -49,6 +53,7 @@ export default function ImageLightbox({
               sizes={sizes}
               className={imageClassName}
             />
+            {badge}
           </button>
         </DialogTrigger>
         <DialogContent className="w-auto max-w-[96vw] border-0 bg-transparent p-0 shadow-none [&>button:hover]:bg-black/90 [&>button]:right-2 [&>button]:top-2 [&>button]:rounded-full [&>button]:bg-black/70 [&>button]:p-2 [&>button]:text-white [&>button]:opacity-100">

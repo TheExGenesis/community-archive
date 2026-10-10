@@ -36,6 +36,12 @@ import Image from 'next/image'
 import { SectionReady } from '@/components/PagePerformance'
 import type { SectionsByYear } from '@/lib/metaTwitter/chapterSections'
 import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
+import { ProfileStats } from '@/components/metaTwitter/ProfileStats'
+import {
+  profileAllTimeThemes,
+  profileThemesByYear,
+} from '@/lib/metaTwitter/themeConfig'
+import type { ProfileYearThemes } from '@/lib/metaTwitter/profileThemes'
 
 interface PageProps {
   params: { account_id: string }
@@ -121,6 +127,19 @@ async function ProfileArchiveContent({
       initialPage={initialPage}
       sectionsByYear={sectionsByYear}
     />
+  )
+}
+
+/** The latest year's themes (this year, when generated) and all time. */
+function profileThemePeriods(accountId: string): ProfileYearThemes[] {
+  const currentYear = new Date().getUTCFullYear()
+  const latestYear = Object.entries(profileThemesByYear(accountId) ?? {})
+    .map(([year, entry]) => ({ year: Number(year), entry }))
+    .filter(({ year }) => year <= currentYear)
+    .sort((left, right) => right.year - left.year)[0]?.entry
+  const allTime = profileAllTimeThemes(accountId)
+  return [latestYear, allTime].filter((entry): entry is ProfileYearThemes =>
+    Boolean(entry),
   )
 }
 
@@ -217,6 +236,10 @@ export default async function UserPage({ params, searchParams }: PageProps) {
                 <OwnerActions profile={profile} />
               </Suspense>
             }
+          />
+          <ProfileStats
+            displayName={profile.account_display_name}
+            themeYears={profileThemePeriods(accountId)}
           />
           <Suspense fallback={<ProfileArchiveSkeleton />}>
             <ProfileArchiveContent

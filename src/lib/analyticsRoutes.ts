@@ -13,6 +13,8 @@ export const analyticsRoutes = {
   '/trends': ['trends', 'product'],
   '/user-dir': ['user_directory', 'product'],
   '/user/[account_id]': ['user_profile', 'product'],
+  '/user/[account_id]/shelf': ['user_shelf', 'product'],
+  '/shelf': ['shelf', 'product'],
   '/tweets': ['tweets', 'product'],
   '/tweets/[tweet_id]': ['tweet', 'product'],
   '/social-graph': ['social_graph', 'product'],

@@ -3901,3 +3901,57 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.ca_tweet_like_summary(text[], text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ca_tweet_like_summary(text[], text) TO service_role;
+
+-- The shelf for one account, with the owner's curation applied. Public callers
+-- (include_unapproved=false) see approved items whose content has not changed since the
+-- approval; the owner sees everything, with status 'changed' for an approved item that
+-- needs another look and 'hidden' items so they can be restored. Both require membership.
+CREATE FUNCTION public.get_shelf(p_account_id text, include_unapproved boolean)
+RETURNS TABLE (
+  work_key text, shelf_row text, medium text, label text, needs_title boolean,
+  creator text, url text, marks text[], evidence_tweet_ids text[],
+  first_at timestamptz, last_at timestamptz, image_url text, image_source text,
+  status text, computed_at timestamptz
+) LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+  SELECT i.work_key, i.shelf_row, i.medium, coalesce(c.title, i.label),
+         i.needs_title AND c.title IS NULL, i.creator, i.url, i.marks,
+         i.evidence_tweet_ids, i.first_at, i.last_at, i.image_url, i.image_source,
+         CASE WHEN c.status='approved' AND c.approved_hash IS DISTINCT FROM i.content_hash
+              THEN 'changed' ELSE coalesce(c.status, 'pending') END, i.computed_at
+  FROM shelf.items i
+  LEFT JOIN shelf.curation c ON c.account_id=i.account_id AND c.work_key=i.work_key
+  WHERE i.account_id=p_account_id
+    AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=p_account_id)
+    AND (include_unapproved OR (c.status='approved' AND c.approved_hash=i.content_hash))
+  ORDER BY i.shelf_row, cardinality(i.evidence_tweet_ids) DESC, i.last_at DESC
+  LIMIT 2000
+$$;
+
+-- Owner curation. status NULL clears the decision (back to pending); title NULL keeps
+-- the generated label. The caller must have verified the session owns the account.
+CREATE FUNCTION public.set_shelf_curation(p_account_id text, p_work_keys text[], p_status text, p_title text)
+RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE n integer;
+BEGIN
+  IF p_account_id IS NULL OR p_account_id !~ '^[0-9]{1,20}$'
+     OR p_work_keys IS NULL OR cardinality(p_work_keys) NOT BETWEEN 1 AND 500
+     OR (p_status IS NOT NULL AND p_status NOT IN ('approved','hidden'))
+     OR (p_title IS NOT NULL AND cardinality(p_work_keys) <> 1) THEN
+    RAISE EXCEPTION 'Invalid shelf curation' USING ERRCODE='22023';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=p_account_id) THEN
+    RAISE EXCEPTION 'Account is not a current member' USING ERRCODE='42501';
+  END IF;
+  INSERT INTO shelf.curation(account_id, work_key, status, title, approved_hash, updated_at)
+    SELECT p_account_id, i.work_key, p_status, nullif(btrim(p_title),''),
+           CASE WHEN p_status='approved' THEN i.content_hash END, now()
+    FROM shelf.items i WHERE i.account_id=p_account_id AND i.work_key=ANY(p_work_keys)
+  ON CONFLICT (account_id, work_key) DO UPDATE
+    SET status=EXCLUDED.status,
+        title=CASE WHEN p_title IS NULL THEN shelf.curation.title ELSE EXCLUDED.title END,
+        approved_hash=EXCLUDED.approved_hash,
+        updated_at=now();
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END
+$$;

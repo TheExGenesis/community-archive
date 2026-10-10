@@ -224,3 +224,28 @@ ALTER TABLE bulletin.jev_items ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON bulletin.pipeline_state,bulletin.jev_items FROM PUBLIC,anon,authenticated;
 GRANT SELECT ON bulletin.pipeline_state TO service_role;
 GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.jev_items TO service_role;
+
+ALTER TABLE shelf.runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.mentions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.named_tweets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.curation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.resolutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.short_links ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON SCHEMA shelf FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON ALL TABLES IN SCHEMA shelf FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA shelf FROM PUBLIC,anon,authenticated;
+GRANT USAGE ON SCHEMA shelf TO service_role;
+GRANT SELECT,INSERT,UPDATE ON shelf.runs TO service_role;
+GRANT SELECT,INSERT,UPDATE ON shelf.calls TO service_role;
+-- Facts are append-only.
+GRANT SELECT,INSERT ON shelf.mentions,shelf.named_tweets,shelf.answers TO service_role;
+GRANT SELECT,INSERT,UPDATE,DELETE ON shelf.items,shelf.curation,shelf.resolutions TO service_role;
+GRANT SELECT,INSERT,UPDATE ON shelf.short_links TO service_role;
+GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA shelf TO service_role;
+REVOKE ALL ON FUNCTION public.get_shelf(text,boolean) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.set_shelf_curation(text,text[],text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_shelf(text,boolean) TO service_role;
+GRANT EXECUTE ON FUNCTION public.set_shelf_curation(text,text[],text,text) TO service_role;

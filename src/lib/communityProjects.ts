@@ -249,6 +249,7 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     slug: 'prolifica',
     name: 'Prolifica',
     creator: 'Joshua',
+    creatorHandle: 'workflowsauce',
     summary: 'See fifty Community Archive voices placed on one remixable map.',
     description:
       'Prolifica hosts “isles”: small data tools an agent builds from your data and anyone can remix with theirs. “Fifty voices from the Community Archive” maps 200 tweets by what each one is about and how it says it.',

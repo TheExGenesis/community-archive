@@ -562,6 +562,36 @@ CREATE TABLE IF NOT EXISTS "public"."tweet_page_summaries" (
 );
 ALTER TABLE "public"."tweet_page_summaries" OWNER TO "postgres";
 
+-- One row per agentic search question, keyed by a search run id the server
+-- picks before the workflow starts (older rows use their workflow run id).
+-- Private to the asker: only the server's service-role client reads or writes
+-- it, and route code checks ownership. Also backs the per-member and global
+-- budgets.
+CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
+    "id" text PRIMARY KEY,
+    "account_id" text NOT NULL,
+    "conversation_id" text CHECK (length("conversation_id") <= 100),
+    "question" text NOT NULL CHECK (length("question") <= 1000),
+    "status" text NOT NULL CHECK ("status" IN ('running', 'completed', 'failed')),
+    "model" text NOT NULL,
+    "started_at" timestamptz NOT NULL DEFAULT now(),
+    "completed_at" timestamptz,
+    "answer" text,
+    "cited_tweet_ids" text[] NOT NULL DEFAULT '{}',
+    "invalid_citation_ids" text[] NOT NULL DEFAULT '{}',
+    "tool_calls" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "input_tokens" integer NOT NULL DEFAULT 0,
+    "output_tokens" integer NOT NULL DEFAULT 0,
+    "cost_usd" numeric NOT NULL DEFAULT 0,
+    "error" text,
+    -- The answer's message parts with tweets reduced to ids; tweets are
+    -- fetched again through the gateway when a past answer is opened.
+    "parts" jsonb,
+    -- The Workflow run executing it; null until the workflow has started.
+    "workflow_run_id" text
+);
+ALTER TABLE "public"."agent_search_runs" OWNER TO "postgres";
+
 -- Reader comments on a published edition. The display identity is captured at
 -- write time so rendering never joins auth.users; writes go through the API's
 -- service-role client after session verification. Deletes are soft so a thread

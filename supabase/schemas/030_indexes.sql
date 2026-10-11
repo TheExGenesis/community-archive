@@ -159,6 +159,14 @@ CREATE INDEX IF NOT EXISTS "tweet_page_summaries_tweet_ids_idx"
 CREATE INDEX IF NOT EXISTS "tweet_page_summaries_search_idx"
   ON "public"."tweet_page_summaries" USING gin ("search_vector");
 
+-- Per-member daily counts and history, and the global daily cost total.
+CREATE INDEX IF NOT EXISTS "agent_search_runs_account_started_idx"
+  ON "public"."agent_search_runs" ("account_id", "started_at" DESC);
+CREATE INDEX IF NOT EXISTS "agent_search_runs_started_idx"
+  ON "public"."agent_search_runs" ("started_at");
+CREATE INDEX IF NOT EXISTS "agent_search_runs_conversation_idx"
+  ON "public"."agent_search_runs" ("conversation_id", "started_at");
+
 CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
   ON "public"."digest_edition_comments" ("edition_id", "created_at");
 

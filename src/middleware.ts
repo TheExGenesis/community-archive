@@ -153,6 +153,12 @@ function getApiRateLimitPolicy(
   method: string,
   isSG: boolean,
 ) {
+  if (pathname === '/api/mcp') {
+    return {
+      bucket: 'api:mcp',
+      maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
   if (method === 'GET' && pathname.startsWith('/api/companion/v1/')) {
     return {
       bucket: 'api:companion',
@@ -396,7 +402,8 @@ export async function middleware(request: NextRequest) {
     !previewBot &&
     !publicDocumentationRoute &&
     !monitoringHealthRoute &&
-    !machineAuthRoute
+    !machineAuthRoute &&
+    pathname !== '/api/mcp'
   ) {
     // Block empty or missing UA
     if (!ua || ua.trim().length === 0) {

@@ -20,7 +20,7 @@ interface ClickHouseSearchTweet {
   }>
 }
 
-interface ClickHouseSearchResponse {
+export interface ClickHouseSearchResponse {
   data: {
     tweets: ClickHouseSearchTweet[]
     nextOffset: number | null
@@ -39,7 +39,9 @@ interface ClickHouseSearchRequestOptions {
   excludeRetweets?: boolean
 }
 
-function mapSearchTweets(result: ClickHouseSearchResponse): TimelineTweet[] {
+export function mapSearchTweets(
+  result: ClickHouseSearchResponse,
+): TimelineTweet[] {
   return result.data.tweets.map((tweet) => ({
     tweet_id: tweet.tweetId,
     account_id: tweet.accountId,
@@ -66,25 +68,21 @@ function mapSearchTweets(result: ClickHouseSearchResponse): TimelineTweet[] {
   }))
 }
 
-async function requestClickHouseSearch(
+export function buildClickHouseSearchParams(
   criteria: FilterCriteria,
-  page: number,
-  pageSize: number,
-  fetchImpl: typeof fetch,
+  limit: number,
+  offset: number,
   options: ClickHouseSearchRequestOptions = {},
-): Promise<MappedClickHouseSearchResponse> {
+) {
   const query = criteria.rawSearchQuery?.trim()
   if (!query) {
     throw new Error('ClickHouse text search requires the raw search query')
   }
 
-  const offset = (page - 1) * pageSize
-  if (offset > 5_000) return { tweets: [], definitiveEmpty: false }
-
   const params = new URLSearchParams({
     q: query,
     mode: query.split(/\s+/).length > 1 ? 'phrase' : 'all',
-    limit: String(pageSize),
+    limit: String(limit),
     offset: String(offset),
   })
   if (criteria.fromUsername) params.set('from_user', criteria.fromUsername)
@@ -95,7 +93,26 @@ async function requestClickHouseSearch(
   if (criteria.sort && criteria.sort !== 'newest')
     params.set('sort', criteria.sort)
   if (options.preview) params.set('preview', 'true')
-  if (options.excludeRetweets) params.set('exclude_retweets', 'true')
+  if (options.excludeRetweets !== undefined)
+    params.set('exclude_retweets', String(options.excludeRetweets))
+  return params
+}
+
+async function requestClickHouseSearch(
+  criteria: FilterCriteria,
+  page: number,
+  pageSize: number,
+  fetchImpl: typeof fetch,
+  options: ClickHouseSearchRequestOptions = {},
+): Promise<MappedClickHouseSearchResponse> {
+  const offset = (page - 1) * pageSize
+  const params = buildClickHouseSearchParams(
+    criteria,
+    pageSize,
+    offset,
+    options,
+  )
+  if (offset > 5_000) return { tweets: [], definitiveEmpty: false }
 
   const response = await fetchImpl(`/api/tweet-search?${params.toString()}`, {
     cache: 'no-store',

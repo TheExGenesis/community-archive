@@ -12,7 +12,7 @@ import {
 import path from 'path'
 import type { Database, Json } from '@/database-types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
-import { startOfUtcDay } from './day'
+import { startOfUtcDay, startOfUtcMonth } from './day'
 import type { KeySource } from './ownKey'
 import type { AgentSearchRun } from './types'
 
@@ -64,6 +64,8 @@ export interface AdmissionRequest {
   keySource: KeySource
   /** The limit for this question's key source. */
   dailyLimit: number
+  /** The monthly limit for this question's key source, counted the same way. */
+  monthlyLimit: number
   globalDailyUsd: number
   /** A running run older than this no longer blocks a new one. */
   staleRunMs: number
@@ -75,6 +77,7 @@ export type AdmissionResult =
   | 'ok'
   | 'not_found'
   | 'daily_limit'
+  | 'monthly_limit'
   | 'run_in_progress'
   | 'global_budget'
 
@@ -230,6 +233,14 @@ export function admissionDecision(
       (request.keySource === 'own' || keySourceOf(run) === 'house'),
   )
   if (today.length >= request.dailyLimit) return 'daily_limit'
+  // Deleted runs keep their accounting, so they still count here.
+  const monthStart = Date.parse(startOfUtcMonth(now))
+  const thisMonth = own.filter(
+    (run) =>
+      Date.parse(run.startedAt) >= monthStart &&
+      (request.keySource === 'own' || keySourceOf(run) === 'house'),
+  )
+  if (thisMonth.length >= request.monthlyLimit) return 'monthly_limit'
   if (
     own.some(
       (run) =>
@@ -529,6 +540,7 @@ const ADMISSION_RESULTS: AdmissionResult[] = [
   'ok',
   'not_found',
   'daily_limit',
+  'monthly_limit',
   'run_in_progress',
   'global_budget',
 ]
@@ -646,6 +658,7 @@ export function createSupabaseRunStore(
         p_global_daily_usd: request.globalDailyUsd,
         p_stale_after_seconds: Math.ceil(request.staleRunMs / 1000),
         p_key_source: request.keySource,
+        p_monthly_limit: Math.floor(request.monthlyLimit),
       })
       if (error)
         throw new Error(`Agent search admission failed: ${error.message}`)

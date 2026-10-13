@@ -43,9 +43,12 @@ export function ownKeyRefusalMessage(error: Error | undefined): string | null {
  */
 export function OwnKeyControl({
   ownLimit,
+  ownMonthLimit,
 }: {
   /** Questions a day on one's own key, when the page knows it. */
   ownLimit?: number | null
+  /** Questions a month on one's own key, when the page knows it. */
+  ownMonthLimit?: number | null
 }) {
   const [hasKey, setKey] = useOwnKey()
   const [draft, setDraft] = useState('')
@@ -54,8 +57,12 @@ export function OwnKeyControl({
   const inputId = useId()
   const noteId = useId()
   const limitText = ownLimit
-    ? `up to ${ownLimit.toLocaleString('en-US')} questions a day`
-    : `${OWN_KEY_LIMIT_MULTIPLIER} times as many questions a day`
+    ? `up to ${ownLimit.toLocaleString('en-US')} questions a day${
+        ownMonthLimit
+          ? ` and ${ownMonthLimit.toLocaleString('en-US')} a month`
+          : ''
+      }`
+    : `${OWN_KEY_LIMIT_MULTIPLIER} times as many questions`
 
   const save = async (event: FormEvent) => {
     event.preventDefault()

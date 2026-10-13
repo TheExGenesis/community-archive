@@ -58,15 +58,43 @@ interface Quota {
   remaining: number
   /** ISO time the daily count starts over (UTC midnight). */
   resetsAt: string
+  /** The same for the UTC month; null when the server did not say. */
+  monthLimit: number | null
+  monthRemaining: number | null
+  monthResetsAt: string | null
   /** The member may pay with their own OpenRouter key. */
   ownKeyEnabled: boolean
-  /** The same count on one's own key: a higher limit, all questions counted. */
+  /** The same counts on one's own key: higher limits, all questions counted. */
   ownLimit: number | null
   ownRemaining: number | null
+  ownMonthLimit: number | null
+  ownMonthRemaining: number | null
+}
+
+/** One count a question is held to: today's, or this month's. */
+interface Allowance {
+  limit: number
+  remaining: number
+  resetsAt: string
+  period: 'day' | 'month'
+}
+
+/** The count that runs out first; on a tie, the day's. */
+function bindingAllowance(day: Allowance, month: Allowance | null): Allowance {
+  return month && month.remaining < day.remaining ? month : day
 }
 
 const resetTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+const resetDate = (iso: string) =>
+  new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })
+/** When an allowance starts over: a time today, a date for the month. */
+const resetLabel = (allowance: Allowance) =>
+  allowance.period === 'month'
+    ? resetDate(allowance.resetsAt)
+    : resetTime(allowance.resetsAt)
+const numberOrNull = (value: unknown) =>
+  typeof value === 'number' ? value : null
 
 interface Conversation {
   /** Also the chat id the server stores runs under. */
@@ -105,14 +133,41 @@ export default function AgentSearch({
     houseQuota.ownKeyEnabled &&
     houseQuota.ownLimit !== null &&
     houseQuota.ownRemaining !== null
-  const quota =
-    houseQuota && onOwnKey
+  // The day's and the month's counts for the key in use, and the one that
+  // runs out first.
+  const dayAllowance: Allowance | null = houseQuota && {
+    limit: onOwnKey
+      ? (houseQuota.ownLimit ?? houseQuota.limit)
+      : houseQuota.limit,
+    remaining: onOwnKey
+      ? (houseQuota.ownRemaining ?? houseQuota.remaining)
+      : houseQuota.remaining,
+    resetsAt: houseQuota.resetsAt,
+    period: 'day',
+  }
+  const monthLimit = houseQuota
+    ? onOwnKey
+      ? houseQuota.ownMonthLimit
+      : houseQuota.monthLimit
+    : null
+  const monthRemaining = houseQuota
+    ? onOwnKey
+      ? houseQuota.ownMonthRemaining
+      : houseQuota.monthRemaining
+    : null
+  const monthAllowance: Allowance | null =
+    houseQuota?.monthResetsAt && monthLimit !== null && monthRemaining !== null
       ? {
-          ...houseQuota,
-          limit: houseQuota.ownLimit ?? houseQuota.limit,
-          remaining: houseQuota.ownRemaining ?? houseQuota.remaining,
+          limit: monthLimit,
+          remaining: monthRemaining,
+          resetsAt: houseQuota.monthResetsAt,
+          period: 'month',
         }
-      : houseQuota
+      : null
+  const quota =
+    houseQuota && dayAllowance
+      ? { ...houseQuota, ...bindingAllowance(dayAllowance, monthAllowance) }
+      : null
   const [input, setInput] = useState('')
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
@@ -199,6 +254,11 @@ export default function AgentSearch({
         ownKeyEnabled?: boolean
         ownKeyDailyLimit?: number
         ownKeyRemainingToday?: number
+        monthlyLimit?: number
+        remainingThisMonth?: number
+        monthResetsAt?: string
+        ownKeyMonthlyLimit?: number
+        ownKeyRemainingThisMonth?: number
       }
       setRecent(body.conversations ?? [])
       if (
@@ -220,6 +280,12 @@ export default function AgentSearch({
             typeof body.ownKeyRemainingToday === 'number'
               ? body.ownKeyRemainingToday
               : null,
+          monthLimit: numberOrNull(body.monthlyLimit),
+          monthRemaining: numberOrNull(body.remainingThisMonth),
+          monthResetsAt:
+            typeof body.monthResetsAt === 'string' ? body.monthResetsAt : null,
+          ownMonthLimit: numberOrNull(body.ownKeyMonthlyLimit),
+          ownMonthRemaining: numberOrNull(body.ownKeyRemainingThisMonth),
         })
       }
     } catch {
@@ -309,8 +375,17 @@ export default function AgentSearch({
     : (ownKeyRefusalMessage(error) ??
       describeChatError(
         error,
-        quota
-          ? { limit: quota.limit, resetLabel: resetTime(quota.resetsAt) }
+        dayAllowance
+          ? {
+              limit: dayAllowance.limit,
+              resetLabel: resetLabel(dayAllowance),
+              month: monthAllowance
+                ? {
+                    limit: monthAllowance.limit,
+                    resetLabel: resetLabel(monthAllowance),
+                  }
+                : undefined,
+            }
           : undefined,
       ))
 
@@ -421,9 +496,16 @@ export default function AgentSearch({
     setInput('')
     setRunStartedAt(Date.now())
     // Shown at once; the next refresh replaces it with the stored count.
+    const less = (n: number | null) => (n === null ? null : Math.max(0, n - 1))
     setQuota((current) =>
       current
-        ? { ...current, remaining: Math.max(0, current.remaining - 1) }
+        ? {
+            ...current,
+            remaining: Math.max(0, current.remaining - 1),
+            monthRemaining: less(current.monthRemaining),
+            ownRemaining: less(current.ownRemaining),
+            ownMonthRemaining: less(current.ownMonthRemaining),
+          }
         : current,
     )
     // A follow-up sent from the bottom of a long answer would otherwise
@@ -563,13 +645,17 @@ export default function AgentSearch({
   const today: QuestionsToday | null = quota && {
     limit: quota.limit,
     remaining: quota.remaining,
-    resetLabel: resetTime(quota.resetsAt),
+    period: quota.period,
+    resetLabel: resetLabel(quota),
     ownKey: onOwnKey,
     ownKeyEnabled: quota.ownKeyEnabled,
     ownLimit: quota.ownLimit,
+    ownMonthLimit: quota.ownMonthLimit,
   }
   const limitSentence = quota
-    ? `You’ve used today’s ${quota.limit} questions. You can ask again at ${resetTime(quota.resetsAt)}.`
+    ? quota.period === 'month'
+      ? `You’ve used this month’s ${quota.limit} questions. You can ask again on ${resetLabel(quota)}.`
+      : `You’ve used today’s ${quota.limit} questions. You can ask again at ${resetLabel(quota)}.`
     : null
   const canAskAgain = !busy && !loading && !outOfQuestions
 
@@ -676,8 +762,12 @@ export default function AgentSearch({
             trigger="Use your own OpenRouter key"
             className="text-foreground underline decoration-muted-foreground/50"
           />{' '}
-          to ask up to {today.ownLimit?.toLocaleString('en-US') ?? 'more'} a
-          day.
+          to ask up to{' '}
+          {(today.period === 'month'
+            ? today.ownMonthLimit
+            : today.ownLimit
+          )?.toLocaleString('en-US') ?? 'more'}{' '}
+          a {today.period}.
         </p>
       )}
     </div>

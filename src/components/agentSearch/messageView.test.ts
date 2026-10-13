@@ -634,7 +634,10 @@ describe('describeChatError', () => {
 
   test('maps refusal codes to plain messages', () => {
     expect(describeChatError(failed(429, '{"error":"daily_limit"}'))).toBe(
-      "You've used today's 10 questions. You can ask again after midnight UTC.",
+      "You've used today's questions. You can ask again tomorrow.",
+    )
+    expect(describeChatError(failed(429, '{"error":"monthly_limit"}'))).toBe(
+      "You've used this month's questions. You can ask again next month.",
     )
     expect(
       describeChatError(failed(429, '{"error":"run_in_progress"}')),
@@ -656,6 +659,13 @@ describe('describeChatError', () => {
         resetLabel: '4:00 AM',
       }),
     ).toBe('You’ve used today’s 4 questions. You can ask again at 4:00 AM.')
+    expect(
+      describeChatError(failed(429, '{"error":"monthly_limit"}'), {
+        limit: 10,
+        resetLabel: '8:00 AM',
+        month: { limit: 30, resetLabel: '1 Nov' },
+      }),
+    ).toBe('You’ve used this month’s 30 questions. You can ask again on 1 Nov.')
   })
 })
 

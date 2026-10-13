@@ -116,6 +116,37 @@ test('with no questions left the composer becomes a sentence with the reset time
   expect(screen.queryByLabelText('Ask a follow-up')).toBeNull()
 })
 
+test('when the month runs out before the day, the page counts the month', async () => {
+  const month = (remaining: number) => {
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        conversations: [],
+        dailyLimit: 10,
+        remainingToday: 8,
+        resetsAt: new Date(Date.now() + 6 * 3600_000).toISOString(),
+        monthlyLimit: 30,
+        remainingThisMonth: remaining,
+        monthResetsAt: new Date(Date.now() + 9 * 86_400_000).toISOString(),
+      }),
+    })) as unknown as typeof fetch
+  }
+  mockChat.messages = thread
+  month(2)
+  const { unmount } = render(<AgentSearch />)
+  expect(await screen.findByText('2 left this month')).toBeInTheDocument()
+  unmount()
+
+  month(0)
+  render(<AgentSearch />)
+  expect(
+    await screen.findByText(
+      /You’ve used this month’s 30 questions. You can ask again on/,
+    ),
+  ).toBeInTheDocument()
+  expect(screen.queryByLabelText('Ask a follow-up')).toBeNull()
+})
+
 test('while a question runs there is no composer, only Stop in the log', () => {
   mockChat.messages = [thread[0]]
   mockChat.status = 'submitted'

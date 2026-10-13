@@ -1281,8 +1281,9 @@ function orderByScore(ids: string[], scores: Map<string, number>) {
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
-  daily_limit:
-    "You've used today's 10 questions. You can ask again after midnight UTC.",
+  daily_limit: "You've used today's questions. You can ask again tomorrow.",
+  monthly_limit:
+    "You've used this month's questions. You can ask again next month.",
   run_in_progress:
     'Your previous question is still running. Wait for it to finish, then ask again.',
   global_budget:
@@ -1297,7 +1298,13 @@ const ERROR_MESSAGES: Record<string, string> = {
  */
 export function describeChatError(
   error: Error | undefined,
-  quota?: { limit: number; resetLabel: string },
+  quota?: {
+    /** Today's count: its limit and when it starts over. */
+    limit: number
+    resetLabel: string
+    /** This month's, when the page knows it. */
+    month?: { limit: number; resetLabel: string }
+  },
 ): string | null {
   if (!error) return null
   const match = /Failed to fetch chat: (\d{3}) ?([\s\S]*)$/.exec(error.message)
@@ -1314,6 +1321,9 @@ export function describeChatError(
   }
   if (code === 'daily_limit' && quota) {
     return `You’ve used today’s ${quota.limit} questions. You can ask again at ${quota.resetLabel}.`
+  }
+  if (code === 'monthly_limit' && quota?.month) {
+    return `You’ve used this month’s ${quota.month.limit} questions. You can ask again on ${quota.month.resetLabel}.`
   }
   if (code && ERROR_MESSAGES[code]) return ERROR_MESSAGES[code]
   if (status === 401) return 'Sign in to ask a question.'

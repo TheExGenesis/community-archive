@@ -41,17 +41,25 @@ export type AgentSearchBudgetResult =
   | { ok: true }
   | {
       ok: false
-      reason: 'not_found' | 'daily_limit' | 'run_in_progress' | 'global_budget'
+      reason:
+        | 'not_found'
+        | 'daily_limit'
+        | 'monthly_limit'
+        | 'run_in_progress'
+        | 'global_budget'
     }
 
 export interface AgentSearchBudgetLimits {
   dailyLimit: number
+  /** Questions a member may ask in a UTC month on the house key. */
+  monthlyLimit: number
   globalDailyUsd: number
   staleRunMs: number
 }
 
 const DEFAULT_LIMITS: AgentSearchBudgetLimits = {
   dailyLimit: 10,
+  monthlyLimit: 30,
   globalDailyUsd: 25,
   staleRunMs: 600_000,
 }
@@ -74,6 +82,10 @@ export function agentSearchBudgetLimits(
       env.AGENT_SEARCH_DAILY_LIMIT,
       DEFAULT_LIMITS.dailyLimit,
     ),
+    monthlyLimit: readLimit(
+      env.AGENT_SEARCH_MONTHLY_LIMIT,
+      DEFAULT_LIMITS.monthlyLimit,
+    ),
     globalDailyUsd: readLimit(
       env.AGENT_SEARCH_GLOBAL_DAILY_USD,
       DEFAULT_LIMITS.globalDailyUsd,
@@ -95,7 +107,15 @@ export function agentSearchDailyLimits(
   return { house, own: house * OWN_KEY_LIMIT_MULTIPLIER }
 }
 
-export { startOfUtcDay } from './day'
+/** Questions a UTC month for each key source: the house limit, and ten times it. */
+export function agentSearchMonthlyLimits(
+  env: NodeJS.ProcessEnv = process.env,
+): Record<KeySource, number> {
+  const house = agentSearchBudgetLimits(env).monthlyLimit
+  return { house, own: house * OWN_KEY_LIMIT_MULTIPLIER }
+}
+
+export { startOfUtcDay, startOfUtcMonth } from './day'
 
 /**
  * A run still marked running that may still be writing: started within the
@@ -117,7 +137,7 @@ export function isLiveRun(
  * Admits a question or says why not, and on admission stores the run as
  * running under `runId` before any workflow starts. Every account obeys the
  * caps, including the development preview account 'dev'. A question on the
- * member's own key gets ten times the daily limit; it still counts against
+ * member's own key gets ten times the daily and monthly limits; it still counts against
  * the global spend cap, since its scorer calls are on the house. A running run older
  * than the stale window no longer blocks, so a lost run cannot lock a member
  * out for the day; the start route first closes runs whose workflow ended
@@ -132,6 +152,7 @@ export async function admitAgentSearchRun(
     ...request,
     ...limits,
     dailyLimit: agentSearchDailyLimits()[request.keySource],
+    monthlyLimit: agentSearchMonthlyLimits()[request.keySource],
   })
   return result === 'ok' ? { ok: true } : { ok: false, reason: result }
 }

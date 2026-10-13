@@ -13,7 +13,9 @@ import { OwnKeyControl } from './OwnKeyControl'
 export interface QuestionsToday {
   limit: number
   remaining: number
-  /** Local time the count starts over, e.g. "8:00 AM". */
+  /** Which count runs out first: today's or this month's. */
+  period: 'day' | 'month'
+  /** When that count starts over: a local time ("8:00 AM") or date ("1 Nov"). */
   resetLabel: string
   /** The questions are on the member's own key. */
   ownKey: boolean
@@ -21,10 +23,14 @@ export interface QuestionsToday {
   ownKeyEnabled: boolean
   /** Questions a day on one's own key. */
   ownLimit: number | null
+  /** Questions a month on one's own key. */
+  ownMonthLimit?: number | null
 }
 
+const PERIOD_WORDS = { day: 'today', month: 'this month' } as const
+
 /**
- * "N left today", which opens to what the count means and the one thing
+ * "N left today" (or "this month", when the month runs out first), which opens to what the count means and the one thing
  * that changes it: the member's own OpenRouter key. The same control lives
  * in Settings, where the popover links.
  */
@@ -40,7 +46,8 @@ export function QuestionsLeft({
 }) {
   const used = Math.max(0, today.limit - today.remaining)
   const label =
-    trigger ?? `${today.remaining.toLocaleString('en-US')} left today`
+    trigger ??
+    `${today.remaining.toLocaleString('en-US')} left ${PERIOD_WORDS[today.period]}`
   if (!today.ownKeyEnabled) {
     return <span className={`tabular-nums ${className}`}>{label}</span>
   }
@@ -57,11 +64,15 @@ export function QuestionsLeft({
       <PopoverContent align="end" className="w-80 space-y-3">
         <p className="text-sm text-muted-foreground">
           {used.toLocaleString('en-US')} of{' '}
-          {today.limit.toLocaleString('en-US')} questions used today
-          {today.ownKey ? ' on your key' : ''}. The count starts over at{' '}
-          {today.resetLabel}.
+          {today.limit.toLocaleString('en-US')} questions used{' '}
+          {PERIOD_WORDS[today.period]}
+          {today.ownKey ? ' on your key' : ''}. The count starts over{' '}
+          {today.period === 'month' ? 'on' : 'at'} {today.resetLabel}.
         </p>
-        <OwnKeyControl ownLimit={today.ownLimit} />
+        <OwnKeyControl
+          ownLimit={today.ownLimit}
+          ownMonthLimit={today.ownMonthLimit}
+        />
         <Link
           href="/settings#ask-archive"
           className="inline-block rounded-sm text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

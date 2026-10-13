@@ -11,7 +11,8 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
 1. `POST /api/agent-search` checks the viewer (`src/lib/agentSearch/eligibility.ts`),
    then admits the question (`budget.ts`, `runStore.ts`): one database call
    (`agent_search_admit`) checks that nobody else owns the conversation, the
-   member's daily count and running run, and the global daily spend, and
+   member's daily and monthly counts and running run, and the global daily
+   spend, and
    stores the run as `running` under a search run id (`asr_…`) the server
    picked. Two requests can never both take the last slot, and a store error
    refuses the question. Only then does the route start the
@@ -203,6 +204,7 @@ resolved headers, including the API key, into the event log.
 | `AGENT_SEARCH_SCORER_REASONING` | `low` | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`) |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true` |
 | `AGENT_SEARCH_DAILY_LIMIT` | `10` | Questions per member per UTC day |
+| `AGENT_SEARCH_MONTHLY_LIMIT` | `30` | Questions per member per UTC month, counted like the daily limit; the page shows whichever runs out first |
 | `AGENT_SEARCH_GLOBAL_DAILY_USD` | `25` | Global daily spend kill switch |
 | `AGENT_SEARCH_RUN_DEADLINE_MS` | `300000` | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools |
 | `AGENT_SEARCH_STALE_RUN_MS` | `600000` | When a running run stops blocking a new one; never less than the deadline plus 2 minutes. A run whose workflow has ended stops blocking at once |
@@ -219,8 +221,9 @@ Production and Preview. It is the same key the Daily Digest uses
 ### A member's own OpenRouter key
 
 A member may pay for their questions with their own OpenRouter key and ask ten
-times the daily limit (`AGENT_SEARCH_DAILY_LIMIT` x 10, counting all of that
-day's questions; house questions keep their own count). They add it from the
+times the daily and monthly limits (`AGENT_SEARCH_DAILY_LIMIT` x 10 and
+`AGENT_SEARCH_MONTHLY_LIMIT` x 10, counting all of that day's or month's
+questions; house questions keep their own counts). They add it from the
 "N left today" popover or the Ask the archive section in Settings.
 
 - **Where it lives.** In the member's browser (localStorage). The page sends it

@@ -2046,6 +2046,7 @@ export type Database = {
           p_global_daily_usd: number
           p_stale_after_seconds: number
           p_key_source: string
+          p_monthly_limit: number
         }
         Returns: string
       }

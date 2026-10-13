@@ -202,6 +202,7 @@ describe('file run store', () => {
       model: 'openai:gpt-6.1-sol',
       keySource: 'house' as const,
       dailyLimit: 3,
+      monthlyLimit: 5,
       globalDailyUsd: 25,
       staleRunMs: 600_000,
       now,
@@ -282,6 +283,64 @@ describe('file run store', () => {
       ).toBe('ok')
       // Anyone's spend today counts toward the global cap.
       expect(decide([{ accountId: '7', costUsd: 25 }])).toBe('global_budget')
+    })
+
+    test('counts the UTC month the same way as the day', () => {
+      const decide = (
+        starts: Array<[string, 'house' | 'own']>,
+        extra: Record<string, unknown> = {},
+      ) =>
+        admissionDecision(
+          starts.map(([startedAt, keySource], i) =>
+            baseRun({ id: `m${i}`, status: 'completed', startedAt, keySource }),
+          ),
+          request(extra),
+          now,
+        )
+      const earlier = (day: number): string => `2026-10-0${day}T12:00:00.000Z`
+      const house = (day: number): [string, 'house'] => [earlier(day), 'house']
+      const own = (day: number): [string, 'own'] => [earlier(day), 'own']
+      // Five house questions earlier this month use up the month.
+      expect(decide([1, 2, 3, 4, 5].map(house))).toBe('monthly_limit')
+      // Last month's do not count.
+      expect(
+        decide([
+          ['2026-09-30T23:59:59.000Z', 'house'],
+          ...[1, 2, 3, 4].map(house),
+        ]),
+      ).toBe('ok')
+      // Own-key questions do not use up house questions...
+      expect(decide([1, 2, 3, 4, 5].map(own))).toBe('ok')
+      // ...but an own-key question counts all of them, under its own limit.
+      expect(
+        decide([...[1, 2, 3].map(own), ...[4, 5].map(house)], {
+          keySource: 'own',
+          dailyLimit: 30,
+          monthlyLimit: 5,
+        }),
+      ).toBe('monthly_limit')
+      expect(
+        decide([1, 2, 3, 4, 5].map(house), {
+          keySource: 'own',
+          dailyLimit: 30,
+          monthlyLimit: 50,
+        }),
+      ).toBe('ok')
+      // Deleted conversations keep their accounting, so they still count.
+      expect(
+        admissionDecision(
+          [1, 2, 3, 4, 5].map((day) =>
+            baseRun({
+              id: `d${day}`,
+              status: 'completed',
+              startedAt: earlier(day),
+              deletedAt: '2026-10-08T09:00:00.000Z',
+            } as Partial<AgentSearchRun>),
+          ),
+          request(),
+          now,
+        ),
+      ).toBe('monthly_limit')
     })
   })
 
@@ -525,6 +584,7 @@ describe('supabase run store', () => {
         model: 'openai:gpt-6.1-sol',
         keySource: 'own',
         dailyLimit: 100,
+        monthlyLimit: 300,
         globalDailyUsd: 25,
         staleRunMs: 600_000,
       }),
@@ -539,6 +599,7 @@ describe('supabase run store', () => {
       p_global_daily_usd: 25,
       p_stale_after_seconds: 600,
       p_key_source: 'own',
+      p_monthly_limit: 300,
     })
     rpc.mockResolvedValueOnce({ data: null, error: { message: 'down' } })
     await expect(store.admit({} as never)).rejects.toThrow('admission failed')

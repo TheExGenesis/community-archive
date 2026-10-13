@@ -84,6 +84,7 @@ describe('agentSearchPricingProblem', () => {
 
 const ENV_KEYS = [
   'AGENT_SEARCH_DAILY_LIMIT',
+  'AGENT_SEARCH_MONTHLY_LIMIT',
   'AGENT_SEARCH_GLOBAL_DAILY_USD',
   'AGENT_SEARCH_STALE_RUN_MS',
 ] as const
@@ -124,26 +125,35 @@ describe('admitAgentSearchRun', () => {
     expect(store.admit).toHaveBeenCalledWith({
       ...request,
       dailyLimit: 10,
+      monthlyLimit: 30,
       globalDailyUsd: 25,
       staleRunMs: 600_000,
     })
   })
 
-  test.each(['not_found', 'daily_limit', 'run_in_progress', 'global_budget'])(
-    'passes on the refusal %s',
-    async (reason) => {
-      await expect(
-        admitAgentSearchRun(storeAnswering(reason), request),
-      ).resolves.toEqual({ ok: false, reason })
-    },
-  )
+  test.each([
+    'not_found',
+    'daily_limit',
+    'monthly_limit',
+    'run_in_progress',
+    'global_budget',
+  ])('passes on the refusal %s', async (reason) => {
+    await expect(
+      admitAgentSearchRun(storeAnswering(reason), request),
+    ).resolves.toEqual({ ok: false, reason })
+  })
 
-  test("a question on the member's own key gets ten times the daily limit", async () => {
+  test("a question on the member's own key gets ten times the daily and monthly limits", async () => {
     process.env.AGENT_SEARCH_DAILY_LIMIT = '4'
+    process.env.AGENT_SEARCH_MONTHLY_LIMIT = '12'
     const store = storeAnswering('ok')
     await admitAgentSearchRun(store, { ...request, keySource: 'own' })
     expect(store.admit).toHaveBeenCalledWith(
-      expect.objectContaining({ keySource: 'own', dailyLimit: 40 }),
+      expect.objectContaining({
+        keySource: 'own',
+        dailyLimit: 40,
+        monthlyLimit: 120,
+      }),
     )
   })
 

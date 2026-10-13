@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
-import { agentSearchDailyLimits, isLiveRun } from '@/lib/agentSearch/budget'
+import {
+  agentSearchDailyLimits,
+  agentSearchMonthlyLimits,
+  isLiveRun,
+} from '@/lib/agentSearch/budget'
+import { startOfNextUtcMonth, startOfUtcMonth } from '@/lib/agentSearch/day'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { summarizeConversations } from '@/lib/agentSearch/history'
 import { ownKeysEnabled } from '@/lib/agentSearch/openRouterKey'
@@ -21,7 +26,9 @@ function utcMidnight(now: Date) {
 // started since UTC midnight count, stopped ones included. House questions
 // count against the house limit; on their own OpenRouter key a member may
 // ask up to ten times as many, all of today's questions counted. The page
-// knows whether it holds a key and shows the matching pair.
+// knows whether it holds a key and shows the matching pair. The month is
+// counted the same way, from the start of the UTC month, under its own
+// limits; the page shows whichever runs out first.
 export async function GET() {
   const access = await getAgentSearchViewer()
   if (!access.ok) {
@@ -34,11 +41,16 @@ export async function GET() {
   const now = new Date()
   const midnight = utcMidnight(now)
   const limits = agentSearchDailyLimits()
+  const monthly = agentSearchMonthlyLimits()
   const since = new Date(midnight).toISOString()
-  const [runs, houseToday, allToday] = await Promise.all([
-    store.listRecent(access.viewer.accountId, RECENT_RUNS),
-    store.countSince(access.viewer.accountId, since, 'house'),
-    store.countSince(access.viewer.accountId, since),
+  const monthStart = startOfUtcMonth(now)
+  const account = access.viewer.accountId
+  const [runs, houseToday, allToday, houseMonth, allMonth] = await Promise.all([
+    store.listRecent(account, RECENT_RUNS),
+    store.countSince(account, since, 'house'),
+    store.countSince(account, since),
+    store.countSince(account, monthStart, 'house'),
+    store.countSince(account, monthStart),
   ])
   return NextResponse.json(
     {
@@ -49,6 +61,11 @@ export async function GET() {
       ownKeyDailyLimit: limits.own,
       ownKeyRemainingToday: Math.max(0, limits.own - allToday),
       resetsAt: new Date(midnight + DAY_MS).toISOString(),
+      monthlyLimit: monthly.house,
+      remainingThisMonth: Math.max(0, monthly.house - houseMonth),
+      ownKeyMonthlyLimit: monthly.own,
+      ownKeyRemainingThisMonth: Math.max(0, monthly.own - allMonth),
+      monthResetsAt: startOfNextUtcMonth(now),
     },
     { headers: noStore },
   )

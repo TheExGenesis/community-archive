@@ -46,6 +46,7 @@ beforeEach(() => {
     ],
   })
   delete process.env.AGENT_SEARCH_DAILY_LIMIT
+  delete process.env.AGENT_SEARCH_MONTHLY_LIMIT
   jest.mocked(getAgentSearchRunStore).mockReturnValue(store as never)
   jest.mocked(getAgentSearchViewer).mockResolvedValue({
     ok: true,
@@ -77,6 +78,33 @@ test('reports questions left today, counted from UTC midnight', async () => {
     ownKeyDailyLimit: 100,
     ownKeyRemainingToday: 95,
     resetsAt: '2026-10-10T00:00:00.000Z',
+  })
+})
+
+test('reports questions left this month, counted from the start of the UTC month', async () => {
+  // Today: 3 house, 5 in all. This month: 20 house, 40 in all.
+  store.countSince.mockImplementation(
+    async (_account: string, since: string, keySource?: string) =>
+      since.startsWith('2026-10-01')
+        ? keySource === 'house'
+          ? 20
+          : 40
+        : keySource === 'house'
+          ? 3
+          : 5,
+  )
+  const body = await (await GET()).json()
+  expect(store.countSince).toHaveBeenCalledWith(
+    'acct-1',
+    '2026-10-01T00:00:00.000Z',
+    'house',
+  )
+  expect(body).toMatchObject({
+    monthlyLimit: 30,
+    remainingThisMonth: 10,
+    ownKeyMonthlyLimit: 300,
+    ownKeyRemainingThisMonth: 260,
+    monthResetsAt: '2026-11-01T00:00:00.000Z',
   })
 })
 

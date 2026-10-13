@@ -92,6 +92,15 @@ export default function AgentSearch({
   // arrives (stopRun reads this when onChatSendMessage calls it).
   const stopPendingRef = useRef(false)
   const stopRunRef = useRef<() => void>(() => {})
+  // The conversation on screen, or loading. Sending puts its id in the URL,
+  // and a server render of the page (Fast Refresh in development, a router
+  // refresh) then passes it back as initialConversationId: reopening it would
+  // resume the run a second time while the first stream is still being read,
+  // and two streams into one chat push copies of the answer.
+  const shownConversationRef = useRef<string | null>(null)
+  // Whether the chat is reading a stream, for effects that must not start
+  // another one.
+  const busyRef = useRef(false)
   const transport = useMemo(
     () =>
       new WorkflowChatTransport<UIMessage>({
@@ -105,6 +114,7 @@ export default function AgentSearch({
         },
         onChatSendMessage: (response, { chatId }) => {
           runIdRef.current = response.headers.get('x-workflow-run-id')
+          shownConversationRef.current = chatId
           // Only an accepted question makes the conversation worth linking to.
           if (response.ok) showConversationInUrl(chatId)
           if (stopPendingRef.current) stopRunRef.current()
@@ -161,6 +171,7 @@ export default function AgentSearch({
   }, [])
 
   const openConversation = useCallback(async (id: string) => {
+    shownConversationRef.current = id
     setLoading(true)
     setLoadError(null)
     try {
@@ -183,11 +194,9 @@ export default function AgentSearch({
       showConversationInUrl(id)
     } catch {
       setLoadError('That conversation could not be opened.')
-      setConversation({
-        id: newConversationId(),
-        pending: [],
-        runningRunId: null,
-      })
+      const fresh = newConversationId()
+      shownConversationRef.current = fresh
+      setConversation({ id: fresh, pending: [], runningRunId: null })
       showConversationInUrl(null)
     } finally {
       setLoading(false)
@@ -198,7 +207,7 @@ export default function AgentSearch({
   useEffect(() => {
     if (!conversation.pending) return
     setMessages(conversation.pending)
-    if (conversation.runningRunId) {
+    if (conversation.runningRunId && !busyRef.current) {
       runIdRef.current = conversation.runningRunId
       setRunStartedAt(Date.now())
       void resumeStream()
@@ -211,7 +220,12 @@ export default function AgentSearch({
   }, [conversation, setMessages, resumeStream])
 
   useEffect(() => {
-    if (initialConversationId) void openConversation(initialConversationId)
+    if (
+      initialConversationId &&
+      initialConversationId !== shownConversationRef.current
+    ) {
+      void openConversation(initialConversationId)
+    }
   }, [initialConversationId, openConversation])
 
   // Refresh the list and the quota on arrival, whenever an answer finishes,
@@ -223,6 +237,7 @@ export default function AgentSearch({
   const inputId = useId()
 
   const busy = status === 'submitted' || status === 'streaming'
+  busyRef.current = busy
   const scrollToQuestionRef = useRef(false)
   const outOfQuestions =
     quota !== null &&
@@ -351,11 +366,9 @@ export default function AgentSearch({
     if (busy) return
     if (error) clearError()
     setLoadError(null)
-    setConversation({
-      id: newConversationId(),
-      pending: [],
-      runningRunId: null,
-    })
+    const fresh = newConversationId()
+    shownConversationRef.current = fresh
+    setConversation({ id: fresh, pending: [], runningRunId: null })
     showConversationInUrl(null)
     textareaRef.current?.focus()
   }
@@ -500,7 +513,7 @@ export default function AgentSearch({
     <main className="min-h-screen bg-background">
       <section
         className={`mx-auto w-full px-4 py-8 sm:px-6 sm:py-12 ${
-          inThread ? 'max-w-6xl' : 'max-w-2xl'
+          inThread ? 'max-w-[84rem]' : 'max-w-2xl'
         }`}
       >
         {inThread ? (
@@ -686,7 +699,7 @@ export default function AgentSearch({
             settles into place below the last turn. Hidden while a question
             runs: Stop, in the step log, is the only action then. */}
         {hasThread && !loading && !busy && (
-          <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-none">
+          <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-[calc(48rem+3rem)]">
             {outOfQuestions ? limitNote : threadForm}
           </div>
         )}

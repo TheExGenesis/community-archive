@@ -5,7 +5,13 @@ import type { UIMessage } from 'ai'
 const mockChat: {
   messages: UIMessage[]
   status: 'ready' | 'submitted' | 'streaming' | 'error'
-} = { messages: [], status: 'ready' }
+  resumeStream: jest.Mock
+} = { messages: [], status: 'ready', resumeStream: jest.fn() }
+const mockTransport: {
+  options?: {
+    onChatSendMessage: (response: Response, info: { chatId: string }) => void
+  }
+} = {}
 
 jest.mock('@ai-sdk/react', () => ({
   useChat: () => ({
@@ -14,13 +20,17 @@ jest.mock('@ai-sdk/react', () => ({
     error: undefined,
     setMessages: jest.fn(),
     sendMessage: jest.fn(),
-    resumeStream: jest.fn(),
+    resumeStream: mockChat.resumeStream,
     clearError: jest.fn(),
     stop: jest.fn(),
   }),
 }))
 jest.mock('@ai-sdk/workflow/client', () => ({
-  WorkflowChatTransport: class {},
+  WorkflowChatTransport: class {
+    constructor(options: typeof mockTransport.options) {
+      mockTransport.options = options
+    }
+  },
 }))
 jest.mock('./AnswerMarkdown', () => ({
   AnswerMarkdown: ({ children }: { children: string }) => <div>{children}</div>,
@@ -58,6 +68,7 @@ beforeAll(() => {
 beforeEach(() => {
   mockChat.messages = []
   mockChat.status = 'ready'
+  mockChat.resumeStream = jest.fn()
 })
 
 test('a first visit is the heading and a composer that carries the facts', async () => {
@@ -114,4 +125,55 @@ test('while a question runs there is no composer, only Stop in the log', () => {
   expect(screen.getByLabelText('Search progress')).toHaveTextContent(
     'Reading the question',
   )
+})
+
+describe('the conversation in the URL', () => {
+  const runningConversation = () => {
+    global.fetch = jest.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        String(url).includes('/conversations/')
+          ? {
+              messages: [
+                { id: 'asr_1-question', role: 'user', parts: [] },
+              ] as UIMessage[],
+              runningRunId: 'asr_1',
+            }
+          : { conversations: [] },
+    })) as unknown as typeof fetch
+  }
+  const conversationLoads = () =>
+    (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes('/conversations/'),
+    ).length
+
+  test('opening a running conversation resumes it once, even when the page renders again', async () => {
+    runningConversation()
+    const { rerender } = render(
+      <AgentSearch initialConversationId="conversation-open" />,
+    )
+    await waitFor(() => expect(mockChat.resumeStream).toHaveBeenCalledTimes(1))
+    rerender(<AgentSearch initialConversationId="conversation-open" />)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(conversationLoads()).toBe(1)
+    expect(mockChat.resumeStream).toHaveBeenCalledTimes(1)
+  })
+
+  // Sending puts the id in the URL; a server render of the page (Fast
+  // Refresh, a router refresh) then passed it back, the page reopened the
+  // conversation and resumed the run beside the stream it was reading, and
+  // the two streams pushed copies of the answer.
+  test('the conversation being asked in is not reopened when its id comes back from the URL', async () => {
+    runningConversation()
+    const { rerender } = render(<AgentSearch />)
+    const chatId = 'conversation-asked'
+    mockTransport.options?.onChatSendMessage(
+      new Response(null, { headers: { 'x-workflow-run-id': 'asr_1' } }),
+      { chatId },
+    )
+    rerender(<AgentSearch initialConversationId={chatId} />)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(conversationLoads()).toBe(0)
+    expect(mockChat.resumeStream).not.toHaveBeenCalled()
+  })
 })

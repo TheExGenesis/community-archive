@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   AlertCircle,
+  Brain,
   Check,
   ChevronRight,
   ChevronsUpDown,
@@ -16,6 +17,7 @@ import {
   latestThought,
   NOT_SEARCHED_LINE,
   type ProgressLine,
+  type TimelineEntry,
 } from './messageView'
 
 /** After this long the log says so. */
@@ -46,10 +48,6 @@ function StepIcon({ status }: { status: ProgressLine['status'] | 'stopped' }) {
   return <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
 }
 
-/**
- * One step. A running step shows the model's newest sentence of reasoning
- * under it; a finished one opens to its full reasoning, folded by default.
- */
 function StepItem({
   step,
   status,
@@ -57,48 +55,73 @@ function StepItem({
   step: ProgressLine
   status: ProgressLine['status'] | 'stopped'
 }) {
-  const [open, setOpen] = useState(false)
-  const reasoningId = useId()
-  const reasoning = step.reasoning?.trim()
-  const thought = status === 'running' ? latestThought(reasoning) : ''
-  const label = (
-    <span
-      className={`min-w-0 break-words ${status === 'running' ? 'text-foreground' : ''}`}
-    >
-      {step.text}
-    </span>
-  )
   return (
     <li className="flex items-start gap-2">
       <StepIcon status={status} />
+      <span
+        className={`min-w-0 break-words ${status === 'running' ? 'text-foreground' : ''}`}
+      >
+        {step.text}
+      </span>
+    </li>
+  )
+}
+
+/** The first sentence of some reasoning, for its folded line. */
+function firstSentence(text: string) {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? flat
+}
+
+/**
+ * The model's reasoning between steps. While it is being written it stays
+ * open and shows the whole text as it streams; once the next step starts it
+ * folds to its first sentence. A reader's own open or close wins over both.
+ */
+function ThinkingItem({ text, current }: { text: string; current: boolean }) {
+  const [readerOpen, setReaderOpen] = useState<boolean | null>(null)
+  const open = readerOpen ?? current
+  const bodyId = useId()
+  const bodyRef = useRef<HTMLParagraphElement>(null)
+  // Keep the newest text in view while it streams.
+  useEffect(() => {
+    const body = bodyRef.current
+    if (body && current) body.scrollTop = body.scrollHeight
+  }, [text, current, open])
+  return (
+    <li className="flex items-start gap-2">
+      <Brain
+        aria-hidden="true"
+        className={`mt-0.5 h-4 w-4 shrink-0 ${
+          current
+            ? 'animate-pulse text-foreground motion-reduce:animate-none'
+            : ''
+        }`}
+      />
       <div className="min-w-0 flex-1">
-        {reasoning && status !== 'running' ? (
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            aria-expanded={open}
-            aria-controls={reasoningId}
-            className="group inline-flex max-w-full items-start gap-1 rounded-sm text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {label}
-            <span className="sr-only">, show the reasoning</span>
-            <ChevronRight
-              aria-hidden="true"
-              className={`mt-0.5 h-3.5 w-3.5 shrink-0 opacity-60 transition-transform group-hover:opacity-100 motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
-            />
-          </button>
-        ) : (
-          label
-        )}
-        {thought && (
-          <p className="truncate text-xs text-muted-foreground">{thought}</p>
-        )}
-        {reasoning && open && status !== 'running' && (
+        <button
+          type="button"
+          onClick={() => setReaderOpen(!open)}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          className="group flex max-w-full items-start gap-1 rounded-sm text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="min-w-0 truncate">
+            <span className={current ? 'text-foreground' : ''}>Thinking</span>
+            {!open && <span> · {firstSentence(text)}</span>}
+          </span>
+          <ChevronRight
+            aria-hidden="true"
+            className={`mt-0.5 h-3.5 w-3.5 shrink-0 opacity-60 transition-transform group-hover:opacity-100 motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
+          />
+        </button>
+        {open && (
           <p
-            id={reasoningId}
-            className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-words border-l border-border pl-3 text-xs leading-relaxed text-muted-foreground"
+            ref={bodyRef}
+            id={bodyId}
+            className="mt-1 max-h-60 max-w-[68ch] overflow-y-auto whitespace-pre-wrap break-words border-l border-border pl-3 text-xs leading-relaxed text-muted-foreground"
           >
-            {reasoning}
+            {text}
           </p>
         )}
       </div>
@@ -107,79 +130,49 @@ function StepItem({
 }
 
 function StepList({
-  steps,
+  entries,
+  live = false,
   stoppedRunning = false,
   id,
 }: {
-  steps: ProgressLine[]
+  entries: TimelineEntry[]
+  /** The run is still going: its latest reasoning is being written. */
+  live?: boolean
   /** A run that is over: a step still marked running was cut short. */
   stoppedRunning?: boolean
   id?: string
 }) {
   return (
     <ol id={id} className="space-y-1.5 text-sm text-muted-foreground">
-      {steps.map((step) => (
-        <StepItem
-          key={step.id}
-          step={step}
-          status={
-            stoppedRunning && step.status === 'running'
-              ? 'stopped'
-              : step.status
-          }
-        />
-      ))}
+      {entries.map((entry) =>
+        entry.kind === 'thinking' ? (
+          <ThinkingItem
+            key={entry.id}
+            text={entry.text}
+            current={live && entry.latest}
+          />
+        ) : (
+          <StepItem
+            key={entry.line.id}
+            step={entry.line}
+            status={
+              stoppedRunning && entry.line.status === 'running'
+                ? 'stopped'
+                : entry.line.status
+            }
+          />
+        ),
+      )}
     </ol>
   )
 }
 
-/**
- * The steps plus the one under way that has no tool call yet: the model
- * reading the question, working out its next step, or writing the answer.
- * It carries the reasoning that follows the last tool call.
- */
-function withCurrentStep(
+/** The timeline a log shows: the turn's own, or just its steps. */
+const entriesFor = (
   steps: ProgressLine[],
-  thinking: string,
-  phase: 'searching' | 'writing' | 'written' | 'ended',
-): ProgressLine[] {
-  const reasoning = thinking.trim() || undefined
-  if (phase === 'searching') {
-    if (steps.some((step) => step.status === 'running')) return steps
-    return [
-      ...steps,
-      {
-        id: 'current-step',
-        status: 'running',
-        text: steps.length
-          ? 'Working out the next step'
-          : 'Reading the question',
-        reasoning,
-      },
-    ]
-  }
-  if (!reasoning) return steps
-  if (phase === 'ended') {
-    return [
-      ...steps,
-      {
-        id: 'current-step',
-        status: 'running',
-        text: 'Working out the next step',
-        reasoning,
-      },
-    ]
-  }
-  return [
-    ...steps,
-    {
-      id: 'current-step',
-      status: phase === 'writing' ? 'running' : 'done',
-      text: phase === 'writing' ? 'Writing the answer' : 'Wrote the answer',
-      reasoning,
-    },
-  ]
-}
+  timeline: TimelineEntry[] | undefined,
+): TimelineEntry[] =>
+  timeline ?? steps.map((line) => ({ kind: 'step' as const, line }))
 
 function useElapsed(startedAt: number) {
   const [now, setNow] = useState(() => Date.now())
@@ -209,23 +202,33 @@ function StopButton({ onStop }: { onStop: () => void }) {
  */
 function RunningLog({
   steps,
-  thinking,
+  timeline,
   startedAt,
   onStop,
 }: {
   steps: ProgressLine[]
-  thinking: string
+  timeline?: TimelineEntry[]
   startedAt: number
   onStop: () => void
 }) {
   const elapsed = useElapsed(startedAt)
   const [open, setOpen] = useState(true)
   const listId = useId()
-  const lines = withCurrentStep(steps, thinking, 'searching')
-  const current =
-    [...lines].reverse().find((step) => step.status === 'running') ??
-    lines[lines.length - 1]
-  const thought = latestThought(current?.reasoning)
+  const logged = entriesFor(steps, timeline)
+  // Before anything streams, the model is reading the question.
+  const entries: TimelineEntry[] = logged.length
+    ? logged
+    : [
+        {
+          kind: 'step',
+          line: {
+            id: 'reading',
+            status: 'running',
+            text: 'Reading the question',
+          },
+        },
+      ]
+  const current = entries[entries.length - 1]
   return (
     <div className="space-y-2">
       <div className="flex min-h-[2.5rem] items-center justify-between gap-4">
@@ -253,20 +256,26 @@ function RunningLog({
       </div>
       <div aria-live="polite" aria-label="Search progress">
         {open ? (
-          <StepList id={listId} steps={lines} />
+          <StepList id={listId} entries={entries} live />
         ) : (
-          current && (
-            <p
-              id={listId}
-              className="flex min-w-0 items-start gap-2 text-sm text-muted-foreground"
-            >
-              <StepIcon status={current.status} />
-              <span className="min-w-0 truncate">
-                <span className="text-foreground">{current.text}</span>
-                {thought && <span> · {thought}</span>}
+          <p
+            id={listId}
+            className="flex min-w-0 items-start gap-2 text-sm text-muted-foreground"
+          >
+            {current.kind === 'thinking' ? (
+              <Brain aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <StepIcon status={current.line.status} />
+            )}
+            <span className="min-w-0 truncate">
+              <span className="text-foreground">
+                {current.kind === 'thinking' ? 'Thinking' : current.line.text}
               </span>
-            </p>
-          )
+              {current.kind === 'thinking' && latestThought(current.text) && (
+                <span> · {latestThought(current.text)}</span>
+              )}
+            </span>
+          </p>
         )}
       </div>
       {elapsed >= SLOW_MS && (
@@ -286,7 +295,7 @@ function RunningLog({
 function EndedLog({
   mode,
   steps: loggedSteps,
-  thinking,
+  timeline,
   elapsedMs,
   unavailable,
   onAskAgain,
@@ -294,18 +303,27 @@ function EndedLog({
 }: {
   mode: 'stopped' | 'failed'
   steps: ProgressLine[]
-  thinking: string
+  timeline?: TimelineEntry[]
   elapsedMs: number | null
   unavailable: boolean
   onAskAgain?: () => void
   canAskAgain: boolean
 }) {
-  const steps = withCurrentStep(loggedSteps, thinking, 'ended')
+  const entries = entriesFor(loggedSteps, timeline)
   const [showEarlier, setShowEarlier] = useState(false)
   const reasonId = useId()
   const listId = useId()
-  const hidden = Math.max(0, steps.length - VISIBLE_STEPS)
-  const visible = showEarlier ? steps : steps.slice(hidden)
+  // The latest six steps show, with the reasoning between them; earlier
+  // ones fold.
+  const stepIndexes = entries.flatMap((entry, index) =>
+    entry.kind === 'step' ? [index] : [],
+  )
+  const hiddenSteps = Math.max(0, stepIndexes.length - VISIBLE_STEPS)
+  const cut = hiddenSteps ? stepIndexes[hiddenSteps] : 0
+  // Reasoning just before the first visible step belongs with it.
+  const start = cut && entries[cut - 1]?.kind === 'thinking' ? cut - 1 : cut
+  const visible = showEarlier ? entries : entries.slice(start)
+  const hidden = hiddenSteps
 
   const title =
     mode === 'stopped'
@@ -373,7 +391,7 @@ function EndedLog({
         </button>
       )}
       {visible.length > 0 && (
-        <StepList id={listId} steps={visible} stoppedRunning />
+        <StepList id={listId} entries={visible} stoppedRunning />
       )}
     </div>
   )
@@ -383,15 +401,15 @@ export type StepLogProps =
   | {
       mode: 'running'
       steps: ProgressLine[]
-      /** Reasoning after the last tool call (TurnView.thinking). */
-      thinking?: string
+      /** The steps with the model's reasoning between them (TurnView). */
+      timeline?: TimelineEntry[]
       startedAt: number
       onStop: () => void
     }
   | {
       mode: 'stopped' | 'failed'
       steps: ProgressLine[]
-      thinking?: string
+      timeline?: TimelineEntry[]
       /** How long a run stopped in this visit had run; null when unknown. */
       elapsedMs: number | null
       /** Failed with every tool call failing. */
@@ -409,7 +427,7 @@ export function StepLog(props: StepLogProps) {
     return (
       <RunningLog
         steps={props.steps}
-        thinking={props.thinking ?? ''}
+        timeline={props.timeline}
         startedAt={props.startedAt}
         onStop={props.onStop}
       />
@@ -419,7 +437,7 @@ export function StepLog(props: StepLogProps) {
     <EndedLog
       mode={props.mode}
       steps={props.steps}
-      thinking={props.thinking ?? ''}
+      timeline={props.timeline}
       elapsedMs={props.elapsedMs}
       unavailable={Boolean(props.unavailable)}
       onAskAgain={props.onAskAgain}
@@ -435,15 +453,15 @@ export function StepLog(props: StepLogProps) {
 export function LogLine({
   summary,
   steps,
-  thinking = '',
+  timeline,
   cappedAt,
   onStop,
   more,
 }: {
   summary: string
   steps: ProgressLine[]
-  /** Reasoning after the last tool call: the answer's own. */
-  thinking?: string
+  /** The steps with the model's reasoning between them. */
+  timeline?: TimelineEntry[]
   /** The tweet limit a check stopped at, when one did. */
   cappedAt?: number | null
   /** Set while the answer is still being written. */
@@ -458,7 +476,7 @@ export function LogLine({
 }) {
   const [open, setOpen] = useState(false)
   const contentId = useId()
-  const lines = withCurrentStep(steps, thinking, onStop ? 'writing' : 'written')
+  const entries = entriesFor(steps, timeline)
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-4">
@@ -498,7 +516,9 @@ export function LogLine({
           id={contentId}
           className="ml-1.5 space-y-2 border-l border-border pl-4"
         >
-          {lines.length > 0 && <StepList steps={lines} />}
+          {entries.length > 0 && (
+            <StepList entries={entries} live={Boolean(onStop)} />
+          )}
           {cappedAt ? (
             <p className="text-sm text-muted-foreground">
               A check stopped at its {cappedAt.toLocaleString('en-US')}-tweet

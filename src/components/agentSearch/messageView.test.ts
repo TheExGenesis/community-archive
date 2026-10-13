@@ -10,12 +10,12 @@ import {
   describeChatError,
   formatElapsed,
   latestThought,
+  timelineFor,
   logSummary,
   describeCommand,
   progressLines,
   searchSubject,
   toolCalls,
-  trailingReasoning,
 } from './messageView'
 
 const tweet = (id: string, extra: Partial<AgentTweet> = {}): AgentTweet => ({
@@ -226,6 +226,17 @@ describe('searchSubject', () => {
 })
 
 describe('collectToolTweets', () => {
+  test("a command's scores give relevance, later commands replacing earlier ones", () => {
+    const found = collectToolTweets([
+      { tweets: [tweet('1'), tweet('2')], scores: { '1': 0.4, '2': 0.9 } },
+      // A later command re-scored 1 and sent it as an id only.
+      { tweets: [], scores: { '1': 0.7 } },
+    ])
+    expect(found.scores.get('1')).toBe(0.7)
+    expect(found.scores.get('2')).toBe(0.9)
+    expect(found.byId.has('1')).toBe(true)
+  })
+
   test('keeps full tweets over quoted embeds and skips embeds as results', () => {
     const quoted = {
       id: '7',
@@ -827,37 +838,53 @@ describe('reasoning', () => {
       text: value,
     }) as unknown as UIMessage['parts'][number]
 
-  test("each step's reasoning goes to its first call; the rest is the step under way", () => {
+  test('reasoning is its own entry, between the steps, in stream order', () => {
     const message = assistant('a1', [
       reasoning('Start broad.'),
+      reasoning('Singapore first.'),
       toolPart('search_tweets', { query: 'singapore' }, { tweets: [] }),
       toolPart('search_tweets', { query: 'sg' }, { tweets: [] }),
       reasoning('Too few. Try a semantic search.'),
       toolPart('semantic_search', { query: 'living in singapore' }),
       reasoning('Enough to answer.'),
     ])
-    expect(toolCalls(message).map((call) => call.reasoning)).toEqual([
-      'Start broad.',
-      undefined,
-      'Too few. Try a semantic search.',
+    const timeline = timelineFor(message)
+    expect(
+      timeline.map((entry) =>
+        entry.kind === 'thinking'
+          ? `think: ${entry.text}${entry.latest ? ' (latest)' : ''}`
+          : `step: ${entry.line.text}`,
+      ),
+    ).toEqual([
+      'think: Start broad.\n\nSingapore first.',
+      'step: Searched “singapore” · 0 tweets',
+      'step: Searched “sg” · 0 tweets',
+      'think: Too few. Try a semantic search.',
+      'step: Searching by meaning “living in singapore”',
+      'think: Enough to answer. (latest)',
     ])
-    expect(progressLines(message).map((line) => line.reasoning)).toEqual([
-      'Start broad.',
-      undefined,
-      'Too few. Try a semantic search.',
-    ])
-    expect(trailingReasoning(message)).toBe('Enough to answer.')
-    expect(buildTurnView([message], 0, { streaming: true }).thinking).toBe(
-      'Enough to answer.',
+    expect(buildTurnView([message], 0, { streaming: true }).timeline).toEqual(
+      timeline,
     )
   })
 
-  test('a message without reasoning has none', () => {
+  test('a retried call keeps its place at its first attempt', () => {
+    const message = assistant('a1', [
+      toolPart('search_tweets', { query: 'x' }, undefined, 'output-error'),
+      reasoning('That failed. Try again.'),
+      toolPart('search_tweets', { query: 'x' }, { tweets: [] }),
+    ])
+    expect(timelineFor(message).map((entry) => entry.kind)).toEqual([
+      'step',
+      'thinking',
+    ])
+  })
+
+  test('a message without reasoning is only its steps', () => {
     const message = assistant('a1', [
       toolPart('search_tweets', { query: 'x' }, { tweets: [] }),
     ])
-    expect(progressLines(message)[0].reasoning).toBeUndefined()
-    expect(trailingReasoning(message)).toBe('')
+    expect(timelineFor(message).map((entry) => entry.kind)).toEqual(['step'])
   })
 
   test('the live line is the newest sentence, even one still being written', () => {

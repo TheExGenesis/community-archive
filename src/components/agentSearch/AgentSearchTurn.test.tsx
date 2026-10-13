@@ -79,7 +79,7 @@ test('shows the live steps with Stop while the agent searches', () => {
   expect(screen.queryByRole('region', { name: 'Sources' })).toBeNull()
 })
 
-test("a live search shows the model's newest reasoning under the step", () => {
+test("a live search shows the model's reasoning before the step it led to", () => {
   const messages: UIMessage[] = [
     {
       id: 'a1',
@@ -100,8 +100,9 @@ test("a live search shows the model's newest reasoning under the step", () => {
       onStop={jest.fn()}
     />,
   )
+  // Followed by a step, the reasoning has folded to its first sentence.
   expect(screen.getByLabelText('Search progress')).toHaveTextContent(
-    'Search for it by name.',
+    'Thinking · The question names the archive.Searching “community archive”',
   )
 })
 

@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { LogLine, StepLog } from './StepLog'
-import type { ProgressLine } from './messageView'
+import type { ProgressLine, TimelineEntry } from './messageView'
 
 const done = (n: number): ProgressLine => ({
   id: `s${n}`,
@@ -148,54 +148,103 @@ test('the folded line opens in place to the steps, a cap note and what was not s
   expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
 })
 
-test('the running log folds to the step under way and its newest reasoning', () => {
-  render(
+const thinking = (id: string, text: string, latest = false): TimelineEntry => ({
+  kind: 'thinking',
+  id,
+  text,
+  latest,
+})
+const step = (line: ProgressLine): TimelineEntry => ({ kind: 'step', line })
+
+test('reasoning being written shows in full; earlier reasoning is folded', () => {
+  const timeline = [
+    thinking('t1', 'Start with the word itself. Then widen.'),
+    step(done(1)),
+    thinking(
+      't2',
+      'One reply looks relevant. Read the thread around it.',
+      true,
+    ),
+  ]
+  const { rerender } = render(
     <StepLog
       mode="running"
-      steps={[
-        { ...done(1), reasoning: 'Start with the word itself.' },
-        {
-          id: 'r',
-          status: 'running',
-          text: 'Reading thread',
-          reasoning: 'One reply looks relevant. Read the thread around it.',
-        },
-      ]}
+      steps={[done(1)]}
+      timeline={timeline}
       startedAt={Date.now() - 5_000}
       onStop={jest.fn()}
     />,
   )
   const progress = screen.getByLabelText('Search progress')
-  // The running step shows its newest sentence under it.
-  expect(progress).toHaveTextContent('Read the thread around it.')
-  // A finished step's reasoning stays folded until asked for.
-  expect(progress).not.toHaveTextContent('Start with the word itself.')
-  fireEvent.click(screen.getByRole('button', { name: /Searched “term 1”/ }))
-  expect(progress).toHaveTextContent('Start with the word itself.')
-
-  const header = screen.getByRole('button', { name: /Searching/ })
-  expect(header).toHaveAttribute('aria-expanded', 'true')
-  fireEvent.click(header)
-  expect(header).toHaveAttribute('aria-expanded', 'false')
-  expect(progress).not.toHaveTextContent('Searched “term 1”')
+  // The latest reasoning is open, whole.
   expect(progress).toHaveTextContent(
-    'Reading thread · Read the thread around it.',
+    'One reply looks relevant. Read the thread around it.',
   )
-  // Stop stays while folded.
-  expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
+  // Earlier reasoning folds to its first sentence and opens on request.
+  expect(progress).toHaveTextContent('Thinking · Start with the word itself.')
+  expect(progress).not.toHaveTextContent('Then widen.')
+  const [first] = screen.getAllByRole('button', { name: /Thinking/ })
+  fireEvent.click(first)
+  expect(progress).toHaveTextContent('Then widen.')
+
+  // The next step starts: the latest reasoning folds by itself, and what
+  // the reader opened stays open.
+  rerender(
+    <StepLog
+      mode="running"
+      steps={[done(1), done(2)]}
+      timeline={[
+        ...timeline.slice(0, 2),
+        thinking('t2', 'One reply looks relevant. Read the thread around it.'),
+        step(done(2)),
+      ]}
+      startedAt={Date.now() - 5_000}
+      onStop={jest.fn()}
+    />,
+  )
+  expect(progress).toHaveTextContent('Thinking · One reply looks relevant.')
+  expect(progress).not.toHaveTextContent('Read the thread around it.')
+  expect(progress).toHaveTextContent('Then widen.')
 })
 
-test('reasoning after the last call is the step being worked out', () => {
+test('the running log folds to the entry under way and its newest sentence', () => {
   render(
     <StepLog
       mode="running"
       steps={[done(1)]}
-      thinking="That search was too narrow. Try the plural."
+      timeline={[
+        step(done(1)),
+        thinking('t1', 'That search was too narrow. Try the plural.', true),
+      ]}
       startedAt={Date.now()}
       onStop={jest.fn()}
     />,
   )
-  expect(screen.getByLabelText('Search progress')).toHaveTextContent(
-    'Working out the next stepTry the plural.',
+  const header = screen.getByRole('button', { name: /Searching/ })
+  expect(header).toHaveAttribute('aria-expanded', 'true')
+  fireEvent.click(header)
+  expect(header).toHaveAttribute('aria-expanded', 'false')
+  const progress = screen.getByLabelText('Search progress')
+  expect(progress).not.toHaveTextContent('Searched “term 1”')
+  expect(progress).toHaveTextContent('Thinking · Try the plural.')
+  // Stop stays while folded.
+  expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
+})
+
+test('a stopped log shows its reasoning folded', () => {
+  render(
+    <StepLog
+      mode="stopped"
+      steps={[done(1)]}
+      timeline={[
+        step(done(1)),
+        thinking('t1', 'Try the plural. Then people.', true),
+      ]}
+      elapsedMs={4_000}
+    />,
   )
+  expect(screen.getByRole('button', { name: /Thinking/ })).toHaveTextContent(
+    'Thinking · Try the plural.',
+  )
+  expect(screen.queryByText(/Then people/)).toBeNull()
 })

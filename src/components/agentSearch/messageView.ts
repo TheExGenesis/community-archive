@@ -26,17 +26,28 @@ export interface ToolCallView {
   input: Record<string, unknown>
   output: unknown
   errorText?: string
-  /** What the model reasoned in the step that made this call. */
-  reasoning?: string
 }
 
 export interface ProgressLine {
   id: string
   text: string
   status: 'running' | 'done' | 'error'
-  /** The model's reasoning before this step, when the stream carried it. */
-  reasoning?: string
 }
+
+/**
+ * The step log in the order things happened: the model's reasoning as its
+ * own entries between the steps it led to. Reasoning comes only from a live
+ * or in-session stream; saved conversations keep none.
+ */
+export type TimelineEntry =
+  | { kind: 'step'; line: ProgressLine }
+  | {
+      kind: 'thinking'
+      id: string
+      text: string
+      /** No tool call has followed it yet: the step being worked out now. */
+      latest: boolean
+    }
 
 export interface Citation {
   id: string
@@ -56,6 +67,8 @@ export type AnswerBlock =
       tweets: PortalTweet[]
       /** How the agent chose to show it; the reader can switch. */
       view: ListView
+      /** The relevance check's probability for the tweets it scored. */
+      scores: ReadonlyMap<string, number>
     }
   /** A citation alone on its line: the tweet shown whole, in place. */
   | { kind: 'tweet'; key: string; citation: Citation }
@@ -132,8 +145,8 @@ export interface TurnView {
   foundSoFar: number
   /** The best few of those, for the side column while the answer is written. */
   topFound: PortalTweet[]
-  /** Reasoning after the last tool call (see trailingReasoning). */
-  thinking: string
+  /** The steps with the model's reasoning between them, in order. */
+  timeline: TimelineEntry[]
 }
 
 type LooseRecord = Record<string, unknown>
@@ -170,49 +183,87 @@ const collectKept = (out: LooseRecord) =>
   asNumber(out.keptCount) ?? asArray(out.kept).length
 
 /** Tool parts arrive as `tool-<name>` (static) or `dynamic-tool` with toolName. */
-// Each model step streams its reasoning first, then its tool calls (or the
-// answer text). Reasoning goes to the first call after it; what follows the
-// last call belongs to the step under way, or to the answer.
-function readParts(message: UIMessage) {
-  const calls: ToolCallView[] = []
-  let pending = ''
+type PartEntry =
+  | { kind: 'reasoning'; text: string }
+  | { kind: 'call'; call: ToolCallView }
+
+// The message's reasoning and tool calls in stream order. Consecutive
+// reasoning parts (one model step can stream several) read as one.
+function readParts(message: UIMessage): PartEntry[] {
+  const entries: PartEntry[] = []
   for (const part of message.parts) {
     const record = part as unknown as LooseRecord
     const type = String(record.type)
     if (type === 'reasoning') {
       const text = asString(record.text)
-      if (text) pending = pending ? `${pending}\n\n${text}` : text
+      if (!text) continue
+      const last = entries[entries.length - 1]
+      if (last?.kind === 'reasoning') last.text = `${last.text}\n\n${text}`
+      else entries.push({ kind: 'reasoning', text })
       continue
     }
     let name: string | undefined
     if (type === 'dynamic-tool') name = asString(record.toolName)
     else if (type.startsWith('tool-')) name = type.slice('tool-'.length)
     if (!name) continue
-    calls.push({
-      id: asString(record.toolCallId) ?? `${name}-${calls.length}`,
-      name,
-      state: String(record.state ?? 'input-streaming'),
-      input: isRecord(record.input) ? record.input : {},
-      output: record.state === 'output-available' ? record.output : undefined,
-      errorText: asString(record.errorText),
-      ...(pending.trim() ? { reasoning: pending.trim() } : {}),
+    const calls = entries.filter((entry) => entry.kind === 'call').length
+    entries.push({
+      kind: 'call',
+      call: {
+        id: asString(record.toolCallId) ?? `${name}-${calls}`,
+        name,
+        state: String(record.state ?? 'input-streaming'),
+        input: isRecord(record.input) ? record.input : {},
+        output: record.state === 'output-available' ? record.output : undefined,
+        errorText: asString(record.errorText),
+      },
     })
-    pending = ''
   }
-  return { calls, trailingReasoning: pending.trim() }
+  return entries
 }
 
 export function toolCalls(message: UIMessage): ToolCallView[] {
-  return readParts(message).calls
+  return readParts(message).flatMap((entry) =>
+    entry.kind === 'call' ? [entry.call] : [],
+  )
 }
 
 /**
- * The model's reasoning after its last tool call: the step it is working
- * out now, or the answer it is about to write. Empty when the stream carried
- * none (saved conversations keep no reasoning).
+ * The steps and the reasoning between them, in the order they streamed. A
+ * retried call keeps its place at its first attempt, as its step line does.
  */
-export function trailingReasoning(message: UIMessage): string {
-  return readParts(message).trailingReasoning
+export function timelineFor(message: UIMessage): TimelineEntry[] {
+  const entries = readParts(message)
+  const calls = entries.flatMap((entry) =>
+    entry.kind === 'call' ? [entry.call] : [],
+  )
+  const groups = groupCalls(calls)
+  const lines = new Map(
+    progressFor(calls).map((line) => [line.id, line] as const),
+  )
+  const lineOf = new Map<string, ProgressLine>()
+  for (const group of groups) {
+    const line = lines.get(group[0].id)
+    if (line) for (const call of group) lineOf.set(call.id, line)
+  }
+  const placed = new Set<string>()
+  const timeline: TimelineEntry[] = []
+  entries.forEach((entry, index) => {
+    if (entry.kind === 'reasoning') {
+      timeline.push({
+        kind: 'thinking',
+        id: `thinking-${index}`,
+        text: entry.text.trim(),
+        latest: !entries.slice(index + 1).some((e) => e.kind === 'call'),
+      })
+      return
+    }
+    const line = lineOf.get(entry.call.id)
+    if (!line || placed.has(line.id)) return
+    placed.add(line.id)
+    timeline.push({ kind: 'step', line })
+  })
+  return timeline
 }
 
 /**
@@ -559,13 +610,18 @@ function callKey(call: ToolCallView) {
  * attempt: its result once it succeeds, the attempt under way if one is, or
  * the failure with how many times it was tried.
  */
-export function progressFor(calls: ToolCallView[]): ProgressLine[] {
+/** Calls grouped by what they asked for: a retry joins its first attempt. */
+function groupCalls(calls: ToolCallView[]): ToolCallView[][] {
   const groups = new Map<string, ToolCallView[]>()
   for (const call of calls) {
     const key = callKey(call)
     groups.set(key, [...(groups.get(key) ?? []), call])
   }
-  return Array.from(groups.values()).map((group) => {
+  return Array.from(groups.values())
+}
+
+export function progressFor(calls: ToolCallView[]): ProgressLine[] {
+  return groupCalls(calls).map((group) => {
     const done = [...group]
       .reverse()
       .find((call) => call.state === 'output-available')
@@ -577,11 +633,7 @@ export function progressFor(calls: ToolCallView[]): ProgressLine[] {
     if (!done && !running && group.length > 1) {
       line.text += ` · tried ${group.length === 2 ? 'twice' : `${group.length} times`}`
     }
-    // The latest attempt's reasoning: a retry says why it tried again.
-    const reasoning = [...group]
-      .reverse()
-      .find((call) => call.reasoning)?.reasoning
-    return { ...line, id: group[0].id, ...(reasoning ? { reasoning } : {}) }
+    return { ...line, id: group[0].id }
   })
 }
 
@@ -594,7 +646,11 @@ export interface FoundTweets {
   byId: Map<string, PortalTweet>
   /** Ids returned as results (not only as someone's quoted tweet), in order. */
   results: string[]
-  /** Highest classifier probability seen per id. */
+  /**
+   * Relevance per id: the scorer's p. A command's `scores` (its files and
+   * printed rows) replace earlier values; otherwise the highest p seen on a
+   * tweet.
+   */
   scores: Map<string, number>
   /** Workspace files the tools reported, path to ids (latest write wins). */
   files: Map<string, string[]>
@@ -679,7 +735,14 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
     }
   }
 
-  outputs.forEach((output) => visit(output, false))
+  outputs.forEach((output) => {
+    visit(output, false)
+    if (isRecord(output) && isRecord(output.scores)) {
+      for (const [id, p] of Object.entries(output.scores)) {
+        if (typeof p === 'number' && Number.isFinite(p)) scores.set(id, p)
+      }
+    }
+  })
   return { byId, results, scores, files: collectWorkspaceFiles(outputs) }
 }
 
@@ -816,12 +879,18 @@ export function buildAnswer(
       if (!listed.includes(id)) listed.push(id)
     }
     if (tweets.length) {
+      const scores = new Map<string, number>()
+      for (const tweet of tweets) {
+        const score = found.scores.get(tweet.id)
+        if (score !== undefined) scores.set(tweet.id, score)
+      }
       blocks.push({
         kind: 'list',
         key: `${scope}-list-${index}`,
         label: part.label,
         tweets,
         view: part.view,
+        scores,
       })
     }
   })
@@ -1063,7 +1132,7 @@ export function buildTurnView(
     topFound: orderByScore(own.results, own.scores)
       .slice(0, TOP_FOUND)
       .map(tweetFor),
-    thinking: trailingReasoning(message),
+    timeline: timelineFor(message),
   }
 }
 

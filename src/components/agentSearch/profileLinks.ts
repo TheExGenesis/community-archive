@@ -11,9 +11,6 @@ export interface Person {
   tweetId?: string
   /** How many of their tweets the run returned. */
   tweets?: number
-  /** Earliest and latest of those tweets, ISO dates. */
-  firstAt?: string
-  lastAt?: string
 }
 
 /** The people behind a run's tweets, each tweet counted once. */
@@ -41,11 +38,6 @@ export function peopleFromTweets(
         person.avatar = tweet.avatar
         person.tweetId = tweet.id
       }
-      const at = Number.isFinite(Date.parse(tweet.createdAt))
-        ? tweet.createdAt
-        : undefined
-      if (at && (!person.firstAt || at < person.firstAt)) person.firstAt = at
-      if (at && (!person.lastAt || at > person.lastAt)) person.lastAt = at
       people.set(key, person)
     }
   }

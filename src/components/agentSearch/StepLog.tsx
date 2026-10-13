@@ -293,6 +293,7 @@ export function LogLine({
   steps,
   cappedAt,
   onStop,
+  more,
 }: {
   summary: string
   steps: ProgressLine[]
@@ -300,6 +301,13 @@ export function LogLine({
   cappedAt?: number | null
   /** Set while the answer is still being written. */
   onStop?: () => void
+  /** Tweets found but not in the answer, which open below it. */
+  more?: {
+    count: number
+    open: boolean
+    controls: string
+    onToggle: () => void
+  }
 }) {
   const [open, setOpen] = useState(false)
   const contentId = useId()
@@ -319,6 +327,22 @@ export function LogLine({
           />
           <span className="min-w-0">{summary}</span>
         </button>
+        {more && (
+          <button
+            type="button"
+            onClick={more.onToggle}
+            aria-expanded={more.open}
+            aria-controls={more.controls}
+            className="group -ml-3 mr-auto inline-flex min-h-[2.5rem] shrink-0 items-center rounded-md px-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span aria-hidden="true" className="mr-1.5">
+              ·
+            </span>
+            <span className="underline decoration-muted-foreground/40 underline-offset-4 group-hover:decoration-foreground">
+              {more.count.toLocaleString('en-US')} more found
+            </span>
+          </button>
+        )}
         {onStop && <StopButton onStop={onStop} />}
       </div>
       {open && (

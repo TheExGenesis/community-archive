@@ -18,8 +18,6 @@ const person: Person = {
   avatar: null,
   tweetId: '1',
   tweets: 3,
-  firstAt: '2023-05-02T00:00:00.000Z',
-  lastAt: '2026-09-01T00:00:00.000Z',
 }
 
 const preview = {
@@ -46,9 +44,7 @@ test('the card shows what the run knows at once, then the bio and facts', async 
   render(<ProfileCard person={person} href="/user/csgbwk" />)
   expect(screen.getByText('@csgbwk')).toBeInTheDocument()
   expect(
-    screen.getByText(
-      '3 tweets in this answer’s results · May 2023 to Sep 2026',
-    ),
+    screen.getByText('3 tweets found for this question'),
   ).toBeInTheDocument()
   expect(screen.getByTestId('profile-loading')).toBeInTheDocument()
   expect(await screen.findByText('building robots')).toBeInTheDocument()
@@ -115,7 +111,5 @@ test('people are counted once per tweet, with their date range', () => {
   expect(people.get('alice')).toMatchObject({
     username: 'Alice',
     tweets: 2,
-    firstAt: '2024-01-01T00:00:00Z',
-    lastAt: '2025-06-01T00:00:00Z',
   })
 })

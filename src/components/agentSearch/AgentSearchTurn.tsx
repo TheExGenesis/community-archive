@@ -1,14 +1,20 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { PanelRightOpen } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnswerMarkdown } from './AnswerMarkdown'
-import { CitationContext, type CitationLinks } from './CitationContext'
+import {
+  CitationContext,
+  RAIL_MEDIA,
+  type CitationLinks,
+} from './CitationContext'
 import { CitationRail } from './CitationRail'
 import { CitationSheet } from './CitationSheet'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { logSummary, type TurnView } from './messageView'
 import { peopleFromTweets } from './profileLinks'
 import { EmbeddedTweet, ResultList } from './ResultList'
+import { useCitedColumnHidden } from './railPreference'
 import { Sources } from './Sources'
 import { LogLine, StepLog } from './StepLog'
 
@@ -70,8 +76,10 @@ export function AgentSearchTurn({
       ]),
     [answer.citations, answer.blocks, view.relevant, view.otherMatches],
   )
+  const [railHidden, setRailHidden] = useCitedColumnHidden()
   const links = useMemo<CitationLinks>(
     () => ({
+      railShown: !railHidden,
       selected,
       hovered,
       inView,
@@ -84,7 +92,7 @@ export function AgentSearchTurn({
       },
       tweetFor: (anchor) => citedByAnchor.get(anchor),
     }),
-    [selected, hovered, inView, citedByAnchor],
+    [selected, hovered, inView, citedByAnchor, railHidden],
   )
   const citationNumbers = useMemo(
     () =>
@@ -145,6 +153,31 @@ export function AgentSearchTurn({
         ? null
         : { kind: view.outcome, elapsedMs: null }))
 
+  // Tweets found but not in the answer open below it from the log line's
+  // count. Phones always show them, since they also hold the cited tier.
+  const [moreOpen, setMoreOpen] = useState(false)
+  const sourcesRef = useRef<HTMLDivElement>(null)
+  const sourcesId = useId()
+  const moreCount = view.receipt.relevant + view.receipt.other
+  const moreControl =
+    showSources && !ended && moreCount > 0
+      ? {
+          count: moreCount,
+          open: moreOpen,
+          controls: sourcesId,
+          onToggle: () => {
+            const wide = window.matchMedia?.(RAIL_MEDIA).matches ?? false
+            const opening = !wide || !moreOpen
+            if (wide) setMoreOpen(opening)
+            if (opening) {
+              requestAnimationFrame(() =>
+                sourcesRef.current?.scrollIntoView({ block: 'start' }),
+              )
+            }
+          },
+        }
+      : undefined
+
   const log = active ? (
     hasAnswer ? (
       <LogLine
@@ -171,9 +204,10 @@ export function AgentSearchTurn({
     />
   ) : (
     <LogLine
-      summary={logSummary(view)}
+      summary={logSummary(view, { withoutMore: Boolean(moreControl) })}
       steps={view.progress}
       cappedAt={view.receipt.cappedAt}
+      more={moreControl}
     />
   )
 
@@ -184,7 +218,9 @@ export function AgentSearchTurn({
   // Sources under the answer.
   return (
     <CitationContext.Provider value={links}>
-      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,48rem)_minmax(21rem,32rem)] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
+      <div
+        className={`space-y-5 lg:grid ${railHidden ? 'lg:grid-cols-[minmax(0,48rem)_auto]' : 'lg:grid-cols-[minmax(0,48rem)_minmax(21rem,32rem)]'} lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0`}
+      >
         <div className="min-w-0 space-y-5 lg:col-start-1">
           {log}
 
@@ -239,16 +275,44 @@ export function AgentSearchTurn({
           )}
         </div>
 
+        {railHidden &&
+          (answer.citations.length > 0 ||
+            (active && view.topFound.length > 0)) && (
+            // Where the closed column was, so it reopens from the same spot.
+            <div className="hidden lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block">
+              <button
+                type="button"
+                onClick={() => setRailHidden(false)}
+                className="sticky top-16 inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-md px-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <PanelRightOpen aria-hidden="true" className="h-4 w-4" />
+                {answer.citations.length ? 'Cited' : 'Found so far'}
+                {answer.citations.length > 0 && (
+                  <span className="font-normal tabular-nums">
+                    · {answer.citations.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
         <EvidenceBoundary label="cited tweets">
           <CitationRail
             citations={answer.citations}
             active={active}
             found={view.topFound}
+            hidden={railHidden}
+            onHide={() => setRailHidden(true)}
           />
         </EvidenceBoundary>
 
         {!active && showSources && (
-          <div className="min-w-0 scroll-mt-24 lg:col-start-1">
+          <div
+            ref={sourcesRef}
+            id={sourcesId}
+            className={`min-w-0 scroll-mt-24 lg:col-start-1 ${
+              moreControl && !moreOpen ? 'lg:hidden' : ''
+            }`}
+          >
             <EvidenceBoundary label="sources">
               <Sources
                 title={
@@ -258,6 +322,9 @@ export function AgentSearchTurn({
                       ? 'Found before it stopped'
                       : 'Sources'
                 }
+                // Opened from the count, the section needs no heading of
+                // its own on wide screens.
+                titleClassName={moreControl ? 'lg:sr-only' : undefined}
                 relevant={view.relevant}
                 relevantNotShown={view.relevantNotShown}
                 otherMatches={view.otherMatches}

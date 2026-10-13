@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
+import { X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
 import type { Citation, TurnView } from './messageView'
@@ -111,8 +112,14 @@ export const CitationRail = forwardRef<
     active: boolean
     /** Shown while the run is still searching and nothing is cited yet. */
     found: TurnView['topFound']
+    /** Wide screens: the reader closed the column. */
+    hidden?: boolean
+    onHide?: () => void
   }
->(function CitationRail({ citations, active, found }, ref) {
+>(function CitationRail(
+  { citations, active, found, hidden = false, onHide },
+  ref,
+) {
   const links = useCitationLinks()
   const railRef = useRef<HTMLElement | null>(null)
   const headerRef = useRef<HTMLDivElement>(null)
@@ -209,7 +216,7 @@ export const CitationRail = forwardRef<
   // tweets move into the Cited tier of Sources under the answer.
   return (
     <div
-      className={`${active ? '' : 'hidden'} lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:self-stretch`}
+      className={`${active ? '' : 'hidden'} lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-stretch ${hidden ? 'lg:hidden' : 'lg:block'}`}
     >
       <aside
         ref={setRefs}
@@ -221,7 +228,7 @@ export const CitationRail = forwardRef<
       >
         <div
           ref={headerRef}
-          className="z-20 flex items-baseline justify-between gap-3 border-b border-border bg-background/95 py-2.5 backdrop-blur lg:sticky lg:top-0 lg:px-4"
+          className="z-20 flex items-center gap-3 border-b border-border bg-background/95 py-2.5 backdrop-blur lg:sticky lg:top-0 lg:px-4"
         >
           <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             {title}
@@ -231,14 +238,27 @@ export const CitationRail = forwardRef<
               </span>
             )}
           </h3>
-          {citations.length > 1 && (
-            <span
-              aria-hidden="true"
-              className="hidden text-xs tabular-nums text-muted-foreground lg:inline"
-            >
-              {Math.min(position, citations.length)} of {citations.length}
-            </span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {citations.length > 1 && (
+              <span
+                aria-hidden="true"
+                className="hidden text-xs tabular-nums text-muted-foreground lg:inline"
+              >
+                {Math.min(position, citations.length)} of {citations.length}
+              </span>
+            )}
+            {onHide && (
+              <button
+                type="button"
+                onClick={onHide}
+                aria-label="Close cited tweets"
+                title="Close"
+                className="-mr-1.5 hidden h-7 w-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:inline-flex"
+              >
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
         {citations.length ? (
           <ol className="divide-y divide-border">

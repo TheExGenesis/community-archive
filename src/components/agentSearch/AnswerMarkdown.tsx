@@ -87,8 +87,9 @@ function CitationChip({
             if (!links) return
             // Neither path follows the #anchor, so the page never jumps.
             event.preventDefault()
-            if (window.matchMedia(RAIL_MEDIA).matches) links.select(anchor)
-            else links.openSheet(anchor, event.currentTarget)
+            if (links.railShown && window.matchMedia(RAIL_MEDIA).matches) {
+              links.select(anchor)
+            } else links.openSheet(anchor, event.currentTarget)
           }}
           onMouseEnter={enter}
           onMouseLeave={leave}

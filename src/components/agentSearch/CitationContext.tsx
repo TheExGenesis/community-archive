@@ -21,6 +21,8 @@ export interface CitationLinks {
   hover: (anchor: string | null) => void
   /** Narrow screens: open the post in a sheet; focus returns to `chip`. */
   openSheet: (anchor: string, chip: HTMLElement) => void
+  /** Wide screens show the cited column unless the reader closed it. */
+  railShown: boolean
   /** The cited tweet, for the card a chip shows on hover. */
   tweetFor: (anchor: string) => PortalTweet | undefined
 }

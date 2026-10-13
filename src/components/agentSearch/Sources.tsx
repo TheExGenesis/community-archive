@@ -26,12 +26,14 @@ const PILL =
  */
 export function Sources({
   title,
+  titleClassName = '',
   relevant,
   relevantNotShown,
   otherMatches,
   citations,
 }: {
   title: string
+  titleClassName?: string
   relevant: PortalTweet[]
   /** Judged relevant but not returned to the page. */
   relevantNotShown: number
@@ -106,7 +108,11 @@ export function Sources({
       className={`space-y-3 ${onlyCited ? 'lg:hidden' : ''}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <h3
+          className={`text-base font-semibold text-foreground ${titleClassName}`}
+        >
+          {title}
+        </h3>
         {tier !== 'cited' || !onlyCited ? (
           <div
             role="group"

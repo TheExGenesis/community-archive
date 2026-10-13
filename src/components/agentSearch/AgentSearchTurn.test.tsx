@@ -118,8 +118,13 @@ test('renders the answer with its list, the cited rail and the sources', () => {
 
   // The folded log line opens in place to the steps and what was not searched.
   const line = screen.getByRole('button', {
-    name: '1 step · 2 tweets in the answer · 2 more found',
+    name: '1 step · 2 tweets in the answer',
   })
+  // What was found but not used opens from its own count.
+  expect(screen.getByRole('button', { name: /2 more found/ })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
   fireEvent.click(line)
   expect(line).toHaveAttribute('aria-expanded', 'true')
   expect(screen.getByText(/Searched “community archive”/)).toBeInTheDocument()

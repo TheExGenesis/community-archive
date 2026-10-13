@@ -20,13 +20,6 @@ export const ProfilePeopleContext = createContext<
   ReadonlyMap<string, Person> | undefined
 >(undefined)
 
-const monthFormat = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
-const monthOf = (iso?: string) => (iso ? monthFormat.format(new Date(iso)) : '')
-
 // One request per person per page load; a failure is remembered as null so
 // the card stops asking.
 const previews = new Map<string, Promise<Preview | null>>()
@@ -80,9 +73,6 @@ export function ProfileCard({
   }, [key])
 
   const count = person.tweets ?? 0
-  const from = monthOf(person.firstAt)
-  const to = monthOf(person.lastAt)
-  const range = from && to && from !== to ? `${from} to ${to}` : from
   const facts = preview
     ? [
         preview.location,
@@ -128,8 +118,8 @@ export function ProfileCard({
       )}
       {count > 0 && (
         <p className="text-xs text-muted-foreground">
-          {count} {count === 1 ? 'tweet' : 'tweets'} in this answer’s results
-          {range ? ` · ${range}` : ''}
+          {count.toLocaleString('en-US')} {count === 1 ? 'tweet' : 'tweets'}{' '}
+          found for this question
         </p>
       )}
       <Link

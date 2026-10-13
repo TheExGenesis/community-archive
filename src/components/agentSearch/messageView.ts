@@ -1014,7 +1014,11 @@ const TOP_FOUND = 3
  */
 export function logSummary(
   view: TurnView,
-  options: { writing?: boolean } = {},
+  options: {
+    writing?: boolean
+    /** Leave out "N more found"; the page shows it as its own control. */
+    withoutMore?: boolean
+  } = {},
 ): string {
   const steps = view.progress.length
   if (!steps) return 'No new searches, used the earlier tweets'
@@ -1028,7 +1032,9 @@ export function logSummary(
     parts.push(`${plural(shown, 'tweet')} in the answer`)
   else if (shown) parts.push(`${plural(shown, 'tweet')} cited`)
   const more = view.receipt.relevant + view.receipt.other
-  if (more) parts.push(`${more.toLocaleString('en-US')} more found`)
+  if (more && !options.withoutMore) {
+    parts.push(`${more.toLocaleString('en-US')} more found`)
+  }
   if (!shown && !more && !view.foundSoFar) parts.push('nothing found')
   return parts.join(' · ')
 }

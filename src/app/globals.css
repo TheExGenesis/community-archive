@@ -167,20 +167,10 @@
   }
 }
 
-/* The browser's clear button in search fields draws in the system accent
-   colour (often blue); draw a muted × instead, in the theme's colour. */
+/* No browser clear button (×) in search fields: other text fields have
+   none, and it drew in the system accent colour. */
 input[type='search']::-webkit-search-cancel-button {
   -webkit-appearance: none;
   appearance: none;
-  height: 0.875rem;
-  width: 0.875rem;
-  cursor: pointer;
-  background-color: hsl(var(--muted-foreground));
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-}
-input[type='search']::-webkit-search-cancel-button:hover {
-  background-color: hsl(var(--foreground));
+  display: none;
 }

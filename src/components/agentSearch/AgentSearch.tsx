@@ -7,6 +7,10 @@ import { ArrowUp, Lock, Plus, Quote } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
+import { OWN_KEY_HEADER } from '@/lib/agentSearch/ownKey'
+import { ownKeyRefusalMessage } from './OwnKeyControl'
+import { readOwnKey, useOwnKey } from './ownKeyStore'
+import { QuestionsLeft, type QuestionsToday } from './QuestionsLeft'
 import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
@@ -48,6 +52,11 @@ interface Quota {
   remaining: number
   /** ISO time the daily count starts over (UTC midnight). */
   resetsAt: string
+  /** The member may pay with their own OpenRouter key. */
+  ownKeyEnabled: boolean
+  /** The same count on one's own key: a higher limit, all questions counted. */
+  ownLimit: number | null
+  ownRemaining: number | null
 }
 
 const resetTime = (iso: string) =>
@@ -78,7 +87,26 @@ export default function AgentSearch({
   // Client clock when the current answer was asked for (or reopened), for the
   // status row's timer.
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
-  const [quota, setQuota] = useState<Quota | null>(null)
+  const [houseQuota, setQuota] = useState<Quota | null>(null)
+  const [hasOwnKey] = useOwnKey()
+  // Questions go out on the member's key only while the server allows it.
+  const ownKeyEnabledRef = useRef(true)
+  // The count that applies to the next question: on the member's own key
+  // when this browser holds one, otherwise the house's.
+  const onOwnKey =
+    hasOwnKey &&
+    houseQuota !== null &&
+    houseQuota.ownKeyEnabled &&
+    houseQuota.ownLimit !== null &&
+    houseQuota.ownRemaining !== null
+  const quota =
+    houseQuota && onOwnKey
+      ? {
+          ...houseQuota,
+          limit: houseQuota.ownLimit ?? houseQuota.limit,
+          remaining: houseQuota.ownRemaining ?? houseQuota.remaining,
+        }
+      : houseQuota
   const [input, setInput] = useState('')
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
@@ -110,7 +138,13 @@ export default function AgentSearch({
         prepareSendMessagesRequest: ({ id, messages }) => {
           stopPendingRef.current = false
           const last = [...messages].reverse().find((m) => m.role === 'user')
-          return { body: { id, question: last ? messageText(last) : '' } }
+          const body = { id, question: last ? messageText(last) : '' }
+          // The member's own key, if this browser holds one, pays for the
+          // question; it travels in a header and the server never stores it.
+          const ownKey = ownKeyEnabledRef.current ? readOwnKey() : null
+          return ownKey
+            ? { body, headers: { [OWN_KEY_HEADER]: ownKey } }
+            : { body }
         },
         onChatSendMessage: (response, { chatId }) => {
           runIdRef.current = response.headers.get('x-workflow-run-id')
@@ -152,6 +186,9 @@ export default function AgentSearch({
         dailyLimit?: number
         remainingToday?: number
         resetsAt?: string
+        ownKeyEnabled?: boolean
+        ownKeyDailyLimit?: number
+        ownKeyRemainingToday?: number
       }
       setRecent(body.conversations ?? [])
       if (
@@ -159,10 +196,20 @@ export default function AgentSearch({
         typeof body.remainingToday === 'number' &&
         typeof body.resetsAt === 'string'
       ) {
+        ownKeyEnabledRef.current = body.ownKeyEnabled === true
         setQuota({
           limit: body.dailyLimit,
           remaining: body.remainingToday,
           resetsAt: body.resetsAt,
+          ownKeyEnabled: body.ownKeyEnabled === true,
+          ownLimit:
+            typeof body.ownKeyDailyLimit === 'number'
+              ? body.ownKeyDailyLimit
+              : null,
+          ownRemaining:
+            typeof body.ownKeyRemainingToday === 'number'
+              ? body.ownKeyRemainingToday
+              : null,
         })
       }
     } catch {
@@ -249,12 +296,13 @@ export default function AgentSearch({
   const answerFailed = Boolean(error) && lastMessage?.role === 'assistant'
   const errorMessage = answerFailed
     ? null
-    : describeChatError(
+    : (ownKeyRefusalMessage(error) ??
+      describeChatError(
         error,
         quota
           ? { limit: quota.limit, resetLabel: resetTime(quota.resetsAt) }
           : undefined,
-      )
+      ))
 
   // A refused POST (limit, eligibility) leaves the question with no reply.
   // Drop it from the thread and put it back in the box so nothing is lost.
@@ -404,6 +452,14 @@ export default function AgentSearch({
   })
 
   const quotaLow = quota !== null && quota.remaining <= 3
+  const today: QuestionsToday | null = quota && {
+    limit: quota.limit,
+    remaining: quota.remaining,
+    resetLabel: resetTime(quota.resetsAt),
+    ownKey: onOwnKey,
+    ownKeyEnabled: quota.ownKeyEnabled,
+    ownLimit: quota.ownLimit,
+  }
   const limitSentence = quota
     ? `You’ve used today’s ${quota.limit} questions. You can ask again at ${resetTime(quota.resetsAt)}.`
     : null
@@ -455,9 +511,7 @@ export default function AgentSearch({
             Answers cite tweets
           </span>
           <span className="ml-auto flex items-center gap-3">
-            {quota && (
-              <span className="tabular-nums">{quota.remaining} left today</span>
-            )}
+            {today && <QuestionsLeft today={today} />}
             <button
               type="submit"
               disabled={!input.trim()}
@@ -494,17 +548,31 @@ export default function AgentSearch({
           <ArrowUp aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
-      {quotaLow && quota && (
-        <p className="mt-1.5 text-xs tabular-nums text-muted-foreground">
-          {quota.remaining} left today
+      {quotaLow && today && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          <QuestionsLeft today={today} />
         </p>
       )}
       {errorNote}
     </form>
   )
 
+  // Out of house questions, the member's own key is the way to keep going.
   const limitNote = (
-    <p className="text-sm leading-6 text-muted-foreground">{limitSentence}</p>
+    <div className="space-y-1 text-sm leading-6 text-muted-foreground">
+      <p>{limitSentence}</p>
+      {today?.ownKeyEnabled && !onOwnKey && (
+        <p>
+          <QuestionsLeft
+            today={today}
+            trigger="Use your own OpenRouter key"
+            className="text-foreground underline decoration-muted-foreground/50"
+          />{' '}
+          to ask up to {today.ownLimit?.toLocaleString('en-US') ?? 'more'} a
+          day.
+        </p>
+      )}
+    </div>
   )
 
   const inThread = hasThread || loading

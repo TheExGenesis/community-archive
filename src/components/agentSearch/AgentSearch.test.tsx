@@ -37,6 +37,7 @@ jest.mock('./AnswerMarkdown', () => ({
 }))
 
 import AgentSearch, { EXAMPLE_QUESTIONS } from './AgentSearch'
+import { writeOwnKey } from './ownKeyStore'
 
 const quota = (remaining: number) => {
   global.fetch = jest.fn(async () => ({
@@ -175,5 +176,66 @@ describe('the conversation in the URL', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(conversationLoads()).toBe(0)
     expect(mockChat.resumeStream).not.toHaveBeenCalled()
+  })
+})
+
+describe('the member’s own OpenRouter key', () => {
+  const KEY = `sk-or-v1-${'f6'.repeat(32)}`
+  const quotaWithKeys = () => {
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        conversations: [],
+        dailyLimit: 10,
+        remainingToday: 0,
+        ownKeyEnabled: true,
+        ownKeyDailyLimit: 100,
+        ownKeyRemainingToday: 90,
+        resetsAt: new Date(Date.now() + 6 * 3600_000).toISOString(),
+      }),
+    })) as unknown as typeof fetch
+  }
+  const prepare = () =>
+    (
+      mockTransport.options as unknown as {
+        prepareSendMessagesRequest: (input: {
+          id: string
+          messages: UIMessage[]
+        }) => { body: unknown; headers?: Record<string, string> }
+      }
+    ).prepareSendMessagesRequest({
+      id: 'conv-1234',
+      messages: [
+        { id: 'u', role: 'user', parts: [{ type: 'text', text: 'Who?' }] },
+      ],
+    })
+
+  afterEach(() => writeOwnKey(null))
+
+  test('out of house questions, the page offers the key', async () => {
+    quotaWithKeys()
+    render(<AgentSearch />)
+    expect(
+      await screen.findByRole('button', {
+        name: 'Use your own OpenRouter key',
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/to ask up to 100 a day/)).toBeInTheDocument()
+    // Without a key, nothing extra goes with a question.
+    expect(prepare().headers).toBeUndefined()
+  })
+
+  test('with a key, questions carry it and the count is the key’s', async () => {
+    writeOwnKey(KEY)
+    quotaWithKeys()
+    render(<AgentSearch />)
+    expect(
+      await screen.findByRole('button', { name: /90 left today/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('On your key')).toBeInTheDocument()
+    expect(prepare()).toEqual({
+      body: { id: 'conv-1234', question: 'Who?' },
+      headers: { 'x-openrouter-key': KEY },
+    })
   })
 })

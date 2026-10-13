@@ -209,11 +209,37 @@ resolved headers, including the API key, into the event log.
 | `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set |
 | `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...` | price table | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost) |
 | `AGENT_SEARCH_RUN_STORE` | file outside production | `file` forces the local JSON store |
+| `AGENT_SEARCH_KEY_SECRET` | unset | At least 32 characters. Seals members' own OpenRouter keys (below); unset, own keys are refused |
 
 The default planner runs on OpenRouter, so `OPENROUTER_API_KEY` must be set in
 Production and Preview. It is the same key the Daily Digest uses
 (`docs/daily-digest.md`). The default scorer stays on OpenAI Decisions
 (`OPENAI_API_KEY`).
+
+### A member's own OpenRouter key
+
+A member may pay for their questions with their own OpenRouter key and ask ten
+times the daily limit (`AGENT_SEARCH_DAILY_LIMIT` x 10, counting all of that
+day's questions; house questions keep their own count). They add it from the
+"N left today" popover or the Ask the archive section in Settings.
+
+- **Where it lives.** In the member's browser (localStorage). The page sends it
+  with each question in the `x-openrouter-key` header. The server keeps no copy,
+  so there is no key table to leak.
+- **Before a run.** The start route checks it with OpenRouter
+  (`GET /api/v1/key`) and refuses a key that is invalid, free tier, a management
+  key, or out of limit or budget, with a code the page explains
+  (`own_key_*`).
+- **In the workflow.** Workflow inputs and step arguments are kept in the
+  event log, so the route seals the key first: AES-256-GCM under
+  `AGENT_SEARCH_KEY_SECRET`, with the run id as authenticated data
+  (`ownKey.ts`). Only the sealed text crosses steps; the model step opens it
+  just before each call. A refusal by OpenRouter mid-run (401, 402, 403, 429)
+  fails the run with a plain message; it never falls back to the house key.
+- **Spend.** The run records `key_source = 'own'`. Planner calls on the
+  member's key add tokens but no cost, so `cost_usd` and the global daily cap
+  count house spend only. The scorer and the semantic search still run on the
+  house, so own-key questions still stop when the global cap is reached.
 
 The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_URL`,
 `CLICKHOUSE_ANALYTICS_API_TOKEN`) are the site's existing ones. The route sets

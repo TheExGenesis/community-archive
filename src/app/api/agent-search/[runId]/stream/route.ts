@@ -7,6 +7,7 @@ import { getAgentSearchAccess } from '@/lib/agentSearch/eligibility'
 import { workflowRunIdOf } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 import {
+  closeWhenRunEnds,
   endWithFinish,
   finishedStream,
   isTerminalStatus,
@@ -83,16 +84,18 @@ export async function GET(
   }
   let readable: ReadableStream<UIMessageChunk>
   try {
+    const runEnded = async () => {
+      const current = await status()
+      return current === 'expired' || isTerminalStatus(current)
+    }
     readable = endWithFinish(
-      run
-        .getReadable({ startIndex: 0 })
-        .pipeThrough(
-          createModelCallToUIChunkTransform({ uiStartIndex: startIndex }),
-        ),
-      async () => {
-        const current = await status()
-        return current === 'expired' || isTerminalStatus(current)
-      },
+      closeWhenRunEnds(
+        run.getReadable({ startIndex: 0 }),
+        runEnded,
+      ).pipeThrough(
+        createModelCallToUIChunkTransform({ uiStartIndex: startIndex }),
+      ),
+      runEnded,
     )
   } catch (error) {
     if (!RunExpiredError.is(error)) throw error

@@ -7,7 +7,7 @@ jest.mock('workflow/errors', () => ({
 }))
 
 import type { UIMessageChunk } from 'ai'
-import { endWithFinish, finishedStream } from './stream'
+import { closeWhenRunEnds, endWithFinish, finishedStream } from './stream'
 
 const chunks = (...values: UIMessageChunk[]) =>
   new ReadableStream<UIMessageChunk>({
@@ -112,5 +112,44 @@ describe('agent search streams', () => {
 
   test('a run with nothing to replay is just a finish', async () => {
     expect(await read(finishedStream())).toEqual(['finish'])
+  })
+})
+
+describe('a run stream that closes early', () => {
+  const raw = (...values: number[]) =>
+    new ReadableStream<number>({
+      start(controller) {
+        values.forEach((value) => controller.enqueue(value))
+        controller.close()
+      },
+    })
+  async function drain(stream: ReadableStream<number>) {
+    const out: number[] = []
+    const reader = stream.getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) return out
+      out.push(value)
+    }
+  }
+
+  test('closes when the run is over', async () => {
+    expect(
+      await drain(closeWhenRunEnds(raw(1, 2), async () => true, 0)),
+    ).toEqual([1, 2])
+  })
+
+  test('fails, so the page reconnects, when the run is still going', async () => {
+    const out: number[] = []
+    const reader = closeWhenRunEnds(raw(1), async () => false, 0).getReader()
+    out.push((await reader.read()).value as number)
+    await expect(reader.read()).rejects.toThrow(/still going/)
+    expect(out).toEqual([1])
+  })
+
+  test('waits briefly for a status that lags the last chunk', async () => {
+    let calls = 0
+    const ended = async () => ++calls > 1
+    expect(await drain(closeWhenRunEnds(raw(1), ended, 0))).toEqual([1])
   })
 })

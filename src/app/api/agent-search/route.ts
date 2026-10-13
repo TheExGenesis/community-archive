@@ -16,7 +16,11 @@ import { agentSearchModelSpec } from '@/lib/agentSearch/model'
 import { parseAgentSearchRequest } from '@/lib/agentSearch/request'
 import { closeEndedRuns, newSearchRunId } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
-import { endWithFinish, isTerminalStatus } from '@/lib/agentSearch/stream'
+import {
+  closeWhenRunEnds,
+  endWithFinish,
+  isTerminalStatus,
+} from '@/lib/agentSearch/stream'
 import { agentSearchWorkflow } from '@/workflows/agentSearch'
 
 // Runs stream for up to a few minutes; the repo default is 15 s (vercel.json).
@@ -142,10 +146,13 @@ export async function POST(request: Request) {
   // The page addresses the run (stream, cancel) by its search run id. A run
   // stopped (here or from another tab) does not end this stream with a
   // finish chunk; endWithFinish adds one so the page stops waiting.
+  const runEnded = () => run.status.then(isTerminalStatus)
   return createUIMessageStreamResponse({
     stream: endWithFinish(
-      run.readable.pipeThrough(createModelCallToUIChunkTransform()),
-      () => run.status.then(isTerminalStatus),
+      closeWhenRunEnds(run.readable, runEnded).pipeThrough(
+        createModelCallToUIChunkTransform(),
+      ),
+      runEnded,
     ),
     headers: { ...noStore, 'x-workflow-run-id': runId },
   })

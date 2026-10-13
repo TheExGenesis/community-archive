@@ -105,3 +105,35 @@ export function endWithFinish(
     },
   })
 }
+
+/** How long a closed stream waits for its run's status to catch up. */
+const SETTLE_MS = 2_000
+
+/**
+ * Lets a run's stream close only once the run is over. The run's readable
+ * can close while the run goes on (with the local world it closed after
+ * 45 to 110 s while the workflow kept calling the model), and the UI chunk
+ * transform answers any close with a finish chunk, which tells the page the
+ * answer is done. Failing the stream instead makes the page reconnect and
+ * read on from where it was. A run whose status lags its last chunk gets a
+ * short grace before the stream fails.
+ */
+export function closeWhenRunEnds<T>(
+  source: ReadableStream<T>,
+  runEnded: () => Promise<boolean>,
+  settleMs: number = SETTLE_MS,
+): ReadableStream<T> {
+  const ended = () => runEnded().catch(() => false)
+  return source.pipeThrough(
+    new TransformStream<T, T>({
+      async flush(controller) {
+        if (await ended()) return
+        await new Promise((resolve) => setTimeout(resolve, settleMs))
+        if (await ended()) return
+        controller.error(
+          new Error('The run is still going; its stream closed early'),
+        )
+      },
+    }),
+  )
+}

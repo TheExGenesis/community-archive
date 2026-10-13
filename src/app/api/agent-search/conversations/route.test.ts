@@ -11,6 +11,14 @@ jest.mock('@/lib/agentSearch/runStore', () => ({
 jest.mock('@/lib/agentSearch/history', () => ({
   summarizeConversations: () => [],
 }))
+// The scorer and providers are ESM-only; the quota route never calls them.
+jest.mock('@/lib/agentSearch/classifier', () => ({
+  agentSearchScorer: () => 'decisions',
+}))
+jest.mock('@ai-sdk/openai', () => ({ createOpenAI: jest.fn() }))
+jest.mock('@ai-sdk/openai-compatible', () => ({
+  createOpenAICompatible: jest.fn(),
+}))
 
 const store = { listRecent: jest.fn(), countSince: jest.fn() }
 

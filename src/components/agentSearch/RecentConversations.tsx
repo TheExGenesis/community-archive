@@ -162,13 +162,15 @@ export function RecentConversations({
                 {current ? 'Open now' : detail(conversation)}
               </span>
             </button>
+            {/* Delete shows on the row's hover or keyboard focus, and
+                always where nothing can hover. */}
             {onDelete && (
               <button
                 type="button"
                 onClick={() => setConfirming(conversation.id)}
                 aria-label={`Delete “${conversation.title}”`}
                 title="Delete"
-                className="flex w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                className="flex w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
               >
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
               </button>

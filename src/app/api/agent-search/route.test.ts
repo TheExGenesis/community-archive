@@ -32,6 +32,7 @@ jest.mock('@/lib/agentSearch/budget', () => ({
 }))
 jest.mock('@/lib/agentSearch/stream', () => ({
   endWithFinish: (stream: ReadableStream) => stream,
+  closeWhenRunEnds: (stream: ReadableStream) => stream,
   isTerminalStatus: () => true,
 }))
 jest.mock('@/lib/agentSearch/openRouterKey', () => ({

@@ -160,7 +160,7 @@ export default function AdvancedSearchForm() {
             className="h-10 gap-2 bg-background px-4 text-muted-foreground hover:text-foreground"
           >
             <Sparkles aria-hidden="true" className="h-4 w-4" />
-            Ask
+            Ask AI
             <kbd
               aria-hidden="true"
               className="hidden rounded border border-border px-1 font-sans text-[11px] leading-4 text-muted-foreground sm:inline"

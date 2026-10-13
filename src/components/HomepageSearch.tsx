@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import UserSearchInput from '@/components/UserSearchInput'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { buildSearchParams, parseSearchExpression } from '@/lib/searchParams'
+import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
+import { AskShortcutChip } from '@/components/AskShortcutChip'
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
 
@@ -28,6 +30,19 @@ export default function HomepageSearch() {
     router.push(`/search?${params.toString()}`)
   }
 
+  // ⌘/Ctrl+Enter, or the chip, hands the text to Ask the archive instead.
+  const ask = () => {
+    const trimmed = query.trim()
+    if (!trimmed) return
+    capturePostHogEvent('search_interface_action', {
+      action: 'ask_from_search',
+      has_query: true,
+      active_filter_count: Object.keys(parseSearchExpression(trimmed).options)
+        .length,
+    })
+    router.push(buildAskHref(trimmed))
+  }
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     search(query)
@@ -44,9 +59,21 @@ export default function HomepageSearch() {
           onValueChange={setQuery}
           placeholder="Search tweets, people, ideas"
           aria-label="Search Community Archive"
-          className="h-14 rounded-[50px] border-0 bg-transparent pl-3 pr-16 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg"
+          className={`h-14 rounded-[50px] border-0 bg-transparent pl-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg ${query.trim() ? 'pr-32' : 'pr-16'}`}
           autoComplete="off"
+          aria-keyshortcuts="Control+Enter Meta+Enter"
+          onKeyDownCapture={(event) => {
+            if (!isAskShortcut(event) || !query.trim()) return
+            event.preventDefault()
+            ask()
+          }}
         />
+        {query.trim() && (
+          <AskShortcutChip
+            onAsk={ask}
+            className="absolute right-16 top-1/2 -translate-y-1/2 sm:right-[4.25rem]"
+          />
+        )}
         <Button
           type="submit"
           size="icon"

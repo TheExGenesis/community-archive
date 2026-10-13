@@ -8,11 +8,23 @@ import UserSearchInput from '@/components/UserSearchInput'
 import { buildSearchHref, parseSearchExpression } from '@/lib/searchParams'
 import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { AskShortcutChip } from '@/components/AskShortcutChip'
 
 export default function HeaderSearch() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const searchHref = buildSearchHref(query)
+
+  const ask = () => {
+    if (!query.trim()) return
+    capturePostHogEvent('search_interface_action', {
+      action: 'ask_from_search',
+      has_query: true,
+      active_filter_count: Object.keys(parseSearchExpression(query).options)
+        .length,
+    })
+    router.push(buildAskHref(query))
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,7 +56,7 @@ export default function HeaderSearch() {
             placeholder="Search tweets..."
             value={query}
             onValueChange={setQuery}
-            className="h-9 w-40 border-border bg-muted py-1.5 pl-8 pr-3 text-sm focus:ring-brand lg:w-56"
+            className={`h-9 w-40 border-border bg-muted py-1.5 pl-8 text-sm focus:ring-brand lg:w-56 ${query.trim() ? 'pr-16' : 'pr-3'}`}
             aria-label="Search Community Archive"
             aria-keyshortcuts="Control+Enter Meta+Enter"
             title="Enter to search · Ctrl or ⌘ + Enter to ask the archive"
@@ -52,16 +64,15 @@ export default function HeaderSearch() {
             onKeyDownCapture={(event) => {
               if (!isAskShortcut(event) || !query.trim()) return
               event.preventDefault()
-              capturePostHogEvent('search_interface_action', {
-                action: 'ask_from_search',
-                has_query: true,
-                active_filter_count: Object.keys(
-                  parseSearchExpression(query).options,
-                ).length,
-              })
-              router.push(buildAskHref(query))
+              ask()
             }}
           />
+          {query.trim() && (
+            <AskShortcutChip
+              onAsk={ask}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2"
+            />
+          )}
         </div>
       </form>
     </>

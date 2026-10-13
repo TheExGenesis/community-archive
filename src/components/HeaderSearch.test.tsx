@@ -43,3 +43,16 @@ test('⌘↵ or Ctrl↵ in the header box asks; an empty box does nothing', () =
     '/search/ask?q=who+writes+about+singapore',
   )
 })
+
+test('the header box shows an Ask chip once it has text, which asks', () => {
+  render(<HeaderSearch />)
+  expect(
+    screen.queryByRole('button', { name: 'Ask the archive instead' }),
+  ).toBeNull()
+  const box = screen.getByRole('textbox', { name: 'Search Community Archive' })
+  fireEvent.change(box, { target: { value: 'singapore' } })
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Ask the archive instead' }),
+  )
+  expect(mockPush).toHaveBeenCalledWith('/search/ask?q=singapore')
+})

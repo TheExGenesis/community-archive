@@ -260,3 +260,28 @@ describe('EnvLanguageModel usage recording', () => {
     )
   })
 })
+
+test('the usage recorder survives this module being evaluated again', async () => {
+  const recorder = jest.fn().mockResolvedValue(undefined)
+  setModelUsageRecorder(recorder)
+  let fresh: typeof import('./model') | undefined
+  jest.isolateModules(() => {
+    fresh = jest.requireActual('./model') as typeof import('./model')
+  })
+  const doStream = jest.fn().mockResolvedValue({
+    stream: new ReadableStream({
+      start(controller) {
+        controller.enqueue({ type: 'finish', usage: {}, finishReason: 'stop' })
+        controller.close()
+      },
+    }),
+  })
+  ;(createOpenAI as jest.Mock).mockReturnValue(() => ({ doStream }))
+  process.env.OPENAI_API_KEY = 'test-key'
+  const model = new fresh!.EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1')
+  const reader = (await model.doStream({})).stream.getReader()
+  while (!(await reader.read()).done);
+  expect(recorder).toHaveBeenCalled()
+  setModelUsageRecorder(null)
+  delete process.env.OPENAI_API_KEY
+})

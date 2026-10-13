@@ -233,12 +233,19 @@ type ModelUsageRecorder = (
 
 // usage.ts registers the recorder when it loads. This module is also part of
 // the sandboxed workflow body, which may not import the run store (Node fs),
-// so it cannot import usage.ts itself.
-let modelUsageRecorder: ModelUsageRecorder | null = null
+// so it cannot import usage.ts itself. The recorder lives on globalThis, not
+// in a module variable: when this module is evaluated again (a dev server
+// recompiling mid-run did this) while usage.ts is not, a module variable
+// would be empty and every later model call would fail.
+const RECORDER_KEY = Symbol.for('community-archive.agentSearch.usageRecorder')
+type RecorderHolder = { [RECORDER_KEY]?: ModelUsageRecorder | null }
 
 export function setModelUsageRecorder(recorder: ModelUsageRecorder | null) {
-  modelUsageRecorder = recorder
+  ;(globalThis as RecorderHolder)[RECORDER_KEY] = recorder
 }
+
+const modelUsageRecorder = () =>
+  (globalThis as RecorderHolder)[RECORDER_KEY] ?? null
 
 async function recordModelCallUsage(
   runId: string,
@@ -247,11 +254,12 @@ async function recordModelCallUsage(
   detail: ModelCallDetail,
 ) {
   // Fail closed: a model call that cannot be counted must not pass silently.
-  if (!modelUsageRecorder) {
+  const recorder = modelUsageRecorder()
+  if (!recorder) {
     throw new Error('Agent search usage recorder is not registered')
   }
   const outputTokens = (usage as Record<string, unknown> | null)?.outputTokens
-  await modelUsageRecorder(runId, spec, readModelCallUsage(usage), {
+  await recorder(runId, spec, readModelCallUsage(usage), {
     ...detail,
     reasoningTokens: tokenCount(outputTokens, 'reasoning'),
   })

@@ -634,6 +634,7 @@ export default function AgentSearch({
                       startedAt={runStartedAt ?? Date.now()}
                       found={view.foundSoFar}
                       writing={Boolean(view.answer.markdown.trim())}
+                      steps={view.progress}
                       onStop={stopFromStatus}
                     />
                   )}

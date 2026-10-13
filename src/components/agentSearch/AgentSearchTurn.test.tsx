@@ -45,7 +45,7 @@ const search = (state: string, output?: unknown) =>
     ...(output ? { output } : {}),
   }) as unknown as UIMessage['parts'][number]
 
-test('shows live progress while the agent is still searching', () => {
+test('leaves live progress to the status above while the agent searches', () => {
   const messages: UIMessage[] = [
     { id: 'a1', role: 'assistant', parts: [search('input-available')] },
   ]
@@ -55,11 +55,7 @@ test('shows live progress while the agent is still searching', () => {
       active
     />,
   )
-  expect(screen.getByLabelText('Search progress')).toHaveAttribute(
-    'aria-live',
-    'polite',
-  )
-  expect(screen.getByText('Searching “community archive”')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Search progress')).not.toBeInTheDocument()
   expect(screen.queryByText('How this was searched')).not.toBeInTheDocument()
 })
 
@@ -79,13 +75,6 @@ test('renders the receipt, cited tweets, unverified note, evidence tabs and cove
   ]
   render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
 
-  expect(
-    screen.getByRole('button', { name: 'Based on 1 cited post' }),
-  ).toBeInTheDocument()
-  expect(
-    screen.getByRole('button', { name: '1 more judged relevant' }),
-  ).toBeInTheDocument()
-
   const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
   expect(cited).toHaveTextContent('Post 1')
   expect(document.getElementById('ask-a1-tweet-1')).toBeInTheDocument()
@@ -97,7 +86,7 @@ test('renders the receipt, cited tweets, unverified note, evidence tabs and cove
   ).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByText('Post 2')).toBeInTheDocument()
   expect(screen.queryByText('Post 3')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: '1 other match' }))
+  fireEvent.mouseDown(screen.getByRole('tab', { name: 'Other matches (1)' }))
   expect(screen.getByText('Post 3')).toBeInTheDocument()
 
   // One note says how it searched; the step list is gone once answered.

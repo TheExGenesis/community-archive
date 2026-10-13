@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { AnswerMarkdown } from './AnswerMarkdown'
 import {
   CitationContext,
@@ -14,52 +14,9 @@ import { EvidenceBoundary } from './EvidenceBoundary'
 import { EvidenceTabs, type EvidenceTab } from './EvidenceTabs'
 import {
   NOT_SEARCHED_LINE,
-  receiptSegments,
   type CoverageView,
-  type ProgressLine,
-  type ReceiptTarget,
   type TurnView,
 } from './messageView'
-
-export function ProgressList({
-  lines,
-  active,
-}: {
-  lines: ProgressLine[]
-  active: boolean
-}) {
-  const list = (
-    <ol className="space-y-1.5 text-sm text-muted-foreground">
-      {lines.map((line) => (
-        <li key={line.id} className="flex items-start gap-2">
-          {line.status === 'running' ? (
-            <Loader2
-              aria-hidden="true"
-              className="mt-0.5 h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none"
-            />
-          ) : line.status === 'error' ? (
-            <AlertCircle
-              aria-hidden="true"
-              className="mt-0.5 h-4 w-4 shrink-0 text-destructive"
-            />
-          ) : (
-            <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-          )}
-          <span className="min-w-0 break-words">{line.text}</span>
-        </li>
-      ))}
-    </ol>
-  )
-
-  // While the agent works, this lists what it did; afterwards the same
-  // ground is covered by How this was searched under the evidence.
-  if (!active) return null
-  return (
-    <div aria-live="polite" aria-label="Search progress">
-      {lines.length > 0 && list}
-    </div>
-  )
-}
 
 export function CoverageBlock({ coverage }: { coverage: CoverageView }) {
   const nothingRan =
@@ -118,37 +75,6 @@ export function CoverageBlock({ coverage }: { coverage: CoverageView }) {
       )}
       <p>{NOT_SEARCHED_LINE}.</p>
     </section>
-  )
-}
-
-/** One muted line under the question: what the answer rests on. */
-function Receipt({
-  receipt,
-  onSelect,
-}: {
-  receipt: TurnView['receipt']
-  onSelect: (target: ReceiptTarget) => void
-}) {
-  const segments = receiptSegments(receipt)
-  return (
-    <p className="text-sm text-muted-foreground">
-      {segments.map((segment, index) => (
-        <span key={segment.text}>
-          {index > 0 && <span aria-hidden="true"> · </span>}
-          {segment.target ? (
-            <button
-              type="button"
-              onClick={() => onSelect(segment.target as ReceiptTarget)}
-              className="rounded-sm underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {segment.text}
-            </button>
-          ) : (
-            segment.text
-          )}
-        </span>
-      ))}
-    </p>
   )
 }
 
@@ -251,7 +177,7 @@ export function AgentSearchTurn({
     return () => observer.disconnect()
   }, [answerKey])
 
-  const showTier = (target: ReceiptTarget) => {
+  const showTier = (target: EvidenceTab) => {
     // Cited posts are in the rail on wide screens and a tab on phones.
     if (target === 'cited' && window.matchMedia(RAIL_MEDIA).matches) {
       citedRef.current?.scrollIntoView({ block: 'start' })
@@ -274,9 +200,6 @@ export function AgentSearchTurn({
     <CitationContext.Provider value={links}>
       <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
         <div className="min-w-0 space-y-5 lg:col-start-1">
-          {!active && <Receipt receipt={view.receipt} onSelect={showTier} />}
-          <ProgressList lines={view.progress} active={active && !hasAnswer} />
-
           {hasAnswer && (
             <div
               ref={answerRef}

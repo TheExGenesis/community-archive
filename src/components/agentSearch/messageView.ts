@@ -3,7 +3,11 @@
 // progress lines, citation numbering, unverified ids, and the coverage note.
 
 import type { UIMessage } from 'ai'
-import { CITATION_PATTERN } from '@/lib/agentSearch/citations'
+import {
+  CITATION_PATTERN,
+  collectWorkspaceFiles,
+  splitPostLists,
+} from '@/lib/agentSearch/citations'
 import type { PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 
 export const NOT_SEARCHED_LINE =
@@ -34,11 +38,22 @@ export interface Citation {
   anchor: string
 }
 
+/** Prose, or a list of posts the agent placed in the answer. */
+export type AnswerBlock =
+  | { kind: 'text'; markdown: string }
+  | { kind: 'list'; key: string; label: string; tweets: PortalTweet[] }
+
 export interface AnswerView {
-  /** Answer markdown with each marker rewritten to a citation-chip link. */
+  /** The prose, each marker rewritten to a citation-chip link; no lists. */
   markdown: string
+  /** The answer in order: prose blocks and post lists. */
+  blocks: AnswerBlock[]
   citations: Citation[]
+  /** Ids shown in the answer's post lists. */
+  listed: string[]
   unverified: string[]
+  /** Workspace files a list named that no tool reported. */
+  missingLists: string[]
 }
 
 export interface CoverageSearch {
@@ -82,6 +97,8 @@ export type TurnOutcome = 'done' | 'stopped' | 'failed'
 
 export interface TurnView {
   outcome: TurnOutcome
+  /** Failed with every tool call failing: the archive search was down. */
+  unavailable: boolean
   progress: ProgressLine[]
   answer: AnswerView
   /** Found posts judged relevant (p >= 0.5) that the answer does not cite. */
@@ -284,7 +301,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
       if (subject) {
         running = `Searching ${subject}`
         finished = `Searched ${subject} · ${tweets}`
-        failure = `Search for ${subject} failed`
+        failure = `Could not search ${subject}`
       } else {
         const qualifiers = searchQualifiers(input)
         const what = qualifiers.length
@@ -292,7 +309,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
           : 'recent posts'
         running = `Browsing ${what}`
         finished = `Browsed ${what} · ${tweets}`
-        failure = `Browsing ${what} failed`
+        failure = `Could not browse ${what}`
       }
       break
     }
@@ -306,7 +323,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
       finished = `Checked ${plural(asNumber(out.scored) ?? 0, 'post')} matching ${subject} · ${collectKept(
         out,
       )} relevant${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-post limit` : ''}`
-      failure = `Checking posts matching ${subject} failed`
+      failure = `Could not check posts matching ${subject}`
       break
     }
     case 'score_tweets': {
@@ -316,7 +333,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
       finished = `Checked ${plural(scored.length, 'post')} against your question · ${keptCount(
         scored,
       )} relevant`
-      failure = 'Checking posts against your question failed'
+      failure = 'Could not check posts against your question'
       break
     }
     case 'get_thread': {
@@ -342,7 +359,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
     default:
       running = `Running ${call.name}`
       finished = `Ran ${call.name}`
-      failure = `${call.name} failed`
+      failure = `Could not run ${call.name}`
   }
 
   return {
@@ -352,8 +369,53 @@ export function progressLine(call: ToolCallView): ProgressLine {
   }
 }
 
+// Models fill unused optional fields with '' or []; two calls that differ only
+// there are the same call.
+function callKey(call: ToolCallView) {
+  const meaningful = Object.keys(call.input)
+    .sort()
+    .filter((key) => {
+      const value = call.input[key]
+      return !(
+        value === undefined ||
+        value === null ||
+        value === '' ||
+        (Array.isArray(value) && value.length === 0)
+      )
+    })
+    .map((key) => [key, call.input[key]])
+  return `${call.name}:${JSON.stringify(meaningful)}`
+}
+
+/**
+ * One line per distinct call. A retried call is one line, not one per
+ * attempt: its result once it succeeds, the attempt under way if one is, or
+ * the failure with how many times it was tried.
+ */
+export function progressFor(calls: ToolCallView[]): ProgressLine[] {
+  const groups = new Map<string, ToolCallView[]>()
+  for (const call of calls) {
+    const key = callKey(call)
+    groups.set(key, [...(groups.get(key) ?? []), call])
+  }
+  return Array.from(groups.values()).map((group) => {
+    const done = [...group]
+      .reverse()
+      .find((call) => call.state === 'output-available')
+    const running = group.find(
+      (call) =>
+        call.state !== 'output-available' && call.state !== 'output-error',
+    )
+    const line = progressLine(done ?? running ?? group[group.length - 1])
+    if (!done && !running && group.length > 1) {
+      line.text += ` · tried ${group.length === 2 ? 'twice' : `${group.length} times`}`
+    }
+    return { ...line, id: group[0].id }
+  })
+}
+
 export function progressLines(message: UIMessage): ProgressLine[] {
-  return toolCalls(message).map(progressLine)
+  return progressFor(toolCalls(message))
 }
 
 export interface FoundTweets {
@@ -363,6 +425,8 @@ export interface FoundTweets {
   results: string[]
   /** Highest classifier probability seen per id. */
   scores: Map<string, number>
+  /** Workspace files the tools reported, path to ids (latest write wins). */
+  files: Map<string, string[]>
 }
 
 function quotedAsPortal(tweet: PortalQuotedTweet): PortalTweet {
@@ -445,7 +509,7 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
   }
 
   outputs.forEach((output) => visit(output, false))
-  return { byId, results, scores }
+  return { byId, results, scores, files: collectWorkspaceFiles(outputs) }
 }
 
 export function citationAnchor(scope: string, tweetId: string) {
@@ -455,8 +519,11 @@ export function citationAnchor(scope: string, tweetId: string) {
 export const UNVERIFIED_HREF_PREFIX = '#ask-unverified-'
 
 /** A partial marker at the end of a streaming answer would flash as raw text. */
+// While streaming, an unfinished marker would flash as raw syntax.
 function trimPartialMarker(text: string) {
-  return text.replace(/\[(?:\[(?:t(?::\d*)?)?)?\]?$/, '')
+  return text
+    .replace(/\[\[posts:[^\]]*\]?$/, '')
+    .replace(/\[(?:\[(?:t(?::\d*)?)?)?\]?$/, '')
 }
 
 /**
@@ -473,30 +540,74 @@ export function buildAnswer(
   const source = options.streaming ? trimPartialMarker(text) : text
   const citations: Citation[] = []
   const unverified: string[] = []
-  const markdown = source.replace(
-    new RegExp(CITATION_PATTERN.source, 'g'),
-    (_marker, id: string, offset: number) => {
-      // Chips need a gap from the word or chip before them, but no double space.
-      const gap = offset > 0 && !/\s/.test(source[offset - 1]) ? ' ' : ''
+  const listed: string[] = []
+  const missingLists: string[] = []
+  const cite = (prose: string) =>
+    prose.replace(
+      new RegExp(CITATION_PATTERN.source, 'g'),
+      (_marker, id: string, offset: number) => {
+        // Chips need a gap from the word or chip before them, but no double space.
+        const gap = offset > 0 && !/\s/.test(prose[offset - 1]) ? ' ' : ''
+        const tweet = found.byId.get(id)
+        if (!tweet) {
+          if (!unverified.includes(id)) unverified.push(id)
+          return `${gap}[unverified](${UNVERIFIED_HREF_PREFIX}${id})`
+        }
+        let citation = citations.find((item) => item.id === id)
+        if (!citation) {
+          citation = {
+            id,
+            n: citations.length + 1,
+            tweet,
+            anchor: citationAnchor(scope, id),
+          }
+          citations.push(citation)
+        }
+        return `${gap}[${citation.n}](#${citation.anchor})`
+      },
+    )
+
+  const blocks: AnswerBlock[] = []
+  splitPostLists(source).forEach((part, index) => {
+    if (part.type === 'text') {
+      if (part.value.trim()) {
+        blocks.push({ kind: 'text', markdown: cite(part.value) })
+      }
+      return
+    }
+    // A list naming a workspace file no tool reported is not shown, and
+    // named. Ids no tool returned are dropped from the list and named as
+    // unverified, as citations are; a list left empty is not shown.
+    const ids = part.path ? found.files.get(part.path) : part.ids
+    if (!ids) {
+      if (part.path && !missingLists.includes(part.path)) {
+        missingLists.push(part.path)
+      }
+      return
+    }
+    const tweets: PortalTweet[] = []
+    for (const id of ids) {
       const tweet = found.byId.get(id)
       if (!tweet) {
         if (!unverified.includes(id)) unverified.push(id)
-        return `${gap}[unverified](${UNVERIFIED_HREF_PREFIX}${id})`
+        continue
       }
-      let citation = citations.find((item) => item.id === id)
-      if (!citation) {
-        citation = {
-          id,
-          n: citations.length + 1,
-          tweet,
-          anchor: citationAnchor(scope, id),
-        }
-        citations.push(citation)
-      }
-      return `${gap}[${citation.n}](#${citation.anchor})`
-    },
-  )
-  return { markdown, citations, unverified }
+      tweets.push(tweet)
+      if (!listed.includes(id)) listed.push(id)
+    }
+    if (tweets.length) {
+      blocks.push({
+        kind: 'list',
+        key: `${scope}-list-${index}`,
+        label: part.label,
+        tweets,
+      })
+    }
+  })
+  const markdown = blocks
+    .flatMap((block) => (block.kind === 'text' ? [block.markdown] : []))
+    .join('\n\n')
+  return { markdown, blocks, citations, listed, unverified, missingLists }
 }
 
 /**
@@ -613,7 +724,8 @@ export function messageText(message: UIMessage): string {
 
 /**
  * The answer is the text after the last tool call; earlier text is the
- * model thinking aloud between searches. Falls back to all text.
+ * model thinking aloud between searches ("I'll look for…"), never the
+ * answer. A turn that called no tools (a clarifying question) is all text.
  */
 export function answerText(message: UIMessage): string {
   const parts = message.parts
@@ -622,11 +734,10 @@ export function answerText(message: UIMessage): string {
     if (part.type === 'dynamic-tool' || part.type.startsWith('tool-'))
       lastTool = index
   })
-  const after = parts
+  return parts
     .slice(lastTool + 1)
     .map((part) => (part.type === 'text' ? part.text : ''))
     .join('')
-  return after.trim() ? after : messageText(message)
 }
 
 /**
@@ -647,16 +758,27 @@ export function buildTurnView(
     .flatMap((item) => toolCalls(item).map((call) => call.output))
   const ownOutputs = calls.map((call) => call.output)
   const found = collectToolTweets([...ownOutputs, ...priorOutputs])
+  // Files in time order, so this turn's latest write of a path wins.
+  found.files = collectWorkspaceFiles([...priorOutputs, ...ownOutputs])
   const own = collectToolTweets(ownOutputs)
   const text = answerText(message)
-  const outcome = turnOutcome(text)
+  let outcome = turnOutcome(text)
+  // A finished turn with no answer did not finish properly, however the
+  // stream ended.
+  if (outcome === 'done' && !options.streaming && !text.trim()) {
+    outcome = 'failed'
+  }
   const answer = buildAnswer(
     outcome === 'done' ? text : '',
     found,
     message.id,
     options,
   )
-  const cited = new Set(answer.citations.map((citation) => citation.id))
+  // Sources below the answer hold what the answer neither cites nor lists.
+  const cited = new Set([
+    ...answer.citations.map((citation) => citation.id),
+    ...answer.listed,
+  ])
   const uncited = orderByScore(
     own.results.filter((id) => !cited.has(id)),
     own.scores,
@@ -690,7 +812,11 @@ export function buildTurnView(
 
   return {
     outcome,
-    progress: calls.map(progressLine),
+    unavailable:
+      outcome === 'failed' &&
+      calls.length > 0 &&
+      calls.every((call) => call.state === 'output-error'),
+    progress: progressFor(calls),
     answer,
     relevant,
     relevantNotShown,
@@ -746,49 +872,6 @@ function evidenceGroups(
     return tweets.length ? [{ label, tweets }] : []
   })
   return groups.length ? groups : null
-}
-
-export type ReceiptTarget = 'cited' | 'relevant' | 'other'
-
-/** One line under the question; each count can link to its tier. */
-export function receiptSegments(
-  receipt: ReceiptView,
-): Array<{ text: string; target: ReceiptTarget | null }> {
-  const segments: Array<{ text: string; target: ReceiptTarget | null }> = [
-    receipt.cited
-      ? {
-          text: `Based on ${plural(receipt.cited, 'cited post')}`,
-          target: 'cited',
-        }
-      : { text: 'No posts cited', target: null },
-  ]
-  if (receipt.scorerRan && receipt.relevant) {
-    segments.push({
-      text: `${receipt.relevant.toLocaleString('en-US')} more judged relevant`,
-      target: 'relevant',
-    })
-  }
-  if (receipt.other) {
-    const matches = `${receipt.other.toLocaleString('en-US')} other ${
-      receipt.other === 1 ? 'match' : 'matches'
-    }`
-    segments.push({
-      text:
-        !receipt.scorerRan && receipt.searches
-          ? `${matches} from ${receipt.searches} ${
-              receipt.searches === 1 ? 'search' : 'searches'
-            }`
-          : matches,
-      target: 'other',
-    })
-  }
-  if (receipt.cappedAt) {
-    segments.push({
-      text: `stopped at the ${receipt.cappedAt.toLocaleString('en-US')}-post limit`,
-      target: null,
-    })
-  }
-  return segments
 }
 
 /** Scored posts first, highest probability first; the rest keep search order. */

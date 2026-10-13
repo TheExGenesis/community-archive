@@ -10,7 +10,6 @@ import {
   describeChatError,
   formatElapsed,
   progressLines,
-  receiptSegments,
   searchSubject,
   toolCalls,
 } from './messageView'
@@ -470,27 +469,7 @@ describe('buildTurnView', () => {
     const view = buildTurnView(messages, 0)
     expect(view.relevant.map((t) => t.id)).toEqual(['2'])
     expect(view.relevantNotShown).toBe(3)
-    expect(receiptSegments(view.receipt).map((s) => s.text)).toEqual([
-      'Based on 1 cited post',
-      '4 more judged relevant',
-      'stopped at the 300-post limit',
-    ])
-  })
-
-  test('describes coverage without a scorer as matches from searches', () => {
-    expect(
-      receiptSegments({
-        cited: 22,
-        relevant: 0,
-        other: 130,
-        searches: 4,
-        scorerRan: false,
-        cappedAt: null,
-      }),
-    ).toEqual([
-      { text: 'Based on 22 cited posts', target: 'cited' },
-      { text: '130 other matches from 4 searches', target: 'other' },
-    ])
+    expect(view.receipt).toMatchObject({ cited: 1, relevant: 4, cappedAt: 300 })
   })
 
   test('reads a saved stopped or failed run as an outcome, not as answer text', () => {
@@ -568,5 +547,98 @@ describe('describeChatError', () => {
         resetLabel: '4:00 AM',
       }),
     ).toBe('You’ve used today’s 4 questions. You can ask again at 4:00 AM.')
+  })
+})
+
+describe('progress and answers with lists', () => {
+  test('shows a retried call once: its result, or how often it failed', () => {
+    const failed = (query: string) =>
+      toolPart(
+        'search_tweets',
+        { query, fromUser: '' },
+        undefined,
+        'output-error',
+      )
+    const lines = buildTurnView(
+      [
+        assistant('a1', [
+          failed('singapore'),
+          toolPart(
+            'search_tweets',
+            { query: 'singapore', anyOf: [] },
+            undefined,
+            'output-error',
+          ),
+          failed('sg'),
+          toolPart('search_tweets', { query: 'sg' }, { tweets: [tweet('1')] }),
+        ]),
+      ],
+      0,
+    ).progress
+    expect(lines.map((line) => [line.status, line.text])).toEqual([
+      ['error', 'Could not search “singapore” · tried twice'],
+      ['done', 'Searched “sg” · 1 tweet'],
+    ])
+  })
+
+  test('a finished turn whose every call failed is the archive being down', () => {
+    const view = buildTurnView(
+      [
+        assistant('a1', [
+          text('I will look for people.'),
+          toolPart('search_tweets', { query: 'x' }, undefined, 'output-error'),
+        ]),
+      ],
+      0,
+    )
+    expect(view.outcome).toBe('failed')
+    expect(view.unavailable).toBe(true)
+    expect(view.answer.markdown).toBe('')
+  })
+
+  test('builds answer blocks from lists of ids and workspace files', () => {
+    const view = buildTurnView(
+      [
+        assistant('a1', [
+          toolPart(
+            'search_tweets',
+            { query: 'x' },
+            {
+              tweets: [tweet('1'), tweet('2'), tweet('3')],
+              files: { 'lists/a.jsonl': ['2', '3'] },
+            },
+          ),
+          text(
+            'Some [[t:1]]\n[[posts: Group | lists/a.jsonl]]\n[[posts: Ids | 1, 99]]\n[[posts: Gone | lists/none.jsonl]]',
+          ),
+        ]),
+      ],
+      0,
+    )
+    const { answer } = view
+    expect(answer.blocks.map((block) => block.kind)).toEqual([
+      'text',
+      'list',
+      'list',
+    ])
+    expect(
+      answer.blocks.flatMap((block) =>
+        block.kind === 'list' ? [block.tweets.map((t) => t.id)] : [],
+      ),
+    ).toEqual([['2', '3'], ['1']])
+    expect(answer.listed).toEqual(['2', '3', '1'])
+    expect(answer.unverified).toEqual(['99'])
+    expect(answer.missingLists).toEqual(['lists/none.jsonl'])
+    // Listed and cited tweets are not repeated below the answer.
+    expect(view.otherMatches).toEqual([])
+  })
+
+  test('hides an unfinished list marker while streaming', () => {
+    const view = buildTurnView(
+      [assistant('a1', [text('Here [[posts: Liv')])],
+      0,
+      { streaming: true },
+    )
+    expect(view.answer.markdown).toBe('Here ')
   })
 })

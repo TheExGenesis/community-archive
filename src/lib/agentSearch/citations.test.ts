@@ -1,7 +1,9 @@
 import {
   collectToolTweetIds,
+  collectWorkspaceFiles,
   extractCitationIds,
   splitCitations,
+  splitPostLists,
   validateCitations,
 } from './citations'
 
@@ -40,5 +42,36 @@ describe('agent search citations', () => {
       { type: 'cite', id: '1' },
       { type: 'text', value: '!' },
     ])
+  })
+
+  test('reads post lists of ids or workspace files, and validates every id', () => {
+    const text =
+      'Intro [[t:1]]\n[[posts: Living there | 2, 3, 2]]\nThen [[posts:  | lists/a.jsonl]] end'
+    expect(splitPostLists(text)).toEqual([
+      { type: 'text', value: 'Intro [[t:1]]\n' },
+      { type: 'list', label: 'Living there', ids: ['2', '3'], path: null },
+      { type: 'text', value: '\nThen ' },
+      { type: 'list', label: 'Posts', ids: [], path: 'lists/a.jsonl' },
+      { type: 'text', value: ' end' },
+    ])
+    const files = new Map([['lists/a.jsonl', ['4', '9']]])
+    expect(extractCitationIds(text, files)).toEqual(['1', '2', '3', '4', '9'])
+    expect(validateCitations(text, ['1', '2', '3', '4'], files)).toEqual({
+      cited: ['1', '2', '3', '4'],
+      invalid: ['9'],
+    })
+  })
+
+  test('refuses unsafe workspace paths and keeps the latest write of a file', () => {
+    expect(splitPostLists('[[posts: x | ../etc/passwd]]')[0]).toMatchObject({
+      ids: [],
+      path: null,
+    })
+    expect(
+      collectWorkspaceFiles([
+        { files: { 'a.jsonl': ['1'] } },
+        { files: { 'a.jsonl': ['2', 'x'], '../b': ['3'] } },
+      ]),
+    ).toEqual(new Map([['a.jsonl', ['2']]]))
   })
 })

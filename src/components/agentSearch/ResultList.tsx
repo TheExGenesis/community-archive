@@ -5,7 +5,9 @@ import TweetCard from '@/components/TweetCard'
 import { TWEETS_VIEW, type ListView } from '@/lib/agentSearch/listView'
 import type { PortalTweet } from '@/lib/portal/types'
 import { GroupingToggle, type Grouping } from './GroupingToggle'
+import { DEFAULT_SORT, sortTweets, type ListSort } from './listSort'
 import type { Citation } from './messageView'
+import { SortLinks } from './SortLinks'
 import { PeopleList, TweetRowList } from './TweetRows'
 
 /** A list shows this many rows before the rest fold. */
@@ -26,11 +28,14 @@ export function ResultList({
   tweets,
   citations,
   view = TWEETS_VIEW,
+  scores,
 }: {
   label: string | null
   tweets: PortalTweet[]
   citations: ReadonlyMap<string, number>
   view?: ListView
+  /** The relevance check's probability per tweet, when it scored them. */
+  scores?: ReadonlyMap<string, number>
 }) {
   const authors = useMemo(
     () => new Set(tweets.map((tweet) => tweet.username)).size,
@@ -38,6 +43,14 @@ export function ResultList({
   )
   const [grouping, setGrouping] = useState<Grouping>(
     view.kind === 'people' && authors > 1 ? 'people' : 'tweets',
+  )
+  const [sort, setSort] = useState<ListSort>(DEFAULT_SORT)
+  // Most tweets only means something once tweets are grouped by person.
+  const sortKey: ListSort =
+    grouping === 'tweets' && sort.key === 'count' ? DEFAULT_SORT : sort
+  const sorted = useMemo(
+    () => sortTweets(tweets, sortKey, scores),
+    [tweets, sortKey, scores],
   )
   // Switched to people from a tweets list, each person shows their tweets;
   // the agent's own people view keeps the showcase it asked for.
@@ -50,10 +63,13 @@ export function ResultList({
         label={name}
         citations={citations}
         showcase={showcase}
+        sort={sortKey}
+        scores={scores}
       />
     ) : (
       <TweetRowList
-        tweets={tweets}
+        key={`${sortKey.key}-${sortKey.ascending}`}
+        tweets={sorted}
         first={label === null ? INLINE_ROWS : FIRST_ROWS}
         step={tweets.length}
         label={name}
@@ -75,13 +91,26 @@ export function ResultList({
             {authors > 1 && ` · ${authors.toLocaleString('en-US')} people`}
           </span>
         </h3>
-        {authors > 1 && (
-          <GroupingToggle
-            value={grouping}
-            onChange={setGrouping}
-            label={`Show ${label} as`}
-          />
-        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {count > 1 && (
+            <SortLinks
+              options={
+                grouping === 'people'
+                  ? ['relevance', 'count', 'date']
+                  : ['relevance', 'date']
+              }
+              value={sortKey}
+              onChange={setSort}
+            />
+          )}
+          {authors > 1 && (
+            <GroupingToggle
+              value={grouping}
+              onChange={setGrouping}
+              label={`Show ${label} as`}
+            />
+          )}
+        </div>
       </div>
       {body}
     </section>

@@ -91,3 +91,35 @@ test('a list with no label sits in the prose: no heading and no switch', () => {
   expect(screen.queryByRole('button', { name: 'People' })).toBeNull()
   expect(screen.getByRole('list', { name: 'Tweets' })).toBeInTheDocument()
 })
+
+test('a list sorts by relevance by default and can sort by date', () => {
+  const scored = [tweet('1', 'bob'), tweet('2', 'alice')]
+  scored[0].createdAt = '2025-03-01T00:00:00.000Z'
+  render(
+    <ResultList
+      label="Scored"
+      tweets={scored}
+      citations={noCitations}
+      scores={
+        new Map([
+          ['2', 0.9],
+          ['1', 0.3],
+        ])
+      }
+    />,
+  )
+  const rows = () =>
+    screen.getAllByText(/^Tweet \d by/).map((el) => el.textContent)
+  expect(
+    screen.getByRole('button', { name: /Sort by relevance/ }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  expect(rows()).toEqual(['Tweet 2 by alice', 'Tweet 1 by bob'])
+  fireEvent.click(screen.getByRole('button', { name: 'Sort by date' }))
+  expect(rows()).toEqual(['Tweet 1 by bob', 'Tweet 2 by alice'])
+  // Most tweets only appears once the list is grouped by person.
+  expect(screen.queryByRole('button', { name: /most tweets/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'People' }))
+  expect(
+    screen.getByRole('button', { name: /Sort by most tweets/ }),
+  ).toBeInTheDocument()
+})

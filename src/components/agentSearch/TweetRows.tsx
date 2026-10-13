@@ -5,6 +5,7 @@ import { ChevronDown, Plus } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { TweetAvatar } from '@/components/TweetAvatar'
 import type { PortalTweet } from '@/lib/portal/types'
+import { sortPeople, type ListSort } from './listSort'
 
 const monthFormat = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -224,14 +225,23 @@ export interface Person {
  * author's first tweet, and each author keeps their tweets' order.
  */
 export function groupByPerson(tweets: PortalTweet[]): Person[] {
+  return sortPeople(groupInOrder(tweets), COUNT_SORT)
+}
+
+/** Groups tweets by author in the order each author first appears. */
+function groupInOrder(tweets: PortalTweet[]): Person[] {
   const groups = new Map<string, PortalTweet[]>()
   for (const tweet of tweets) {
     groups.set(tweet.username, [...(groups.get(tweet.username) ?? []), tweet])
   }
-  return Array.from(groups.entries())
-    .map(([username, list]) => ({ username, name: list[0].name, tweets: list }))
-    .sort((a, b) => b.tweets.length - a.tweets.length)
+  return Array.from(groups.entries()).map(([username, list]) => ({
+    username,
+    name: list[0].name,
+    tweets: list,
+  }))
 }
+
+const COUNT_SORT: ListSort = { key: 'count', ascending: false }
 
 const tweetCount = (n: number) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? 'tweet' : 'tweets'}`
@@ -346,13 +356,21 @@ export function PeopleList({
   label,
   citations,
   showcase = 0,
+  sort = COUNT_SORT,
+  scores,
 }: {
   tweets: PortalTweet[]
   label: string
   citations?: ReadonlyMap<string, number>
   showcase?: number | 'all'
+  /** Order of the people, and of each person's tweets (listSort.ts). */
+  sort?: ListSort
+  scores?: ReadonlyMap<string, number>
 }) {
-  const people = useMemo(() => groupByPerson(tweets), [tweets])
+  const people = useMemo(
+    () => sortPeople(groupInOrder(tweets), sort, scores),
+    [tweets, sort, scores],
+  )
   const [shown, setShown] = useState(FIRST_PEOPLE)
   const left = people.length - shown
   const numbered = tweets.some((tweet) => citations?.has(tweet.id))

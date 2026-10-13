@@ -24,7 +24,10 @@ const firstLine = (text: string) =>
     .find(Boolean) ?? ''
 
 const ROW_CLASS =
-  'flex min-h-[3rem] w-full items-center gap-3 px-1 py-2 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring'
+  'flex min-h-[3rem] w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring'
+// Under a person's name: one line per tweet, no rules between them.
+const NESTED_ROW_CLASS =
+  'flex min-h-[2.25rem] w-full items-center gap-3 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring'
 
 /**
  * One tweet as a row led by what it says, with who and when in small type,
@@ -35,14 +38,14 @@ export function TweetRow({
   tweet,
   citation,
   numbered = citation !== undefined,
-  hideAuthor = false,
+  nested = false,
 }: {
   tweet: PortalTweet
   citation?: number
   /** Keep the number's place even when this tweet is not cited. */
   numbered?: boolean
-  /** Under a person's name, the row need not say who again. */
-  hideAuthor?: boolean
+  /** Under a person's name: a lighter row that need not say who again. */
+  nested?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = useId()
@@ -72,14 +75,24 @@ export function TweetRow({
     </span>
   )
   return (
-    <li className="border-b border-border">
+    <li className={nested ? '' : 'border-b border-border'}>
       {open ? (
-        <div id={bodyId} className="flex items-start gap-2 py-1 pl-1 pr-1">
-          {chip && <div className="pt-3">{chip}</div>}
-          <div className="min-w-0 flex-1">
+        // The open card keeps the row's geometry: its avatar, the citation
+        // number and the collapse button sit where the row's avatar, number
+        // and expand button were.
+        <div
+          id={bodyId}
+          className={`flex items-start gap-3 ${nested ? 'px-2' : 'px-4'}`}
+        >
+          {chip && <div className={nested ? 'pt-2' : 'pt-[14px]'}>{chip}</div>}
+          <div
+            className={`min-w-0 flex-1 [&>article]:pl-0 [&>article]:pr-0 ${
+              nested ? '[&>article]:pt-px' : '[&>article]:pt-[7px]'
+            }`}
+          >
             <TweetCard tweet={tweet} showDate showExternalLink />
           </div>
-          <div className="shrink-0 pt-3">
+          <div className={`shrink-0 ${nested ? 'pt-2.5' : 'pt-4'}`}>
             <button
               ref={closeRef}
               type="button"
@@ -87,7 +100,7 @@ export function TweetRow({
               aria-expanded
               aria-controls={bodyId}
               aria-label={`Collapse tweet by @${tweet.username}`}
-              className="rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronDown aria-hidden="true" className="h-4 w-4 rotate-180" />
             </button>
@@ -100,12 +113,12 @@ export function TweetRow({
           onClick={toggle}
           aria-expanded={false}
           aria-controls={bodyId}
-          className={ROW_CLASS}
+          className={nested ? NESTED_ROW_CLASS : ROW_CLASS}
         >
           {chip}
-          {!hideAuthor && <TweetAvatar tweet={tweet} size={28} />}
+          {!nested && <TweetAvatar tweet={tweet} size={28} />}
           <span className="min-w-0 flex-1">
-            {!hideAuthor && (
+            {!nested && (
               <span className="block truncate text-xs text-muted-foreground">
                 @{tweet.username}
               </span>
@@ -138,7 +151,8 @@ export function TweetRowList({
   label,
   citations,
   moreLabel = (n) => `${n.toLocaleString('en-US')} more`,
-  hideAuthor = false,
+  nested = false,
+  numbered: numberedAcross,
 }: {
   tweets: PortalTweet[]
   first: number
@@ -147,30 +161,47 @@ export function TweetRowList({
   citations?: ReadonlyMap<string, number>
   moreLabel?: (n: number) => string
   /** The rows sit under their author's name. */
-  hideAuthor?: boolean
+  nested?: boolean
+  /**
+   * Keep a place for citation numbers on every row. Defaults to whether any
+   * of these tweets is cited; a grouped list decides once for all groups so
+   * their rows line up.
+   */
+  numbered?: boolean
 }) {
   const [shown, setShown] = useState(first)
   const left = tweets.length - shown
-  const numbered = tweets.some((tweet) => citations?.has(tweet.id))
+  const numbered =
+    numberedAcross ?? tweets.some((tweet) => citations?.has(tweet.id))
   return (
-    <ul aria-label={label} className="border-t border-border">
+    <ul
+      aria-label={label}
+      className={
+        // The rule runs down from the centre of the person's avatar.
+        nested
+          ? 'ml-[17px] border-l border-border pl-[19px]'
+          : 'border-t border-border'
+      }
+    >
       {tweets.slice(0, shown).map((tweet) => (
         <TweetRow
           key={tweet.id}
           tweet={tweet}
           citation={citations?.get(tweet.id)}
           numbered={numbered}
-          hideAuthor={hideAuthor}
+          nested={nested}
         />
       ))}
       {left > 0 && (
-        <li className="border-b border-border">
+        <li className={nested ? '' : 'border-b border-border'}>
           <button
             type="button"
             onClick={() => setShown((value) => value + step)}
-            className={`${ROW_CLASS} text-muted-foreground hover:text-foreground`}
+            className={`${nested ? NESTED_ROW_CLASS : ROW_CLASS} text-muted-foreground hover:text-foreground`}
           >
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
+            <span
+              className={`inline-flex shrink-0 items-center justify-center ${nested ? 'h-5 w-6' : 'h-7 w-7'}`}
+            >
               <Plus aria-hidden="true" className="h-4 w-4" />
             </span>
             {moreLabel(left)}
@@ -251,13 +282,13 @@ function PersonRow({
         />
       </button>
       {open && (
-        <div id={bodyId} className="pb-3 pl-10">
+        <div id={bodyId} className="pb-3">
           <TweetRowList
             tweets={person.tweets}
             first={10}
             label={`Tweets by @${person.username}`}
             citations={citations}
-            hideAuthor
+            nested
           />
         </div>
       )}
@@ -273,30 +304,31 @@ function PersonGroup({
   person,
   showcase,
   citations,
+  numbered,
 }: {
   person: Person
   showcase: number | 'all'
   citations?: ReadonlyMap<string, number>
+  numbered: boolean
 }) {
   const count = person.tweets.length
   return (
-    <li className="border-b border-border pb-2">
-      <div className="flex min-h-[3rem] items-center gap-3 px-1 pt-2 text-sm">
+    <li className="py-2">
+      <div className="flex min-h-[2.5rem] items-center gap-3 px-1 text-sm">
         <PersonLine person={person} />
       </div>
-      <div className="pl-10">
-        <TweetRowList
-          tweets={person.tweets}
-          first={showcase === 'all' ? ALL_FIRST : showcase}
-          step={count}
-          label={`Tweets by @${person.username}`}
-          citations={citations}
-          moreLabel={(n) =>
-            `${n.toLocaleString('en-US')} more by @${person.username}`
-          }
-          hideAuthor
-        />
-      </div>
+      <TweetRowList
+        tweets={person.tweets}
+        first={showcase === 'all' ? ALL_FIRST : showcase}
+        step={count}
+        label={`Tweets by @${person.username}`}
+        citations={citations}
+        moreLabel={(n) =>
+          `${n.toLocaleString('en-US')} more by @${person.username}`
+        }
+        numbered={numbered}
+        nested
+      />
     </li>
   )
 }
@@ -323,8 +355,16 @@ export function PeopleList({
   const people = useMemo(() => groupByPerson(tweets), [tweets])
   const [shown, setShown] = useState(FIRST_PEOPLE)
   const left = people.length - shown
+  const numbered = tweets.some((tweet) => citations?.has(tweet.id))
   return (
-    <ul aria-label={label} className="border-t border-border">
+    <ul
+      aria-label={label}
+      className={
+        showcase === 0
+          ? 'border-t border-border'
+          : 'divide-y divide-border border-y border-border'
+      }
+    >
       {people
         .slice(0, shown)
         .map((person) =>
@@ -340,11 +380,12 @@ export function PeopleList({
               person={person}
               showcase={showcase}
               citations={citations}
+              numbered={numbered}
             />
           ),
         )}
       {left > 0 && (
-        <li className="border-b border-border">
+        <li className={showcase === 0 ? 'border-b border-border' : ''}>
           <button
             type="button"
             onClick={() => setShown(people.length)}

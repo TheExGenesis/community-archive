@@ -7,11 +7,16 @@ import {
   agentSearchInstructions,
   agentSearchPrepareStep,
   createAgentSearchTools,
+  createBashAgentTools,
   finalAnswerText,
+  questionWithWorkspace,
   toolsKeepFailing,
+  type AgentSearchToolMode,
+  type BashInput,
 } from '@/lib/agentSearch/agent'
 import {
   collectToolTweetIds,
+  collectWorkspaceFiles,
   validateCitations,
 } from '@/lib/agentSearch/citations'
 import { buildConversationContext } from '@/lib/agentSearch/context'
@@ -28,11 +33,23 @@ import {
   getTweetsImpl,
   scoreTweetsImpl,
   searchTweetsImpl,
+  semanticLimitReached,
+  semanticSearchImpl,
   type CollectAndScoreInput,
   type FindPeopleInput,
   type ScoreTweetsInput,
   type SearchTweetsToolInput,
 } from '@/lib/agentSearch/toolImpl'
+import {
+  MAX_SEMANTIC_CALLS_PER_RUN,
+  type SemanticSearchInput,
+} from '@/lib/agentSearch/semantic'
+import {
+  applyChanges,
+  describeManifest,
+  type WorkspaceManifest,
+} from '@/lib/agentSearch/workspace/manifest'
+import { runBashCommand } from '@/lib/agentSearch/workspace/workspace'
 
 // Each tool runs as a durable step, recorded in the run's event log and never
 // re-run once it has finished. Gateway reads are free and retried once. The
@@ -104,6 +121,39 @@ async function getTweetsStep(
 }
 getTweetsStep.maxRetries = 1
 
+// One command in the agent's workspace. The workspace is rebuilt from the
+// manifest the workflow carries (see workspace/manifest.ts) and the command's
+// changes come back in its output. It may score, so it is never retried; it
+// adds what it spent to the run before returning or throwing.
+async function bashStep(
+  input: BashInput,
+  manifest: WorkspaceManifest,
+  semanticUsed: number,
+  runId: string,
+  deadlineAt: number,
+) {
+  'use step'
+  return withRecordedCost(runId, () =>
+    runBashCommand({
+      command: input.command,
+      manifest,
+      semanticUsed,
+      limits: { deadlineAt },
+    }),
+  )
+}
+bashStep.maxRetries = 0
+
+// Semantic search is slow (about 14 s), so a failed call is not retried.
+async function semanticSearchStep(
+  input: SemanticSearchInput,
+  deadlineAt: number,
+) {
+  'use step'
+  return semanticSearchImpl(input, { deadlineAt })
+}
+semanticSearchStep.maxRetries = 0
+
 // Earlier turns come from the run store, never from the browser. Only the
 // asker's own runs count, though the route already refused anyone else's
 // conversation.
@@ -117,7 +167,7 @@ async function loadContextStep(
   const store = getAgentSearchRunStore()
   const current = await store.get(runId)
   if (current?.status !== 'running') {
-    return { stopped: true, messages: [], priorTweetIds: [] }
+    return { stopped: true, messages: [], priorTweetIds: [], workspace: {} }
   }
   const runs = await store.listConversation(conversationId)
   const context = await buildConversationContext(
@@ -134,6 +184,8 @@ interface RunSummary {
   toolCalls: AgentSearchRun['toolCalls']
   toolOutputs: unknown[]
   priorTweetIds: string[]
+  /** Workspace files earlier turns left: path to ids. */
+  priorFiles: Record<string, string[]>
   error: string | null
 }
 
@@ -143,10 +195,19 @@ async function recordRunStep(summary: RunSummary) {
   'use step'
   // A citation is valid when a tool returned the tweet in this conversation:
   // in this run, or in an earlier turn (see citations.ts).
-  const { cited, invalid } = validateCitations(summary.text, [
-    ...Array.from(collectToolTweetIds(summary.toolOutputs)),
-    ...summary.priorTweetIds,
-  ])
+  // Lists may name workspace files from this run or an earlier turn.
+  const files = new Map(Object.entries(summary.priorFiles))
+  collectWorkspaceFiles(summary.toolOutputs).forEach((ids, path) =>
+    files.set(path, ids),
+  )
+  const { cited, invalid } = validateCitations(
+    summary.text,
+    [
+      ...Array.from(collectToolTweetIds(summary.toolOutputs)),
+      ...summary.priorTweetIds,
+    ],
+    files,
+  )
   const store = getAgentSearchRunStore()
   // Admission stored the run before the workflow started. A run the member
   // stopped meanwhile stays stopped; its spend is already recorded.
@@ -191,25 +252,55 @@ export interface AgentSearchWorkflowInput {
   date: string
   /** Epoch ms; after it no tool call starts and the model must answer. */
   deadlineAt: number
+  /** How the agent searches; runs started before modes existed used typed tools. */
+  toolMode?: AgentSearchToolMode
 }
 
 export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   'use workflow'
 
   const { runId, deadlineAt } = input
+  const toolMode = input.toolMode ?? 'typed'
+  // The workspace as of the last finished command, carried between steps.
+  let workspace: WorkspaceManifest = {}
+  // A question may run only a few semantic searches (each about 14 s).
+  let semanticUsed = 0
+  const tools =
+    toolMode === 'bash'
+      ? createBashAgentTools(async (args) => {
+          const output = await bashStep(
+            args,
+            workspace,
+            semanticUsed,
+            runId,
+            deadlineAt,
+          )
+          workspace = applyChanges(workspace, output.workspace)
+          semanticUsed += output.semanticCalls ?? 0
+          return output
+        })
+      : createAgentSearchTools({
+          find_people: (args) => findPeopleStep(args, deadlineAt),
+          search_tweets: (args) => searchTweetsStep(args, deadlineAt),
+          collect_and_score: (args) =>
+            collectAndScoreStep(args, runId, deadlineAt),
+          score_tweets: (args) => scoreTweetsStep(args, runId, deadlineAt),
+          get_thread: (args) => getThreadStep(args, deadlineAt),
+          get_quote_posts: (args) => getQuotePostsStep(args, deadlineAt),
+          get_tweets: (args) => getTweetsStep(args, deadlineAt),
+          semantic_search: async (args) => {
+            if (semanticUsed >= MAX_SEMANTIC_CALLS_PER_RUN) {
+              return semanticLimitReached(args.query)
+            }
+            semanticUsed += 1
+            return semanticSearchStep(args, deadlineAt)
+          },
+        })
   const agent = new WorkflowAgent({
     // Each planner call records its own usage on this run.
     model: agentSearchModel(input.modelSpec, runId),
-    instructions: agentSearchInstructions(input.date),
-    tools: createAgentSearchTools({
-      find_people: (args) => findPeopleStep(args, deadlineAt),
-      search_tweets: (args) => searchTweetsStep(args, deadlineAt),
-      collect_and_score: (args) => collectAndScoreStep(args, runId, deadlineAt),
-      score_tweets: (args) => scoreTweetsStep(args, runId, deadlineAt),
-      get_thread: (args) => getThreadStep(args, deadlineAt),
-      get_quote_posts: (args) => getQuotePostsStep(args, deadlineAt),
-      get_tweets: (args) => getTweetsStep(args, deadlineAt),
-    }),
+    instructions: agentSearchInstructions(input.date, toolMode),
+    tools,
   })
 
   let error: string | null = null
@@ -218,6 +309,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   const toolOutputs: unknown[] = []
   let parts: unknown[] = []
   let priorTweetIds: string[] = []
+  let priorFiles: Record<string, string[]> = {}
   try {
     const context = await loadContextStep(
       input.conversationId,
@@ -227,11 +319,18 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
     // Stopped before it began: nothing was spent and nothing is recorded.
     if (context.stopped) return { runId }
     priorTweetIds = context.priorTweetIds
+    workspace = context.workspace
+    priorFiles = Object.fromEntries(
+      Object.entries(context.workspace).flatMap(([path, file]) =>
+        file.kind === 'tweets' ? [[path, file.rows.map((row) => row.id)]] : [],
+      ),
+    )
+    const question =
+      toolMode === 'bash'
+        ? questionWithWorkspace(input.question, describeManifest(workspace))
+        : input.question
     const result = await agent.stream({
-      messages: [
-        ...context.messages,
-        { role: 'user', content: input.question },
-      ],
+      messages: [...context.messages, { role: 'user', content: question }],
       writable: getWritable<ModelCallStreamPart>(),
       stopWhen: [isStepCount(AGENT_SEARCH_MAX_STEPS), toolsKeepFailing],
       prepareStep: agentSearchPrepareStep(deadlineAt),
@@ -276,6 +375,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
     toolCalls,
     toolOutputs,
     priorTweetIds,
+    priorFiles,
     error,
   })
   if (error) throw new Error(error)

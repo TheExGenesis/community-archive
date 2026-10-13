@@ -3,10 +3,17 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, Lock, Plus, Quote } from 'lucide-react'
+import { ArrowUp, Lock, Plus, Quote, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
+import {
+  ASK_PREFILL_PARAMS,
+  askFilterLabel,
+  questionWithFilters,
+  type AskFilter,
+  type AskPrefill,
+} from '@/lib/askFromSearch'
 import { OWN_KEY_HEADER } from '@/lib/agentSearch/ownKey'
 import { ownKeyRefusalMessage } from './OwnKeyControl'
 import { readOwnKey, useOwnKey } from './ownKeyStore'
@@ -51,6 +58,14 @@ function showConversationInUrl(id: string | null) {
   // Null state, not window.history.state: Next's router skips entries that
   // carry its own marker, then puts its old URL back on the next render.
   window.history.replaceState(null, '', url)
+}
+
+/** Drops a handed-over search from the address bar, so a reload asks fresh. */
+function forgetPrefillInUrl() {
+  const url = new URL(window.location.href)
+  const before = url.search
+  for (const param of ASK_PREFILL_PARAMS) url.searchParams.delete(param)
+  if (url.search !== before) window.history.replaceState(null, '', url)
 }
 
 interface Quota {
@@ -107,8 +122,11 @@ interface Conversation {
 
 export default function AgentSearch({
   initialConversationId = null,
+  initialPrefill = null,
 }: {
   initialConversationId?: string | null
+  /** A search handed over from archive search; prefilled, never sent. */
+  initialPrefill?: AskPrefill | null
 }) {
   const [conversation, setConversation] = useState<Conversation>(() => ({
     id: initialConversationId ?? newConversationId(),
@@ -168,7 +186,13 @@ export default function AgentSearch({
     houseQuota && dayAllowance
       ? { ...houseQuota, ...bindingAllowance(dayAllowance, monthAllowance) }
       : null
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(initialPrefill?.text ?? '')
+  // Filters from a handed-over search, added to the question when it is sent.
+  const [askFilters, setAskFilters] = useState<AskFilter[]>(
+    initialPrefill?.filters ?? [],
+  )
+  // Held until the conversation it came with has opened, which clears the box.
+  const prefillRef = useRef(initialConversationId ? initialPrefill : null)
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
   const [stopped, setStopped] = useState<Record<string, number | null>>({})
@@ -312,8 +336,11 @@ export default function AgentSearch({
         pending: body.messages,
         runningRunId: body.runningRunId,
       })
-      // A draft from another conversation would be sent into this one.
-      setInput('')
+      // A draft from another conversation would be sent into this one; a
+      // search handed over with this conversation becomes its follow-up.
+      setInput(prefillRef.current?.text ?? '')
+      setAskFilters(prefillRef.current?.filters ?? [])
+      prefillRef.current = null
       showConversationInUrl(id)
     } catch {
       setLoadError('That conversation could not be opened.')
@@ -350,6 +377,16 @@ export default function AgentSearch({
       void openConversation(initialConversationId)
     }
   }, [initialConversationId, openConversation])
+
+  // A handed-over search lives in the box now; the address keeps only the
+  // conversation, so a reload does not prefill again.
+  useEffect(() => {
+    if (!initialPrefill) return
+    forgetPrefillInUrl()
+    textareaRef.current?.focus()
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Refresh the list and the quota on arrival, whenever an answer finishes,
   // and after a refusal.
@@ -590,9 +627,16 @@ export default function AgentSearch({
   const deleteAllHistory = () =>
     deleteHistory('/api/agent-search/conversations', true)
 
+  // The box sends what is typed plus any filters a handed-over search left.
+  const sendDraft = () => {
+    if (!input.trim() || busy || loading) return
+    ask(questionWithFilters(input, askFilters))
+    setAskFilters([])
+  }
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    ask(input)
+    sendDraft()
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -602,9 +646,40 @@ export default function AgentSearch({
       !event.nativeEvent.isComposing
     ) {
       event.preventDefault()
-      ask(input)
+      sendDraft()
     }
   }
+
+  const filterChips = askFilters.length > 0 && (
+    <ul
+      aria-label="Search filters added to your question"
+      className="flex flex-wrap gap-1.5"
+    >
+      {askFilters.map((filter) => {
+        const label = askFilterLabel(filter)
+        return (
+          <li
+            key={filter.key}
+            className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pl-2.5 pr-1 text-xs text-foreground"
+          >
+            {label}
+            <button
+              type="button"
+              aria-label={`Remove ${label}`}
+              onClick={() =>
+                setAskFilters((current) =>
+                  current.filter((item) => item.key !== filter.key),
+                )
+              }
+              className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X aria-hidden="true" className="h-3 w-3" />
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
 
   const hasThread = messages.length > 0
   const lastIndex = messages.length - 1
@@ -690,20 +765,13 @@ export default function AgentSearch({
         Your question
       </label>
       <div className="rounded-xl border border-border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring">
+        {filterChips && <div className="px-4 pt-3">{filterChips}</div>}
         {textarea(
           3,
           'Ask about members’ tweets',
-          'block w-full px-4 pb-1 pt-3.5',
+          `block w-full px-4 pb-1 ${filterChips ? 'pt-2' : 'pt-3.5'}`,
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Lock aria-hidden="true" className="h-3.5 w-3.5" />
-            Private to you
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Quote aria-hidden="true" className="h-3.5 w-3.5" />
-            Answers cite tweets
-          </span>
           <span className="ml-auto flex items-center gap-3">
             {today && <QuestionsLeft today={today} />}
             <button
@@ -717,6 +785,17 @@ export default function AgentSearch({
           </span>
         </div>
       </div>
+      <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <Lock aria-hidden="true" className="h-3.5 w-3.5" />
+          Private to you
+        </span>
+        <span aria-hidden="true">·</span>
+        <span className="inline-flex items-center gap-1.5">
+          <Quote aria-hidden="true" className="h-3.5 w-3.5" />
+          Answers cite tweets
+        </span>
+      </p>
       {errorNote}
     </form>
   )
@@ -727,6 +806,7 @@ export default function AgentSearch({
       <label htmlFor={inputId} className="sr-only">
         Ask a follow-up
       </label>
+      {filterChips && <div className="mb-1.5">{filterChips}</div>}
       <div className="flex items-end gap-2 rounded-xl border border-border bg-card p-1.5 pl-3 shadow-sm focus-within:ring-2 focus-within:ring-ring">
         {textarea(
           input.includes('\n') ? 3 : 1,

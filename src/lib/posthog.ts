@@ -169,6 +169,7 @@ const isSortOrder = isOneOf(['asc', 'desc'])
 const isSearchInterfaceAction = isOneOf([
   'advanced_options_closed',
   'advanced_options_opened',
+  'ask_from_search',
   'result_sort_changed',
   'starter_search_selected',
 ])

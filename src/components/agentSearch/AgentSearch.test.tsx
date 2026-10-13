@@ -6,7 +6,13 @@ const mockChat: {
   messages: UIMessage[]
   status: 'ready' | 'submitted' | 'streaming' | 'error'
   resumeStream: jest.Mock
-} = { messages: [], status: 'ready', resumeStream: jest.fn() }
+  sendMessage: jest.Mock
+} = {
+  messages: [],
+  status: 'ready',
+  resumeStream: jest.fn(),
+  sendMessage: jest.fn(),
+}
 const mockTransport: {
   options?: {
     onChatSendMessage: (response: Response, info: { chatId: string }) => void
@@ -19,7 +25,7 @@ jest.mock('@ai-sdk/react', () => ({
     status: mockChat.status,
     error: undefined,
     setMessages: jest.fn(),
-    sendMessage: jest.fn(),
+    sendMessage: mockChat.sendMessage,
     resumeStream: mockChat.resumeStream,
     clearError: jest.fn(),
     stop: jest.fn(),
@@ -70,6 +76,7 @@ beforeEach(() => {
   mockChat.messages = []
   mockChat.status = 'ready'
   mockChat.resumeStream = jest.fn()
+  mockChat.sendMessage = jest.fn()
 })
 
 test('a first visit is the heading and a composer that carries the facts', async () => {
@@ -80,8 +87,12 @@ test('a first visit is the heading and a composer that carries the facts', async
   ).toBeInTheDocument()
   const box = screen.getByLabelText('Your question')
   expect(box).toHaveAttribute('placeholder', 'Ask about members’ tweets')
+  // The facts sit under the box, not inside it.
+  const composer = box.closest('.rounded-xl') as HTMLElement
   expect(screen.getByText('Private to you')).toBeInTheDocument()
   expect(screen.getByText('Answers cite tweets')).toBeInTheDocument()
+  expect(composer).not.toHaveTextContent('Private to you')
+  expect(composer).not.toHaveTextContent('Answers cite tweets')
   expect(await screen.findByText('10 left today')).toBeInTheDocument()
   expect(screen.queryByText(/Answers are private/)).toBeNull()
   expect(screen.queryByText(/Shift\+Enter/)).toBeNull()
@@ -310,5 +321,42 @@ describe('the member’s own OpenRouter key', () => {
       body: { id: 'conv-1234', question: 'Who?' },
       headers: { 'x-openrouter-key': KEY },
     })
+  })
+})
+
+describe('a search handed over from archive search', () => {
+  test('prefills the box and the filters as chips, and sends nothing until asked', async () => {
+    quota(10)
+    window.history.replaceState(
+      null,
+      '',
+      '/search/ask?q=singapore&fromUser=visakanv&sinceDate=2025-01-01',
+    )
+    render(
+      <AgentSearch
+        initialPrefill={{
+          text: 'singapore',
+          filters: [
+            { key: 'from', value: 'visakanv' },
+            { key: 'since', value: '2025-01-01' },
+          ],
+        }}
+      />,
+    )
+    const box = screen.getByLabelText('Your question')
+    expect(box).toHaveValue('singapore')
+    expect(screen.getByText('From @visakanv')).toBeInTheDocument()
+    expect(mockChat.sendMessage).not.toHaveBeenCalled()
+    // The address forgets the search, so a reload starts fresh.
+    expect(window.location.search).toBe('')
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Remove Since 1 Jan 2025' }),
+    )
+    await screen.findByText('10 left today')
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(mockChat.sendMessage).toHaveBeenCalledWith({
+      text: 'singapore (from @visakanv)',
+    })
+    expect(screen.queryByText('From @visakanv')).toBeNull()
   })
 })

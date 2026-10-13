@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import AgentSearch from '@/components/agentSearch/AgentSearch'
+import { ASK_PREFILL_PARAMS, askPrefillFrom } from '@/lib/askFromSearch'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 
 // Eligibility depends on the session cookie, so this page is never cached.
@@ -51,7 +52,9 @@ function Gate({
 export default async function AskTheArchivePage({
   searchParams,
 }: {
-  searchParams?: { c?: string | string[] }
+  searchParams?: { c?: string | string[] } & Partial<
+    Record<(typeof ASK_PREFILL_PARAMS)[number], string | string[]>
+  >
 }) {
   const access = await getAgentSearchViewer()
 
@@ -100,6 +103,8 @@ export default async function AskTheArchivePage({
       initialConversationId={
         requested && /^[A-Za-z0-9_-]{8,100}$/.test(requested) ? requested : null
       }
+      // A search handed over from archive search: prefilled, never sent.
+      initialPrefill={askPrefillFrom(searchParams ?? {})}
     />
   )
 }

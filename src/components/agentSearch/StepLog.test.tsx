@@ -248,3 +248,24 @@ test('a stopped log shows its reasoning folded', () => {
   )
   expect(screen.queryByText(/Then people/)).toBeNull()
 })
+
+test('a search step can be opened in archive search, in a new tab', () => {
+  render(
+    <StepLog
+      mode="stopped"
+      steps={[
+        { ...done(1), searchHref: '/search?q=term+1' },
+        { id: 's2', status: 'done', text: 'Checked 300 tweets · 40 relevant' },
+      ]}
+      elapsedMs={null}
+    />,
+  )
+  // In the DOM for keyboard users even while hidden until hover or focus.
+  const links = screen.getAllByRole('link', {
+    name: 'Open this search in archive search',
+  })
+  expect(links).toHaveLength(1)
+  expect(links[0]).toHaveAttribute('href', '/search?q=term+1')
+  expect(links[0]).toHaveAttribute('target', '_blank')
+  expect(links[0].getAttribute('rel')).toContain('noopener')
+})

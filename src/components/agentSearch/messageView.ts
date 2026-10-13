@@ -32,6 +32,11 @@ export interface ProgressLine {
   id: string
   text: string
   status: 'running' | 'done' | 'error'
+  /**
+   * The same keyword search on the archive's search page, when the step was
+   * one the page can express (no OR lists, no semantic or scoring steps).
+   */
+  searchHref?: string
 }
 
 /**
@@ -481,6 +486,97 @@ export function describeCommand(command: string): string {
   return 'Looking through the results'
 }
 
+const SEARCH_DATE = /^\d{4}-\d{2}-\d{2}$/
+const PAGE_SORTS = new Set(['newest', 'oldest', 'likes', 'reposts'])
+
+/** The archive search page's URL for a keyword search, or null. */
+export function archiveSearchHref(search: {
+  query?: string | null
+  fromUser?: string | null
+  replyToUser?: string | null
+  since?: string | null
+  until?: string | null
+  sort?: string | null
+}): string | null {
+  const query = search.query?.trim()
+  if (!query) return null
+  const params = new URLSearchParams({ q: query })
+  const from = search.fromUser?.trim().replace(/^@/, '')
+  const replyTo = search.replyToUser?.trim().replace(/^@/, '')
+  if (from) params.set('fromUser', from)
+  if (replyTo) params.set('replyToUser', replyTo)
+  for (const [key, value] of [
+    ['sinceDate', search.since],
+    ['untilDate', search.until],
+  ] as const) {
+    if (!value) continue
+    if (!SEARCH_DATE.test(value)) return null
+    params.set(key, value)
+  }
+  if (search.sort && search.sort !== 'newest') {
+    if (!PAGE_SORTS.has(search.sort)) return null
+    params.set('sort', search.sort)
+  }
+  return `/search?${params.toString()}`
+}
+
+// The workspace `search` command's options (workspace/commands.ts). --limit
+// only caps how many come back and --all matches every word, as the search
+// page does; --any (an OR list) has no equivalent there.
+const SEARCH_VALUE_FLAGS = new Set([
+  'any',
+  'from',
+  'reply-to',
+  'since',
+  'until',
+  'sort',
+  'limit',
+])
+
+/** The first `search` in a shell command the search page can express. */
+export function bashSearchHref(command: string): string | null {
+  for (const segment of command.split(/;|&&|\|\||\|/)) {
+    const words = Array.from(
+      segment.trim().matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g),
+    ).map((match) => match[1] ?? match[2] ?? match[3])
+    if (words[0] !== 'search') continue
+    const terms: string[] = []
+    const flags: Record<string, string> = {}
+    let expressible = true
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i]
+      if (word === '>' || word === '>>') break
+      if (!word.startsWith('--')) {
+        terms.push(word)
+        continue
+      }
+      const [name, inline] = word.slice(2).split(/=(.*)/s, 2)
+      if (name === 'all') continue
+      if (!SEARCH_VALUE_FLAGS.has(name) || name === 'any') {
+        expressible = false
+        break
+      }
+      const value = inline ?? words[++i]
+      if (value === undefined) {
+        expressible = false
+        break
+      }
+      flags[name] = value
+    }
+    if (!expressible) continue
+    const href = archiveSearchHref({
+      query: terms.join(' '),
+      fromUser: flags.from,
+      replyToUser: flags['reply-to'],
+      since: flags.since,
+      until: flags.until,
+      sort: flags.sort,
+    })
+    if (href) return href
+  }
+  return null
+}
+
 /** Mirrors DEFAULT_COLLECT in toolImpl: the limit when the agent sets none. */
 const DEFAULT_COLLECT = 300
 
@@ -492,6 +588,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
   let running: string
   let finished: string
   let failure: string
+  let searchHref: string | null = null
 
   switch (call.name) {
     case 'find_people': {
@@ -506,6 +603,16 @@ export function progressLine(call: ToolCallView): ProgressLine {
     }
     case 'search_tweets': {
       const subject = searchSubject(input)
+      if (!asArray(input.anyOf).length) {
+        searchHref = archiveSearchHref({
+          query: asString(input.query),
+          fromUser: asString(input.fromUser),
+          replyToUser: asString(input.replyToUser),
+          since: asString(input.since),
+          until: asString(input.until),
+          sort: asString(input.sort),
+        })
+      }
       const tweets = plural(asArray(out.tweets).length, 'tweet')
       if (subject) {
         running = `Searching ${subject}`
@@ -590,6 +697,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
       if (done && (asNumber(out.exitCode) ?? 0) !== 0) {
         return { id: call.id, text: failure, status: 'error' }
       }
+      searchHref = bashSearchHref(asString(input.command) ?? '')
       break
     }
     default:
@@ -602,6 +710,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
     id: call.id,
     text: failed ? failure : done ? finished : running,
     status: failed ? 'error' : done ? 'done' : 'running',
+    ...(searchHref ? { searchHref } : {}),
   }
 }
 

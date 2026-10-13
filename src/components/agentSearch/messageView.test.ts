@@ -3,6 +3,8 @@ import type { AgentTweet, ScoredTweet } from '@/lib/agentSearch/types'
 import {
   NOT_SEARCHED_LINE,
   answerText,
+  archiveSearchHref,
+  bashSearchHref,
   buildAnswer,
   buildCoverage,
   buildTurnView,
@@ -13,6 +15,7 @@ import {
   timelineFor,
   logSummary,
   describeCommand,
+  progressLine,
   progressLines,
   searchSubject,
   toolCalls,
@@ -966,5 +969,75 @@ describe('reasoning', () => {
       latestThought('First idea. Then search for people who live there'),
     ).toBe('Then search for people who live there')
     expect(latestThought('  ')).toBe('')
+  })
+})
+
+describe('opening a step in archive search', () => {
+  test('a plain search maps to the same query', () => {
+    expect(
+      bashSearchHref('search singapore --limit 300 > s1.jsonl; wc -l s1.jsonl'),
+    ).toBe('/search?q=singapore')
+  })
+
+  test('author, reply, date and sort options become search page filters', () => {
+    expect(
+      bashSearchHref(
+        'search "great movie" --from @patio11 --reply-to visakanv --since 2023-01-01 --until=2023-12-31 --sort likes',
+      ),
+    ).toBe(
+      '/search?q=great+movie&fromUser=patio11&replyToUser=visakanv&sinceDate=2023-01-01&untilDate=2023-12-31&sort=likes',
+    )
+  })
+
+  test('an OR list has no equivalent; a later expressible search is used', () => {
+    expect(
+      bashSearchHref('search sg --any singaporean,changi > s2.jsonl'),
+    ).toBeNull()
+    expect(
+      bashSearchHref(
+        'search sg --any singaporean > a.jsonl && search changi > b.jsonl',
+      ),
+    ).toBe('/search?q=changi')
+  })
+
+  test('semantic search, scoring and people lookups get no link', () => {
+    expect(
+      bashSearchHref('semantic "moving to singapore for work" > m1.jsonl'),
+    ).toBeNull()
+    expect(
+      bashSearchHref('score s1.jsonl "Is this about Singapore?" > c1.jsonl'),
+    ).toBeNull()
+    expect(bashSearchHref('people visakanv')).toBeNull()
+  })
+
+  test('a malformed date gives no link rather than a wrong one', () => {
+    expect(archiveSearchHref({ query: 'x', since: 'yesterday' })).toBeNull()
+  })
+
+  test('step lines carry the link for bash and typed searches', () => {
+    const bash = progressLine({
+      id: 'b',
+      name: 'bash',
+      state: 'output-available',
+      input: { command: 'search singapore --from visakanv > s1.jsonl' },
+      output: { summary: 'Searched “singapore” · 300 tweets', exitCode: 0 },
+    })
+    expect(bash.searchHref).toBe('/search?q=singapore&fromUser=visakanv')
+    const typed = progressLine({
+      id: 't',
+      name: 'search_tweets',
+      state: 'output-available',
+      input: { query: 'bluesky', since: '2024-01-01' },
+      output: { tweets: [] },
+    })
+    expect(typed.searchHref).toBe('/search?q=bluesky&sinceDate=2024-01-01')
+    const orList = progressLine({
+      id: 'o',
+      name: 'search_tweets',
+      state: 'output-available',
+      input: { query: 'bluesky', anyOf: ['bsky'] },
+      output: { tweets: [] },
+    })
+    expect(orList.searchHref).toBeUndefined()
   })
 })

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   AlertCircle,
+  ArrowUpRight,
   Brain,
   Check,
   ChevronRight,
@@ -48,6 +49,26 @@ function StepIcon({ status }: { status: ProgressLine['status'] | 'stopped' }) {
   return <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
 }
 
+/**
+ * The step's search on the archive search page, in a new tab. Quiet: it shows
+ * when the line is hovered or focused; where nothing can hover, it stays as a
+ * small icon so it can still be reached.
+ */
+function OpenInSearch({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open this search in archive search"
+      className="ml-2 inline-flex items-center gap-0.5 whitespace-nowrap rounded-sm align-baseline text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground hover:underline focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
+    >
+      <span className="[@media(hover:none)]:sr-only">Open in search</span>
+      <ArrowUpRight aria-hidden="true" className="h-3 w-3" />
+    </a>
+  )
+}
+
 function StepItem({
   step,
   status,
@@ -56,12 +77,13 @@ function StepItem({
   status: ProgressLine['status'] | 'stopped'
 }) {
   return (
-    <li className="flex items-start gap-2">
+    <li className="group flex items-start gap-2">
       <StepIcon status={status} />
       <span
         className={`min-w-0 break-words ${status === 'running' ? 'text-foreground' : ''}`}
       >
         {step.text}
+        {step.searchHref && <OpenInSearch href={step.searchHref} />}
       </span>
     </li>
   )

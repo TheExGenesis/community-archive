@@ -1,6 +1,7 @@
 import 'server-only'
 import type { RunLimits } from './deadline'
 import { getTweetDetails, getTweetsByIds } from './gateway'
+import { CITATION_PATTERN, QUOTE_PATTERN } from './citations'
 import { collectRefs } from './history'
 import type { AgentSearchRun, AgentTweet } from './types'
 
@@ -25,8 +26,13 @@ export async function loadConversationTweets(
 ): Promise<Map<string, AgentTweet>> {
   const all = new Set<string>()
   for (const run of runs) collectRefs(run.parts ?? [], all)
+  // Full cards only for tweets the prose cites or quotes; listed tweets
+  // (citedTweetIds also holds those, often hundreds) show as rows and use
+  // the lighter batch lookup.
   const cited = new Set(
-    runs.flatMap((run) => run.citedTweetIds).filter((id) => all.has(id)),
+    runs
+      .flatMap((run) => chipIds(run.answer ?? ''))
+      .filter((id) => all.has(id)),
   )
   const rest = Array.from(all).filter((id) => !cited.has(id))
   const citedIds = Array.from(cited)
@@ -43,13 +49,28 @@ export async function loadConversationTweets(
 
   const tweets = new Map<string, AgentTweet>()
   let next = 0
+  // A batch that fails or runs out of time leaves its tweets out rather
+  // than failing the whole conversation; the page shows what came back.
   const worker = async () => {
     while (next < batches.length) {
-      for (const tweet of await batches[next++]()) tweets.set(tweet.id, tweet)
+      const batch = batches[next++]
+      try {
+        for (const tweet of await batch()) tweets.set(tweet.id, tweet)
+      } catch (error) {
+        console.warn('[agent-search] history tweets batch failed', error)
+      }
     }
   }
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, batches.length) }, worker),
   )
   return tweets
+}
+
+/** Ids the answer cites with a chip or quotes, not those in its lists. */
+function chipIds(answer: string): string[] {
+  return [
+    ...Array.from(answer.matchAll(new RegExp(CITATION_PATTERN.source, 'g'))),
+    ...Array.from(answer.matchAll(new RegExp(QUOTE_PATTERN.source, 'g'))),
+  ].map((match) => match[1])
 }

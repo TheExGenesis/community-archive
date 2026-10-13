@@ -11,7 +11,7 @@ import {
 import type { PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 
 export const NOT_SEARCHED_LINE =
-  "Not searched: live X, people who never joined the archive (except in members' threads), deleted posts"
+  "Not searched: live X, people who never joined the archive (except in members' threads), deleted tweets"
 
 /** A classifier probability at or above this counts as kept (spec: p >= 0.5). */
 const KEPT_P = 0.5
@@ -246,8 +246,19 @@ export function searchSubject(input: LooseRecord): string | null {
   if (from) people.push(`from ${handle(from)}`)
   if (replyTo) people.push(`replying to ${handle(replyTo)}`)
   if (!words.length && !people.length) return null
-  const head = [words.length ? words.map(quote).join(', ') : 'posts', ...people]
+  const head = [
+    words.length ? words.map(quote).join(', ') : 'tweets',
+    ...people,
+  ]
   return [head.join(' '), ...searchQualifiers(input)].join(', ')
+}
+
+/** “query”, from @x: what a search by meaning looked for. */
+function meaningSubject(input: LooseRecord): string {
+  const query = asString(input.query)
+  const from = asString(input.fromUser)
+  const subject = query ? quote(query) : 'tweets'
+  return from ? `${subject} from ${handle(from)}` : subject
 }
 
 function termsSubject(input: LooseRecord): string {
@@ -255,7 +266,7 @@ function termsSubject(input: LooseRecord): string {
     .map(asString)
     .filter((term): term is string => Boolean(term))
   const from = asString(input.fromUser)
-  const subject = terms.length ? terms.map(quote).join(', ') : 'posts'
+  const subject = terms.length ? terms.map(quote).join(', ') : 'tweets'
   const range = dateRangeLabel(asString(input.since), asString(input.until))
   return [from ? `${subject} from ${handle(from)}` : subject, range]
     .filter(Boolean)
@@ -270,6 +281,16 @@ function criterionText(input: LooseRecord): string {
   return criterion.length > CRITERION_LIMIT
     ? `${criterion.slice(0, CRITERION_LIMIT).trimEnd()}…`
     : criterion
+}
+
+const COMMAND_LIMIT = 80
+
+/** One line of a shell command, cut to fit a step. */
+function shortCommand(command: string) {
+  const line = command.replace(/\s+/g, ' ').trim()
+  return line.length > COMMAND_LIMIT
+    ? `${line.slice(0, COMMAND_LIMIT).trimEnd()}…`
+    : line || 'a command'
 }
 
 /** Mirrors DEFAULT_COLLECT in toolImpl: the limit when the agent sets none. */
@@ -305,12 +326,22 @@ export function progressLine(call: ToolCallView): ProgressLine {
       } else {
         const qualifiers = searchQualifiers(input)
         const what = qualifiers.length
-          ? `posts, ${qualifiers.join(', ')}`
-          : 'recent posts'
+          ? `tweets, ${qualifiers.join(', ')}`
+          : 'recent tweets'
         running = `Browsing ${what}`
         finished = `Browsed ${what} · ${tweets}`
         failure = `Could not browse ${what}`
       }
+      break
+    }
+    case 'semantic_search': {
+      const subject = meaningSubject(input)
+      running = `Searching by meaning ${subject}`
+      finished = `Searched by meaning ${subject} · ${plural(
+        asArray(out.tweets).length,
+        'tweet',
+      )}`
+      failure = `Could not search by meaning ${subject}`
       break
     }
     case 'collect_and_score': {
@@ -319,41 +350,57 @@ export function progressLine(call: ToolCallView): ProgressLine {
       const limit =
         asNumber(out.limit) ?? asNumber(input.maxTweets) ?? DEFAULT_COLLECT
       const question = criterion ? ` against ${quote(criterion)}` : ''
-      running = `Checking up to ${plural(limit, 'post')} matching ${subject}${question}`
-      finished = `Checked ${plural(asNumber(out.scored) ?? 0, 'post')} matching ${subject} · ${collectKept(
+      running = `Checking up to ${plural(limit, 'tweet')} matching ${subject}${question}`
+      finished = `Checked ${plural(asNumber(out.scored) ?? 0, 'tweet')} matching ${subject} · ${collectKept(
         out,
-      )} relevant${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-post limit` : ''}`
-      failure = `Could not check posts matching ${subject}`
+      )} relevant${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-tweet limit` : ''}`
+      failure = `Could not check tweets matching ${subject}`
       break
     }
     case 'score_tweets': {
       const scored = asArray(out.scored)
       const count = asArray(input.tweetIds).length
-      running = `Checking ${count ? plural(count, 'post') : 'posts'} against your question`
-      finished = `Checked ${plural(scored.length, 'post')} against your question · ${keptCount(
+      running = `Checking ${count ? plural(count, 'tweet') : 'tweets'} against your question`
+      finished = `Checked ${plural(scored.length, 'tweet')} against your question · ${keptCount(
         scored,
       )} relevant`
-      failure = 'Could not check posts against your question'
+      failure = 'Could not check tweets against your question'
       break
     }
     case 'get_thread': {
       running = 'Reading thread'
       finished = out.notFound
         ? 'Thread not found'
-        : `Read thread · ${plural(asArray(out.conversation).length, 'post')}`
+        : `Read thread · ${plural(asArray(out.conversation).length, 'tweet')}`
       failure = 'Could not read thread'
       break
     }
     case 'get_quote_posts': {
       running = 'Reading quotes'
-      finished = `Read quotes · ${plural(asArray(out.tweets).length, 'post')}`
+      finished = `Read quotes · ${plural(asArray(out.tweets).length, 'tweet')}`
       failure = 'Could not read quotes'
       break
     }
     case 'get_tweets': {
-      running = 'Fetching posts'
-      finished = `Fetched ${plural(asArray(out.tweets).length, 'post')}`
-      failure = 'Could not fetch posts'
+      running = 'Fetching tweets'
+      finished = `Fetched ${plural(asArray(out.tweets).length, 'tweet')}`
+      failure = 'Could not fetch tweets'
+      break
+    }
+    case 'bash': {
+      // The workspace's shell: say what ran, and its own summary of what it
+      // did, or the first line it printed.
+      const command = shortCommand(asString(input.command) ?? '')
+      const firstLine = (asString(out.stdout) ?? '')
+        .split('\n')
+        .map((line) => line.trim())
+        .find(Boolean)
+      running = `Running ${command}`
+      finished = asString(out.summary) ?? firstLine ?? `Ran ${command}`
+      failure = `Could not run ${command}`
+      if (done && (asNumber(out.exitCode) ?? 0) !== 0) {
+        return { id: call.id, text: failure, status: 'error' }
+      }
       break
     }
     default:
@@ -669,9 +716,14 @@ export function buildCoverage(calls: ToolCallView[]): CoverageView {
         // Further pages of one search read as that search.
         const input = { ...call.input }
         delete input.offset
-        tally(searchSubject(input) ?? 'recent posts', false).tweets += asArray(
+        tally(searchSubject(input) ?? 'recent tweets', false).tweets += asArray(
           out.tweets,
         ).length
+        break
+      }
+      case 'semantic_search': {
+        tally(`${meaningSubject(call.input)}, by meaning`, false).tweets +=
+          asArray(out.tweets).length
         break
       }
       case 'collect_and_score': {
@@ -707,7 +759,7 @@ export function buildCoverage(calls: ToolCallView[]): CoverageView {
     return {
       label: entry.label,
       detail: entry.scoring
-        ? `${plural(entry.checked, 'post')} checked, ${entry.kept.toLocaleString('en-US')} relevant${
+        ? `${plural(entry.checked, 'tweet')} checked, ${entry.kept.toLocaleString('en-US')} relevant${
             entry.capped ? ', stopped at the limit' : ''
           }`
         : `${plural(entry.tweets, 'tweet')}${times}`,
@@ -794,7 +846,9 @@ export function buildTurnView(
   for (const call of calls) {
     if (call.state !== 'output-available') continue
     const out = isRecord(call.output) ? call.output : {}
-    if (call.name === 'search_tweets') searches += 1
+    if (call.name === 'search_tweets' || call.name === 'semantic_search') {
+      searches += 1
+    }
     if (call.name === 'collect_and_score') {
       searches += 1
       relevantNotShown += Math.max(
@@ -839,6 +893,30 @@ export function buildTurnView(
 }
 
 const TOP_FOUND = 3
+
+/**
+ * The folded step log in one line: how much searching happened and what the
+ * answer rests on. "6 steps · 4 cited · 27 more found".
+ */
+export function logSummary(
+  view: TurnView,
+  options: { writing?: boolean } = {},
+): string {
+  const steps = view.progress.length
+  if (!steps) return 'No new searches, used the earlier tweets'
+  const parts = [plural(steps, 'step')]
+  if (options.writing) return [...parts, 'writing the answer'].join(' · ')
+  const shown = new Set([
+    ...view.answer.citations.map((citation) => citation.id),
+    ...view.answer.listed,
+  ]).size
+  if (view.answer.listed.length) parts.push(`${shown} in the answer`)
+  else if (shown) parts.push(`${shown} cited`)
+  const more = view.receipt.relevant + view.receipt.other
+  if (more) parts.push(`${more.toLocaleString('en-US')} more found`)
+  if (!shown && !more && !view.foundSoFar) parts.push('nothing found')
+  return parts.join(' · ')
+}
 
 // A saved run that ended without an answer is closed with one of these
 // lines (history.ts); the page shows its own banner instead.

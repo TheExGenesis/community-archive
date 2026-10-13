@@ -9,6 +9,7 @@ import {
   collectToolTweets,
   describeChatError,
   formatElapsed,
+  logSummary,
   progressLines,
   searchSubject,
   toolCalls,
@@ -114,11 +115,11 @@ describe('progressLines', () => {
       progressLines(message).map((line) => [line.status, line.text]),
     ).toEqual([
       ['done', 'Searched “community archive” from @alice · 2 tweets'],
-      ['done', 'Checked 412 posts matching “archive”, “CA” · 31 relevant'],
-      ['done', 'Checked 2 posts against your question · 1 relevant'],
-      ['done', 'Read thread · 2 posts'],
-      ['done', 'Read quotes · 1 post'],
-      ['error', 'Could not fetch posts'],
+      ['done', 'Checked 412 tweets matching “archive”, “CA” · 31 relevant'],
+      ['done', 'Checked 2 tweets against your question · 1 relevant'],
+      ['done', 'Read thread · 2 tweets'],
+      ['done', 'Read quotes · 1 tweet'],
+      ['error', 'Could not fetch tweets'],
       ['running', 'Looking up “visa”'],
     ])
   })
@@ -131,7 +132,7 @@ describe('progressLines', () => {
     }
     const running = assistant('a1', [toolPart('collect_and_score', input)])
     expect(progressLines(running)[0].text).toBe(
-      'Checking up to 300 posts matching “book” from @patio11 against “Does this tweet recommend a book?”',
+      'Checking up to 300 tweets matching “book” from @patio11 against “Does this tweet recommend a book?”',
     )
     const done = assistant('a2', [
       toolPart('collect_and_score', input, {
@@ -145,7 +146,7 @@ describe('progressLines', () => {
       }),
     ])
     expect(progressLines(done)[0].text).toBe(
-      'Checked 300 posts matching “book” from @patio11 · 12 relevant · stopped at the 300-post limit',
+      'Checked 300 tweets matching “book” from @patio11 · 12 relevant · stopped at the 300-tweet limit',
     )
   })
 
@@ -200,7 +201,7 @@ describe('searchSubject', () => {
       searchSubject({ query: 'a', since: '2024-03-05', until: '2024-06-01' }),
     ).toBe('“a”, 5 Mar 2024 to 1 Jun 2024')
     expect(searchSubject({ query: 'a', sort: 'newest' })).toBe('“a”')
-    expect(searchSubject({ fromUser: 'x' })).toBe('posts from @x')
+    expect(searchSubject({ fromUser: 'x' })).toBe('tweets from @x')
     expect(searchSubject({})).toBeNull()
   })
 
@@ -210,8 +211,8 @@ describe('searchSubject', () => {
       toolPart('search_tweets', { until: '2020-01-01' }),
     ])
     expect(progressLines(message).map((line) => line.text)).toEqual([
-      'Browsed recent posts · 1 tweet',
-      'Browsing posts, before 1 Jan 2020',
+      'Browsed recent tweets · 1 tweet',
+      'Browsing tweets, before 1 Jan 2020',
     ])
   })
 
@@ -368,7 +369,7 @@ describe('buildCoverage', () => {
         { label: '“archive”', detail: '3 tweets from 2 searches' },
         {
           label: '“archive”',
-          detail: '1,000 posts checked, 70 relevant, stopped at the limit',
+          detail: '1,000 tweets checked, 70 relevant, stopped at the limit',
         },
       ],
       scored: 1001,
@@ -640,5 +641,117 @@ describe('progress and answers with lists', () => {
       { streaming: true },
     )
     expect(view.answer.markdown).toBe('Here ')
+  })
+})
+
+describe('workspace steps and the folded log line', () => {
+  test('a bash step says what ran and what it reported', () => {
+    const long = `jq -c 'select(.author=="@member_a" or .author=="@member_b")' c1.jsonl > lists/living.jsonl && wc -l lists/living.jsonl`
+    const lines = progressLines(
+      assistant('a1', [
+        toolPart('bash', { command: 'search "Singapore" > s1.jsonl' }),
+        toolPart(
+          'bash',
+          { command: long },
+          { stdout: '\n12 lists/living.jsonl\n', exitCode: 0 },
+        ),
+        toolPart(
+          'bash',
+          { command: 'score s1.jsonl "lives there?" > c1.jsonl' },
+          { stdout: '', exitCode: 0, summary: 'c1.jsonl: 23 of 200 kept' },
+        ),
+        toolPart('bash', { command: 'jq bad' }, { stdout: '', exitCode: 2 }),
+      ]),
+    )
+    expect(lines.map((line) => [line.status, line.text])).toEqual([
+      ['running', 'Running search "Singapore" > s1.jsonl'],
+      ['done', '12 lists/living.jsonl'],
+      ['done', 'c1.jsonl: 23 of 200 kept'],
+      ['error', 'Could not run jq bad'],
+    ])
+    expect(
+      progressLines(assistant('a2', [toolPart('bash', { command: long })]))[0]
+        .text,
+    ).toMatch(/^Running jq -c .{60,}…$/)
+  })
+
+  test('sums up steps, what the answer rests on, and what else was found', () => {
+    const search = toolPart(
+      'search_tweets',
+      { query: 'x' },
+      { tweets: [tweet('1'), tweet('2'), tweet('3')] },
+    )
+    const cited = buildTurnView(
+      [assistant('a1', [search, text('A [[t:1]]')])],
+      0,
+    )
+    expect(logSummary(cited)).toBe('1 step · 1 cited · 2 more found')
+    expect(logSummary(cited, { writing: true })).toBe(
+      '1 step · writing the answer',
+    )
+    const listed = buildTurnView(
+      [assistant('a2', [search, text('A [[t:1]]\n[[posts: All | 1, 2]]')])],
+      0,
+    )
+    expect(logSummary(listed)).toBe('1 step · 2 in the answer · 1 more found')
+    const empty = buildTurnView(
+      [
+        assistant('a3', [
+          toolPart('search_tweets', { query: 'y' }, { tweets: [] }),
+          text('Nothing turned up.'),
+        ]),
+      ],
+      0,
+    )
+    expect(logSummary(empty)).toBe('1 step · nothing found')
+    const followUp = buildTurnView([assistant('a4', [text('From before.')])], 0)
+    expect(logSummary(followUp)).toBe(
+      'No new searches, used the earlier tweets',
+    )
+  })
+})
+
+describe('semantic search steps', () => {
+  test('describes a search by meaning, and treats its tweets as results', () => {
+    const lines = progressLines(
+      assistant('a1', [
+        toolPart('semantic_search', { query: 'moving abroad' }),
+        toolPart(
+          'semantic_search',
+          { query: 'living in SG', fromUser: '@member_a', k: 20 },
+          { tweets: [tweet('1'), tweet('2')] },
+        ),
+        toolPart(
+          'semantic_search',
+          { query: 'expat life' },
+          undefined,
+          'output-error',
+        ),
+      ]),
+    )
+    expect(lines.map((line) => [line.status, line.text])).toEqual([
+      ['running', 'Searching by meaning “moving abroad”'],
+      ['done', 'Searched by meaning “living in SG” from @member_a · 2 tweets'],
+      ['error', 'Could not search by meaning “expat life”'],
+    ])
+    const view = buildTurnView(
+      [
+        assistant('a2', [
+          toolPart(
+            'semantic_search',
+            { query: 'living in SG' },
+            { tweets: [{ ...tweet('3'), distance: 0.21 }, tweet('4')] },
+          ),
+          text('Some [[t:3]]'),
+        ]),
+      ],
+      0,
+    )
+    expect(view.answer.citations.map((citation) => citation.id)).toEqual(['3'])
+    expect(view.otherMatches.map((t) => t.id)).toEqual(['4'])
+    expect(view.receipt.searches).toBe(1)
+    expect(view.coverage.searches).toEqual([
+      { label: '“living in SG”, by meaning', detail: '2 tweets' },
+    ])
   })
 })

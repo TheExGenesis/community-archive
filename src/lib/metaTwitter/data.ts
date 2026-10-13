@@ -5,6 +5,7 @@ import { unstable_cache } from 'next/cache'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
 import { isTwitterUsername } from '@/lib/apiInputValidation'
+import { createServerServiceRoleClient } from '@/utils/supabase'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -275,6 +276,28 @@ export const resolvePublicProfileIdentity = async (
   if (error) throw error
   if (!data?.username) return null
   return { accountId: data.account_id ?? null, username: data.username }
+}
+
+/**
+ * Whether PostgreSQL policy withholds an account from public serving: an
+ * explicit opt-out or a scrape block. The stable ID is the key; the current
+ * handle rides along because an opt-out recorded by handle for an account that
+ * never joined has no ID to match. Errors propagate so a failed policy read
+ * never renders a profile.
+ */
+export const isPolicyBlockedAccount = async (
+  accountId: string,
+  username: string,
+): Promise<boolean> => {
+  // Next would otherwise cache the RPC and keep serving a stale decision.
+  const { data, error } = await createServerServiceRoleClient({
+    noStore: true,
+  }).rpc('policy_account_is_blocked', {
+    p_account_id: accountId,
+    p_username: username,
+  })
+  if (error) throw error
+  return data !== false
 }
 
 export const getCachedArchivedAt = unstable_cache(

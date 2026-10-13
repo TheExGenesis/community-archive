@@ -7,7 +7,7 @@ import type { PortalTweet } from '@/lib/portal/types'
 import { GroupingToggle, type Grouping } from './GroupingToggle'
 import { DEFAULT_SORT, sortTweets, type ListSort } from './listSort'
 import type { Citation } from './messageView'
-import { SortLinks } from './SortLinks'
+import { SortMenu } from './SortMenu'
 import { PeopleList, TweetRowList } from './TweetRows'
 
 /** A list shows this many rows before the rest fold. */
@@ -93,7 +93,7 @@ export function ResultList({
         </h3>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {count > 1 && (
-            <SortLinks
+            <SortMenu
               options={
                 grouping === 'people'
                   ? ['relevance', 'count', 'date']

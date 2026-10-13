@@ -92,7 +92,7 @@ test('a list with no label sits in the prose: no heading and no switch', () => {
   expect(screen.getByRole('list', { name: 'Tweets' })).toBeInTheDocument()
 })
 
-test('a list sorts by relevance by default and can sort by date', () => {
+test('a list sorts by relevance by default and can sort by date', async () => {
   const scored = [tweet('1', 'bob'), tweet('2', 'alice')]
   scored[0].createdAt = '2025-03-01T00:00:00.000Z'
   render(
@@ -110,16 +110,21 @@ test('a list sorts by relevance by default and can sort by date', () => {
   )
   const rows = () =>
     screen.getAllByText(/^Tweet \d by/).map((el) => el.textContent)
-  expect(
-    screen.getByRole('button', { name: /Sort by relevance/ }),
-  ).toHaveAttribute('aria-pressed', 'true')
+  const trigger = () => screen.getByRole('button', { name: /^Sort:/ })
+  expect(trigger()).toHaveAccessibleName('Sort: relevance, descending')
   expect(rows()).toEqual(['Tweet 2 by alice', 'Tweet 1 by bob'])
-  fireEvent.click(screen.getByRole('button', { name: 'Sort by date' }))
-  expect(rows()).toEqual(['Tweet 1 by bob', 'Tweet 2 by alice'])
-  // Most tweets only appears once the list is grouped by person.
-  expect(screen.queryByRole('button', { name: /most tweets/ })).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'People' }))
+  // Radix opens its menu from the keyboard in jsdom.
+  const open = () => fireEvent.keyDown(trigger(), { key: 'Enter' })
+  open()
   expect(
-    screen.getByRole('button', { name: /Sort by most tweets/ }),
+    screen.queryByRole('menuitemradio', { name: 'Most tweets' }),
+  ).toBeNull()
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Date' }))
+  expect(rows()).toEqual(['Tweet 1 by bob', 'Tweet 2 by alice'])
+  // Most tweets is offered once the list is grouped by person.
+  fireEvent.click(screen.getByRole('button', { name: 'People' }))
+  open()
+  expect(
+    await screen.findByRole('menuitemradio', { name: 'Most tweets' }),
   ).toBeInTheDocument()
 })

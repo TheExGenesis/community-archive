@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai'
 import type { AgentSearchRun, AgentTweet } from './types'
+import { tweetFilesOnly } from './workspace/manifest'
 
 // Past answers outlive Workflow's own run data (7 days after a run ends on
 // Vercel Pro), so each run stores its answer as UI message parts. Tweets are
@@ -111,6 +112,29 @@ function slimPeople(output: unknown): unknown {
 }
 
 /**
+ * A workspace command keeps what the page needs to show it again: its
+ * summary, exit code, the tweet files it wrote (ids) and their tweets (as
+ * references). Its stdout, stderr and text files are dropped: they may hold
+ * tweet text, which is never stored with an answer.
+ */
+function slimBash(output: unknown): unknown {
+  if (!isRecord(output)) return output
+  return {
+    summary: output.summary,
+    exitCode: output.exitCode,
+    files: isRecord(output.files) ? output.files : {},
+    workspace: tweetFilesOnly(output.workspace),
+    tweets: Array.isArray(output.tweets) ? output.tweets : [],
+    ...(typeof output.costUsd === 'number' ? { costUsd: output.costUsd } : {}),
+  }
+}
+
+const SLIM: Record<string, (output: unknown) => unknown> = {
+  find_people: slimPeople,
+  bash: slimBash,
+}
+
+/**
  * The assistant message as the page would have built it from the stream:
  * one tool part per call, then the final answer text.
  */
@@ -128,10 +152,9 @@ export function buildRunParts(steps: StepLike[], text: string): unknown[] {
               toolCallId: call.toolCallId,
               state: 'output-available',
               input: call.input,
-              output:
-                call.toolName === 'find_people'
-                  ? slimPeople(result.output)
-                  : result.output,
+              output: (SLIM[call.toolName] ?? ((output) => output))(
+                result.output,
+              ),
             }
           : {
               type: `tool-${call.toolName}`,

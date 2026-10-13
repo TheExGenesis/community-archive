@@ -1,9 +1,13 @@
 import 'server-only'
 import { convertToModelMessages, type ModelMessage, type UIMessage } from 'ai'
-import { createAgentSearchTools } from './agent'
+import { createAgentSearchTools, createBashAgentTools } from './agent'
 import { collectRefs, conversationMessages } from './history'
 import { loadConversationTweets } from './historyTweets'
 import type { AgentSearchRun, AgentTweet } from './types'
+import {
+  manifestFromOutputs,
+  type WorkspaceManifest,
+} from './workspace/manifest'
 
 // A follow-up question sees the conversation as the server stored it, never
 // as the browser sends it: the client sends only the new question. Earlier
@@ -22,6 +26,20 @@ export interface ConversationContext {
    * conversation. A follow-up answer may cite them (see citations.ts).
    */
   priorTweetIds: string[]
+  /** The workspace files earlier turns left (tweet files only). */
+  workspace: WorkspaceManifest
+}
+
+/** Stored bash outputs of these runs, in order, for their workspace changes. */
+function bashOutputs(runs: AgentSearchRun[]): unknown[] {
+  return runs.flatMap((run) =>
+    (Array.isArray(run.parts) ? run.parts : []).flatMap((part) => {
+      const record = part as { type?: unknown; output?: unknown } | null
+      return record?.type === 'tool-bash' && record.output
+        ? [record.output]
+        : []
+    }),
+  )
 }
 
 /** The conversation's finished runs before the current one, oldest first. */
@@ -64,8 +82,9 @@ const textOnly = (message: UIMessage): UIMessage => ({
 
 async function toModelMessages(messages: UIMessage[]) {
   return convertToModelMessages(messages, {
-    // toModelOutput compacts old tool outputs, as in the original turn.
-    tools: createAgentSearchTools(),
+    // toModelOutput compacts old tool outputs, as in the original turn; a
+    // stored bash output shows its summary and files.
+    tools: { ...createAgentSearchTools(), ...createBashAgentTools() },
     // A run stopped mid-tool leaves a call without a result.
     ignoreIncompleteToolCalls: true,
   })
@@ -82,9 +101,11 @@ export async function buildConversationContext(
   const priorTweetIds = new Set<string>()
   for (const run of prior) collectRefs(run.parts ?? [], priorTweetIds)
 
+  const workspace = manifestFromOutputs(bashOutputs(prior))
+
   const recent = prior.slice(-MAX_CONTEXT_TURNS)
   if (recent.length === 0) {
-    return { messages: [], priorTweetIds: Array.from(priorTweetIds) }
+    return { messages: [], priorTweetIds: Array.from(priorTweetIds), workspace }
   }
   const tweets = await loadTweets(recent)
   const messages: ModelMessage[] = []
@@ -97,5 +118,5 @@ export async function buildConversationContext(
     )
     messages.push(...converted)
   }
-  return { messages, priorTweetIds: Array.from(priorTweetIds) }
+  return { messages, priorTweetIds: Array.from(priorTweetIds), workspace }
 }

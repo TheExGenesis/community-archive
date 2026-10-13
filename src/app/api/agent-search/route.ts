@@ -6,6 +6,7 @@ import {
   admitAgentSearchRun,
   agentSearchPricingProblem,
 } from '@/lib/agentSearch/budget'
+import { agentSearchToolMode } from '@/lib/agentSearch/agent'
 import { agentSearchRunDeadlineMs } from '@/lib/agentSearch/deadline'
 import {
   agentSearchAccessStatus,
@@ -25,10 +26,7 @@ export const dynamic = 'force-dynamic'
 const noStore = { 'Cache-Control': 'private, no-store' }
 
 const unavailable = () =>
-  NextResponse.json(
-    { error: 'unavailable' },
-    { status: 503, headers: noStore },
-  )
+  NextResponse.json({ error: 'unavailable' }, { status: 503, headers: noStore })
 
 const workflowStatus = (workflowRunId: string) =>
   getRun(workflowRunId).status.catch(() => null)
@@ -43,9 +41,7 @@ export async function POST(request: Request) {
   }
   const accountId = access.viewer.accountId
 
-  const parsed = parseAgentSearchRequest(
-    await request.json().catch(() => null),
-  )
+  const parsed = parseAgentSearchRequest(await request.json().catch(() => null))
   if (!parsed) {
     return NextResponse.json(
       { error: 'invalid_request' },
@@ -118,6 +114,7 @@ export async function POST(request: Request) {
         modelSpec,
         date: new Date().toISOString().slice(0, 10),
         deadlineAt: Date.now() + agentSearchRunDeadlineMs(),
+        toolMode: agentSearchToolMode(),
       },
     ])
   } catch (error) {

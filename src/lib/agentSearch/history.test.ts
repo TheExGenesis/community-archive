@@ -255,3 +255,52 @@ describe('conversationMessages', () => {
     expect(answer.parts).toEqual([{ type: 'text', text: 'Plain answer' }])
   })
 })
+
+describe('stored bash commands', () => {
+  test('keep summary, files, tweet references and tweet files, never stdout or notes', () => {
+    const [part] = buildRunParts(
+      [
+        {
+          toolCalls: [
+            {
+              toolCallId: 'b1',
+              toolName: 'bash',
+              input: { command: 'search x > s1.jsonl' },
+            },
+          ],
+          toolResults: [
+            {
+              toolCallId: 'b1',
+              output: {
+                stdout: '{"id":"1","text":"secret tweet text"}\n',
+                stderr: 'search “x”: 1 tweet\n',
+                exitCode: 0,
+                summary: 'Searched “x” · 1 tweet',
+                files: { 's1.jsonl': ['1'] },
+                tweets: [tweet('1')],
+                workspace: {
+                  's1.jsonl': { kind: 'tweets', rows: [{ id: '1', p: 0.8 }] },
+                  'notes.txt': { kind: 'text', text: 'secret tweet text' },
+                },
+                costUsd: 0,
+                semanticCalls: 0,
+              },
+            },
+          ],
+        },
+      ],
+      '',
+    ) as Array<{ output: Record<string, unknown> }>
+    expect(JSON.stringify(part)).not.toContain('secret tweet text')
+    expect(part.output).toEqual({
+      summary: 'Searched “x” · 1 tweet',
+      exitCode: 0,
+      files: { 's1.jsonl': ['1'] },
+      workspace: {
+        's1.jsonl': { kind: 'tweets', rows: [{ id: '1', p: 0.8 }] },
+      },
+      tweets: [{ $t: '1' }],
+      costUsd: 0,
+    })
+  })
+})

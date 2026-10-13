@@ -22,11 +22,15 @@ export interface CompactTweet {
   quotes?: string
   likes: number
   p?: number
+  /** Semantic search: how close the tweet is to the query (higher is closer). */
+  distance?: number
 }
 
 export const COMPACT_TEXT_LIMIT = 500
 
-export function compactTweet(tweet: AgentTweet & { p?: number }): CompactTweet {
+export function compactTweet(
+  tweet: AgentTweet & { p?: number; distance?: number },
+): CompactTweet {
   const text =
     tweet.text.length > COMPACT_TEXT_LIMIT
       ? `${tweet.text.slice(0, COMPACT_TEXT_LIMIT)}…`
@@ -40,6 +44,9 @@ export function compactTweet(tweet: AgentTweet & { p?: number }): CompactTweet {
     ...(tweet.quoteTweetId ? { quotes: tweet.quoteTweetId } : {}),
     likes: tweet.likes,
     ...(tweet.p === undefined ? {} : { p: Math.round(tweet.p * 100) / 100 }),
+    ...(tweet.distance === undefined
+      ? {}
+      : { distance: Math.round(tweet.distance * 1000) / 1000 }),
   }
 }
 

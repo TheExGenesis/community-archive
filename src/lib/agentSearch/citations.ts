@@ -6,7 +6,9 @@
 // earlier turns' ids from context.ts) and the page (messageView.ts, from the
 // earlier messages it holds) apply the same rule.
 
-export const CITATION_PATTERN = /\[\[t:(\d{1,20})\]\]/g
+// DeepSeek V4.1 Flash sometimes drops the prefix and writes [[<id>]]; in the
+// eval it did so for 3 of 8 typed-tool answers, so the prefix is optional.
+export const CITATION_PATTERN = /\[\[(?:t:)?(\d{1,20})\]\]/g
 
 // When the answer is a set of posts, the agent shows them as a list where it
 // wants them: [[posts: <label> | <source>]]. The source is either tweet ids

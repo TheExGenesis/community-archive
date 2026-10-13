@@ -11,6 +11,11 @@ import {
   type SearchMode,
   type SearchSort,
 } from './gateway'
+import {
+  SEMANTIC_LIMIT_MESSAGE,
+  semanticSearch,
+  type SemanticSearchInput,
+} from './semantic'
 import type { AgentTweet, ScoredTweet } from './types'
 
 // Plain implementations of the agent's tools. The workflow wraps each one in a
@@ -145,7 +150,7 @@ async function parentTexts(
   return texts
 }
 
-async function scoreWithParents(
+export async function scoreWithParents(
   criterion: string,
   tweets: AgentTweet[],
   withParent: boolean,
@@ -178,7 +183,7 @@ async function scoreWithParents(
  * that run out pass to terms that still have pages. `capped` is true when
  * matching posts were left unfetched.
  */
-async function collectAcrossTerms(
+export async function collectAcrossTerms(
   terms: string[],
   max: number,
   filters: { since?: string; until?: string; fromUser?: string },
@@ -344,6 +349,25 @@ export async function getTweetsImpl(
   return { tweets }
 }
 
+export async function semanticSearchImpl(
+  raw: SemanticSearchInput,
+  limits: RunLimits = {},
+): Promise<
+  | Awaited<ReturnType<typeof semanticSearch>>
+  | { query: string; limitReached: true; message: string; tweets: [] }
+> {
+  const input = present(raw)
+  return semanticSearch(input, limits)
+}
+
+/** What the typed tool returns once a question has used its semantic searches. */
+export const semanticLimitReached = (query: string) => ({
+  query,
+  limitReached: true as const,
+  message: SEMANTIC_LIMIT_MESSAGE,
+  tweets: [] as [],
+})
+
 export const AGENT_SEARCH_TOOL_EXECUTORS = {
   find_people: findPeopleImpl,
   search_tweets: searchTweetsImpl,
@@ -352,6 +376,7 @@ export const AGENT_SEARCH_TOOL_EXECUTORS = {
   get_thread: getThreadImpl,
   get_quote_posts: getQuotePostsImpl,
   get_tweets: getTweetsImpl,
+  semantic_search: semanticSearchImpl,
 }
 
 export type AgentSearchToolExecutors = typeof AGENT_SEARCH_TOOL_EXECUTORS

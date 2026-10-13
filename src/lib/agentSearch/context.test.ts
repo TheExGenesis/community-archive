@@ -9,7 +9,11 @@ jest.mock('ai', () => ({
 jest.mock('./toolImpl', () => ({ AGENT_SEARCH_TOOL_EXECUTORS: {} }))
 jest.mock('./historyTweets', () => ({ loadConversationTweets: jest.fn() }))
 
-import { buildConversationContext, MAX_CONTEXT_TURNS, priorRuns } from './context'
+import {
+  buildConversationContext,
+  MAX_CONTEXT_TURNS,
+  priorRuns,
+} from './context'
 import { buildRunParts } from './history'
 import type { AgentSearchRun, AgentTweet } from './types'
 
@@ -97,8 +101,12 @@ describe('buildConversationContext', () => {
   })
 
   test('a first question has no earlier turns', async () => {
-    const context = await buildConversationContext([run('r1')], 'r1', loadTweets)
-    expect(context).toEqual({ messages: [], priorTweetIds: [] })
+    const context = await buildConversationContext(
+      [run('r1')],
+      'r1',
+      loadTweets,
+    )
+    expect(context).toEqual({ messages: [], priorTweetIds: [], workspace: {} })
     expect(mockConvert).not.toHaveBeenCalled()
   })
 
@@ -151,6 +159,88 @@ describe('buildConversationContext', () => {
     const assistant = context.messages.find(
       (m: any) => m.role === 'assistant',
     ) as any
-    expect(assistant.parts).toEqual([{ type: 'text', text: 'Answer r1 [[t:11]]' }])
+    expect(assistant.parts).toEqual([
+      { type: 'text', text: 'Answer r1 [[t:11]]' },
+    ])
+  })
+})
+
+describe('the workspace across turns', () => {
+  test('carries earlier turns’ tweet files and shows stored commands as summaries', async () => {
+    mockConvert
+      .mockReset()
+      .mockImplementation(async (messages, options) =>
+        messages.flatMap((message: { parts: Array<Record<string, unknown>> }) =>
+          message.parts
+            .filter((part) => part.type === 'tool-bash')
+            .map((part) =>
+              options.tools.bash.toModelOutput({ output: part.output }),
+            ),
+        ),
+      )
+    const withBash = run('r1', {
+      parts: buildRunParts(
+        [
+          {
+            toolCalls: [
+              {
+                toolCallId: 'b1',
+                toolName: 'bash',
+                input: { command: 'search x > s1.jsonl' },
+              },
+            ],
+            toolResults: [
+              {
+                toolCallId: 'b1',
+                output: {
+                  stdout: 'rows',
+                  stderr: '',
+                  exitCode: 0,
+                  summary: 'Searched “x” · 2 tweets',
+                  files: { 's1.jsonl': ['11', '12'] },
+                  tweets: [tweet('11'), tweet('12')],
+                  workspace: {
+                    's1.jsonl': {
+                      kind: 'tweets',
+                      rows: [{ id: '11' }, { id: '12', p: 0.7 }],
+                    },
+                  },
+                  costUsd: 0,
+                  semanticCalls: 0,
+                },
+              },
+            ],
+          },
+        ],
+        'See [[posts: All | s1.jsonl]]',
+      ),
+    })
+    const loadTweets = jest.fn(
+      async () =>
+        new Map([
+          ['11', tweet('11')],
+          ['12', tweet('12')],
+        ]),
+    )
+    const context = await buildConversationContext(
+      [withBash, run('r2', { status: 'running' })],
+      'r2',
+      loadTweets,
+    )
+    expect(context.workspace).toEqual({
+      's1.jsonl': {
+        kind: 'tweets',
+        rows: [{ id: '11' }, { id: '12', p: 0.7 }],
+      },
+    })
+    expect(context.messages).toEqual([
+      {
+        type: 'json',
+        value: {
+          output: 'Searched “x” · 2 tweets\ns1.jsonl · 2 tweets',
+          exitCode: 0,
+        },
+      },
+    ])
   })
 })

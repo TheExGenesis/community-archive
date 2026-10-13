@@ -31,14 +31,19 @@ Then, from the repo root:
     node_modules/.bin/tsx --tsconfig scripts/agent-search/tsconfig.json scripts/agent-search/eval.ts --class person-centric,time-bounded
     node_modules/.bin/tsx --tsconfig scripts/agent-search/tsconfig.json scripts/agent-search/eval.ts --limit 5 --concurrency 2
 
-Other flags: `--model provider:model` (default `AGENT_SEARCH_MODEL` or `openai:gpt-6.1-sol`),
-`--timeout-ms` (per question, default 300000), `--questions <file>`, `--no-validate-keys`,
-`--allow-remote-gateway`.
+Other flags: `--model provider:model` (default `AGENT_SEARCH_MODEL` or
+`openrouter:deepseek/deepseek-v4.1-flash`), `--tools bash|typed` (default `AGENT_SEARCH_TOOLS`
+or `bash`: the shell workspace, or the typed tools), `--timeout-ms` (per question, default
+300000), `--questions <file>`, `--no-validate-keys`, `--allow-remote-gateway`.
 
 Environment: the script reads `~/ca-local/gateway/site.env` (override the path with
-`AGENT_SEARCH_GATEWAY_ENV`) and takes only `OPENAI_API_KEY` from `.env.local`, so
-production settings in `.env.local` never reach a run. Variables already set in the shell
-win. It refuses a gateway URL that is not localhost unless `--allow-remote-gateway` is
+`AGENT_SEARCH_GATEWAY_ENV`) and takes only the model keys, `OPENAI_API_KEY` and
+`OPENROUTER_API_KEY`, from `.env.local` and `.env` in the repo root (or in
+`AGENT_SEARCH_KEYS_DIR`, for a worktree), so production settings never reach a run.
+Variables already set in the shell win. An `openrouter:` model needs `OPENROUTER_API_KEY`.
+In bash mode the shell is the same workspace as the workflow's, carried between commands
+through the manifest, so a run exercises the same rebuild path; `semantic` calls the real
+embeddings API (2 per question). It refuses a gateway URL that is not localhost unless `--allow-remote-gateway` is
 passed. The scorer used by `collect_and_score` / `score_tweets` follows
 `AGENT_SEARCH_SCORER` (see `docs/agent-search.md`); with an OpenAI key and nothing set it
 is the Decisions API.
@@ -70,9 +75,13 @@ drops any that no longer resolve, so opt-outs leave the key; dropped ids are rep
   misses. Exact keys only; for partial keys the cited-outside-key count is shown
   instead, because those ids are unjudged.
 - **invalid**: citations whose id never appeared in a tool result (`validateCitations`
-  against `collectToolTweetIds` of all tool outputs). The per-question table shows
+  against `collectToolTweetIds` of all tool outputs). Tweets in a `[[posts: … | lists/x.jsonl]]`
+  list count as cited, resolved through the files the commands reported. The per-question table shows
   distinct ids; the by-class table reports invalid markers, repeats included, as a rate
   of all markers.
+- **command errors** (bash mode): commands that threw or exited non-zero. A failure inside
+  a pipe whose last command succeeds exits 0 and is not counted.
+- **semantic**: semantic searches the run made.
 - A run whose model failed, was cut off at the token limit or filtered, or returned no
   answer, is reported as an error, not scored as an answer (`agentRunFailure`).
 - **call N** (recall-a-tweet): which tool call first returned the target tweet.

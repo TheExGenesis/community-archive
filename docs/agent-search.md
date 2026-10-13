@@ -33,30 +33,101 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    run (`RunExpiredError`) answers a reconnect with a finish alone. `vercel.json` sets `supportsCancellation` on the reconnect
    route so a closed tab ends its function; the start route is left without
    it, since it must finish recording the workflow run once admitted.
-2. The workflow runs AI SDK 7's `WorkflowAgent`. Each tool call is a durable
-   step. Tools (`src/lib/agentSearch/agent.ts`, implemented in `toolImpl.ts`):
-   `find_people`, `search_tweets`, `collect_and_score`, `score_tweets`,
-   `get_thread`, `get_quote_posts`, `get_tweets`. They read only through the
-   gateway (`gateway.ts`), which applies opt-outs. The page receives full tweet
-   objects; the model receives a compact form (`toModelOutput`).
-3. The agent starts with keyword searches. When a question's answer is a set of
-   posts and the searches are too many and too noisy to read, `collect_and_score`
-   pulls matching posts (300 by default, up to 1,000 when the agent asks) and
-   scores each one against a yes/no criterion (`classifier.ts`). The default
-   scorer is OpenAI's Decisions API (one `predicate` question per post, 48
-   requests at a time); Jev through OpenRouter and an LLM with structured output
-   are alternatives. Replies are scored with their parent's text. The result
-   says when the limit cut the collection short.
-4. The answer cites tweets as `[[t:<id>]]`. A citation counts only if the id
-   came back from a tool in the same conversation, in this run or an earlier
-   turn (`citations.ts`); the page marks other ids as unverified and the run
-   record lists them. The page and the stored run apply the same rule.
+2. The workflow runs AI SDK 7's `WorkflowAgent` with one tool, `bash`
+   (`src/lib/agentSearch/agent.ts`): the model writes command lines and the
+   archive's results come back as files in a shell workspace (see
+   [The workspace](#the-workspace)). Each command is a durable step. Every
+   archive read goes through the gateway (`gateway.ts`), which applies
+   opt-outs. The page receives the command's summary, the tweet files it
+   wrote and the tweets it touched; the model receives only stdout, capped at
+   about 4,000 characters, and the exit code. `AGENT_SEARCH_TOOLS=typed`
+   switches back to the earlier typed tools (`find_people`, `search_tweets`,
+   `semantic_search`, `collect_and_score`, `score_tweets`, `get_thread`,
+   `get_quote_posts`, `get_tweets`, implemented in `toolImpl.ts`), which pass
+   compact tweets to the model.
+3. The agent starts with keyword searches, adding semantic search for ideas
+   phrased many ways. When a question's answer is a set of posts and the
+   searches are too many and too noisy to read, it collects a file of
+   candidates (up to 1,000) and scores each one against a yes/no criterion
+   (`classifier.ts`). The default scorer is OpenAI's Decisions API (one
+   `predicate` question per post, 48 requests at a time); Jev through
+   OpenRouter and an LLM with structured output are alternatives. Replies are
+   scored with their parent's text.
+4. The answer cites single tweets as `[[t:<id>]]` and shows sets of tweets as
+   lists, `[[posts: <label> | lists/<name>.jsonl]]` (a workspace file) or
+   `[[posts: <label> | <id>, <id>]]`. A citation or listed tweet counts only
+   if its id came back from a tool in the same conversation, in this run or an
+   earlier turn (`citations.ts`); a list's file resolves to the ids the
+   command that wrote it reported. The page marks other ids as unverified and
+   the run record lists them. The page and the stored run apply the same rule.
 5. The last step stores the run (`runStore.ts`): question, answer, cited and
    invalid ids, and tool calls. The answer is the last model step's text. A
    run of up to 20 model steps may not call tools on its last step, so it
    always ends with an answer. A model error, or a finish other than `stop`
    (cut off at the token limit, content filter), marks the run `failed` with
    the reason in `error`; any partial answer is kept and shown as unfinished.
+   Two steps in a row in which every tool call failed (the archive is down)
+   end the run with that error.
+
+## The workspace
+
+The shell is [just-bash](https://www.npmjs.com/package/just-bash), a bash
+interpreter in TypeScript with an in-memory file system: no network, no
+processes, no python or node, and the `hardened` execution limits (90 s per
+command, bounded by the run's deadline; 8 MB of output; 64 MB of files). Its
+usual tools (`jq`, `grep`, `sort`, `uniq`, `wc`, `head`, `cut`, `awk`, `sed`)
+work on files under `/work`, and archive commands are added
+(`src/lib/agentSearch/workspace/commands.ts`):
+
+| Command | Does |
+|---|---|
+| `search <words> [--any w1,w2] [--all] [--from @h] [--reply-to @h] [--since D] [--until D] [--sort …] [--limit N]` | Keyword search; JSONL tweets to stdout (50 by default, up to 1,000) |
+| `semantic "<idea>" [--from @h] [--k N] [--threshold 0-1]` | Meaning search (below); rows carry `distance` |
+| `people <name or handle>` | Members and accounts matching a name |
+| `score <file> "<yes/no question>" [--no-parent]` | Scores every tweet in a file; rows gain `p`, best first |
+| `thread <id>`, `quotes <id>`, `tweets <id…>`, `read <id>` | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet |
+
+A tweet file is JSONL, one tweet per line: `id`, `author`, `date`, `likes`,
+`reposts`, `replyTo`, `quotes`, `media`, `p` when scored, and `text`. Each
+command writes a one-line summary to stderr (`search “x”: 120 tweets · 85
+authors · 2023-01 to 2025-06 · more exist`), which the model sees, and a
+shorter one for the page (`Searched “x” · 120 tweets`).
+
+Each command runs in a fresh shell, because a workflow step may run in
+another process. Between commands, and between turns of a conversation, the
+workspace is carried as a manifest (`workspace/manifest.ts`): for each tweet
+file, its ids in order with `p` and up to 8 short fields the agent added (a
+group label, say), never tweet text. A file is rebuilt only when a command
+reads it, by fetching its ids through the gateway again, so a tweet whose
+author has opted out since drops out. Other files (counts, notes) are carried
+as text for the rest of the run (up to 20,000 characters) but are never
+stored with the answer, since they may hold tweet text.
+
+Each command's output reports the changes it made (`workspace`) and the ids in
+each tweet file it wrote (`files`). The stored run keeps the summary, exit
+code, `files`, tweet-file changes and tweet ids (`history.ts`), never stdout,
+stderr or notes. A follow-up rebuilds the workspace by replaying the earlier
+turns' changes in order, and its question lists those files.
+
+## Semantic search
+
+`semantic` (and the typed `semantic_search`) calls the Tweetstack embeddings
+API (`POST https://embed.tweetstack.app/embeddings/search`, Qwen3-Embedding-4B
+over the archive; `semantic.ts`). It takes about 13–14 seconds, so it is
+limited to 2 calls per run; a third returns an error telling the agent to use
+keyword search. Its timeout is bounded by the run's deadline. The API returns
+tweet ids with a distance; the metadata text it also returns is never used.
+The ids are fetched again through the gateway, keeping the API's order and
+distance, so opt-outs and deletions apply. A failed semantic call does not
+count as the archive being down.
+
+The prompt steers semantic search to paraphrased ideas, surveys and
+investigative questions, and keyword search to names, handles, exact phrases
+and dates; the two are combined by merging files and scoring.
+
+Before release, the maintainer of the API should confirm how it handles
+opt-outs (the re-fetch drops opted-out tweets from results, but the index may
+still match them) and how fresh its index is.
 
 ## Cost
 
@@ -66,11 +137,12 @@ progress and a stopped or failed run keeps what it spent (`usage.ts`):
 - Each planner call adds its tokens and estimated cost to the run inside the
   model step, as soon as the provider reports usage (`EnvLanguageModel` with a
   run id). A failed write fails the call.
-- `collect_and_score` and `score_tweets` add their scorer cost before they
-  return or throw. A scorer that fails part-way throws a `ScoringError`
-  carrying the cost of the calls that succeeded. These two steps are never
-  retried, since a retry pays for all the scoring again; gateway-only tools
-  retry once.
+- The shell's `score` (and the typed `collect_and_score` and `score_tweets`)
+  add their scorer cost before they return or throw. A scorer that fails
+  part-way throws a `ScoringError` carrying the cost of the calls that
+  succeeded. Shell commands and these two tools are never retried, since a
+  retry pays for all the scoring again; gateway-only tools retry once.
+  Semantic search has no charge.
 - Writes are increments (`agent_search_add_usage`), so concurrent steps of one
   run never overwrite each other, and status updates never touch spend.
 - A run does not start when the planner, or the `llm` scorer, has no price or
@@ -104,7 +176,10 @@ through the gateway. Tool outputs are converted with the tool definitions, so
 each one is compacted by its `toModelOutput` as when the model first saw it,
 and a tool call left without a result by a Stop is ignored. The model sees the
 last 3 earlier turns (`MAX_CONTEXT_TURNS`); the page shows the whole
-conversation. Citations may use tweets from any earlier turn.
+conversation. Citations may use tweets from any earlier turn. Stored shell
+commands come back as their summary and the files they wrote, and the
+workspace is rebuilt from every earlier turn's tweet files, so a follow-up
+can work on `lists/` from the last answer.
 
 Models cross Workflow step boundaries as `EnvLanguageModel`, which serializes
 only its `provider:model` spec. Provider models would otherwise serialize their
@@ -114,7 +189,10 @@ resolved headers, including the API key, into the event log.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AGENT_SEARCH_MODEL` | `openai:gpt-6.1-sol` | Planner (`openai:` or `openrouter:` spec) |
+| `AGENT_SEARCH_MODEL` | `openrouter:deepseek/deepseek-v4.1-flash` | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative |
+| `AGENT_SEARCH_TOOLS` | `bash` | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with |
+| `SEMANTIC_SEARCH_URL` | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint |
+| `OPENROUTER_API_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default |
 | `AGENT_SEARCH_SCORER` | unset | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM |
 | `AGENT_SEARCH_SCORER_MODEL` | `openai:gpt-6-luna` | Model for the `llm` scorer |
 | `AGENT_SEARCH_SCORER_REASONING` | `low` | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`) |
@@ -126,6 +204,11 @@ resolved headers, including the API key, into the event log.
 | `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set |
 | `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...` | price table | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost) |
 | `AGENT_SEARCH_RUN_STORE` | file outside production | `file` forces the local JSON store |
+
+The default planner runs on OpenRouter, so `OPENROUTER_API_KEY` must be set in
+Production and Preview. It is the same key the Daily Digest uses
+(`docs/daily-digest.md`). The default scorer stays on OpenAI Decisions
+(`OPENAI_API_KEY`).
 
 The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_URL`,
 `CLICKHOUSE_ANALYTICS_API_TOKEN`) are the site's existing ones. The route sets

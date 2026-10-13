@@ -293,6 +293,66 @@ function shortCommand(command: string) {
     : line || 'a command'
 }
 
+// The words of a shell segment, with quotes removed and options dropped.
+function commandWords(segment: string): string[] {
+  const words = Array.from(segment.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)).map(
+    (match) => match[1] ?? match[2] ?? match[3],
+  )
+  const kept: string[] = []
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]
+    if (word === '>' || word === '>>') break
+    if (word.startsWith('--')) {
+      // An option and its value: --limit 300, --from @x.
+      if (
+        !word.includes('=') &&
+        words[i + 1] &&
+        !words[i + 1].startsWith('-')
+      ) {
+        i++
+      }
+      continue
+    }
+    kept.push(word)
+  }
+  return kept
+}
+
+/**
+ * What a running shell command is doing, in words: the first archive command
+ * in it, or looking through files already found. Members never see the shell.
+ */
+export function describeCommand(command: string): string {
+  const segments = command.split(/;|&&|\|\||\|/)
+  for (const segment of segments) {
+    const [name, ...rest] = commandWords(segment.trim())
+    const text = rest.join(' ').trim()
+    switch (name) {
+      case 'search':
+        return text ? `Searching ${quote(text)}` : 'Searching'
+      case 'semantic':
+        return text
+          ? `Searching by meaning ${quote(text)}`
+          : 'Searching by meaning'
+      case 'people':
+        return text ? `Looking up ${quote(text)}` : 'Looking up people'
+      case 'score':
+        return rest[1]
+          ? `Checking tweets against ${quote(criterionText({ criterion: rest.slice(1).join(' ') }))}`
+          : 'Checking tweets against your question'
+      case 'thread':
+        return 'Reading thread'
+      case 'quotes':
+        return 'Reading quotes'
+      case 'read':
+        return 'Reading a tweet in full'
+      case 'tweets':
+        return 'Collecting tweets'
+    }
+  }
+  return 'Looking through the results'
+}
+
 /** Mirrors DEFAULT_COLLECT in toolImpl: the limit when the agent sets none. */
 const DEFAULT_COLLECT = 300
 
@@ -395,9 +455,10 @@ export function progressLine(call: ToolCallView): ProgressLine {
         .split('\n')
         .map((line) => line.trim())
         .find(Boolean)
-      running = `Running ${command}`
+      const doing = describeCommand(asString(input.command) ?? '')
+      running = doing
       finished = asString(out.summary) ?? firstLine ?? `Ran ${command}`
-      failure = `Could not run ${command}`
+      failure = `Could not finish: ${doing.charAt(0).toLowerCase()}${doing.slice(1)}`
       if (done && (asNumber(out.exitCode) ?? 0) !== 0) {
         return { id: call.id, text: failure, status: 'error' }
       }

@@ -10,6 +10,7 @@ import {
   describeChatError,
   formatElapsed,
   logSummary,
+  describeCommand,
   progressLines,
   searchSubject,
   toolCalls,
@@ -664,15 +665,39 @@ describe('workspace steps and the folded log line', () => {
       ]),
     )
     expect(lines.map((line) => [line.status, line.text])).toEqual([
-      ['running', 'Running search "Singapore" > s1.jsonl'],
+      ['running', 'Searching “Singapore”'],
       ['done', '12 lists/living.jsonl'],
       ['done', 'c1.jsonl: 23 of 200 kept'],
-      ['error', 'Could not run jq bad'],
+      ['error', 'Could not finish: looking through the results'],
     ])
     expect(
       progressLines(assistant('a2', [toolPart('bash', { command: long })]))[0]
         .text,
-    ).toMatch(/^Running jq -c .{60,}…$/)
+    ).toBe('Looking through the results')
+  })
+
+  test('describes a running shell command in words, never the shell', () => {
+    expect(
+      describeCommand(
+        "search singapore --limit 1000 > s2.jsonl; wc -l s2.jsonl; jq -r '.author' s2.jsonl | sort",
+      ),
+    ).toBe('Searching “singapore”')
+    expect(
+      describeCommand(
+        'semantic "moved to Singapore for work" --k 200 > v1.jsonl',
+      ),
+    ).toBe('Searching by meaning “moved to Singapore for work”')
+    expect(describeCommand('people visakanv; people singapore')).toBe(
+      'Looking up “visakanv”',
+    )
+    expect(
+      describeCommand(
+        'score s1.jsonl "Does this tweet talk about living there?" > c1.jsonl',
+      ),
+    ).toBe('Checking tweets against “Does this tweet talk about living there?”')
+    expect(
+      describeCommand('mkdir -p lists && jq -c . c1.jsonl > lists/a.jsonl'),
+    ).toBe('Looking through the results')
   })
 
   test('sums up steps, what the answer rests on, and what else was found', () => {

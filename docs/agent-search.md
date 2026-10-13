@@ -228,6 +228,7 @@ resolved headers, including the API key, into the event log.
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY`                                                                         |                                                  | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true`                                                                                                           |
 | `AGENT_SEARCH_DAILY_LIMIT`                                                                                      | `10`                                             | Questions per member per UTC day                                                                                                                                                  |
 | `AGENT_SEARCH_MONTHLY_LIMIT`                                                                                    | `30`                                             | Questions per member per UTC month, counted like the daily limit; the page shows whichever runs out first                                                                         |
+| `AGENT_SEARCH_ENABLED`                                                                                          | on                                               | Set to `false` to pause new questions (history still works); see below                                                                                                            |
 | `AGENT_SEARCH_GLOBAL_DAILY_USD`                                                                                 | `25`                                             | Global daily spend kill switch                                                                                                                                                    |
 | `AGENT_SEARCH_RUN_DEADLINE_MS`                                                                                  | `300000`                                         | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools                     |
 | `AGENT_SEARCH_STALE_RUN_MS`                                                                                     | `600000`                                         | When a running run stops blocking a new one; never less than the deadline plus 2 minutes. A run whose workflow has ended stops blocking at once                                   |
@@ -267,9 +268,51 @@ questions; house questions keep their own counts). They add it from the
   count house spend only. The scorer and the semantic search still run on the
   house, so own-key questions still stop when the global cap is reached.
 
+### Pausing Ask the archive
+
+`AGENT_SEARCH_ENABLED` is the off switch (`src/lib/agentSearch/enabled.ts`).
+Unset means on: the feature already needs migrations and keys before it can
+run, and a switch that defaulted off would leave a fresh deploy silently dead.
+Set it to `false` (or `0`, `off`, `no`) to pause without a deploy:
+
+- `POST /api/agent-search` refuses new questions with `503 { error: 'disabled' }`
+  before any check, admission or spend.
+- The Ask page replaces its composer with "Ask the archive is paused"; members
+  can still open and delete their conversations (the conversation routes are
+  unaffected).
+- The search-box entry points (Ask AI on `/search`, the ⌘↵ chip in the
+  homepage and header boxes) hide; `/api/auth/navigation` reports `askEnabled`.
+- The nav item stays and leads to the paused page.
+
 The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_URL`,
 `CLICKHOUSE_ANALYTICS_API_TOKEN`) are the site's existing ones. The route sets
 `maxDuration = 300`; the repository default is 15 seconds.
+
+## Data handling and retention
+
+What leaves the site for a question, and what deleting reaches. The page's
+"How questions are handled" disclosure (`QuestionHandling.tsx`) says the same in
+plain words; keep the two in step.
+
+- **The planner model** (OpenRouter by default) receives the question, earlier
+  turns as compact context, and the tool outputs, which include tweet text.
+  OpenRouter calls carry `zdr: true` and `data_collection: deny`.
+- **Semantic search** sends the agent's own search phrase (its wording of the
+  idea, not necessarily the question verbatim) to the Community Archive's
+  embeddings API.
+- **The relevance check** sends tweet text and the agent's yes-or-no criterion
+  to OpenAI's Decisions API (or the configured scorer).
+- **Run records** (`agent_search_runs`) keep the question, the answer as message
+  parts with tweets reduced to ids, the workspace manifest (ids and scores),
+  tool calls and usage. Deleting a conversation clears the content and sets
+  `deleted_at`; started time, status, tokens, cost and key source stay, so the
+  daily and monthly limits and the spend cap still count the run.
+- **Workflow's run data** (step inputs and outputs, including the question and
+  tweet text) is kept by Workflow until its retention ends, about 7 days after
+  the run on Vercel Pro. Deleting a conversation does not reach it; the delete
+  confirmation says so.
+- **A member's own OpenRouter key** stays in their browser and reaches the
+  workflow only sealed (see above); it is never stored.
 
 ## Run storage
 

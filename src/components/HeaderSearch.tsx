@@ -30,7 +30,7 @@ export default function HeaderSearch() {
     router.push(buildAskHref(query))
   }
   // Signed out, asking explains and offers sign-in instead.
-  const { ask, explaining, setExplaining } = useAskFromSearch(goAsk)
+  const { ask, explaining, setExplaining, available } = useAskFromSearch(goAsk)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,18 +62,18 @@ export default function HeaderSearch() {
             placeholder="Search tweets..."
             value={query}
             onValueChange={setQuery}
-            className={`h-9 w-40 border-border bg-muted py-1.5 pl-8 text-sm focus:ring-brand lg:w-56 ${query.trim() ? 'pr-16' : 'pr-3'}`}
+            className={`h-9 w-40 border-border bg-muted py-1.5 pl-8 text-sm focus:ring-brand lg:w-56 ${available && query.trim() ? 'pr-16' : 'pr-3'}`}
             aria-label="Search Community Archive"
             aria-keyshortcuts="Control+Enter Meta+Enter"
             title="Enter to search · Ctrl or ⌘ + Enter to ask the archive"
             autoComplete="off"
             onKeyDownCapture={(event) => {
-              if (!isAskShortcut(event) || !query.trim()) return
+              if (!available || !isAskShortcut(event) || !query.trim()) return
               event.preventDefault()
               ask()
             }}
           />
-          {query.trim() && (
+          {available && query.trim() && (
             <AskSignInPopover
               open={explaining}
               onOpenChange={setExplaining}

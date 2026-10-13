@@ -19,6 +19,7 @@ import { OWN_KEY_HEADER } from '@/lib/agentSearch/ownKey'
 import { ownKeyRefusalMessage } from './OwnKeyControl'
 import { readOwnKey, useOwnKey } from './ownKeyStore'
 import { QuestionsLeft, type QuestionsToday } from './QuestionsLeft'
+import { QuestionHandling } from './QuestionHandling'
 import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
@@ -187,10 +188,13 @@ interface Conversation {
 export default function AgentSearch({
   initialConversationId = null,
   initialPrefill = null,
+  paused = false,
 }: {
   initialConversationId?: string | null
   /** A search handed over from archive search; prefilled, never sent. */
   initialPrefill?: AskPrefill | null
+  /** New questions are off (AGENT_SEARCH_ENABLED); history still works. */
+  paused?: boolean
 }) {
   const [conversation, setConversation] = useState<Conversation>(() => ({
     id: initialConversationId ?? newConversationId(),
@@ -918,6 +922,8 @@ export default function AgentSearch({
           <Quote aria-hidden="true" className="h-3.5 w-3.5" />
           Answers cite tweets
         </span>
+        <span aria-hidden="true">·</span>
+        <QuestionHandling />
       </p>
       {errorNote}
     </form>
@@ -955,6 +961,15 @@ export default function AgentSearch({
   )
 
   // Out of house questions, the member's own key is the way to keep going.
+  // Paused, the composer gives way to one plain line; conversations can
+  // still be opened and deleted.
+  const pausedNote = (
+    <p className="text-sm leading-6 text-muted-foreground">
+      Ask the archive is paused. New questions are off for now; your
+      conversations are still here to read or delete.
+    </p>
+  )
+
   const limitNote = (
     <div className="space-y-1 text-sm leading-6 text-muted-foreground">
       <p>{limitSentence}</p>
@@ -1044,7 +1059,7 @@ export default function AgentSearch({
 
           {!inThread && (
             <>
-              {outOfQuestions ? limitNote : startForm}
+              {paused ? pausedNote : outOfQuestions ? limitNote : startForm}
               {/* Suggestions, not history: chips under the box that fill it
                 rather than send, since one tap should not spend one of the
                 day's questions. */}
@@ -1177,7 +1192,7 @@ export default function AgentSearch({
             runs: Stop, in the step log, is the only action then. */}
           {hasThread && !loading && !busy && (
             <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-[calc(48rem+3rem)]">
-              {outOfQuestions ? limitNote : threadForm}
+              {paused ? pausedNote : outOfQuestions ? limitNote : threadForm}
             </div>
           )}
         </section>

@@ -104,7 +104,12 @@ export default function AdvancedSearchForm() {
     router.push(buildAskHref(query))
   }
   // Signed out, asking explains and offers sign-in instead.
-  const { ask: askInstead, explaining, setExplaining } = useAskFromSearch(goAsk)
+  const {
+    ask: askInstead,
+    explaining,
+    setExplaining,
+    available: canAsk,
+  } = useAskFromSearch(goAsk)
   const shortcut = useAskShortcutLabel()
 
   const activeFilters = [
@@ -157,29 +162,31 @@ export default function AdvancedSearchForm() {
             <Search className="mr-2 h-4 w-4" />
             Search
           </Button>
-          <AskSignInPopover
-            open={explaining}
-            onOpenChange={setExplaining}
-            question={query}
-          >
-            <Button
-              type="button"
-              variant="outline"
-              onClick={askInstead}
-              disabled={!query.trim()}
-              title="Ask the archive: reads the tweets and writes a cited answer"
-              className="h-10 gap-2 bg-background px-4 text-muted-foreground hover:text-foreground"
+          {canAsk && (
+            <AskSignInPopover
+              open={explaining}
+              onOpenChange={setExplaining}
+              question={query}
             >
-              <Sparkles aria-hidden="true" className="h-4 w-4" />
-              Ask AI
-              <kbd
-                aria-hidden="true"
-                className="hidden rounded border border-border px-1 font-sans text-[11px] leading-4 text-muted-foreground sm:inline"
+              <Button
+                type="button"
+                variant="outline"
+                onClick={askInstead}
+                disabled={!query.trim()}
+                title="Ask the archive: reads the tweets and writes a cited answer"
+                className="h-10 gap-2 bg-background px-4 text-muted-foreground hover:text-foreground"
               >
-                {shortcut}↵
-              </kbd>
-            </Button>
-          </AskSignInPopover>
+                <Sparkles aria-hidden="true" className="h-4 w-4" />
+                Ask AI
+                <kbd
+                  aria-hidden="true"
+                  className="hidden rounded border border-border px-1 font-sans text-[11px] leading-4 text-muted-foreground sm:inline"
+                >
+                  {shortcut}↵
+                </kbd>
+              </Button>
+            </AskSignInPopover>
+          )}
         </div>
       </div>
 

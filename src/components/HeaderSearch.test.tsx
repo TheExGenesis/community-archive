@@ -10,8 +10,13 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
 let mockIsMember = true
+let mockAskEnabled = true
 jest.mock('@/components/NavigationAudience', () => ({
-  useNavigationAudience: () => ({ isMember: mockIsMember, isAdmin: false }),
+  useNavigationAudience: () => ({
+    isMember: mockIsMember,
+    isAdmin: false,
+    askEnabled: mockAskEnabled,
+  }),
 }))
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 jest.mock('@/components/UserSearchInput', () => ({
@@ -78,4 +83,17 @@ test('signed out, Ask explains and offers a sign-in that returns to the question
     '/login?redirect=%2Fsearch%2Fask%3Fq%3Dsingapore',
   )
   mockIsMember = true
+})
+
+test('while Ask the archive is paused, the chip and the shortcut do nothing', () => {
+  mockAskEnabled = false
+  render(<HeaderSearch />)
+  const box = screen.getByRole('textbox', { name: 'Search Community Archive' })
+  fireEvent.change(box, { target: { value: 'singapore' } })
+  expect(
+    screen.queryByRole('button', { name: 'Ask the archive instead' }),
+  ).toBeNull()
+  fireEvent.keyDown(box, { key: 'Enter', metaKey: true })
+  expect(mockPush).not.toHaveBeenCalled()
+  mockAskEnabled = true
 })

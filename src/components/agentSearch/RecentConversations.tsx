@@ -171,7 +171,7 @@ export function RecentConversations({
           return (
             <li key={conversation.id}>
               <Confirm
-                question="Delete this conversation?"
+                question="Delete this conversation? Its working logs expire within about 7 days."
                 action="Delete"
                 onConfirm={() => onDelete(conversation.id)}
                 onCancel={() => setConfirming(null)}
@@ -222,7 +222,7 @@ export function RecentConversations({
     onDeleteAll &&
     (confirming === ALL ? (
       <Confirm
-        question={`Delete all ${conversations.length === 1 ? 'history' : `${conversations.length} conversations`}? Today’s questions still count.`}
+        question={`Delete all ${conversations.length === 1 ? 'history' : `${conversations.length} conversations`}? Today’s questions still count, and working logs expire within about 7 days.`}
         action="Delete all"
         onConfirm={onDeleteAll}
         onCancel={() => setConfirming(null)}

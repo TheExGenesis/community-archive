@@ -14,10 +14,15 @@ import { loginHref } from '@/lib/authRedirect'
  * sign-in that returns them to their question.
  */
 export function useAskFromSearch(go: () => void) {
-  const { isMember } = useNavigationAudience()
+  const { isMember, askEnabled } = useNavigationAudience()
   const [explaining, setExplaining] = useState(false)
-  const ask = () => (isMember ? go() : setExplaining(true))
-  return { ask, explaining, setExplaining }
+  // While Ask the archive is paused its entry points hide and do nothing.
+  const ask = () => {
+    if (!askEnabled) return
+    if (isMember) go()
+    else setExplaining(true)
+  }
+  return { ask, explaining, setExplaining, available: askEnabled }
 }
 
 export function AskSignInPopover({

@@ -6,6 +6,7 @@ import {
   askPrefillFrom,
   askReturnPath,
 } from '@/lib/askFromSearch'
+import { agentSearchEnabled } from '@/lib/agentSearch/enabled'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { loginHref } from '@/lib/authRedirect'
 
@@ -115,6 +116,7 @@ export default async function AskTheArchivePage({
       }
       // A search handed over from archive search: prefilled, never sent.
       initialPrefill={askPrefillFrom(searchParams ?? {})}
+      paused={!agentSearchEnabled()}
     />
   )
 }

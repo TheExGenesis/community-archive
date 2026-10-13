@@ -34,7 +34,11 @@ test('deleting a conversation asks in the row first, and can be cancelled', asyn
       name: 'Delete “Who tweets about Singapore?”',
     }),
   )
-  expect(screen.getByText('Delete this conversation?')).toBeInTheDocument()
+  expect(
+    screen.getByText(
+      'Delete this conversation? Its working logs expire within about 7 days.',
+    ),
+  ).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   expect(onDelete).not.toHaveBeenCalled()
   expect(screen.getByText('Who tweets about Singapore?')).toBeInTheDocument()
@@ -82,7 +86,7 @@ test('delete all history asks first and says today’s questions still count', a
   fireEvent.click(screen.getByRole('button', { name: 'Delete all history' }))
   expect(
     screen.getByText(
-      'Delete all 2 conversations? Today’s questions still count.',
+      'Delete all 2 conversations? Today’s questions still count, and working logs expire within about 7 days.',
     ),
   ).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Delete all' }))

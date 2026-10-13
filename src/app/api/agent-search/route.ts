@@ -1,3 +1,4 @@
+import { agentSearchEnabled } from '@/lib/agentSearch/enabled'
 import { createModelCallToUIChunkTransform } from '@ai-sdk/workflow'
 import { createUIMessageStreamResponse } from 'ai'
 import { NextResponse } from 'next/server'
@@ -62,6 +63,13 @@ const ownKeyRefusal = (reason: OwnKeyError) =>
   )
 
 export async function POST(request: Request) {
+  // Paused (AGENT_SEARCH_ENABLED): no new questions; history still works.
+  if (!agentSearchEnabled()) {
+    return NextResponse.json(
+      { error: 'disabled' },
+      { status: 503, headers: noStore },
+    )
+  }
   const access = await getAgentSearchAccess()
   if (!access.ok) {
     return NextResponse.json(

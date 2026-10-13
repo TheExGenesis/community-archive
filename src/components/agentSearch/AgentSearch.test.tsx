@@ -101,6 +101,23 @@ test('a first visit is the heading and a composer that carries the facts', async
   expect(box).toHaveValue(EXAMPLE_QUESTIONS[0])
 })
 
+test('beside the facts, a disclosure says where questions go and what deletion keeps', async () => {
+  quota(10)
+  render(<AgentSearch />)
+  fireEvent.click(
+    screen.getByRole('button', { name: 'How questions are handled' }),
+  )
+  expect(await screen.findByText(/through OpenRouter/)).toBeInTheDocument()
+  expect(screen.getByText(/expire within about 7 days/)).toBeInTheDocument()
+})
+
+test('paused, the composer gives way to a plain line and nothing can be asked', async () => {
+  quota(10)
+  render(<AgentSearch paused />)
+  expect(screen.getByText(/Ask the archive is paused/)).toBeInTheDocument()
+  expect(screen.queryByLabelText('Your question')).toBeNull()
+})
+
 test('in a thread the composer is one line, with the count only when few remain', async () => {
   mockChat.messages = thread
   quota(7)

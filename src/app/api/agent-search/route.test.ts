@@ -165,3 +165,16 @@ test('with own keys turned off, a key is refused rather than ignored', async () 
   expect(await response.json()).toEqual({ error: 'own_key_unavailable' })
   expect(admitAgentSearchRun).not.toHaveBeenCalled()
 })
+
+test('paused, a question is refused before anything is checked or admitted', async () => {
+  process.env.AGENT_SEARCH_ENABLED = 'false'
+  try {
+    const response = await ask()
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ error: 'disabled' })
+    expect(admitAgentSearchRun).not.toHaveBeenCalled()
+    expect(start).not.toHaveBeenCalled()
+  } finally {
+    delete process.env.AGENT_SEARCH_ENABLED
+  }
+})

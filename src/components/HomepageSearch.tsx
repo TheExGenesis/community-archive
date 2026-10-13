@@ -47,7 +47,7 @@ export default function HomepageSearch() {
     router.push(buildAskHref(trimmed))
   }
   // Signed out, asking explains and offers sign-in instead.
-  const { ask, explaining, setExplaining } = useAskFromSearch(goAsk)
+  const { ask, explaining, setExplaining, available } = useAskFromSearch(goAsk)
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -65,16 +65,16 @@ export default function HomepageSearch() {
           onValueChange={setQuery}
           placeholder="Search tweets, people, ideas"
           aria-label="Search Community Archive"
-          className={`h-14 rounded-[50px] border-0 bg-transparent pl-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg ${query.trim() ? 'pr-32' : 'pr-16'}`}
+          className={`h-14 rounded-[50px] border-0 bg-transparent pl-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg ${available && query.trim() ? 'pr-32' : 'pr-16'}`}
           autoComplete="off"
           aria-keyshortcuts="Control+Enter Meta+Enter"
           onKeyDownCapture={(event) => {
-            if (!isAskShortcut(event) || !query.trim()) return
+            if (!available || !isAskShortcut(event) || !query.trim()) return
             event.preventDefault()
             ask()
           }}
         />
-        {query.trim() && (
+        {available && query.trim() && (
           <AskSignInPopover
             open={explaining}
             onOpenChange={setExplaining}

@@ -13,8 +13,13 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => mockParams,
 }))
 let mockIsMember = true
+let mockAskEnabled = true
 jest.mock('@/components/NavigationAudience', () => ({
-  useNavigationAudience: () => ({ isMember: mockIsMember, isAdmin: false }),
+  useNavigationAudience: () => ({
+    isMember: mockIsMember,
+    isAdmin: false,
+    askEnabled: mockAskEnabled,
+  }),
 }))
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 jest.mock('@/components/UserSearchInput', () => ({

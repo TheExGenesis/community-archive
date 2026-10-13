@@ -15,6 +15,9 @@ jest.mock('@/lib/agentSearch/history', () => ({
 jest.mock('@/lib/agentSearch/classifier', () => ({
   agentSearchScorer: () => 'decisions',
 }))
+jest.mock('@/lib/agentSearch/openRouterKey', () => ({
+  ownKeysEnabled: () => true,
+}))
 jest.mock('@ai-sdk/openai', () => ({ createOpenAI: jest.fn() }))
 jest.mock('@ai-sdk/openai-compatible', () => ({
   createOpenAICompatible: jest.fn(),
@@ -49,16 +52,25 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers())
 
 test('reports questions left today, counted from UTC midnight', async () => {
-  store.countSince.mockResolvedValue(3)
+  // 3 house questions today, and 2 more on the member's own key.
+  store.countSince.mockImplementation(
+    async (_account: string, _since: string, keySource?: string) =>
+      keySource === 'house' ? 3 : 5,
+  )
   const body = await (await GET()).json()
   expect(store.countSince).toHaveBeenCalledWith(
     'acct-1',
     '2026-10-09T00:00:00.000Z',
+    'house',
   )
   expect(body).toMatchObject({
     conversations: [],
     dailyLimit: 10,
     remainingToday: 7,
+    // On their own key: ten times the limit, every question today counted.
+    ownKeyEnabled: true,
+    ownKeyDailyLimit: 100,
+    ownKeyRemainingToday: 95,
     resetsAt: '2026-10-10T00:00:00.000Z',
   })
 })

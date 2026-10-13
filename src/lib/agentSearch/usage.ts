@@ -40,9 +40,11 @@ export async function recordRunUsage(
 }
 
 /**
- * One planner call's tokens and estimated cost, added to the run. With call
- * details, the call is also appended to the store's call log, if it keeps
- * one (the local file store does).
+ * One planner call's tokens and estimated cost, added to the run. A call on
+ * the member's own key adds its tokens but no cost: the run's cost is house
+ * spend, which the global cap counts. With call details, the call is also
+ * appended to the store's call log, if it keeps one (the local file store
+ * does), with its estimate either way.
  */
 export async function recordModelUsage(
   runId: string,
@@ -54,7 +56,7 @@ export async function recordModelUsage(
   await recordRunUsage(runId, {
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
-    costUsd,
+    costUsd: detail?.ownKey ? 0 : costUsd,
   })
   const store = getAgentSearchRunStore()
   if (!detail || !store.logModelCall) return

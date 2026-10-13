@@ -15,6 +15,7 @@ import {
   resolveModelPrice,
   setModelUsageRecorder,
 } from './model'
+import { sealOwnKey } from './ownKey'
 
 const mockRecordModelUsage = jest.fn()
 
@@ -284,4 +285,90 @@ test('the usage recorder survives this module being evaluated again', async () =
   expect(recorder).toHaveBeenCalled()
   setModelUsageRecorder(null)
   delete process.env.OPENAI_API_KEY
+})
+
+describe('EnvLanguageModel on a member’s own key', () => {
+  const KEY = `sk-or-v1-${'c3'.repeat(32)}`
+  const SECRET = 'a server secret that is long enough to use'
+  const SPEC = 'openrouter:deepseek/deepseek-v4.1-flash'
+  const serialize = (EnvLanguageModel as any)[Symbol.for('workflow-serialize')]
+  const deserialize = (EnvLanguageModel as any)[
+    Symbol.for('workflow-deserialize')
+  ]
+  const recorder = jest.fn()
+
+  beforeEach(() => {
+    recorder.mockReset().mockResolvedValue(undefined)
+    setModelUsageRecorder(recorder)
+    ;(createOpenAICompatible as jest.Mock).mockReset()
+    process.env.AGENT_SEARCH_KEY_SECRET = SECRET
+    process.env.OPENROUTER_API_KEY = 'house-key'
+  })
+
+  afterEach(() => {
+    setModelUsageRecorder(null)
+    delete process.env.AGENT_SEARCH_KEY_SECRET
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  const streamOf = (parts: unknown[]) =>
+    new ReadableStream({
+      start(controller) {
+        parts.forEach((part) => controller.enqueue(part))
+        controller.close()
+      },
+    })
+
+  test('crosses steps sealed, and calls OpenRouter with the member’s key, not the house’s', async () => {
+    const sealed = await sealOwnKey(KEY, 'asr_1', SECRET)
+    const data = serialize(new EnvLanguageModel(SPEC, 'asr_1', sealed))
+    expect(data).toEqual({ spec: SPEC, runId: 'asr_1', sealedKey: sealed })
+    expect(JSON.stringify(data)).not.toContain(KEY)
+
+    const doStream = jest.fn().mockResolvedValue({
+      stream: streamOf([
+        {
+          type: 'finish',
+          usage: { inputTokens: { total: 10 }, outputTokens: { total: 2 } },
+          finishReason: 'stop',
+        },
+      ]),
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({ doStream }))
+    const model = deserialize(data)
+    const reader = (await model.doStream({})).stream.getReader()
+    while (!(await reader.read()).done);
+    expect(createOpenAICompatible).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: KEY }),
+    )
+    // Its usage is recorded as the member's, which keeps it off house spend.
+    expect(recorder).toHaveBeenCalledWith(
+      'asr_1',
+      SPEC,
+      expect.anything(),
+      expect.objectContaining({ ownKey: true }),
+    )
+  })
+
+  test('a refusal by OpenRouter says what is wrong with the key', async () => {
+    const sealed = await sealOwnKey(KEY, 'asr_1', SECRET)
+    const refusal = Object.assign(new Error('Payment Required'), {
+      statusCode: 402,
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({
+      doStream: jest.fn().mockRejectedValue(refusal),
+    }))
+    await expect(
+      new EnvLanguageModel(SPEC, 'asr_1', sealed).doStream({}),
+    ).rejects.toThrow('Your OpenRouter key has no credit left.')
+  })
+
+  test('without the sealing secret, nothing is called at all', async () => {
+    const sealed = await sealOwnKey(KEY, 'asr_1', SECRET)
+    delete process.env.AGENT_SEARCH_KEY_SECRET
+    await expect(
+      new EnvLanguageModel(SPEC, 'asr_1', sealed).doStream({}),
+    ).rejects.toThrow('Using your own key is not available right now.')
+    expect(createOpenAICompatible).not.toHaveBeenCalled()
+  })
 })

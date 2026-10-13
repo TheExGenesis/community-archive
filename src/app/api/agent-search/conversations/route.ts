@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { agentSearchBudgetLimits } from '@/lib/agentSearch/budget'
+import { agentSearchDailyLimits } from '@/lib/agentSearch/budget'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { summarizeConversations } from '@/lib/agentSearch/history'
+import { ownKeysEnabled } from '@/lib/agentSearch/openRouterKey'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 
 export const dynamic = 'force-dynamic'
@@ -16,8 +17,11 @@ function utcMidnight(now: Date) {
 }
 
 // The viewer's own past conversations, newest first, and how many questions
-// they have left today. The count mirrors the start route's daily cap: every
-// run started since UTC midnight counts, stopped ones included.
+// they have left today. The counts mirror the start route's daily caps: runs
+// started since UTC midnight count, stopped ones included. House questions
+// count against the house limit; on their own OpenRouter key a member may
+// ask up to ten times as many, all of today's questions counted. The page
+// knows whether it holds a key and shows the matching pair.
 export async function GET() {
   const access = await getAgentSearchViewer()
   if (!access.ok) {
@@ -29,16 +33,21 @@ export async function GET() {
   const store = getAgentSearchRunStore()
   const now = new Date()
   const midnight = utcMidnight(now)
-  const { dailyLimit } = agentSearchBudgetLimits()
-  const [runs, usedToday] = await Promise.all([
+  const limits = agentSearchDailyLimits()
+  const since = new Date(midnight).toISOString()
+  const [runs, houseToday, allToday] = await Promise.all([
     store.listRecent(access.viewer.accountId, RECENT_RUNS),
-    store.countSince(access.viewer.accountId, new Date(midnight).toISOString()),
+    store.countSince(access.viewer.accountId, since, 'house'),
+    store.countSince(access.viewer.accountId, since),
   ])
   return NextResponse.json(
     {
       conversations: summarizeConversations(runs).slice(0, MAX_CONVERSATIONS),
-      dailyLimit,
-      remainingToday: Math.max(0, dailyLimit - usedToday),
+      dailyLimit: limits.house,
+      remainingToday: Math.max(0, limits.house - houseToday),
+      ownKeyEnabled: ownKeysEnabled(),
+      ownKeyDailyLimit: limits.own,
+      ownKeyRemainingToday: Math.max(0, limits.own - allToday),
       resetsAt: new Date(midnight + DAY_MS).toISOString(),
     },
     { headers: noStore },

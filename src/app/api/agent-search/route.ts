@@ -13,6 +13,17 @@ import {
   getAgentSearchAccess,
 } from '@/lib/agentSearch/eligibility'
 import { agentSearchModelSpec } from '@/lib/agentSearch/model'
+import {
+  checkOpenRouterKey,
+  ownKeysEnabled,
+} from '@/lib/agentSearch/openRouterKey'
+import {
+  OWN_KEY_HEADER,
+  looksLikeOpenRouterKey,
+  ownKeySecret,
+  sealOwnKey,
+  type OwnKeyError,
+} from '@/lib/agentSearch/ownKey'
 import { parseAgentSearchRequest } from '@/lib/agentSearch/request'
 import { closeEndedRuns, newSearchRunId } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
@@ -35,6 +46,21 @@ const unavailable = () =>
 const workflowStatus = (workflowRunId: string) =>
   getRun(workflowRunId).status.catch(() => null)
 
+const OWN_KEY_STATUS: Record<OwnKeyError, number> = {
+  own_key_invalid: 400,
+  own_key_no_credit: 402,
+  own_key_refused: 403,
+  own_key_rate_limited: 429,
+  own_key_unchecked: 502,
+  own_key_unavailable: 503,
+}
+
+const ownKeyRefusal = (reason: OwnKeyError) =>
+  NextResponse.json(
+    { error: reason },
+    { status: OWN_KEY_STATUS[reason], headers: noStore },
+  )
+
 export async function POST(request: Request) {
   const access = await getAgentSearchAccess()
   if (!access.ok) {
@@ -53,6 +79,19 @@ export async function POST(request: Request) {
     )
   }
   const { conversationId, question } = parsed
+
+  // A member's own OpenRouter key pays for the planner and raises their daily
+  // limit. It is checked with OpenRouter before anything starts, so a bad key
+  // is refused here rather than failing mid-run, and it is never stored: it
+  // enters the workflow only sealed (ownKey.ts). Never echoed or logged.
+  const ownKey = request.headers.get(OWN_KEY_HEADER)?.trim() || null
+  if (ownKey) {
+    if (!ownKeysEnabled()) return ownKeyRefusal('own_key_unavailable')
+    if (!looksLikeOpenRouterKey(ownKey)) return ownKeyRefusal('own_key_invalid')
+    const check = await checkOpenRouterKey(ownKey)
+    if (!check.ok) return ownKeyRefusal(check.reason)
+  }
+  const keySource = ownKey ? 'own' : 'house'
 
   const modelSpec = agentSearchModelSpec()
   // Unpriced spend would never reach the daily cap, so refuse to start.
@@ -80,6 +119,7 @@ export async function POST(request: Request) {
       conversationId,
       question,
       model: modelSpec,
+      keySource,
     })
   } catch (error) {
     console.error('[agent-search] admission failed', error)
@@ -107,6 +147,18 @@ export async function POST(request: Request) {
         console.error('[agent-search] failed to close run', cause),
       )
 
+  let sealedKey: string | undefined
+  if (ownKey) {
+    const secret = ownKeySecret()
+    try {
+      if (!secret) throw new Error('No sealing secret')
+      sealedKey = await sealOwnKey(ownKey, runId, secret)
+    } catch {
+      await closeRun('The key could not be sealed')
+      return ownKeyRefusal('own_key_unavailable')
+    }
+  }
+
   let run: Awaited<ReturnType<typeof start>>
   try {
     run = await start(agentSearchWorkflow, [
@@ -119,6 +171,7 @@ export async function POST(request: Request) {
         date: new Date().toISOString().slice(0, 10),
         deadlineAt: Date.now() + agentSearchRunDeadlineMs(),
         toolMode: agentSearchToolMode(),
+        ...(sealedKey ? { sealedKey } : {}),
       },
     ])
   } catch (error) {

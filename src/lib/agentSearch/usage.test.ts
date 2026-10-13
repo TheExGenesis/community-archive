@@ -75,6 +75,28 @@ describe('agent search usage recording', () => {
     })
   })
 
+  test('a call on the member’s own key adds tokens but no house spend', async () => {
+    const usage = {
+      inputTokens: 1_000_000,
+      cachedInputTokens: 0,
+      outputTokens: 100_000,
+    }
+    await recordModelUsage('wrun_1', 'openai:gpt-6.1-sol', usage, {
+      ms: 10,
+      ownKey: true,
+    })
+    expect(mockAddUsage).toHaveBeenCalledWith('wrun_1', {
+      inputTokens: 1_000_000,
+      outputTokens: 100_000,
+      costUsd: 0,
+    })
+    // The call log keeps the estimate, for comparing models.
+    expect(mockLogModelCall).toHaveBeenCalledWith(
+      'wrun_1',
+      expect.objectContaining({ estimatedCostUsd: 3, ownKey: true }),
+    )
+  })
+
   test('logs a call with its details, and a failed log line does not fail it', async () => {
     const usage = { inputTokens: 1000, cachedInputTokens: 0, outputTokens: 10 }
     const detail = { ms: 900, servedBy: 'DeepInfra', providerCostUsd: 0.0001 }

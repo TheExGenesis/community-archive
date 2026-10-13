@@ -1,6 +1,12 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
+import {
+  OWN_KEY_ERRORS,
+  ownKeyErrorForStatus,
+  ownKeySecret,
+  unsealOwnKey,
+} from './ownKey'
 
 /**
  * Model specs are `provider:model`, e.g. `openai:gpt-6.1-sol` or
@@ -150,15 +156,22 @@ export function parseModelSpec(spec: string): {
   return { provider, modelId }
 }
 
-/** Builds the provider model from environment variables at call time. */
-export function createProviderModel(spec: string): ProviderModel {
+/**
+ * Builds the provider model at call time, from environment variables or, for
+ * an OpenRouter model, from a member's own key.
+ */
+export function createProviderModel(
+  spec: string,
+  ownKey: string | null = null,
+): ProviderModel {
   const { provider, modelId } = parseModelSpec(spec)
   if (provider === 'openai') {
+    if (ownKey) throw new Error('Own keys are for OpenRouter models only')
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
     return createOpenAI({ apiKey })(modelId) as ProviderModel
   }
-  const apiKey = process.env.OPENROUTER_API_KEY
+  const apiKey = ownKey ?? process.env.OPENROUTER_API_KEY
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured')
   return createOpenAICompatible({
     name: 'openrouter',
@@ -201,6 +214,8 @@ export interface ModelCallDetail {
   servedBy?: string
   /** OpenRouter only: what it charged for the call, in USD. */
   providerCostUsd?: number
+  /** Paid with the member's own key: not house spend. */
+  ownKey?: boolean
 }
 
 const tokenCount = (
@@ -286,6 +301,13 @@ function readOpenRouterChunk(raw: unknown, detail: ModelCallDetail) {
   }
 }
 
+/** The error a call on a member's own key failed with, said plainly. */
+function ownKeyCallError(error: unknown): unknown {
+  const status = (error as { statusCode?: unknown } | null)?.statusCode
+  const code = typeof status === 'number' ? ownKeyErrorForStatus(status) : null
+  return code ? new Error(OWN_KEY_ERRORS[code]) : error
+}
+
 /**
  * A model that crosses Workflow step boundaries as its spec string only.
  * Provider models serialize their resolved headers, which include the API
@@ -295,6 +317,11 @@ function readOpenRouterChunk(raw: unknown, detail: ModelCallDetail) {
  * With a run id, every call adds its tokens and cost to that run as soon as
  * the provider reports usage, inside the model step itself. A Stop or a
  * failure later in the run then cannot lose what the call cost.
+ *
+ * With a sealed key (ownKey.ts), calls go out on the member's own OpenRouter
+ * key. Only the sealed form crosses step boundaries; it is opened inside the
+ * model step, just before the call, and a refusal by OpenRouter is reported
+ * as the member's key problem, never retried on the house key.
  */
 export class EnvLanguageModel {
   readonly specificationVersion = 'v4' as const
@@ -303,6 +330,7 @@ export class EnvLanguageModel {
   constructor(
     readonly spec: string,
     readonly runId: string | null = null,
+    readonly sealedKey: string | null = null,
   ) {
     parseModelSpec(spec)
   }
@@ -310,6 +338,28 @@ export class EnvLanguageModel {
   private inner(): any {
     this.resolved ??= createProviderModel(this.spec)
     return this.resolved
+  }
+
+  private async open(): Promise<any> {
+    if (!this.sealedKey) return this.inner()
+    if (this.resolved) return this.resolved
+    const secret = ownKeySecret()
+    if (!secret || !this.runId) {
+      throw new Error(OWN_KEY_ERRORS.own_key_unavailable)
+    }
+    const key = await unsealOwnKey(this.sealedKey, this.runId, secret)
+    this.resolved = createProviderModel(this.spec, key)
+    return this.resolved
+  }
+
+  private async call<T>(task: (model: any) => Promise<T>): Promise<T> {
+    const model = await this.open()
+    if (!this.sealedKey) return task(model)
+    try {
+      return await task(model)
+    } catch (error) {
+      throw ownKeyCallError(error)
+    }
   }
 
   get provider(): string {
@@ -321,32 +371,40 @@ export class EnvLanguageModel {
   }
 
   get supportedUrls() {
+    // OpenAI-compatible providers support no URLs; a sealed key is opened
+    // only inside a call.
+    if (this.sealedKey && !this.resolved) return {}
     return this.inner().supportedUrls ?? {}
   }
 
   async doGenerate(options: unknown) {
     const startedAt = Date.now()
-    const result = await this.inner().doGenerate(options)
+    const result = await this.call<any>((model) => model.doGenerate(options))
     if (this.runId)
       await recordModelCallUsage(this.runId, this.spec, result?.usage, {
         ms: Date.now() - startedAt,
         finishReason: finishReasonText(result?.finishReason),
+        ...(this.sealedKey ? { ownKey: true } : {}),
       })
     return result
   }
 
   async doStream(options: any) {
     const runId = this.runId
-    if (!runId) return this.inner().doStream(options)
+    if (!runId) return this.call<any>((model) => model.doStream(options))
     const spec = this.spec
     const startedAt = Date.now()
     // OpenRouter's raw chunks say who served the call and what it cost. Ask
     // for them, and pass them on only if the caller asked too.
     const peekRaw = this.provider === 'openrouter' && !options?.includeRawChunks
-    const result = await this.inner().doStream(
-      peekRaw ? { ...options, includeRawChunks: true } : options,
+    const result = await this.call<any>((model) =>
+      model.doStream(
+        peekRaw ? { ...options, includeRawChunks: true } : options,
+      ),
     )
-    const detail: ModelCallDetail = { ms: 0 }
+    const detail: ModelCallDetail = this.sealedKey
+      ? { ms: 0, ownKey: true }
+      : { ms: 0 }
     let usage: unknown = null
     const stream = (result.stream as ReadableStream<any>).pipeThrough(
       new TransformStream<any, any>({
@@ -373,21 +431,40 @@ export class EnvLanguageModel {
     return { ...result, stream }
   }
 
+  // Only the sealed key is written to the event log, never the opened one.
   static [WORKFLOW_SERIALIZE](model: EnvLanguageModel) {
-    return model.runId
-      ? { spec: model.spec, runId: model.runId }
-      : { spec: model.spec }
+    return {
+      spec: model.spec,
+      ...(model.runId ? { runId: model.runId } : {}),
+      ...(model.sealedKey ? { sealedKey: model.sealedKey } : {}),
+    }
   }
 
-  static [WORKFLOW_DESERIALIZE](data: { spec: string; runId?: string }) {
-    return new EnvLanguageModel(data.spec, data.runId ?? null)
+  static [WORKFLOW_DESERIALIZE](data: {
+    spec: string
+    runId?: string
+    sealedKey?: string
+  }) {
+    return new EnvLanguageModel(
+      data.spec,
+      data.runId ?? null,
+      data.sealedKey ?? null,
+    )
   }
 }
 
-/** The planner model; pass the run id to record usage on that run. */
+/**
+ * The planner model; pass the run id to record usage on that run, and a
+ * sealed key to call on the member's own OpenRouter key.
+ */
 export function agentSearchModel(
   spec: string,
   runId: string | null = null,
+  sealedKey: string | null = null,
 ): LanguageModel {
-  return new EnvLanguageModel(spec, runId) as unknown as LanguageModel
+  return new EnvLanguageModel(
+    spec,
+    runId,
+    sealedKey,
+  ) as unknown as LanguageModel
 }

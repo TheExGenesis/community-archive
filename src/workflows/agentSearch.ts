@@ -255,6 +255,12 @@ export interface AgentSearchWorkflowInput {
   deadlineAt: number
   /** How the agent searches; runs started before modes existed used typed tools. */
   toolMode?: AgentSearchToolMode
+  /**
+   * The member's own OpenRouter key, sealed for this run (ownKey.ts). The
+   * workflow's inputs are kept in its event log, so the key never enters it
+   * in the clear; the model step opens it just before each call.
+   */
+  sealedKey?: string
 }
 
 export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
@@ -301,7 +307,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
         })
   const agent = new WorkflowAgent({
     // Each planner call records its own usage on this run.
-    model: agentSearchModel(input.modelSpec, runId),
+    model: agentSearchModel(input.modelSpec, runId, input.sealedKey ?? null),
     instructions: agentSearchInstructions(input.date, toolMode),
     tools,
   })

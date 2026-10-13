@@ -14,6 +14,12 @@ describe('agent search citations', () => {
     ).toEqual(['12', '34'])
   })
 
+  test('accepts a bare [[<id>]], which some models write', () => {
+    expect(
+      extractCitationIds('A [[12]] and B [[t:34]] [[posts: x | 5]]'),
+    ).toEqual(['12', '34', '5'])
+  })
+
   test('accepts only ids that a tool returned in the same run', () => {
     const seen = collectToolTweetIds([
       { tweets: [{ id: '12', text: 'x' }] },

@@ -155,11 +155,13 @@ export function AgentSearchTurn({
   )
 
   // Wide screens: the answer on the left, cited tweets in a sticky column
-  // beside it so a citation and its tweet are both on screen. Narrow screens:
-  // the cited tweets are a tier of Sources under the answer.
+  // beside it so a citation and its tweet are both on screen. The answer
+  // keeps a reading width; the column takes the rest, up to a width tweet
+  // cards still read well at. Narrow screens: the cited tweets are a tier of
+  // Sources under the answer.
   return (
     <CitationContext.Provider value={links}>
-      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
+      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,48rem)_minmax(21rem,32rem)] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
         <div className="min-w-0 space-y-5 lg:col-start-1">
           {log}
 

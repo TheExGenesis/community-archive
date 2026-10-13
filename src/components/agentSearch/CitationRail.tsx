@@ -46,12 +46,8 @@ function CitationItem({
       onClick={onClick}
       onMouseEnter={() => links?.hover(citation.anchor)}
       onMouseLeave={() => links?.hover(null)}
-      className={`relative scroll-mt-14 border-l-2 transition-colors focus:outline-none [&_article]:pr-11 [&_article]:hover:bg-transparent ${
-        lit
-          ? 'border-brand bg-brand/10'
-          : near
-            ? 'border-brand/40 bg-muted/60'
-            : 'border-transparent hover:bg-muted/40'
+      className={`flex scroll-mt-14 items-start gap-1 pl-3 transition-colors focus:outline-none [&_article]:hover:bg-transparent ${
+        lit ? 'bg-brand/10' : near ? 'bg-muted/60' : 'hover:bg-muted/40'
       } ${expanded ? '' : 'cursor-pointer'}`}
     >
       <button
@@ -59,7 +55,7 @@ function CitationItem({
         onClick={onToggle}
         aria-expanded={expanded}
         aria-label={`Citation ${citation.n}: ${expanded ? 'show less' : 'show the full post'}`}
-        className={`absolute right-3 top-3 z-10 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        className={`mt-3 inline-flex h-6 min-w-[1.5rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           lit
             ? 'bg-brand text-brand-foreground'
             : 'bg-muted text-foreground hover:bg-accent'
@@ -67,11 +63,13 @@ function CitationItem({
       >
         {citation.n}
       </button>
-      {expanded ? (
-        <TweetCard tweet={citation.tweet} stacked showDate showExternalLink />
-      ) : (
-        <TweetCard tweet={citation.tweet} stacked compact showDate />
-      )}
+      <div className="min-w-0 flex-1">
+        {expanded ? (
+          <TweetCard tweet={citation.tweet} stacked showDate showExternalLink />
+        ) : (
+          <TweetCard tweet={citation.tweet} stacked compact showDate />
+        )}
+      </div>
     </li>
   )
 }
@@ -211,7 +209,7 @@ export const CitationRail = forwardRef<
   // tweets move into the Cited tier of Sources under the answer.
   return (
     <div
-      className={`${active ? '' : 'hidden'} lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:self-stretch lg:border-l lg:border-border lg:bg-muted/20`}
+      className={`${active ? '' : 'hidden'} lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:self-stretch`}
     >
       <aside
         ref={setRefs}

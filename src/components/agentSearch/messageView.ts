@@ -957,7 +957,7 @@ const TOP_FOUND = 3
 
 /**
  * The folded step log in one line: how much searching happened and what the
- * answer rests on. "6 steps · 4 cited · 27 more found".
+ * answer rests on. "6 steps · 4 tweets cited · 27 more found".
  */
 export function logSummary(
   view: TurnView,
@@ -971,8 +971,9 @@ export function logSummary(
     ...view.answer.citations.map((citation) => citation.id),
     ...view.answer.listed,
   ]).size
-  if (view.answer.listed.length) parts.push(`${shown} in the answer`)
-  else if (shown) parts.push(`${shown} cited`)
+  if (view.answer.listed.length)
+    parts.push(`${plural(shown, 'tweet')} in the answer`)
+  else if (shown) parts.push(`${plural(shown, 'tweet')} cited`)
   const more = view.receipt.relevant + view.receipt.other
   if (more) parts.push(`${more.toLocaleString('en-US')} more found`)
   if (!shown && !more && !view.foundSoFar) parts.push('nothing found')

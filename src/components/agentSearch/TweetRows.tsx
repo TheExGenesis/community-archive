@@ -34,9 +34,12 @@ const ROW_CLASS =
 export function TweetRow({
   tweet,
   citation,
+  numbered = citation !== undefined,
 }: {
   tweet: PortalTweet
   citation?: number
+  /** Keep the number's place even when this tweet is not cited. */
+  numbered?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = useId()
@@ -53,23 +56,27 @@ export function TweetRow({
     toggled.current = true
     setOpen((value) => !value)
   }
-  const chip = citation !== undefined && (
-    <span
-      aria-label={`Cited as ${citation}`}
-      className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-foreground"
-    >
-      {citation}
+  const chip = numbered && (
+    <span className="inline-flex w-6 shrink-0 justify-center">
+      {citation !== undefined && (
+        <span
+          aria-label={`Cited as ${citation}`}
+          className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-foreground"
+        >
+          {citation}
+        </span>
+      )}
     </span>
   )
   return (
     <li className="border-b border-border">
       {open ? (
-        <div id={bodyId} className="flex items-start gap-2 py-1 pr-1">
+        <div id={bodyId} className="flex items-start gap-2 py-1 pl-1 pr-1">
+          {chip && <div className="pt-3">{chip}</div>}
           <div className="min-w-0 flex-1">
             <TweetCard tweet={tweet} showDate showExternalLink />
           </div>
-          <div className="flex shrink-0 items-center gap-3 pt-3">
-            {chip}
+          <div className="shrink-0 pt-3">
             <button
               ref={closeRef}
               type="button"
@@ -92,6 +99,7 @@ export function TweetRow({
           aria-controls={bodyId}
           className={ROW_CLASS}
         >
+          {chip}
           <TweetAvatar tweet={tweet} size={28} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs text-muted-foreground">
@@ -104,7 +112,6 @@ export function TweetRow({
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
             {monthOf(tweet.createdAt)}
           </span>
-          {chip}
           <ChevronDown
             aria-hidden="true"
             className="h-4 w-4 shrink-0 text-muted-foreground"
@@ -136,6 +143,7 @@ export function TweetRowList({
 }) {
   const [shown, setShown] = useState(first)
   const left = tweets.length - shown
+  const numbered = tweets.some((tweet) => citations?.has(tweet.id))
   return (
     <ul aria-label={label} className="border-t border-border">
       {tweets.slice(0, shown).map((tweet) => (
@@ -143,6 +151,7 @@ export function TweetRowList({
           key={tweet.id}
           tweet={tweet}
           citation={citations?.get(tweet.id)}
+          numbered={numbered}
         />
       ))}
       {left > 0 && (

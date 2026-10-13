@@ -710,7 +710,7 @@ describe('workspace steps and the folded log line', () => {
       [assistant('a1', [search, text('A [[t:1]]')])],
       0,
     )
-    expect(logSummary(cited)).toBe('1 step · 1 cited · 2 more found')
+    expect(logSummary(cited)).toBe('1 step · 1 tweet cited · 2 more found')
     expect(logSummary(cited, { writing: true })).toBe(
       '1 step · writing the answer',
     )
@@ -718,7 +718,7 @@ describe('workspace steps and the folded log line', () => {
       [assistant('a2', [search, text('A [[t:1]]\n[[posts: All | 1, 2]]')])],
       0,
     )
-    expect(logSummary(listed)).toBe('1 step · 2 in the answer · 1 more found')
+    expect(logSummary(listed)).toBe('1 step · 2 tweets in the answer · 1 more found')
     const empty = buildTurnView(
       [
         assistant('a3', [

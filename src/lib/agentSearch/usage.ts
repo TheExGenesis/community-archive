@@ -2,6 +2,7 @@ import {
   estimateModelCostUsd,
   plannerPriceEnv,
   setModelUsageRecorder,
+  type ModelCallDetail,
   type ModelCallUsage,
 } from './model'
 import { getAgentSearchRunStore, type RunUsageDelta } from './runStore'
@@ -38,17 +39,37 @@ export async function recordRunUsage(
   throw lastError
 }
 
-/** One planner call's tokens and estimated cost. */
+/**
+ * One planner call's tokens and estimated cost, added to the run. With call
+ * details, the call is also appended to the store's call log, if it keeps
+ * one (the local file store does).
+ */
 export async function recordModelUsage(
   runId: string,
   spec: string,
   usage: ModelCallUsage,
+  detail?: ModelCallDetail,
 ): Promise<void> {
+  const costUsd = estimateModelCostUsd(spec, usage, plannerPriceEnv())
   await recordRunUsage(runId, {
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
-    costUsd: estimateModelCostUsd(spec, usage, plannerPriceEnv()),
+    costUsd,
   })
+  const store = getAgentSearchRunStore()
+  if (!detail || !store.logModelCall) return
+  // The log is for comparing models; losing a line must not fail the call.
+  await store
+    .logModelCall(runId, {
+      at: new Date().toISOString(),
+      model: spec,
+      ...usage,
+      ...detail,
+      estimatedCostUsd: costUsd,
+    })
+    .catch((error) =>
+      console.warn('[agent-search] failed to log model call', error),
+    )
 }
 
 // Planner calls run inside Workflow's model step. That step's bundle loads

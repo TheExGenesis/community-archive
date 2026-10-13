@@ -5,6 +5,7 @@ jest.mock('@ai-sdk/openai-compatible', () => ({
 }))
 
 import { createOpenAI } from '@ai-sdk/openai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import {
   EnvLanguageModel,
   MODEL_PRICES_USD_PER_MTOK,
@@ -179,7 +180,59 @@ describe('EnvLanguageModel usage recording', () => {
       'wrun_1',
       'openai:gpt-6.1-sol',
       { inputTokens: 1000, cachedInputTokens: 200, outputTokens: 50 },
+      expect.objectContaining({ finishReason: 'stop', reasoningTokens: 0 }),
     )
+  })
+
+  test('reads who served an OpenRouter call and what it cost, then drops the raw chunks', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    const doStream = jest.fn().mockResolvedValue({
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'raw',
+            rawValue: { provider: 'DeepInfra' },
+          })
+          controller.enqueue({ type: 'text-delta', delta: 'hi' })
+          controller.enqueue({
+            type: 'raw',
+            rawValue: { provider: 'DeepInfra', usage: { cost: 0.00042 } },
+          })
+          controller.enqueue({
+            type: 'finish',
+            usage: {
+              inputTokens: { total: 1000, cacheRead: 0 },
+              outputTokens: { total: 80, reasoning: 30 },
+            },
+            finishReason: { unified: 'stop', raw: 'stop' },
+          })
+          controller.close()
+        },
+      }),
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({ doStream }))
+    const model = new EnvLanguageModel(
+      'openrouter:deepseek/deepseek-v4.1-flash',
+      'wrun_1',
+    )
+    const parts = await drain((await model.doStream({})).stream)
+    expect(doStream).toHaveBeenCalledWith({ includeRawChunks: true })
+    expect(parts.map((part: any) => part.type)).toEqual([
+      'text-delta',
+      'finish',
+    ])
+    expect(mockRecordModelUsage).toHaveBeenCalledWith(
+      'wrun_1',
+      'openrouter:deepseek/deepseek-v4.1-flash',
+      { inputTokens: 1000, cachedInputTokens: 0, outputTokens: 80 },
+      expect.objectContaining({
+        finishReason: 'stop',
+        reasoningTokens: 30,
+        servedBy: 'DeepInfra',
+        providerCostUsd: 0.00042,
+      }),
+    )
+    delete process.env.OPENROUTER_API_KEY
   })
 
   test('records nothing without a run id', async () => {

@@ -1,6 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'crypto'
 import {
+  appendFile,
   mkdir,
   readFile,
   readdir,
@@ -21,6 +22,24 @@ export interface RunUsageDelta {
   inputTokens?: number
   outputTokens?: number
   costUsd?: number
+}
+
+/** One planner call, as the local call log keeps it. */
+export interface ModelCallLogEntry {
+  at: string
+  model: string
+  ms: number
+  finishReason?: string
+  inputTokens: number
+  cachedInputTokens: number
+  outputTokens: number
+  reasoningTokens?: number
+  /** From our price table; what the run's cost and the daily cap count. */
+  estimatedCostUsd: number
+  /** OpenRouter only: the upstream provider that served the call. */
+  servedBy?: string
+  /** OpenRouter only: what it actually charged. */
+  providerCostUsd?: number
 }
 
 /** Fields only addUsage may change, so a status patch never resets spend. */
@@ -72,6 +91,11 @@ export interface AgentSearchRunStore {
    * any account.
    */
   listConversation(conversationId: string): Promise<AgentSearchRun[]>
+  /**
+   * Appends one planner call to a log beside the run, for comparing models
+   * in development. Only the file store keeps it (`<id>.calls.jsonl`).
+   */
+  logModelCall?(id: string, entry: ModelCallLogEntry): Promise<void>
 }
 
 type RunRow = Database['public']['Tables']['agent_search_runs']['Row']
@@ -141,8 +165,10 @@ export function admissionDecision(
   ) {
     return 'not_found'
   }
-  if (own.filter((run) => Date.parse(run.startedAt) >= since).length >=
-    request.dailyLimit) {
+  if (
+    own.filter((run) => Date.parse(run.startedAt) >= since).length >=
+    request.dailyLimit
+  ) {
     return 'daily_limit'
   }
   if (
@@ -258,6 +284,15 @@ export function createFileRunStore(
         })
       }),
     get: (id) => read(id),
+    async logModelCall(id, entry) {
+      assertRunId(id)
+      await mkdir(dir, { recursive: true })
+      await appendFile(
+        path.join(dir, `${id}.calls.jsonl`),
+        `${JSON.stringify(entry)}\n`,
+        'utf8',
+      )
+    },
     async countSince(accountId, sinceIso) {
       const since = Date.parse(sinceIso)
       return (await readAll()).filter(

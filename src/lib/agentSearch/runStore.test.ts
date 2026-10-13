@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from 'fs/promises'
+import { mkdtemp, readFile, readdir, rm } from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import type { AgentSearchRun } from './types'
@@ -122,6 +122,33 @@ describe('file run store', () => {
     )
   })
 
+  test('appends model calls to a log the run listing ignores', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun())
+    const entry = {
+      at: '2026-10-13T10:00:00.000Z',
+      model: 'openrouter:deepseek/deepseek-v4.1-flash',
+      ms: 1200,
+      inputTokens: 1000,
+      cachedInputTokens: 0,
+      outputTokens: 50,
+      estimatedCostUsd: 0.00036,
+      servedBy: 'DeepInfra',
+    }
+    await store.logModelCall!('wrun_01', entry)
+    await store.logModelCall!('wrun_01', { ...entry, ms: 800 })
+    const lines = (
+      await readFile(path.join(dir, 'wrun_01.calls.jsonl'), 'utf8')
+    )
+      .trim()
+      .split('\n')
+    expect(lines.map((line) => JSON.parse(line).ms)).toEqual([1200, 800])
+    expect(await store.countSince('42', '2026-10-08T00:00:00.000Z')).toBe(1)
+    await expect(store.logModelCall!('../x', entry)).rejects.toThrow(
+      'Invalid agent search run id',
+    )
+  })
+
   test('refuses duplicate runs, unknown updates and unsafe ids', async () => {
     const store = createFileRunStore(dir)
     await store.create(baseRun())
@@ -195,10 +222,18 @@ describe('file run store', () => {
     test('lets only one of several simultaneous requests take the last slot', async () => {
       const store = createFileRunStore(dir)
       await store.create(
-        baseRun({ id: 'r1', status: 'completed', startedAt: '2026-10-08T08:00:00.000Z' }),
+        baseRun({
+          id: 'r1',
+          status: 'completed',
+          startedAt: '2026-10-08T08:00:00.000Z',
+        }),
       )
       await store.create(
-        baseRun({ id: 'r2', status: 'completed', startedAt: '2026-10-08T09:00:00.000Z' }),
+        baseRun({
+          id: 'r2',
+          status: 'completed',
+          startedAt: '2026-10-08T09:00:00.000Z',
+        }),
       )
       const results = await Promise.all(
         ['a', 'b', 'c', 'd'].map((id) =>

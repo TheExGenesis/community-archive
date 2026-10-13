@@ -5,8 +5,12 @@ jest.mock('@ai-sdk/openai-compatible', () => ({
   createOpenAICompatible: jest.fn(),
 }))
 const mockAddUsage = jest.fn()
+const mockLogModelCall = jest.fn()
 jest.mock('./runStore', () => ({
-  getAgentSearchRunStore: () => ({ addUsage: mockAddUsage }),
+  getAgentSearchRunStore: () => ({
+    addUsage: mockAddUsage,
+    logModelCall: mockLogModelCall,
+  }),
 }))
 
 import { ScoringError } from './classifier'
@@ -16,6 +20,7 @@ import { recordModelUsage, recordRunUsage, withRecordedCost } from './usage'
 describe('agent search usage recording', () => {
   beforeEach(() => {
     mockAddUsage.mockReset().mockResolvedValue(undefined)
+    mockLogModelCall.mockReset().mockResolvedValue(undefined)
   })
 
   test('a paid tool adds its cost to the run before returning', async () => {
@@ -68,6 +73,28 @@ describe('agent search usage recording', () => {
       outputTokens: 100_000,
       costUsd: 3,
     })
+  })
+
+  test('logs a call with its details, and a failed log line does not fail it', async () => {
+    const usage = { inputTokens: 1000, cachedInputTokens: 0, outputTokens: 10 }
+    const detail = { ms: 900, servedBy: 'DeepInfra', providerCostUsd: 0.0001 }
+    await recordModelUsage('wrun_1', 'openai:gpt-6.1-sol', usage, detail)
+    expect(mockLogModelCall).toHaveBeenCalledWith(
+      'wrun_1',
+      expect.objectContaining({
+        model: 'openai:gpt-6.1-sol',
+        ...usage,
+        ...detail,
+        estimatedCostUsd: 0.0021,
+      }),
+    )
+
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    mockLogModelCall.mockRejectedValue(new Error('disk full'))
+    await expect(
+      recordModelUsage('wrun_1', 'openai:gpt-6.1-sol', usage, detail),
+    ).resolves.toBeUndefined()
+    warn.mockRestore()
   })
 
   test('loading this module registers the model usage recorder', async () => {

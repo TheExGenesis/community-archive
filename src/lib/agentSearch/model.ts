@@ -29,6 +29,14 @@ export const MODEL_PRICES_USD_PER_MTOK: Record<string, ModelPrice> = {
   'openai:gpt-6.1-sol': { input: 2, cachedInput: 0.1, output: 10 },
   'openai:gpt-6-luna': { input: 0.1, cachedInput: 0.01, output: 0.5 },
   'openai:gpt-5.6-terra': { input: 2, cachedInput: 0.2, output: 12 },
+  // OpenRouter's listed price (openrouter.ai/api/v1/models, read 2026-10-13).
+  // Most endpoints charge this or less, so it is an upper estimate; the local
+  // call log records what OpenRouter actually charged (providerCostUsd).
+  'openrouter:deepseek/deepseek-v4.1-flash': {
+    input: 0.3,
+    cachedInput: 0.006,
+    output: 1.2,
+  },
 }
 
 /** Price overrides as read from the environment, still unparsed. */
@@ -48,9 +56,7 @@ export function plannerPriceEnv(
   }
 }
 
-export function scorerPriceEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): PriceEnv {
+export function scorerPriceEnv(env: NodeJS.ProcessEnv = process.env): PriceEnv {
   return {
     input: env.AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK,
     cachedInput: env.AGENT_SEARCH_SCORER_CACHED_INPUT_USD_PER_MTOK,
@@ -163,6 +169,8 @@ export function createProviderModel(spec: string): ProviderModel {
       if (typeof init?.body === 'string') {
         const body = JSON.parse(init.body)
         body.provider = { ...body.provider, data_collection: 'deny', zdr: true }
+        // Usage accounting: the final chunk reports what the call cost.
+        body.usage = { include: true }
         init = { ...init, body: JSON.stringify(body) }
       }
       return fetch(input, init)
@@ -179,7 +187,21 @@ export interface ModelCallUsage {
   outputTokens: number
 }
 
-const tokenCount = (value: unknown, key: 'total' | 'cacheRead'): number => {
+/** What else a planner call reported, for the local call log. */
+export interface ModelCallDetail {
+  ms: number
+  finishReason?: string
+  reasoningTokens?: number
+  /** OpenRouter only: the upstream provider that served the call. */
+  servedBy?: string
+  /** OpenRouter only: what it charged for the call, in USD. */
+  providerCostUsd?: number
+}
+
+const tokenCount = (
+  value: unknown,
+  key: 'total' | 'cacheRead' | 'reasoning',
+): number => {
   if (typeof value === 'number') return key === 'total' ? value : 0
   const count = (value as Record<string, unknown> | undefined)?.[key]
   return typeof count === 'number' && Number.isFinite(count) ? count : 0
@@ -201,6 +223,7 @@ type ModelUsageRecorder = (
   runId: string,
   spec: string,
   usage: ModelCallUsage,
+  detail?: ModelCallDetail,
 ) => Promise<void>
 
 // usage.ts registers the recorder when it loads. This module is also part of
@@ -216,12 +239,38 @@ async function recordModelCallUsage(
   runId: string,
   spec: string,
   usage: unknown,
+  detail: ModelCallDetail,
 ) {
   // Fail closed: a model call that cannot be counted must not pass silently.
   if (!modelUsageRecorder) {
     throw new Error('Agent search usage recorder is not registered')
   }
-  await modelUsageRecorder(runId, spec, readModelCallUsage(usage))
+  const outputTokens = (usage as Record<string, unknown> | null)?.outputTokens
+  await modelUsageRecorder(runId, spec, readModelCallUsage(usage), {
+    ...detail,
+    reasoningTokens: tokenCount(outputTokens, 'reasoning'),
+  })
+}
+
+// V4 finish reasons are { unified, raw }; older ones are plain strings.
+function finishReasonText(reason: unknown): string | undefined {
+  if (typeof reason === 'string') return reason
+  const unified = (reason as { unified?: unknown } | null)?.unified
+  return typeof unified === 'string' ? unified : undefined
+}
+
+// An OpenRouter stream chunk names the provider that served it, and the
+// last one (with usage accounting on) carries the call's cost.
+function readOpenRouterChunk(raw: unknown, detail: ModelCallDetail) {
+  const chunk = raw as {
+    provider?: unknown
+    usage?: { cost?: unknown }
+  } | null
+  if (typeof chunk?.provider === 'string') detail.servedBy = chunk.provider
+  const cost = chunk?.usage?.cost
+  if (typeof cost === 'number' && Number.isFinite(cost)) {
+    detail.providerCostUsd = cost
+  }
 }
 
 /**
@@ -263,27 +312,48 @@ export class EnvLanguageModel {
   }
 
   async doGenerate(options: unknown) {
+    const startedAt = Date.now()
     const result = await this.inner().doGenerate(options)
     if (this.runId)
-      await recordModelCallUsage(this.runId, this.spec, result?.usage)
+      await recordModelCallUsage(this.runId, this.spec, result?.usage, {
+        ms: Date.now() - startedAt,
+        finishReason: finishReasonText(result?.finishReason),
+      })
     return result
   }
 
-  async doStream(options: unknown) {
-    const result = await this.inner().doStream(options)
+  async doStream(options: any) {
     const runId = this.runId
-    if (!runId) return result
+    if (!runId) return this.inner().doStream(options)
     const spec = this.spec
+    const startedAt = Date.now()
+    // OpenRouter's raw chunks say who served the call and what it cost. Ask
+    // for them, and pass them on only if the caller asked too.
+    const peekRaw = this.provider === 'openrouter' && !options?.includeRawChunks
+    const result = await this.inner().doStream(
+      peekRaw ? { ...options, includeRawChunks: true } : options,
+    )
+    const detail: ModelCallDetail = { ms: 0 }
     let usage: unknown = null
     const stream = (result.stream as ReadableStream<any>).pipeThrough(
       new TransformStream<any, any>({
         transform(part, controller) {
-          if (part?.type === 'finish') usage = part.usage
+          if (part?.type === 'raw') {
+            readOpenRouterChunk(part.rawValue, detail)
+            if (peekRaw) return
+          }
+          if (part?.type === 'finish') {
+            usage = part.usage
+            detail.finishReason = finishReasonText(part.finishReason)
+          }
           controller.enqueue(part)
         },
         // A failed write fails the call: the cap must not miss spend.
         async flush() {
-          if (usage) await recordModelCallUsage(runId, spec, usage)
+          if (usage) {
+            detail.ms = Date.now() - startedAt
+            await recordModelCallUsage(runId, spec, usage, detail)
+          }
         },
       }),
     )

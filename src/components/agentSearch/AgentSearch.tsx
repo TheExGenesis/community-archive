@@ -7,6 +7,7 @@ import { ArrowUp, Lock, Plus, Quote, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
+import type { AgentTweet } from '@/lib/agentSearch/types'
 import {
   ASK_PREFILL_PARAMS,
   askFilterLabel,
@@ -31,7 +32,15 @@ import {
   describeChatError,
   messageText,
   type TurnView,
+  type TweetLoad,
+  type TweetSupply,
 } from './messageView'
+import {
+  createTweetLoader,
+  TweetRequestError,
+  type BatchResult,
+  type TweetLoader,
+} from './tweetLoader'
 
 export const EXAMPLE_QUESTIONS = [
   'What has @patio11 said about stablecoins?',
@@ -47,6 +56,61 @@ const STREAM_READ_ATTEMPTS = 8
 const MAX_RECOVERIES = 3
 
 const newConversationId = () => crypto.randomUUID()
+
+const EMPTY_SUPPLY: TweetSupply = { tweets: new Map(), states: new Map() }
+
+/** What the conversation route returns (its tweets stay as references). */
+interface StoredConversation {
+  messages: UIMessage[]
+  runningRunId: string | null
+  /** Tweets the route had time to fetch (the prose-cited ones). */
+  tweets?: AgentTweet[]
+  /** The rest, cited first, for the tweets route. */
+  pendingTweetIds?: string[]
+  /** Cited tweets the gateway no longer returns. */
+  unavailableTweetIds?: string[]
+}
+
+/** One batch from the tweets route; a refusal is not tried again. */
+async function fetchConversationTweets(
+  conversationId: string,
+  ids: string[],
+  signal: AbortSignal,
+): Promise<BatchResult> {
+  const response = await fetch(
+    `/api/agent-search/conversations/${encodeURIComponent(conversationId)}/tweets`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids }),
+      cache: 'no-store',
+      signal,
+    },
+  )
+  if (!response.ok) throw new TweetRequestError(response.status)
+  const body = (await response.json()) as Partial<BatchResult>
+  return {
+    tweets: Array.isArray(body.tweets) ? body.tweets : [],
+    failed: Array.isArray(body.failed) ? body.failed : [],
+  }
+}
+
+/** The supply with a batch added: new maps, so memoized views rebuild. */
+function mergeSupply(
+  current: TweetSupply,
+  tweets: AgentTweet[],
+  states: Map<string, TweetLoad>,
+): TweetSupply {
+  const merged = new Map(current.tweets)
+  for (const tweet of tweets) merged.set(tweet.id, tweet)
+  const known = new Map(current.states)
+  states.forEach((state, id) => {
+    if (merged.has(id)) known.delete(id)
+    else if (state === 'loading') known.delete(id)
+    else known.set(id, state)
+  })
+  return { tweets: merged, states: known }
+}
 
 const questionAnchor = (messageId: string) => `ask-question-${messageId}`
 
@@ -199,6 +263,17 @@ export default function AgentSearch({
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
   const [stopped, setStopped] = useState<Record<string, number | null>>({})
+  // A reopened conversation keeps its tweets as references; these are the
+  // ones fetched so far, and why the others are not. Each batch that lands
+  // rebuilds the answers' views with more of them (messageView.ts).
+  const [supply, setSupply] = useState<TweetSupply>(EMPTY_SUPPLY)
+  const loaderRef = useRef<TweetLoader | null>(null)
+  const stopTweetLoader = () => {
+    loaderRef.current?.stop()
+    loaderRef.current = null
+  }
+  useEffect(() => stopTweetLoader, [])
+  const retryTweets = useCallback(() => loaderRef.current?.retry(), [])
 
   // The run id of the answer in progress, so Stop can cancel the workflow
   // instead of only closing the stream, and a reopened conversation can
@@ -343,9 +418,28 @@ export default function AgentSearch({
         { cache: 'no-store' },
       )
       if (!response.ok) throw new Error(String(response.status))
-      const body = (await response.json()) as {
-        messages: UIMessage[]
-        runningRunId: string | null
+      const body = (await response.json()) as StoredConversation
+      stopTweetLoader()
+      setSupply({
+        tweets: new Map((body.tweets ?? []).map((tweet) => [tweet.id, tweet])),
+        states: new Map(
+          (body.unavailableTweetIds ?? []).map((tweetId) => [
+            tweetId,
+            'unavailable' as const,
+          ]),
+        ),
+      })
+      // The answers show at once with their tweets' places held; the tweets
+      // follow in batches, cited ones first, and fill them in.
+      const pendingTweetIds = body.pendingTweetIds ?? []
+      if (pendingTweetIds.length) {
+        const loader = createTweetLoader({
+          fetchBatch: (ids, signal) => fetchConversationTweets(id, ids, signal),
+          onBatch: (tweets, states) =>
+            setSupply((current) => mergeSupply(current, tweets, states)),
+        })
+        loaderRef.current = loader
+        loader.load(pendingTweetIds)
       }
       setConversation({
         id,
@@ -362,6 +456,8 @@ export default function AgentSearch({
       setLoadError('That conversation could not be opened.')
       const fresh = newConversationId()
       shownConversationRef.current = fresh
+      stopTweetLoader()
+      setSupply(EMPTY_SUPPLY)
       setConversation({ id: fresh, pending: [], runningRunId: null })
       showConversationInUrl(null)
     } finally {
@@ -610,6 +706,8 @@ export default function AgentSearch({
     setLoadError(null)
     const fresh = newConversationId()
     shownConversationRef.current = fresh
+    stopTweetLoader()
+    setSupply(EMPTY_SUPPLY)
     setConversation({ id: fresh, pending: [], runningRunId: null })
     showConversationInUrl(null)
     textareaRef.current?.focus()
@@ -700,8 +798,9 @@ export default function AgentSearch({
   const hasThread = messages.length > 0
   const lastIndex = messages.length - 1
   // Each answer's view, by message index; a question needs its reply's.
-  // Built only when the messages change: typing in the box re-renders the
-  // page, and rebuilding every answer per keystroke made typing lag.
+  // Built only when the messages change, or more of a reopened
+  // conversation's tweets arrive: typing in the box re-renders the page, and
+  // rebuilding every answer per keystroke made typing lag.
   const views = useMemo(() => {
     const built = new Map<number, TurnView>()
     messages.forEach((message, index) => {
@@ -710,11 +809,12 @@ export default function AgentSearch({
         index,
         buildTurnView(messages, index, {
           streaming: busy && index === messages.length - 1,
+          supply,
         }),
       )
     })
     return built
-  }, [messages, busy])
+  }, [messages, busy, supply])
   // Stable handlers for the answers, so a memoized turn skips re-rendering
   // while the member types; each calls the latest ask or stop.
   const askRef = useRef(ask)
@@ -1063,6 +1163,7 @@ export default function AgentSearch({
                           interrupted?.kind === 'stopped' ||
                           view.outcome === 'stopped'
                         }
+                        onRetryTweets={retryTweets}
                       />
                     </EvidenceBoundary>
                   </div>

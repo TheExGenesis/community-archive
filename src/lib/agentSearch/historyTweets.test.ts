@@ -16,7 +16,11 @@ jest.mock('./gateway', () => ({
 }))
 
 import { buildRunParts } from './history'
-import { loadConversationTweets } from './historyTweets'
+import {
+  conversationTweetIds,
+  fetchConversationTweets,
+  loadConversationTweets,
+} from './historyTweets'
 import type { AgentSearchRun } from './types'
 
 const runWithTweets = (id: string, count: number): AgentSearchRun =>
@@ -96,5 +100,63 @@ describe('loadConversationTweets', () => {
     const tweets = await loadConversationTweets(runs)
     expect(tweets.size).toBe(100)
     warn.mockRestore()
+  })
+})
+
+describe('conversationTweetIds', () => {
+  test('orders ids for the page: cited in the prose, then listed, then the rest', () => {
+    const first = runWithTweets('ra', 6)
+    const ids = Array.from(
+      JSON.stringify(first.parts).matchAll(/"\$t":"(\d+)"/g),
+      (m) => m[1],
+    )
+    const [a, b, c, d, e, f] = ids
+    // The list names a file a later turn's command wrote.
+    const second = runWithTweets('rb', 2)
+    const later = Array.from(
+      JSON.stringify(second.parts).matchAll(/"\$t":"(\d+)"/g),
+      (m) => m[1],
+    )
+    ;(second.parts as Array<Record<string, unknown>>)[0].output = {
+      ...((second.parts as Array<Record<string, unknown>>)[0].output as object),
+      files: { 'lists/x.jsonl': [later[0], d] },
+    }
+    const runs = [
+      { ...first, answer: `Quoted [[q:${c} | w]] and [[t:${a}]] [[t:${c}]]` },
+      {
+        ...second,
+        answer: `Also [[t:${b}]]\n[[posts: X | lists/x.jsonl]]\n[[posts: | ${e}, 999]]`,
+      },
+    ] as AgentSearchRun[]
+    expect(conversationTweetIds(runs)).toEqual({
+      cited: [c, a, b],
+      listed: [later[0], d, e],
+      rest: [f, later[1]],
+    })
+  })
+})
+
+describe('fetchConversationTweets', () => {
+  test('full cards for cited ids, the lookup for the rest, and names the ids whose batch failed', async () => {
+    mockLookup.mockClear()
+    mockDetails.mockClear()
+    const ids = Array.from({ length: 120 }, (_, i) => String(1000 + i))
+    mockLookup.mockImplementationOnce(async () => {
+      throw new Error('timeout')
+    })
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = await fetchConversationTweets(
+      ids,
+      new Set(ids.slice(0, 2)),
+      { deadlineAt: Date.now() + 1000 },
+    )
+    warn.mockRestore()
+    // The cited pair went first, as one detail batch, and that batch failed.
+    expect(mockDetails.mock.calls.map(([batch]) => batch)).toEqual([
+      ids.slice(0, 2),
+    ])
+    expect(result.failed).toEqual(ids.slice(0, 2))
+    expect(result.tweets.size).toBe(118)
+    expect(mockLookup.mock.calls.length).toBe(3)
   })
 })

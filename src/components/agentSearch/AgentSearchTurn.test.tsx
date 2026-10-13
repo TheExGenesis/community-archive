@@ -242,3 +242,125 @@ test('says a follow-up with no new searches used the earlier tweets', () => {
     }),
   ).toBeInTheDocument()
 })
+
+describe('a reopened conversation, its tweets still loading', () => {
+  const ref = (id: string, p?: number) =>
+    p === undefined ? { $t: id } : { $t: id, p }
+  const stored: UIMessage[] = [
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-bash',
+          toolCallId: 'c1',
+          state: 'output-available',
+          input: { command: 'search x' },
+          output: {
+            summary: 'Searched “x” · 5 tweets',
+            exitCode: 0,
+            files: { 'lists/all.jsonl': ['3', '4', '5'] },
+            tweets: [
+              ref('1'),
+              ref('2'),
+              ref('3', 0.9),
+              ref('4', 0.5),
+              ref('5'),
+            ],
+          },
+        } as unknown as UIMessage['parts'][number],
+        {
+          type: 'text',
+          text: 'Said [[t:1]] and [[t:2]] [[t:777]].\n[[t:2]]\n[[posts: All | lists/all.jsonl]]',
+        },
+      ],
+    },
+  ]
+  const supply = (
+    ids: string[],
+    states: Record<string, 'failed' | 'unavailable'> = {},
+  ) => ({
+    tweets: new Map(ids.map((id) => [id, tweet(id)])),
+    states: new Map(Object.entries(states)),
+  })
+
+  test('shows the answer at once with places held, not "unverified", then fills them in', () => {
+    const { rerender } = render(
+      <AgentSearchTurn
+        view={buildTurnView(stored, 0, { supply: supply([]) })}
+        active={false}
+      />,
+    )
+    // The prose, the list heading with its full count, and the steps are
+    // there before any tweet is.
+    expect(screen.getByRole('region', { name: 'All' })).toHaveTextContent(
+      'All · 3 tweets',
+    )
+    expect(
+      screen.getByRole('button', { name: '1 step · 5 tweets in the answer' }),
+    ).toBeInTheDocument()
+    const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
+    expect(
+      within(cited).getAllByRole('status', { name: 'Loading this tweet' }),
+    ).toHaveLength(2)
+    expect(within(cited).getByLabelText(/Citation 2/)).toBeInTheDocument()
+    expect(screen.getByText('Loading 5 tweets…')).toBeInTheDocument()
+    expect(screen.getByText('Loading 3 tweets…')).toBeInTheDocument()
+    // Only the id no search returned is unverified.
+    expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
+    expect(screen.queryByText(/no longer available/)).toBeNull()
+
+    rerender(
+      <AgentSearchTurn
+        view={buildTurnView(stored, 0, {
+          supply: supply(['1', '2', '3', '4', '5']),
+        })}
+        active={false}
+      />,
+    )
+    expect(within(cited).queryByRole('status')).toBeNull()
+    expect(cited).toHaveTextContent('Post 1')
+    expect(cited).toHaveTextContent('Post 2')
+    expect(screen.queryByText(/Loading/)).toBeNull()
+    const list = screen.getByRole('region', { name: 'All' })
+    expect(list).toHaveTextContent('All · 3 tweets')
+    expect(within(list).getByText('Post 3')).toBeInTheDocument()
+  })
+
+  test('a tweet that could not be fetched offers Retry; one that is gone says so', () => {
+    const onRetryTweets = jest.fn()
+    render(
+      <AgentSearchTurn
+        view={buildTurnView(stored, 0, {
+          supply: supply(['3', '4'], {
+            '1': 'failed',
+            '2': 'unavailable',
+            '5': 'failed',
+          }),
+        })}
+        active={false}
+        onRetryTweets={onRetryTweets}
+      />,
+    )
+    const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
+    expect(
+      within(cited).getByText('Couldn’t load this tweet'),
+    ).toBeInTheDocument()
+    expect(
+      within(cited).getByText('This tweet is no longer available'),
+    ).toBeInTheDocument()
+    fireEvent.click(within(cited).getByRole('button', { name: 'Retry' }))
+    expect(onRetryTweets).toHaveBeenCalledTimes(1)
+    // The list keeps a place for the failed tweet; the answer says what is gone.
+    const list = screen.getByRole('region', { name: 'All' })
+    expect(list).toHaveTextContent('All · 3 tweets')
+    expect(
+      within(list).getByText('Couldn’t load this tweet'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Couldn’t load 2 tweets/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/One tweet in this answer is no longer available/),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
+  })
+})

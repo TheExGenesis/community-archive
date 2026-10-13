@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext } from 'react'
-import type { PortalTweet } from '@/lib/portal/types'
+import type { Citation } from './messageView'
 
 /**
  * Links an answer's citation chips to its cited-posts rail. Keys are the
@@ -23,8 +23,10 @@ export interface CitationLinks {
   openSheet: (anchor: string, chip: HTMLElement) => void
   /** Wide screens show the cited column unless the reader closed it. */
   railShown: boolean
-  /** The cited tweet, for the card a chip shows on hover. */
-  tweetFor: (anchor: string) => PortalTweet | undefined
+  /** The citation, for the card a chip shows on hover and its load state. */
+  citationFor: (anchor: string) => Citation | undefined
+  /** Fetches again the tweets of a reopened conversation that failed to load. */
+  retryTweets?: () => void
 }
 
 export const CitationContext = createContext<CitationLinks | null>(null)

@@ -54,12 +54,34 @@ export type TimelineEntry =
       latest: boolean
     }
 
-export interface Citation {
+/**
+ * Why a tweet a tool returned is not in hand. A reopened conversation keeps
+ * tweets as references and fetches them again: `loading` until its batch
+ * lands, `failed` when the batch could not be fetched (the reader can retry),
+ * `unavailable` when the gateway had nothing for it (deleted, or the author
+ * opted out since). None of these is "unverified", which is a citation the
+ * searches never returned at all.
+ */
+export type TweetLoad = 'loading' | 'failed' | 'unavailable'
+
+export type CitationState = 'loaded' | TweetLoad
+
+/** Tweets fetched so far for a reopened conversation, and why others are not. */
+export interface TweetSupply {
+  tweets: ReadonlyMap<string, PortalTweet>
+  /** A referenced id absent from both is still loading. */
+  states: ReadonlyMap<string, TweetLoad>
+}
+
+/** A cited tweet with its number; the tweet is null until it is in hand. */
+export type Citation = {
   id: string
   n: number
-  tweet: PortalTweet
   anchor: string
-}
+} & (
+  | { tweet: PortalTweet; state: 'loaded' }
+  | { tweet: null; state: TweetLoad }
+)
 
 /** Prose, or a list of posts the agent placed in the answer. */
 export type AnswerBlock =
@@ -74,6 +96,8 @@ export type AnswerBlock =
       view: ListView
       /** The relevance check's probability for the tweets it scored. */
       scores: ReadonlyMap<string, number>
+      /** Listed tweets not in hand yet, in the list's order, with why. */
+      pending: Array<{ id: string; state: TweetLoad }>
     }
   /** A citation alone on its line: the tweet shown whole, in place. */
   | { kind: 'tweet'; key: string; citation: Citation }
@@ -89,6 +113,16 @@ export interface AnswerView {
   unverified: string[]
   /** Workspace files a list named that no tool reported. */
   missingLists: string[]
+  /** Cited or listed tweets still being fetched. */
+  loading: string[]
+  /** Cited or listed tweets whose fetch failed; a retry may bring them. */
+  failed: string[]
+  /**
+   * Cited or listed tweets the gateway no longer returns. The prose still
+   * names their authors; this list is what a later change would use to
+   * replace those mentions.
+   */
+  unavailable: string[]
 }
 
 export interface CoverageSearch {
@@ -158,6 +192,12 @@ export interface TurnView {
   foundPhase: FoundPhase
   /** The steps with the model's reasoning between them, in order. */
   timeline: TimelineEntry[]
+  /**
+   * Tweets this turn's tools returned that are not in hand (a reopened
+   * conversation fetches them again): how many are still loading, failed,
+   * or gone. Counts and lists grow as batches land.
+   */
+  tweets: { loading: number; failed: number; unavailable: number }
 }
 
 /** A tweet in the side column, with its relevance score once it has one. */
@@ -781,7 +821,17 @@ export interface FoundTweets {
   scores: Map<string, number>
   /** Workspace files the tools reported, path to ids (latest write wins). */
   files: Map<string, string[]>
+  /**
+   * Ids the tools returned as references (a reopened conversation) whose
+   * tweet is not in hand, with why. A tool did return them, so a citation
+   * of one is verified, just not showable yet.
+   */
+  missing: Map<string, TweetLoad>
 }
+
+/** A stored tweet reference (history.ts): its id, and its score if scored. */
+const isRef = (value: LooseRecord): value is { $t: string; p?: unknown } =>
+  typeof value.$t === 'string'
 
 function quotedAsPortal(tweet: PortalQuotedTweet): PortalTweet {
   return { ...tweet, observedAt: tweet.createdAt }
@@ -815,12 +865,18 @@ function profileTweets(profile: LooseRecord, items: unknown): PortalTweet[] {
 /**
  * Same traversal as collectToolTweetIds, but keeps the objects so the page can
  * render cited tweets without another fetch. Full tweets win over quoted embeds.
+ * A reopened conversation's outputs hold references instead of tweets; each
+ * resolves against `supply`, or is noted as missing with why.
  */
-export function collectToolTweets(outputs: unknown[]): FoundTweets {
+export function collectToolTweets(
+  outputs: unknown[],
+  supply?: TweetSupply,
+): FoundTweets {
   const byId = new Map<string, PortalTweet>()
   const full = new Set<string>()
   const results: string[] = []
   const scores = new Map<string, number>()
+  const missing = new Map<string, TweetLoad>()
 
   const visit = (value: unknown, embedded: boolean) => {
     if (Array.isArray(value)) {
@@ -828,6 +884,21 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
       return
     }
     if (!isRecord(value)) return
+    if (isRef(value)) {
+      const id = value.$t
+      const p = asNumber(value.p)
+      const tweet = supply?.tweets.get(id)
+      if (tweet) {
+        visit(p === undefined ? tweet : { ...tweet, p }, embedded)
+      } else {
+        if (!missing.has(id)) {
+          missing.set(id, supply?.states.get(id) ?? 'loading')
+        }
+        // The score is the reference's own; it sorts the tweet once it lands.
+        if (p !== undefined) scores.set(id, Math.max(p, scores.get(id) ?? 0))
+      }
+      return
+    }
     if (
       typeof value.id === 'string' &&
       /^\d{1,20}$/.test(value.id) &&
@@ -870,7 +941,16 @@ export function collectToolTweets(outputs: unknown[]): FoundTweets {
       }
     }
   })
-  return { byId, results, scores, files: collectWorkspaceFiles(outputs) }
+  // A tweet that arrived through one output is in hand for all of them.
+  for (const id of Array.from(missing.keys()))
+    if (byId.has(id)) missing.delete(id)
+  return {
+    byId,
+    results,
+    scores,
+    files: collectWorkspaceFiles(outputs),
+    missing,
+  }
 }
 
 export function citationAnchor(scope: string, tweetId: string) {
@@ -908,29 +988,42 @@ export function buildAnswer(
   const unverified: string[] = []
   const listed: string[] = []
   const missingLists: string[] = []
-  // The citation for a tweet a tool returned, numbered on first use; an id
-  // no tool returned is noted as unverified.
+  const loading: string[] = []
+  const failed: string[] = []
+  const unavailable: string[] = []
+  const noteMissing = (id: string, state: TweetLoad) => {
+    const list =
+      state === 'loading' ? loading : state === 'failed' ? failed : unavailable
+    if (!list.includes(id)) list.push(id)
+  }
+  // The citation for a tweet a tool returned, numbered on first use. A tweet
+  // not in hand yet (a reopened conversation) keeps its number, so nothing
+  // renumbers when it lands; an id no tool returned is noted as unverified.
   const citationFor = (id: string) => {
-    const tweet = found.byId.get(id)
-    if (!tweet) {
+    const tweet = found.byId.get(id) ?? null
+    const missing = found.missing.get(id)
+    if (!tweet && !missing) {
       if (!unverified.includes(id)) unverified.push(id)
       return null
     }
     let citation = citations.find((item) => item.id === id)
     if (!citation) {
-      citation = {
+      if (missing) noteMissing(id, missing)
+      const base = {
         id,
         n: citations.length + 1,
-        tweet,
         anchor: citationAnchor(scope, id),
       }
+      citation = tweet
+        ? { ...base, tweet, state: 'loaded' }
+        : { ...base, tweet: null, state: missing as TweetLoad }
       citations.push(citation)
     }
     return citation
   }
   // A quote the tweet has word for word is shown as a quote; one it does not
   // have is shown as the agent's words, without quote marks. Either way the
-  // tweet is cited.
+  // tweet is cited. Until the tweet is in hand the words cannot be checked.
   const quote = (prose: string) =>
     prose.replace(
       new RegExp(QUOTE_PATTERN.source, 'g'),
@@ -941,7 +1034,7 @@ export function buildAnswer(
           return `${safe} [unverified](${UNVERIFIED_HREF_PREFIX}${id})`
         }
         const chip = `[${citation.n}](#${citation.anchor})`
-        return isVerbatim(words, citation.tweet.text)
+        return citation.tweet && isVerbatim(words, citation.tweet.text)
           ? `[${safe}](${QUOTE_HREF_PREFIX}${citation.anchor}) ${chip}`
           : `${safe} ${chip}`
       },
@@ -987,7 +1080,9 @@ export function buildAnswer(
     }
     // A list naming a workspace file no tool reported is not shown, and
     // named. Ids no tool returned are dropped from the list and named as
-    // unverified, as citations are; a list left empty is not shown.
+    // unverified, as citations are; a list left empty is not shown. Listed
+    // tweets not in hand yet hold a place in the list until they land; one
+    // the gateway no longer has is left out, as before.
     const ids = part.path ? found.files.get(part.path) : part.ids
     if (!ids) {
       if (part.path && !missingLists.includes(part.path)) {
@@ -996,16 +1091,26 @@ export function buildAnswer(
       return
     }
     const tweets: PortalTweet[] = []
+    const pending: Array<{ id: string; state: TweetLoad }> = []
     for (const id of ids) {
       const tweet = found.byId.get(id)
       if (!tweet) {
-        if (!unverified.includes(id)) unverified.push(id)
+        const missing = found.missing.get(id)
+        if (!missing) {
+          if (!unverified.includes(id)) unverified.push(id)
+          continue
+        }
+        noteMissing(id, missing)
+        if (missing !== 'unavailable') {
+          pending.push({ id, state: missing })
+          if (!listed.includes(id)) listed.push(id)
+        }
         continue
       }
       tweets.push(tweet)
       if (!listed.includes(id)) listed.push(id)
     }
-    if (tweets.length) {
+    if (tweets.length || pending.length) {
       const scores = new Map<string, number>()
       for (const tweet of tweets) {
         const score = found.scores.get(tweet.id)
@@ -1018,13 +1123,24 @@ export function buildAnswer(
         tweets,
         view: part.view,
         scores,
+        pending,
       })
     }
   })
   const markdown = blocks
     .flatMap((block) => (block.kind === 'text' ? [block.markdown] : []))
     .join('\n\n')
-  return { markdown, blocks, citations, listed, unverified, missingLists }
+  return {
+    markdown,
+    blocks,
+    citations,
+    listed,
+    unverified,
+    missingLists,
+    loading,
+    failed,
+    unavailable,
+  }
 }
 
 /**
@@ -1162,6 +1278,16 @@ export function answerText(message: UIMessage): string {
     .join('')
 }
 
+export interface TurnViewOptions {
+  streaming?: boolean
+  /**
+   * A reopened conversation: the tweets fetched so far for its stored
+   * references. Building the view again with more of them fills the answer
+   * in place; numbering never changes, since every reference counts.
+   */
+  supply?: TweetSupply
+}
+
 /**
  * Builds the view for the assistant message at `index`. Citations resolve
  * against tool outputs from this and earlier turns, since a follow-up answer
@@ -1170,7 +1296,7 @@ export function answerText(message: UIMessage): string {
 export function buildTurnView(
   messages: UIMessage[],
   index: number,
-  options: { streaming?: boolean } = {},
+  options: TurnViewOptions = {},
 ): TurnView {
   const message = messages[index]
   const calls = toolCalls(message)
@@ -1179,10 +1305,17 @@ export function buildTurnView(
     .filter((item) => item.role === 'assistant')
     .flatMap((item) => toolCalls(item).map((call) => call.output))
   const ownOutputs = calls.map((call) => call.output)
-  const found = collectToolTweets([...ownOutputs, ...priorOutputs])
+  const found = collectToolTweets(
+    [...ownOutputs, ...priorOutputs],
+    options.supply,
+  )
   // Files in time order, so this turn's latest write of a path wins.
   found.files = collectWorkspaceFiles([...priorOutputs, ...ownOutputs])
-  const own = collectToolTweets(ownOutputs)
+  const own = collectToolTweets(ownOutputs, options.supply)
+  const tweets = { loading: 0, failed: 0, unavailable: 0 }
+  own.missing.forEach((state) => {
+    tweets[state] += 1
+  })
   const text = answerText(message)
   let outcome = turnOutcome(text)
   // A finished turn with no answer did not finish properly, however the
@@ -1258,6 +1391,7 @@ export function buildTurnView(
     foundSoFar: own.results.length,
     ...foundSoFar(calls, own),
     timeline: timelineFor(message),
+    tweets,
   }
 }
 

@@ -212,13 +212,15 @@ const STOPPED_TEXT = '_This answer was stopped before it finished._'
 const FAILED_TEXT = '_This answer failed before it finished._'
 
 /**
- * Rebuilds a conversation's messages from stored runs. `tweets` holds every
- * referenced tweet the gateway still returns. A run still in progress gets no
- * assistant message; the caller reconnects to its stream instead.
+ * Rebuilds a conversation's messages from stored runs. With `tweets` (every
+ * referenced tweet the gateway still returns) the references are replaced
+ * by tweets; without it they stay as stored, for a page that resolves them
+ * itself as the tweets arrive (messageView.ts). A run still in progress gets
+ * no assistant message; the caller reconnects to its stream instead.
  */
 export function conversationMessages(
   runs: AgentSearchRun[],
-  tweets: Map<string, AgentTweet>,
+  tweets?: Map<string, AgentTweet>,
 ): UIMessage[] {
   const messages: UIMessage[] = []
   for (const run of runs) {
@@ -229,7 +231,9 @@ export function conversationMessages(
     })
     if (run.status === 'running') continue
     const stored = Array.isArray(run.parts)
-      ? (rehydrate(run.parts, tweets) as UIMessage['parts'])
+      ? ((tweets
+          ? rehydrate(run.parts, tweets)
+          : run.parts) as UIMessage['parts'])
       : run.answer
         ? ([{ type: 'text', text: run.answer }] as UIMessage['parts'])
         : []

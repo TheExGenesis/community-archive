@@ -9,6 +9,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import type { Citation } from './messageView'
+import { TweetPlaceholder } from './TweetPlaceholder'
 
 const NAV =
   'inline-flex h-11 flex-1 items-center justify-center gap-1 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40'
@@ -24,6 +25,7 @@ export function CitationSheet({
   onNavigate,
   onClose,
   returnFocusTo,
+  onRetry,
 }: {
   citations: Citation[]
   /** The open citation, or null when the sheet is closed. */
@@ -32,6 +34,8 @@ export function CitationSheet({
   onClose: () => void
   /** The chip that opened the sheet; focus goes back to it on close. */
   returnFocusTo: HTMLElement | null
+  /** Fetches again a tweet that failed to load. */
+  onRetry?: () => void
 }) {
   const index = citations.findIndex((citation) => citation.anchor === anchor)
   const citation = index >= 0 ? citations[index] : null
@@ -69,13 +73,17 @@ export function CitationSheet({
               </SheetDescription>
             </div>
             <div className="-mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain border-y border-border">
-              <TweetCard
-                key={citation.id}
-                tweet={citation.tweet}
-                stacked
-                showDate
-                showExternalLink
-              />
+              {citation.tweet ? (
+                <TweetCard
+                  key={citation.id}
+                  tweet={citation.tweet}
+                  stacked
+                  showDate
+                  showExternalLink
+                />
+              ) : (
+                <TweetPlaceholder state={citation.state} onRetry={onRetry} />
+              )}
             </div>
             <div className="flex gap-2">
               <button

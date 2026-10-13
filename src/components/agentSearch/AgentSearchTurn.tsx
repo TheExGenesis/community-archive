@@ -17,6 +17,10 @@ import { EmbeddedTweet, ResultList } from './ResultList'
 import { useCitedColumnHidden } from './railPreference'
 import { Sources } from './Sources'
 import { LogLine, StepLog } from './StepLog'
+import { RETRY_BUTTON } from './TweetPlaceholder'
+
+const plural = (n: number, word: string) =>
+  `${n.toLocaleString('en-US')} ${n === 1 ? word : `${word}s`}`
 
 /** A run that ended without a full answer, as the page knows it. */
 export interface TurnInterruption {
@@ -36,6 +40,8 @@ interface AgentSearchTurnProps {
   canAskAgain?: boolean
   /** The latest turn, or one that was stopped: earlier ones keep the rest. */
   showSources?: boolean
+  /** A reopened conversation: fetches again the tweets that failed to load. */
+  onRetryTweets?: () => void
 }
 
 export const AgentSearchTurn = memo(function AgentSearchTurn({
@@ -47,6 +53,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   onAskAgain,
   canAskAgain = true,
   showSources = true,
+  onRetryTweets,
 }: AgentSearchTurnProps) {
   const { answer } = view
   const hasAnswer = answer.blocks.length > 0
@@ -59,9 +66,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   const sheetChipRef = useRef<HTMLElement | null>(null)
   const citedByAnchor = useMemo(
     () =>
-      new Map(
-        answer.citations.map((citation) => [citation.anchor, citation.tweet]),
-      ),
+      new Map(answer.citations.map((citation) => [citation.anchor, citation])),
     [answer.citations],
   )
   // Handles in the answer link to profiles only for people whose tweets the
@@ -69,7 +74,9 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   const people = useMemo(
     () =>
       peopleFromTweets([
-        answer.citations.map((citation) => citation.tweet),
+        answer.citations.flatMap((citation) =>
+          citation.tweet ? [citation.tweet] : [],
+        ),
         ...answer.blocks.flatMap((block) =>
           block.kind === 'list' ? [block.tweets] : [],
         ),
@@ -92,9 +99,10 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         sheetChipRef.current = chip
         setSheetAnchor(anchor)
       },
-      tweetFor: (anchor) => citedByAnchor.get(anchor),
+      citationFor: (anchor) => citedByAnchor.get(anchor),
+      retryTweets: onRetryTweets,
     }),
-    [selected, hovered, inView, citedByAnchor, railHidden],
+    [selected, hovered, inView, citedByAnchor, railHidden, onRetryTweets],
   )
   const citationNumbers = useMemo(
     () =>
@@ -252,6 +260,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
                       citations={citationNumbers}
                       view={block.view}
                       scores={block.scores}
+                      pending={block.pending}
                     />
                   </EvidenceBoundary>
                 ),
@@ -272,6 +281,36 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
               <span className="break-all font-mono text-xs">
                 {answer.unverified.join(', ')}
               </span>
+            </p>
+          )}
+          {!active && answer.unavailable.length > 0 && (
+            <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              {answer.unavailable.length === 1
+                ? 'One tweet in this answer is no longer available: it was deleted, or its author has opted out of the archive.'
+                : `${answer.unavailable.length} tweets in this answer are no longer available: they were deleted, or their authors have opted out of the archive.`}
+            </p>
+          )}
+          {!active && view.tweets.loading > 0 && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Loading {plural(view.tweets.loading, 'tweet')}…
+            </p>
+          )}
+          {!active && view.tweets.loading === 0 && view.tweets.failed > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Couldn’t load {plural(view.tweets.failed, 'tweet')}
+              {onRetryTweets && (
+                <>
+                  {' '}
+                  <span aria-hidden="true">·</span>{' '}
+                  <button
+                    type="button"
+                    onClick={onRetryTweets}
+                    className={RETRY_BUTTON}
+                  >
+                    Retry
+                  </button>
+                </>
+              )}
             </p>
           )}
           {!active && answer.missingLists.length > 0 && (
@@ -350,6 +389,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         onNavigate={setSheetAnchor}
         onClose={() => setSheetAnchor(null)}
         returnFocusTo={sheetChipRef.current}
+        onRetry={onRetryTweets}
       />
     </CitationContext.Provider>
   )
@@ -369,6 +409,7 @@ function sameTurn(a: AgentSearchTurnProps, b: AgentSearchTurnProps) {
     a.onAskAgain === b.onAskAgain &&
     a.canAskAgain === b.canAskAgain &&
     a.showSources === b.showSources &&
+    a.onRetryTweets === b.onRetryTweets &&
     a.interrupted?.kind === b.interrupted?.kind &&
     a.interrupted?.elapsedMs === b.interrupted?.elapsedMs
   )

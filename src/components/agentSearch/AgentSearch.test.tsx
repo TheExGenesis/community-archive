@@ -395,3 +395,81 @@ test('arrival fetches the list once, with placeholders until it lands', async ()
     ),
   ).toHaveLength(1)
 })
+
+describe('opening a stored conversation', () => {
+  test('shows it as soon as the messages arrive and fetches its tweets after, cited first', async () => {
+    let releaseTweets: () => void = () => {}
+    const tweetRequests: string[][] = []
+    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).endsWith('/tweets')) {
+        const { ids } = JSON.parse(String(init?.body)) as { ids: string[] }
+        tweetRequests.push(ids)
+        await new Promise<void>((resolve) => {
+          releaseTweets = resolve
+        })
+        return {
+          ok: true,
+          json: async () => ({
+            tweets: ids.map((id) => ({
+              id,
+              text: `Post ${id}`,
+              username: 'u',
+            })),
+            failed: [],
+          }),
+        }
+      }
+      if (String(url).includes('/conversations/')) {
+        return {
+          ok: true,
+          json: async () => ({
+            messages: [
+              {
+                id: 'r1-question',
+                role: 'user',
+                parts: [{ type: 'text', text: 'Who?' }],
+              },
+              {
+                id: 'r1',
+                role: 'assistant',
+                parts: [{ type: 'text', text: 'Them [[t:1]].' }],
+              },
+            ] as UIMessage[],
+            runningRunId: null,
+            tweets: [],
+            pendingTweetIds: Array.from({ length: 40 }, (_, i) =>
+              String(i + 1),
+            ),
+            unavailableTweetIds: [],
+          }),
+        }
+      }
+      return { ok: true, json: async () => ({ conversations: [] }) }
+    }) as unknown as typeof fetch
+    render(<AgentSearch initialConversationId="conversation-stored" />)
+    expect(
+      screen.getByRole('status', { name: 'Opening the conversation' }),
+    ).toBeInTheDocument()
+    // The skeleton goes as soon as the messages are in, while the tweets
+    // are still being fetched.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('status', { name: 'Opening the conversation' }),
+      ).toBeNull(),
+    )
+    await waitFor(() => expect(tweetRequests.length).toBeGreaterThan(0))
+    // A small first batch (the cited tweets), larger ones after it.
+    expect(tweetRequests[0]).toEqual(
+      Array.from({ length: 30 }, (_, i) => String(i + 1)),
+    )
+    releaseTweets()
+    await waitFor(() => expect(tweetRequests).toHaveLength(2))
+    expect(tweetRequests[1]).toEqual(
+      Array.from({ length: 10 }, (_, i) => String(i + 31)),
+    )
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/agent-search/conversations/conversation-stored/tweets',
+      expect.objectContaining({ method: 'POST', cache: 'no-store' }),
+    )
+  })
+})

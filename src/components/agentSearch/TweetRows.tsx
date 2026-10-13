@@ -4,8 +4,11 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Plus } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { TweetAvatar } from '@/components/TweetAvatar'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { PortalTweet } from '@/lib/portal/types'
 import { sortPeople, type ListSort } from './listSort'
+import type { TweetLoad } from './messageView'
+import { RETRY_BUTTON } from './TweetPlaceholder'
 
 const monthFormat = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -138,6 +141,75 @@ export function TweetRow({
         </button>
       )}
     </li>
+  )
+}
+
+/** Rows drawn as skeletons while a list's tweets load. */
+const SKELETON_ROWS = 3
+
+/**
+ * The place of a list's tweets that are not in hand yet (a reopened
+ * conversation fetches them again): a few skeleton rows and a count while
+ * they load, one row offering Retry for those whose fetch failed. Rows keep
+ * the list's geometry, so the page does not jump as tweets land.
+ */
+export function PendingRows({
+  pending,
+  onRetry,
+  nested = false,
+}: {
+  pending: ReadonlyArray<{ id: string; state: TweetLoad }>
+  onRetry?: () => void
+  nested?: boolean
+}) {
+  const loading = pending.filter((item) => item.state === 'loading').length
+  const failed = pending.filter((item) => item.state === 'failed').length
+  if (!loading && !failed) return null
+  const rowClass = nested ? NESTED_ROW_CLASS : ROW_CLASS
+  const border = nested ? '' : 'border-b border-border'
+  return (
+    <>
+      {Array.from({ length: Math.min(loading, SKELETON_ROWS) }, (_, i) => (
+        <li key={`skeleton-${i}`} aria-hidden="true" className={border}>
+          <div className={`${rowClass} pointer-events-none`}>
+            {!nested && <Skeleton className="h-7 w-7 shrink-0 rounded-full" />}
+            <span className="min-w-0 flex-1 space-y-1.5">
+              {!nested && <Skeleton className="h-3 w-24" />}
+              <Skeleton className="h-4 w-4/5" />
+            </span>
+            <Skeleton className="h-3 w-12 shrink-0" />
+          </div>
+        </li>
+      ))}
+      {loading > 0 && (
+        <li
+          role="status"
+          className={`${border} px-4 py-2 text-xs text-muted-foreground`}
+        >
+          Loading{' '}
+          {loading === 1
+            ? '1 tweet'
+            : `${loading.toLocaleString('en-US')} tweets`}
+          …
+        </li>
+      )}
+      {failed > 0 && (
+        <li className={`${border} px-4 py-2 text-sm text-muted-foreground`}>
+          {failed === 1
+            ? 'Couldn’t load this tweet'
+            : `Couldn’t load ${failed.toLocaleString('en-US')} tweets`}
+          {onRetry && (
+            <>
+              {' '}
+              <span aria-hidden="true">·</span>{' '}
+              <button type="button" onClick={onRetry} className={RETRY_BUTTON}>
+                Retry
+              </button>
+            </>
+          )}
+        </li>
+      )}
+    </>
   )
 }
 

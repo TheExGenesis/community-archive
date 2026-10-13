@@ -13,6 +13,7 @@ import { X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
 import type { Citation, FoundPhase, FoundTweet } from './messageView'
+import { TweetPlaceholder } from './TweetPlaceholder'
 
 const reducedMotion = () =>
   typeof window !== 'undefined' &&
@@ -125,7 +126,13 @@ function CitationItem({
         {citation.n}
       </button>
       <div className="min-w-0 flex-1">
-        {expanded ? (
+        {!citation.tweet ? (
+          <TweetPlaceholder
+            state={citation.state}
+            onRetry={links?.retryTweets}
+            compact
+          />
+        ) : expanded ? (
           <TweetCard tweet={citation.tweet} stacked showDate showExternalLink />
         ) : (
           <TweetCard

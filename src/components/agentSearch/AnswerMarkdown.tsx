@@ -12,6 +12,7 @@ import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
 import { QUOTE_HREF_PREFIX, UNVERIFIED_HREF_PREFIX } from './messageView'
 import { ProfileLink, ProfilePeopleContext } from './ProfilePreview'
 import { remarkProfileLinks, type Person } from './profileLinks'
+import { tweetLoadText } from './TweetPlaceholder'
 
 export type { Person }
 
@@ -59,7 +60,12 @@ function CitationChip({
   const links = useCitationLinks()
   const anchor = href.slice(1)
   const lit = links?.hovered === anchor || links?.selected?.anchor === anchor
-  const tweet = links?.tweetFor(anchor)
+  const citation = links?.citationFor(anchor)
+  const tweet = citation?.tweet ?? undefined
+  // A reopened conversation's chip keeps its number while its tweet is
+  // fetched; until then it pulses, and if the tweet cannot be shown it says
+  // why on hover.
+  const state = citation?.state ?? 'loaded'
   // On a pointer that can hover, the tweet opens in a card after a short
   // pause and stays while the pointer moves onto it.
   const [open, setOpen] = useState(false)
@@ -83,6 +89,8 @@ function CitationChip({
         <a
           href={href}
           aria-label={`Citation ${String(children)}`}
+          title={state === 'loaded' ? undefined : tweetLoadText(state)}
+          data-tweet-state={state === 'loaded' ? undefined : state}
           onClick={(event) => {
             if (!links) return
             // Neither path follows the #anchor, so the page never jumps.
@@ -97,6 +105,12 @@ function CitationChip({
           onBlur={() => links?.hover(null)}
           className={`${CHIP} ${CHIP_HIT_AREA} transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             lit ? 'bg-brand text-brand-foreground' : 'bg-muted text-foreground'
+          } ${
+            state === 'loading'
+              ? 'animate-pulse motion-reduce:animate-none'
+              : state !== 'loaded'
+                ? 'border border-dashed border-border text-muted-foreground'
+                : ''
           }`}
         >
           {children}

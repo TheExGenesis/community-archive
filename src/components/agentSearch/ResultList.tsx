@@ -4,11 +4,15 @@ import { useMemo, useState } from 'react'
 import TweetCard from '@/components/TweetCard'
 import { TWEETS_VIEW, type ListView } from '@/lib/agentSearch/listView'
 import type { PortalTweet } from '@/lib/portal/types'
+import { useCitationLinks } from './CitationContext'
 import { GroupingToggle, type Grouping } from './GroupingToggle'
 import { DEFAULT_SORT, sortTweets, type ListSort } from './listSort'
-import type { Citation } from './messageView'
+import type { Citation, TweetLoad } from './messageView'
 import { SortMenu } from './SortMenu'
-import { PeopleList, TweetRowList } from './TweetRows'
+import { TweetPlaceholder } from './TweetPlaceholder'
+import { PeopleList, PendingRows, TweetRowList } from './TweetRows'
+
+const NO_PENDING: ReadonlyArray<{ id: string; state: TweetLoad }> = []
 
 /** A list shows this many rows before the rest fold. */
 const FIRST_ROWS = 8
@@ -29,6 +33,7 @@ export function ResultList({
   citations,
   view = TWEETS_VIEW,
   scores,
+  pending = NO_PENDING,
 }: {
   label: string | null
   tweets: PortalTweet[]
@@ -36,7 +41,10 @@ export function ResultList({
   view?: ListView
   /** The relevance check's probability per tweet, when it scored them. */
   scores?: ReadonlyMap<string, number>
+  /** Listed tweets not in hand yet (a reopened conversation), with why. */
+  pending?: ReadonlyArray<{ id: string; state: TweetLoad }>
 }) {
+  const links = useCitationLinks()
   const authors = useMemo(
     () => new Set(tweets.map((tweet) => tweet.username)).size,
     [tweets],
@@ -56,31 +64,46 @@ export function ResultList({
   // the agent's own people view keeps the showcase it asked for.
   const showcase = view.kind === 'people' ? view.showcase : 'all'
   const name = label ?? (grouping === 'people' ? 'People' : 'Tweets')
-  const body =
-    grouping === 'people' ? (
-      <PeopleList
-        tweets={tweets}
-        label={name}
-        citations={citations}
-        showcase={showcase}
-        sort={sortKey}
-        scores={scores}
-      />
-    ) : (
-      <TweetRowList
-        key={`${sortKey.key}-${sortKey.ascending}`}
-        tweets={sorted}
-        first={label === null ? INLINE_ROWS : FIRST_ROWS}
-        step={tweets.length}
-        label={name}
-        citations={citations}
-        moreLabel={(n) => `${n.toLocaleString('en-US')} more in this list`}
-      />
-    )
+  // Tweets still to come hold their place under the rows; a person cannot
+  // be grouped before their tweet is in hand.
+  const placeholders = pending.length > 0 && (
+    <ul aria-label={`${name}, still loading`}>
+      <PendingRows pending={pending} onRetry={links?.retryTweets} />
+    </ul>
+  )
+  const body = (
+    <>
+      {(tweets.length > 0 || !placeholders) &&
+        (grouping === 'people' ? (
+          <PeopleList
+            tweets={tweets}
+            label={name}
+            citations={citations}
+            showcase={showcase}
+            sort={sortKey}
+            scores={scores}
+          />
+        ) : (
+          <TweetRowList
+            key={`${sortKey.key}-${sortKey.ascending}`}
+            tweets={sorted}
+            first={label === null ? INLINE_ROWS : FIRST_ROWS}
+            step={tweets.length}
+            label={name}
+            citations={citations}
+            moreLabel={(n) => `${n.toLocaleString('en-US')} more in this list`}
+          />
+        ))}
+      {placeholders}
+    </>
+  )
 
   if (label === null) return <div className="my-4">{body}</div>
 
-  const count = tweets.length
+  // The heading counts tweets still loading, so it does not climb as they
+  // land; one that could not be fetched is still counted, since a retry may
+  // bring it.
+  const count = tweets.length + pending.length
   return (
     <section aria-label={label} className="my-5">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -122,6 +145,7 @@ export function ResultList({
  * citation number it shares with the chips and the rail.
  */
 export function EmbeddedTweet({ citation }: { citation: Citation }) {
+  const links = useCitationLinks()
   return (
     <figure className="my-5 flex items-start gap-2 rounded-lg border border-border py-1 pl-3 pr-1">
       <span
@@ -131,7 +155,14 @@ export function EmbeddedTweet({ citation }: { citation: Citation }) {
         {citation.n}
       </span>
       <div className="min-w-0 flex-1">
-        <TweetCard tweet={citation.tweet} showDate showExternalLink />
+        {citation.tweet ? (
+          <TweetCard tweet={citation.tweet} showDate showExternalLink />
+        ) : (
+          <TweetPlaceholder
+            state={citation.state}
+            onRetry={links?.retryTweets}
+          />
+        )}
       </div>
     </figure>
   )

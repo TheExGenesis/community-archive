@@ -327,7 +327,7 @@ describe('buildAnswer', () => {
       [1, '20'],
       [2, '10'],
     ])
-    expect(answer.citations[0].tweet.text).toBe('Post 20')
+    expect(answer.citations[0].tweet?.text).toBe('Post 20')
     expect(answer.markdown).toBe(
       'People complained [1](#ask-m1-tweet-20). Others agreed [2](#ask-m1-tweet-10) [1](#ask-m1-tweet-20).',
     )
@@ -1039,5 +1039,192 @@ describe('opening a step in archive search', () => {
       output: { tweets: [] },
     })
     expect(orList.searchHref).toBeUndefined()
+  })
+})
+
+describe('a reopened conversation (tweets as references)', () => {
+  const ref = (id: string, p?: number) =>
+    p === undefined ? { $t: id } : { $t: id, p }
+  // The searches returned 1 to 6 (6 scored); the answer cites 1, quotes 2,
+  // embeds 3, lists 4 to 6, and cites 777, which no tool returned.
+  const messages: UIMessage[] = [
+    user('u1', 'Who?'),
+    assistant('a1', [
+      toolPart(
+        'bash',
+        { command: 'search x' },
+        {
+          summary: 'Searched “x” · 6 tweets',
+          exitCode: 0,
+          files: { 'lists/all.jsonl': ['4', '5', '6'] },
+          tweets: [
+            ref('1'),
+            ref('2'),
+            ref('3'),
+            ref('4', 0.2),
+            ref('5', 0.9),
+            ref('6', 0.7),
+          ],
+        },
+      ),
+      text(
+        'Said [[t:1]] and [[q:2 | Post 2]] [[t:777]].\n[[t:3]]\n[[posts: All | lists/all.jsonl]]',
+      ),
+    ]),
+  ]
+  const supply = (
+    ids: string[],
+    states: Record<string, 'failed' | 'unavailable'> = {},
+  ) => ({
+    tweets: new Map(ids.map((id) => [id, tweet(id)])),
+    states: new Map(Object.entries(states)),
+  })
+
+  test('before any tweet arrives, every reference holds its place; only 777 is unverified', () => {
+    const view = buildTurnView(messages, 1, { supply: supply([]) })
+    // Quotes are numbered before the chips of their block (buildAnswer).
+    expect(
+      view.answer.citations.map((c) => [c.n, c.id, c.state, c.tweet]),
+    ).toEqual([
+      [1, '2', 'loading', null],
+      [2, '1', 'loading', null],
+      [3, '3', 'loading', null],
+    ])
+    expect(view.answer.unverified).toEqual(['777'])
+    expect(view.answer.loading).toEqual(['2', '1', '3', '4', '5', '6'])
+    expect(view.answer.failed).toEqual([])
+    expect(view.answer.unavailable).toEqual([])
+    // The chips are numbered; the quote cannot be checked yet, so it is
+    // plain words with the chip.
+    expect(view.answer.markdown.trim()).toBe(
+      'Said [2](#ask-a1-tweet-1) and Post 2 [1](#ask-a1-tweet-2) [unverified](#ask-unverified-777).',
+    )
+    const list = view.answer.blocks.find((b) => b.kind === 'list')
+    expect(list).toMatchObject({
+      tweets: [],
+      pending: [
+        { id: '4', state: 'loading' },
+        { id: '5', state: 'loading' },
+        { id: '6', state: 'loading' },
+      ],
+    })
+    expect(view.answer.listed).toEqual(['4', '5', '6'])
+    expect(view.tweets).toEqual({ loading: 6, failed: 0, unavailable: 0 })
+    expect(view.foundSoFar).toBe(0)
+    expect(logSummary(view)).toBe('1 step · 6 tweets in the answer')
+  })
+
+  test('as batches land the view fills in place: numbering holds, lists sort by score, counts settle', () => {
+    const partial = buildTurnView(messages, 1, {
+      supply: supply(['1', '2', '5']),
+    })
+    expect(partial.answer.citations.map((c) => [c.n, c.state])).toEqual([
+      [1, 'loaded'],
+      [2, 'loaded'],
+      [3, 'loading'],
+    ])
+    // The quote now checks out against the tweet's words.
+    expect(partial.answer.markdown).toContain(
+      '[Post 2](#quote-ask-a1-tweet-2) [1](#ask-a1-tweet-2)',
+    )
+    let list = partial.answer.blocks.find((b) => b.kind === 'list')
+    expect(list).toMatchObject({
+      tweets: [tweet('5')],
+      pending: [
+        { id: '4', state: 'loading' },
+        { id: '6', state: 'loading' },
+      ],
+    })
+    expect(partial.tweets).toEqual({ loading: 3, failed: 0, unavailable: 0 })
+
+    const full = buildTurnView(messages, 1, {
+      supply: supply(['1', '2', '3', '4', '5', '6']),
+    })
+    expect(full.answer.citations.map((c) => [c.n, c.id, c.state])).toEqual([
+      [1, '2', 'loaded'],
+      [2, '1', 'loaded'],
+      [3, '3', 'loaded'],
+    ])
+    expect(full.answer.blocks.map((b) => b.kind)).toEqual([
+      'text',
+      'tweet',
+      'list',
+    ])
+    list = full.answer.blocks.find((b) => b.kind === 'list')
+    expect(list).toMatchObject({ pending: [] })
+    expect(
+      list && list.kind === 'list' && list.tweets.map((t) => t.id),
+    ).toEqual(['4', '5', '6'])
+    // Scores come from the references, so the list can sort by relevance.
+    expect(list && list.kind === 'list' && Array.from(list.scores)).toEqual([
+      ['4', 0.2],
+      ['5', 0.9],
+      ['6', 0.7],
+    ])
+    expect(full.answer.loading).toEqual([])
+    expect(full.tweets).toEqual({ loading: 0, failed: 0, unavailable: 0 })
+    expect(full.foundSoFar).toBe(6)
+    expect(full.receipt).toMatchObject({ cited: 3, relevant: 0, other: 0 })
+    expect(full.answer.unverified).toEqual(['777'])
+  })
+
+  test('a failed fetch and a tweet the gateway no longer has are told apart from unverified', () => {
+    const view = buildTurnView(messages, 1, {
+      supply: supply(['2', '4'], {
+        '1': 'failed',
+        '3': 'unavailable',
+        '5': 'unavailable',
+        '6': 'failed',
+      }),
+    })
+    expect(view.answer.citations.map((c) => [c.id, c.state])).toEqual([
+      ['2', 'loaded'],
+      ['1', 'failed'],
+      ['3', 'unavailable'],
+    ])
+    expect(view.answer.failed).toEqual(['1', '6'])
+    expect(view.answer.unavailable).toEqual(['3', '5'])
+    expect(view.answer.unverified).toEqual(['777'])
+    // An embed of a gone tweet still shows its place, with its number.
+    expect(view.answer.blocks.map((b) => b.kind)).toEqual([
+      'text',
+      'tweet',
+      'list',
+    ])
+    // A listed tweet that is gone drops out of the list, as before; a
+    // failed one keeps its place for a retry.
+    const list = view.answer.blocks.find((b) => b.kind === 'list')
+    expect(list).toMatchObject({
+      tweets: [tweet('4')],
+      pending: [{ id: '6', state: 'failed' }],
+    })
+    expect(view.answer.listed).toEqual(['4', '6'])
+    expect(view.tweets).toEqual({ loading: 0, failed: 2, unavailable: 2 })
+  })
+
+  test('a follow-up resolves an earlier turn’s references through the same supply', () => {
+    const thread: UIMessage[] = [
+      ...messages,
+      user('u2', 'More?'),
+      assistant('a2', [text('Earlier [[t:4]] again.')]),
+    ]
+    const waiting = buildTurnView(thread, 3, { supply: supply([]) })
+    expect(waiting.answer.citations.map((c) => [c.id, c.state])).toEqual([
+      ['4', 'loading'],
+    ])
+    const loaded = buildTurnView(thread, 3, { supply: supply(['4']) })
+    expect(loaded.answer.citations[0].tweet?.text).toBe('Post 4')
+    // Sources count only this turn's own results.
+    expect(loaded.tweets).toEqual({ loading: 0, failed: 0, unavailable: 0 })
+  })
+
+  test('without a supply, references are still verified but not in hand', () => {
+    const view = buildTurnView(messages, 1)
+    expect(view.answer.citations.map((c) => c.state)).toEqual([
+      'loading',
+      'loading',
+      'loading',
+    ])
+    expect(view.answer.unverified).toEqual(['777'])
   })
 })

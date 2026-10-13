@@ -85,13 +85,13 @@ usual tools (`jq`, `grep`, `sort`, `uniq`, `wc`, `head`, `cut`, `awk`, `sed`)
 work on files under `/work`, and archive commands are added
 (`src/lib/agentSearch/workspace/commands.ts`):
 
-| Command | Does |
-|---|---|
-| `search <words> [--any w1,w2] [--all] [--from @h] [--reply-to @h] [--since D] [--until D] [--sort …] [--limit N]` | Keyword search; JSONL tweets to stdout (50 by default, up to 1,000) |
-| `semantic "<idea>" [--from @h] [--k N] [--threshold 0-1]` | Meaning search (below); rows carry `distance` |
-| `people <name or handle>` | Members and accounts matching a name |
-| `score <file> "<yes/no question>" [--no-parent]` | Scores every tweet in a file; rows gain `p`, best first |
-| `thread <id>`, `quotes <id>`, `tweets <id…>`, `read <id>` | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet |
+| Command                                                                                                           | Does                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `search <words> [--any w1,w2] [--all] [--from @h] [--reply-to @h] [--since D] [--until D] [--sort …] [--limit N]` | Keyword search; JSONL tweets to stdout (50 by default, up to 1,000)                            |
+| `semantic "<idea>" [--from @h] [--k N] [--threshold 0-1]`                                                         | Meaning search (below); rows carry `distance`                                                  |
+| `people <name or handle>`                                                                                         | Members and accounts matching a name                                                           |
+| `score <file> "<yes/no question>" [--no-parent]`                                                                  | Scores every tweet in a file; rows gain `p`, best first                                        |
+| `thread <id>`, `quotes <id>`, `tweets <id…>`, `read <id>`                                                         | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet |
 
 A tweet file is JSONL, one tweet per line: `id`, `author`, `date`, `likes`,
 `reposts`, `replyTo`, `quotes`, `media`, `p` when scored, and `text`. Each
@@ -166,11 +166,34 @@ its id. Workflow keeps a run's own data only 7 days after it ends on Vercel Pro
 (1 day on Hobby), so history never replays the event log.
 
 - `GET /api/agent-search/conversations` lists the viewer's recent conversations.
-- `GET /api/agent-search/conversations/{id}` rebuilds one: it fetches the
-  referenced tweets again through the gateway (`historyTweets.ts`), so a post
-  whose author opted out since drops out of old answers. People lookups keep
-  only handles, not bios. A run still answering is reconnected through its
-  stream.
+- `GET /api/agent-search/conversations/{id}` rebuilds one. It answers at once
+  with the messages, their tweets still as references, and `pendingTweetIds`
+  in the order the page wants them: cited in the prose (chips and quotes),
+  then shown in the answers' lists, then the rest the searches returned
+  (`historyTweets.ts`). It spends up to 1.5 s fetching the prose-cited ones
+  first (`tweets`), so a quick gateway fills the chips before the first
+  paint; cited ids the gateway had nothing for are `unavailableTweetIds`.
+  People lookups keep only handles, not bios. A run still answering is
+  reconnected through its stream.
+- `POST /api/agent-search/conversations/{id}/tweets` `{ ids }` (up to 100)
+  fetches those tweets through the gateway, so a post whose author opted out
+  since drops out of old answers. Prose-cited ids get full cards, the rest
+  the batch lookup. Only the asker may call it, and only with ids the
+  conversation's stored runs hold; a deleted conversation has none. It
+  answers `{ tweets, failed }`: an id in neither is gone (deleted, or opted
+  out).
+- The page (`AgentSearch.tsx`, `tweetLoader.ts`) renders the conversation as
+  soon as the messages arrive, with every cited and listed tweet's place
+  held, and fetches the pending ids in batches, cited first, three requests
+  at a time. Each batch rebuilds the answers' views from the tweets in hand
+  (`messageView.ts`), so numbering, lists, scores, people grouping and the
+  sources fill in without moving. A batch that fails is tried three times
+  with backoff; after that its tweets read "Couldn't load this tweet ·
+  Retry". That is distinct from "unverified" (a citation the searches never
+  returned) and from "no longer available" (the gateway returned nothing:
+  deleted, or the author opted out), which the view lists in
+  `answer.unavailable` so a later change can replace the prose that still
+  names those authors.
 - The start route refuses a conversation id that belongs to someone else.
 
 ### Follow-up questions
@@ -193,25 +216,25 @@ resolved headers, including the API key, into the event log.
 
 ## Configuration
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `AGENT_SEARCH_MODEL` | `openrouter:deepseek/deepseek-v4.1-flash` | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative |
-| `AGENT_SEARCH_TOOLS` | `bash` | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with |
-| `SEMANTIC_SEARCH_URL` | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint |
-| `OPENROUTER_API_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default |
-| `AGENT_SEARCH_SCORER` | unset | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM |
-| `AGENT_SEARCH_SCORER_MODEL` | `openai:gpt-6-luna` | Model for the `llm` scorer |
-| `AGENT_SEARCH_SCORER_REASONING` | `low` | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`) |
-| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true` |
-| `AGENT_SEARCH_DAILY_LIMIT` | `10` | Questions per member per UTC day |
-| `AGENT_SEARCH_MONTHLY_LIMIT` | `30` | Questions per member per UTC month, counted like the daily limit; the page shows whichever runs out first |
-| `AGENT_SEARCH_GLOBAL_DAILY_USD` | `25` | Global daily spend kill switch |
-| `AGENT_SEARCH_RUN_DEADLINE_MS` | `300000` | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools |
-| `AGENT_SEARCH_STALE_RUN_MS` | `600000` | When a running run stops blocking a new one; never less than the deadline plus 2 minutes. A run whose workflow has ended stops blocking at once |
-| `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set |
-| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...` | price table | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost) |
-| `AGENT_SEARCH_RUN_STORE` | file outside production | `file` forces the local JSON store |
-| `AGENT_SEARCH_KEY_SECRET` | unset | At least 32 characters. Seals members' own OpenRouter keys (below); unset, own keys are refused |
+| Variable                                                                                                        | Default                                          | Purpose                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AGENT_SEARCH_MODEL`                                                                                            | `openrouter:deepseek/deepseek-v4.1-flash`        | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative                                                                                                |
+| `AGENT_SEARCH_TOOLS`                                                                                            | `bash`                                           | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with                                                                        |
+| `SEMANTIC_SEARCH_URL`                                                                                           | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint                                                                                                                                                          |
+| `OPENROUTER_API_BASE_URL`                                                                                       | `https://openrouter.ai/api/v1`                   | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default                                                                              |
+| `AGENT_SEARCH_SCORER`                                                                                           | unset                                            | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM                                                                   |
+| `AGENT_SEARCH_SCORER_MODEL`                                                                                     | `openai:gpt-6-luna`                              | Model for the `llm` scorer                                                                                                                                                        |
+| `AGENT_SEARCH_SCORER_REASONING`                                                                                 | `low`                                            | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`)                                                                                                                   |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY`                                                                         |                                                  | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true`                                                                                                           |
+| `AGENT_SEARCH_DAILY_LIMIT`                                                                                      | `10`                                             | Questions per member per UTC day                                                                                                                                                  |
+| `AGENT_SEARCH_MONTHLY_LIMIT`                                                                                    | `30`                                             | Questions per member per UTC month, counted like the daily limit; the page shows whichever runs out first                                                                         |
+| `AGENT_SEARCH_GLOBAL_DAILY_USD`                                                                                 | `25`                                             | Global daily spend kill switch                                                                                                                                                    |
+| `AGENT_SEARCH_RUN_DEADLINE_MS`                                                                                  | `300000`                                         | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools                     |
+| `AGENT_SEARCH_STALE_RUN_MS`                                                                                     | `600000`                                         | When a running run stops blocking a new one; never less than the deadline plus 2 minutes. A run whose workflow has ended stops blocking at once                                   |
+| `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table                                      | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set |
+| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...`                              | price table                                      | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost)                                                                       |
+| `AGENT_SEARCH_RUN_STORE`                                                                                        | file outside production                          | `file` forces the local JSON store                                                                                                                                                |
+| `AGENT_SEARCH_KEY_SECRET`                                                                                       | unset                                            | At least 32 characters. Seals members' own OpenRouter keys (below); unset, own keys are refused                                                                                   |
 
 The default planner runs on OpenRouter, so `OPENROUTER_API_KEY` must be set in
 Production and Preview. It is the same key the Daily Digest uses

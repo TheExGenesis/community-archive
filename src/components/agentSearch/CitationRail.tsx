@@ -128,7 +128,13 @@ function CitationItem({
         {expanded ? (
           <TweetCard tweet={citation.tweet} stacked showDate showExternalLink />
         ) : (
-          <TweetCard tweet={citation.tweet} stacked compact showDate />
+          <TweetCard
+            tweet={citation.tweet}
+            stacked
+            compact
+            collapsible
+            showDate
+          />
         )}
       </div>
     </li>
@@ -373,7 +379,7 @@ export const CitationRail = forwardRef<
                   score !== undefined ? '[&_article]:pr-14' : ''
                 } ${steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''}`}
               >
-                <TweetCard tweet={tweet} stacked compact showDate />
+                <TweetCard tweet={tweet} stacked compact collapsible showDate />
                 {score !== undefined && (
                   <span
                     title="Relevance score: the chance the relevance check gave that this tweet answers the question"

@@ -112,7 +112,7 @@ function CitationChip({
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
         >
-          <TweetCard tweet={tweet} stacked compact showDate />
+          <TweetCard tweet={tweet} stacked compact collapsible showDate />
         </PopoverContent>
       )}
     </Popover>

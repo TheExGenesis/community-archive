@@ -358,8 +358,10 @@ export function TweetRow({
     if (previewCollapsed && previewContent.current)
       previewContent.current.scrollTop = 0
   }, [previewCollapsed, tweet.id])
+  // A compact card clamps at two lines, so its text needs Read more sooner.
   const canExpand =
-    isPreview || (collapsible && !noClamp && tweet.text.length > 280)
+    isPreview ||
+    (collapsible && !noClamp && tweet.text.length > (compact ? 140 : 280))
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
@@ -434,7 +436,9 @@ export function TweetRow({
         noClamp || isPreview
           ? ''
           : compact
-            ? 'line-clamp-2'
+            ? canExpand && isExpanded
+              ? ''
+              : 'line-clamp-2'
             : canExpand && !isExpanded
               ? 'line-clamp-5'
               : ''

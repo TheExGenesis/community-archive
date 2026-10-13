@@ -61,6 +61,32 @@ export function finalAnswerText(steps: Array<{ text?: string }>): string {
   return steps[steps.length - 1]?.text ?? ''
 }
 
+/** The run's error when the archive search kept failing (see below). */
+export const ARCHIVE_UNAVAILABLE_ERROR = 'Archive search is not responding'
+
+type StepContent = { content?: Array<{ type: string }> }
+
+const allToolsFailed = (step: StepContent) => {
+  const parts = step.content ?? []
+  const failed = parts.filter((part) => part.type === 'tool-error').length
+  const succeeded = parts.filter((part) => part.type === 'tool-result').length
+  return failed > 0 && succeeded === 0
+}
+
+/**
+ * Stop condition: the last two steps called tools and every call failed.
+ * Retrying against an archive search that is down only burns the run's
+ * five minutes; ending here lets the page say what happened. Stop conditions
+ * are called synchronously, so this must not return a promise.
+ */
+export function toolsKeepFailing({ steps }: { steps: StepContent[] }) {
+  return (
+    steps.length >= 2 &&
+    allToolsFailed(steps[steps.length - 1]) &&
+    allToolsFailed(steps[steps.length - 2])
+  )
+}
+
 const FINISH_FAILURES: Record<string, string> = {
   length: 'The answer was cut off at the output token limit',
   'content-filter': 'The model’s content filter stopped the answer',
@@ -76,8 +102,9 @@ const FINISH_FAILURES: Record<string, string> = {
 export function agentRunFailure(result: {
   error?: unknown
   finishReason?: string
-  steps: Array<{ text?: string }>
+  steps: Array<{ text?: string } & StepContent>
 }): string | null {
+  if (toolsKeepFailing(result)) return ARCHIVE_UNAVAILABLE_ERROR
   if (result.error !== undefined && result.error !== null) {
     const message =
       result.error instanceof Error

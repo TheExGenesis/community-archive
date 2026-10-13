@@ -6,7 +6,9 @@ import {
   AGENT_SEARCH_MAX_STEPS,
   agentRunFailure,
   agentSearchPrepareStep,
+  ARCHIVE_UNAVAILABLE_ERROR,
   finalAnswerText,
+  toolsKeepFailing,
 } from './agent'
 
 describe('agentSearchPrepareStep', () => {
@@ -78,5 +80,26 @@ describe('agentRunFailure', () => {
     expect(
       agentRunFailure({ finishReason: 'stop', steps: [{ text: '  ' }] }),
     ).toBe('The model returned no answer')
+  })
+})
+
+describe('toolsKeepFailing', () => {
+  const failed = { content: [{ type: 'tool-call' }, { type: 'tool-error' }] }
+  const mixed = { content: [{ type: 'tool-error' }, { type: 'tool-result' }] }
+  const answer = { text: 'An answer', content: [{ type: 'text' }] }
+
+  test('stops after two steps in which every tool call failed', () => {
+    expect(toolsKeepFailing({ steps: [failed] })).toBe(false)
+    expect(toolsKeepFailing({ steps: [failed, mixed] })).toBe(false)
+    expect(toolsKeepFailing({ steps: [mixed, failed, failed] })).toBe(true)
+  })
+
+  test('reports the archive as unavailable, not as a step limit', () => {
+    expect(
+      agentRunFailure({ finishReason: 'tool-calls', steps: [failed, failed] }),
+    ).toBe(ARCHIVE_UNAVAILABLE_ERROR)
+    expect(
+      agentRunFailure({ finishReason: 'stop', steps: [answer] }),
+    ).toBeNull()
   })
 })

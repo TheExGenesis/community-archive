@@ -8,6 +8,7 @@ import {
   agentSearchPrepareStep,
   createAgentSearchTools,
   finalAnswerText,
+  toolsKeepFailing,
 } from '@/lib/agentSearch/agent'
 import {
   collectToolTweetIds,
@@ -94,7 +95,10 @@ async function getQuotePostsStep(
 }
 getQuotePostsStep.maxRetries = 1
 
-async function getTweetsStep(input: { tweetIds: string[] }, deadlineAt: number) {
+async function getTweetsStep(
+  input: { tweetIds: string[] },
+  deadlineAt: number,
+) {
   'use step'
   return getTweetsImpl(input, { deadlineAt })
 }
@@ -200,8 +204,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
     tools: createAgentSearchTools({
       find_people: (args) => findPeopleStep(args, deadlineAt),
       search_tweets: (args) => searchTweetsStep(args, deadlineAt),
-      collect_and_score: (args) =>
-        collectAndScoreStep(args, runId, deadlineAt),
+      collect_and_score: (args) => collectAndScoreStep(args, runId, deadlineAt),
       score_tweets: (args) => scoreTweetsStep(args, runId, deadlineAt),
       get_thread: (args) => getThreadStep(args, deadlineAt),
       get_quote_posts: (args) => getQuotePostsStep(args, deadlineAt),
@@ -230,7 +233,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
         { role: 'user', content: input.question },
       ],
       writable: getWritable<ModelCallStreamPart>(),
-      stopWhen: isStepCount(AGENT_SEARCH_MAX_STEPS),
+      stopWhen: [isStepCount(AGENT_SEARCH_MAX_STEPS), toolsKeepFailing],
       prepareStep: agentSearchPrepareStep(deadlineAt),
     })
     for (const step of result.steps) {

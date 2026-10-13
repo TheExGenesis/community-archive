@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import {
   formatElapsed,
+  latestThought,
   NOT_SEARCHED_LINE,
   type ProgressLine,
 } from './messageView'
@@ -45,6 +46,66 @@ function StepIcon({ status }: { status: ProgressLine['status'] | 'stopped' }) {
   return <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
 }
 
+/**
+ * One step. A running step shows the model's newest sentence of reasoning
+ * under it; a finished one opens to its full reasoning, folded by default.
+ */
+function StepItem({
+  step,
+  status,
+}: {
+  step: ProgressLine
+  status: ProgressLine['status'] | 'stopped'
+}) {
+  const [open, setOpen] = useState(false)
+  const reasoningId = useId()
+  const reasoning = step.reasoning?.trim()
+  const thought = status === 'running' ? latestThought(reasoning) : ''
+  const label = (
+    <span
+      className={`min-w-0 break-words ${status === 'running' ? 'text-foreground' : ''}`}
+    >
+      {step.text}
+    </span>
+  )
+  return (
+    <li className="flex items-start gap-2">
+      <StepIcon status={status} />
+      <div className="min-w-0 flex-1">
+        {reasoning && status !== 'running' ? (
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            aria-controls={reasoningId}
+            className="group inline-flex max-w-full items-start gap-1 rounded-sm text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {label}
+            <span className="sr-only">, show the reasoning</span>
+            <ChevronRight
+              aria-hidden="true"
+              className={`mt-0.5 h-3.5 w-3.5 shrink-0 opacity-60 transition-transform group-hover:opacity-100 motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
+            />
+          </button>
+        ) : (
+          label
+        )}
+        {thought && (
+          <p className="truncate text-xs text-muted-foreground">{thought}</p>
+        )}
+        {reasoning && open && status !== 'running' && (
+          <p
+            id={reasoningId}
+            className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-words border-l border-border pl-3 text-xs leading-relaxed text-muted-foreground"
+          >
+            {reasoning}
+          </p>
+        )}
+      </div>
+    </li>
+  )
+}
+
 function StepList({
   steps,
   stoppedRunning = false,
@@ -57,22 +118,67 @@ function StepList({
 }) {
   return (
     <ol id={id} className="space-y-1.5 text-sm text-muted-foreground">
-      {steps.map((step) => {
-        const status =
-          stoppedRunning && step.status === 'running' ? 'stopped' : step.status
-        return (
-          <li key={step.id} className="flex items-start gap-2">
-            <StepIcon status={status} />
-            <span
-              className={`min-w-0 break-words ${status === 'running' ? 'text-foreground' : ''}`}
-            >
-              {step.text}
-            </span>
-          </li>
-        )
-      })}
+      {steps.map((step) => (
+        <StepItem
+          key={step.id}
+          step={step}
+          status={
+            stoppedRunning && step.status === 'running'
+              ? 'stopped'
+              : step.status
+          }
+        />
+      ))}
     </ol>
   )
+}
+
+/**
+ * The steps plus the one under way that has no tool call yet: the model
+ * reading the question, working out its next step, or writing the answer.
+ * It carries the reasoning that follows the last tool call.
+ */
+function withCurrentStep(
+  steps: ProgressLine[],
+  thinking: string,
+  phase: 'searching' | 'writing' | 'written' | 'ended',
+): ProgressLine[] {
+  const reasoning = thinking.trim() || undefined
+  if (phase === 'searching') {
+    if (steps.some((step) => step.status === 'running')) return steps
+    return [
+      ...steps,
+      {
+        id: 'current-step',
+        status: 'running',
+        text: steps.length
+          ? 'Working out the next step'
+          : 'Reading the question',
+        reasoning,
+      },
+    ]
+  }
+  if (!reasoning) return steps
+  if (phase === 'ended') {
+    return [
+      ...steps,
+      {
+        id: 'current-step',
+        status: 'running',
+        text: 'Working out the next step',
+        reasoning,
+      },
+    ]
+  }
+  return [
+    ...steps,
+    {
+      id: 'current-step',
+      status: phase === 'writing' ? 'running' : 'done',
+      text: phase === 'writing' ? 'Writing the answer' : 'Wrote the answer',
+      reasoning,
+    },
+  ]
 }
 
 function useElapsed(startedAt: number) {
@@ -96,30 +202,44 @@ function StopButton({ onStop }: { onStop: () => void }) {
   )
 }
 
-/** The live log while a question searches, before any answer text. */
+/**
+ * The live log while a question searches, before any answer text. The
+ * header folds the steps to one line: the step under way and the model's
+ * newest sentence about it. Stop stays either way.
+ */
 function RunningLog({
   steps,
+  thinking,
   startedAt,
   onStop,
 }: {
   steps: ProgressLine[]
+  thinking: string
   startedAt: number
   onStop: () => void
 }) {
   const elapsed = useElapsed(startedAt)
-  const lines = steps.length
-    ? steps
-    : [
-        {
-          id: 'reading',
-          status: 'running' as const,
-          text: 'Reading the question',
-        },
-      ]
+  const [open, setOpen] = useState(true)
+  const listId = useId()
+  const lines = withCurrentStep(steps, thinking, 'searching')
+  const current =
+    [...lines].reverse().find((step) => step.status === 'running') ??
+    lines[lines.length - 1]
+  const thought = latestThought(current?.reasoning)
   return (
     <div className="space-y-2">
       <div className="flex min-h-[2.5rem] items-center justify-between gap-4">
-        <p className="text-sm font-medium text-foreground">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls={listId}
+          className="-ml-1.5 inline-flex min-h-[2.5rem] items-center gap-1.5 rounded-md px-1.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
+          />
           Searching
           <span
             aria-label={`${Math.floor(elapsed / 1000)} seconds`}
@@ -128,11 +248,26 @@ function RunningLog({
             {' '}
             · {formatElapsed(elapsed)}
           </span>
-        </p>
+        </button>
         <StopButton onStop={onStop} />
       </div>
       <div aria-live="polite" aria-label="Search progress">
-        <StepList steps={lines} />
+        {open ? (
+          <StepList id={listId} steps={lines} />
+        ) : (
+          current && (
+            <p
+              id={listId}
+              className="flex min-w-0 items-start gap-2 text-sm text-muted-foreground"
+            >
+              <StepIcon status={current.status} />
+              <span className="min-w-0 truncate">
+                <span className="text-foreground">{current.text}</span>
+                {thought && <span> · {thought}</span>}
+              </span>
+            </p>
+          )
+        )}
       </div>
       {elapsed >= SLOW_MS && (
         <p className="text-xs text-muted-foreground">
@@ -150,7 +285,8 @@ function RunningLog({
  */
 function EndedLog({
   mode,
-  steps,
+  steps: loggedSteps,
+  thinking,
   elapsedMs,
   unavailable,
   onAskAgain,
@@ -158,11 +294,13 @@ function EndedLog({
 }: {
   mode: 'stopped' | 'failed'
   steps: ProgressLine[]
+  thinking: string
   elapsedMs: number | null
   unavailable: boolean
   onAskAgain?: () => void
   canAskAgain: boolean
 }) {
+  const steps = withCurrentStep(loggedSteps, thinking, 'ended')
   const [showEarlier, setShowEarlier] = useState(false)
   const reasonId = useId()
   const listId = useId()
@@ -171,7 +309,7 @@ function EndedLog({
 
   const title =
     mode === 'stopped'
-      ? !steps.length
+      ? !loggedSteps.length
         ? 'You stopped this before it searched'
         : elapsedMs !== null
           ? `You stopped this at ${formatElapsed(elapsedMs)}`
@@ -186,10 +324,11 @@ function EndedLog({
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">
             {title}
-            {steps.length > 0 && (
+            {loggedSteps.length > 0 && (
               <span className="font-normal text-muted-foreground">
                 {' '}
-                · {steps.length} {steps.length === 1 ? 'step' : 'steps'}
+                · {loggedSteps.length}{' '}
+                {loggedSteps.length === 1 ? 'step' : 'steps'}
               </span>
             )}
           </p>
@@ -244,12 +383,15 @@ export type StepLogProps =
   | {
       mode: 'running'
       steps: ProgressLine[]
+      /** Reasoning after the last tool call (TurnView.thinking). */
+      thinking?: string
       startedAt: number
       onStop: () => void
     }
   | {
       mode: 'stopped' | 'failed'
       steps: ProgressLine[]
+      thinking?: string
       /** How long a run stopped in this visit had run; null when unknown. */
       elapsedMs: number | null
       /** Failed with every tool call failing. */
@@ -267,6 +409,7 @@ export function StepLog(props: StepLogProps) {
     return (
       <RunningLog
         steps={props.steps}
+        thinking={props.thinking ?? ''}
         startedAt={props.startedAt}
         onStop={props.onStop}
       />
@@ -276,6 +419,7 @@ export function StepLog(props: StepLogProps) {
     <EndedLog
       mode={props.mode}
       steps={props.steps}
+      thinking={props.thinking ?? ''}
       elapsedMs={props.elapsedMs}
       unavailable={Boolean(props.unavailable)}
       onAskAgain={props.onAskAgain}
@@ -291,12 +435,15 @@ export function StepLog(props: StepLogProps) {
 export function LogLine({
   summary,
   steps,
+  thinking = '',
   cappedAt,
   onStop,
   more,
 }: {
   summary: string
   steps: ProgressLine[]
+  /** Reasoning after the last tool call: the answer's own. */
+  thinking?: string
   /** The tweet limit a check stopped at, when one did. */
   cappedAt?: number | null
   /** Set while the answer is still being written. */
@@ -311,6 +458,7 @@ export function LogLine({
 }) {
   const [open, setOpen] = useState(false)
   const contentId = useId()
+  const lines = withCurrentStep(steps, thinking, onStop ? 'writing' : 'written')
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-4">
@@ -350,7 +498,7 @@ export function LogLine({
           id={contentId}
           className="ml-1.5 space-y-2 border-l border-border pl-4"
         >
-          {steps.length > 0 && <StepList steps={steps} />}
+          {lines.length > 0 && <StepList steps={lines} />}
           {cappedAt ? (
             <p className="text-sm text-muted-foreground">
               A check stopped at its {cappedAt.toLocaleString('en-US')}-tweet

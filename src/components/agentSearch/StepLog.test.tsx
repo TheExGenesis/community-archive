@@ -147,3 +147,55 @@ test('the folded line opens in place to the steps, a cap note and what was not s
   expect(screen.getByText(/Not searched: live X/)).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
 })
+
+test('the running log folds to the step under way and its newest reasoning', () => {
+  render(
+    <StepLog
+      mode="running"
+      steps={[
+        { ...done(1), reasoning: 'Start with the word itself.' },
+        {
+          id: 'r',
+          status: 'running',
+          text: 'Reading thread',
+          reasoning: 'One reply looks relevant. Read the thread around it.',
+        },
+      ]}
+      startedAt={Date.now() - 5_000}
+      onStop={jest.fn()}
+    />,
+  )
+  const progress = screen.getByLabelText('Search progress')
+  // The running step shows its newest sentence under it.
+  expect(progress).toHaveTextContent('Read the thread around it.')
+  // A finished step's reasoning stays folded until asked for.
+  expect(progress).not.toHaveTextContent('Start with the word itself.')
+  fireEvent.click(screen.getByRole('button', { name: /Searched “term 1”/ }))
+  expect(progress).toHaveTextContent('Start with the word itself.')
+
+  const header = screen.getByRole('button', { name: /Searching/ })
+  expect(header).toHaveAttribute('aria-expanded', 'true')
+  fireEvent.click(header)
+  expect(header).toHaveAttribute('aria-expanded', 'false')
+  expect(progress).not.toHaveTextContent('Searched “term 1”')
+  expect(progress).toHaveTextContent(
+    'Reading thread · Read the thread around it.',
+  )
+  // Stop stays while folded.
+  expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
+})
+
+test('reasoning after the last call is the step being worked out', () => {
+  render(
+    <StepLog
+      mode="running"
+      steps={[done(1)]}
+      thinking="That search was too narrow. Try the plural."
+      startedAt={Date.now()}
+      onStop={jest.fn()}
+    />,
+  )
+  expect(screen.getByLabelText('Search progress')).toHaveTextContent(
+    'Working out the next stepTry the plural.',
+  )
+})

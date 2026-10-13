@@ -26,12 +26,16 @@ export interface ToolCallView {
   input: Record<string, unknown>
   output: unknown
   errorText?: string
+  /** What the model reasoned in the step that made this call. */
+  reasoning?: string
 }
 
 export interface ProgressLine {
   id: string
   text: string
   status: 'running' | 'done' | 'error'
+  /** The model's reasoning before this step, when the stream carried it. */
+  reasoning?: string
 }
 
 export interface Citation {
@@ -128,6 +132,8 @@ export interface TurnView {
   foundSoFar: number
   /** The best few of those, for the side column while the answer is written. */
   topFound: PortalTweet[]
+  /** Reasoning after the last tool call (see trailingReasoning). */
+  thinking: string
 }
 
 type LooseRecord = Record<string, unknown>
@@ -164,11 +170,20 @@ const collectKept = (out: LooseRecord) =>
   asNumber(out.keptCount) ?? asArray(out.kept).length
 
 /** Tool parts arrive as `tool-<name>` (static) or `dynamic-tool` with toolName. */
-export function toolCalls(message: UIMessage): ToolCallView[] {
+// Each model step streams its reasoning first, then its tool calls (or the
+// answer text). Reasoning goes to the first call after it; what follows the
+// last call belongs to the step under way, or to the answer.
+function readParts(message: UIMessage) {
   const calls: ToolCallView[] = []
+  let pending = ''
   for (const part of message.parts) {
     const record = part as unknown as LooseRecord
     const type = String(record.type)
+    if (type === 'reasoning') {
+      const text = asString(record.text)
+      if (text) pending = pending ? `${pending}\n\n${text}` : text
+      continue
+    }
     let name: string | undefined
     if (type === 'dynamic-tool') name = asString(record.toolName)
     else if (type.startsWith('tool-')) name = type.slice('tool-'.length)
@@ -180,9 +195,40 @@ export function toolCalls(message: UIMessage): ToolCallView[] {
       input: isRecord(record.input) ? record.input : {},
       output: record.state === 'output-available' ? record.output : undefined,
       errorText: asString(record.errorText),
+      ...(pending.trim() ? { reasoning: pending.trim() } : {}),
     })
+    pending = ''
   }
-  return calls
+  return { calls, trailingReasoning: pending.trim() }
+}
+
+export function toolCalls(message: UIMessage): ToolCallView[] {
+  return readParts(message).calls
+}
+
+/**
+ * The model's reasoning after its last tool call: the step it is working
+ * out now, or the answer it is about to write. Empty when the stream carried
+ * none (saved conversations keep no reasoning).
+ */
+export function trailingReasoning(message: UIMessage): string {
+  return readParts(message).trailingReasoning
+}
+
+/**
+ * The newest sentence of some reasoning, for a one-line live status: the
+ * last sentence or line, even one still being written.
+ */
+export function latestThought(reasoning: string | undefined): string {
+  const text = (reasoning ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  const sentences = text.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g) ?? [text]
+  for (let i = sentences.length - 1; i >= 0; i--) {
+    const sentence = sentences[i].trim()
+    // A fragment of a word or two reads better with the sentence before it.
+    if (sentence.split(' ').length >= 3 || i === 0) return sentence
+  }
+  return text
 }
 
 const dayFormat = new Intl.DateTimeFormat('en-GB', {
@@ -531,7 +577,11 @@ export function progressFor(calls: ToolCallView[]): ProgressLine[] {
     if (!done && !running && group.length > 1) {
       line.text += ` · tried ${group.length === 2 ? 'twice' : `${group.length} times`}`
     }
-    return { ...line, id: group[0].id }
+    // The latest attempt's reasoning: a retry says why it tried again.
+    const reasoning = [...group]
+      .reverse()
+      .find((call) => call.reasoning)?.reasoning
+    return { ...line, id: group[0].id, ...(reasoning ? { reasoning } : {}) }
   })
 }
 
@@ -1013,6 +1063,7 @@ export function buildTurnView(
     topFound: orderByScore(own.results, own.scores)
       .slice(0, TOP_FOUND)
       .map(tweetFor),
+    thinking: trailingReasoning(message),
   }
 }
 

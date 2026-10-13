@@ -9,11 +9,13 @@ import {
   collectToolTweets,
   describeChatError,
   formatElapsed,
+  latestThought,
   logSummary,
   describeCommand,
   progressLines,
   searchSubject,
   toolCalls,
+  trailingReasoning,
 } from './messageView'
 
 const tweet = (id: string, extra: Partial<AgentTweet> = {}): AgentTweet => ({
@@ -815,5 +817,58 @@ describe('semantic search steps', () => {
     expect(view.coverage.searches).toEqual([
       { label: '“living in SG”, by meaning', detail: '2 tweets' },
     ])
+  })
+})
+
+describe('reasoning', () => {
+  const reasoning = (value: string) =>
+    ({
+      type: 'reasoning',
+      text: value,
+    }) as unknown as UIMessage['parts'][number]
+
+  test("each step's reasoning goes to its first call; the rest is the step under way", () => {
+    const message = assistant('a1', [
+      reasoning('Start broad.'),
+      toolPart('search_tweets', { query: 'singapore' }, { tweets: [] }),
+      toolPart('search_tweets', { query: 'sg' }, { tweets: [] }),
+      reasoning('Too few. Try a semantic search.'),
+      toolPart('semantic_search', { query: 'living in singapore' }),
+      reasoning('Enough to answer.'),
+    ])
+    expect(toolCalls(message).map((call) => call.reasoning)).toEqual([
+      'Start broad.',
+      undefined,
+      'Too few. Try a semantic search.',
+    ])
+    expect(progressLines(message).map((line) => line.reasoning)).toEqual([
+      'Start broad.',
+      undefined,
+      'Too few. Try a semantic search.',
+    ])
+    expect(trailingReasoning(message)).toBe('Enough to answer.')
+    expect(buildTurnView([message], 0, { streaming: true }).thinking).toBe(
+      'Enough to answer.',
+    )
+  })
+
+  test('a message without reasoning has none', () => {
+    const message = assistant('a1', [
+      toolPart('search_tweets', { query: 'x' }, { tweets: [] }),
+    ])
+    expect(progressLines(message)[0].reasoning).toBeUndefined()
+    expect(trailingReasoning(message)).toBe('')
+  })
+
+  test('the live line is the newest sentence, even one still being written', () => {
+    expect(
+      latestThought(
+        'The question asks who. tpot means this part of Twitter. So search',
+      ),
+    ).toBe('tpot means this part of Twitter.')
+    expect(
+      latestThought('First idea. Then search for people who live there'),
+    ).toBe('Then search for people who live there')
+    expect(latestThought('  ')).toBe('')
   })
 })

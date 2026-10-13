@@ -183,12 +183,14 @@ export function AgentSearchTurn({
       <LogLine
         summary={logSummary(view, { writing: true })}
         steps={view.progress}
+        thinking={view.thinking}
         onStop={onStop}
       />
     ) : (
       <StepLog
         mode="running"
         steps={view.progress}
+        thinking={view.thinking}
         startedAt={startedAt}
         onStop={onStop ?? (() => undefined)}
       />
@@ -197,6 +199,7 @@ export function AgentSearchTurn({
     <StepLog
       mode={ended.kind}
       steps={view.progress}
+      thinking={view.thinking}
       elapsedMs={ended.elapsedMs}
       unavailable={ended.kind === 'failed' && view.unavailable}
       onAskAgain={onAskAgain}
@@ -206,6 +209,7 @@ export function AgentSearchTurn({
     <LogLine
       summary={logSummary(view, { withoutMore: Boolean(moreControl) })}
       steps={view.progress}
+      thinking={view.thinking}
       cappedAt={view.receipt.cappedAt}
       more={moreControl}
     />

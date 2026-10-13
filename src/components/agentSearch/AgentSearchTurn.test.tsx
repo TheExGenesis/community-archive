@@ -79,6 +79,32 @@ test('shows the live steps with Stop while the agent searches', () => {
   expect(screen.queryByRole('region', { name: 'Sources' })).toBeNull()
 })
 
+test("a live search shows the model's newest reasoning under the step", () => {
+  const messages: UIMessage[] = [
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [
+        {
+          type: 'reasoning',
+          text: 'The question names the archive. Search for it by name.',
+        } as unknown as UIMessage['parts'][number],
+        search('input-available'),
+      ],
+    },
+  ]
+  render(
+    <AgentSearchTurn
+      view={buildTurnView(messages, 0, { streaming: true })}
+      active
+      onStop={jest.fn()}
+    />,
+  )
+  expect(screen.getByLabelText('Search progress')).toHaveTextContent(
+    'Search for it by name.',
+  )
+})
+
 test('folds the steps into one line once the answer is being written', () => {
   const messages: UIMessage[] = [
     {

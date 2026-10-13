@@ -498,16 +498,37 @@ export default function AgentSearch({
   const hasThread = messages.length > 0
   const lastIndex = messages.length - 1
   // Each answer's view, by message index; a question needs its reply's.
-  const views = new Map<number, TurnView>()
-  messages.forEach((message, index) => {
-    if (message.role !== 'assistant') return
-    views.set(
-      index,
-      buildTurnView(messages, index, {
-        streaming: busy && index === lastIndex,
-      }),
-    )
-  })
+  // Built only when the messages change: typing in the box re-renders the
+  // page, and rebuilding every answer per keystroke made typing lag.
+  const views = useMemo(() => {
+    const built = new Map<number, TurnView>()
+    messages.forEach((message, index) => {
+      if (message.role !== 'assistant') return
+      built.set(
+        index,
+        buildTurnView(messages, index, {
+          streaming: busy && index === messages.length - 1,
+        }),
+      )
+    })
+    return built
+  }, [messages, busy])
+  // Stable handlers for the answers, so a memoized turn skips re-rendering
+  // while the member types; each calls the latest ask or stop.
+  const askRef = useRef(ask)
+  askRef.current = ask
+  const stopRef = useRef(stopFromStatus)
+  stopRef.current = stopFromStatus
+  const stopTurn = useCallback(() => stopRef.current(), [])
+  const askAgainHandlers = useRef(new Map<string, () => void>())
+  const askAgainFor = (question: string) => {
+    let handler = askAgainHandlers.current.get(question)
+    if (!handler) {
+      handler = () => askRef.current(question)
+      askAgainHandlers.current.set(question, handler)
+    }
+    return handler
+  }
 
   const quotaLow = quota !== null && quota.remaining <= 3
   const today: QuestionsToday | null = quota && {
@@ -798,10 +819,12 @@ export default function AgentSearch({
                       view={view}
                       active={active}
                       interrupted={interrupted}
-                      startedAt={runStartedAt ?? Date.now()}
-                      onStop={stopFromStatus}
+                      startedAt={
+                        active ? (runStartedAt ?? undefined) : undefined
+                      }
+                      onStop={stopTurn}
                       onAskAgain={
-                        asked ? () => ask(messageText(asked)) : undefined
+                        asked ? askAgainFor(messageText(asked)) : undefined
                       }
                       canAskAgain={canAskAgain}
                       showSources={

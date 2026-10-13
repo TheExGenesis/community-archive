@@ -1,7 +1,7 @@
 'use client'
 
 import { PanelRightOpen } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnswerMarkdown } from './AnswerMarkdown'
 import {
   CitationContext,
@@ -25,16 +25,7 @@ export interface TurnInterruption {
   elapsedMs: number | null
 }
 
-export function AgentSearchTurn({
-  view,
-  active,
-  interrupted = null,
-  startedAt = Date.now(),
-  onStop,
-  onAskAgain,
-  canAskAgain = true,
-  showSources = true,
-}: {
+interface AgentSearchTurnProps {
   view: TurnView
   active: boolean
   interrupted?: TurnInterruption | null
@@ -45,7 +36,18 @@ export function AgentSearchTurn({
   canAskAgain?: boolean
   /** The latest turn, or one that was stopped: earlier ones keep the rest. */
   showSources?: boolean
-}) {
+}
+
+export const AgentSearchTurn = memo(function AgentSearchTurn({
+  view,
+  active,
+  interrupted = null,
+  startedAt = Date.now(),
+  onStop,
+  onAskAgain,
+  canAskAgain = true,
+  showSources = true,
+}: AgentSearchTurnProps) {
   const { answer } = view
   const hasAnswer = answer.blocks.length > 0
   const answerRef = useRef<HTMLDivElement>(null)
@@ -348,5 +350,24 @@ export function AgentSearchTurn({
         returnFocusTo={sheetChipRef.current}
       />
     </CitationContext.Provider>
+  )
+}, sameTurn)
+
+/**
+ * A finished answer only changes with its view or its state; the page's
+ * handlers are stable and the interruption is rebuilt each render, so it is
+ * compared by value.
+ */
+function sameTurn(a: AgentSearchTurnProps, b: AgentSearchTurnProps) {
+  return (
+    a.view === b.view &&
+    a.active === b.active &&
+    a.startedAt === b.startedAt &&
+    a.onStop === b.onStop &&
+    a.onAskAgain === b.onAskAgain &&
+    a.canAskAgain === b.canAskAgain &&
+    a.showSources === b.showSources &&
+    a.interrupted?.kind === b.interrupted?.kind &&
+    a.interrupted?.elapsedMs === b.interrupted?.elapsedMs
   )
 }

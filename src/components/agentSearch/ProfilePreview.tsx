@@ -124,6 +124,8 @@ export function ProfileCard({
       )}
       <Link
         href={href}
+        target="_blank"
+        rel="noopener noreferrer"
         className="inline-block rounded-sm text-xs font-medium text-brand underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         Open profile
@@ -160,6 +162,8 @@ export function ProfileLink({
   const link = (
     <Link
       href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       className={LINK_CLASS}
       onMouseEnter={() => {
         if (person && window.matchMedia('(hover: hover)').matches) {

@@ -147,7 +147,7 @@ test('renders the answer with its list, the cited rail and the sources', () => {
   expect(within(sources).getByText('@shared')).toBeInTheDocument()
   expect(within(sources).getByText('@user4')).toBeInTheDocument()
   fireEvent.click(within(sources).getByRole('button', { name: 'People' }))
-  expect(within(sources).getAllByText(/1 tweet · Jan 2025/)).toHaveLength(2)
+  expect(within(sources).getAllByText(/1 tweet$/)).toHaveLength(2)
 })
 
 test('a stopped turn keeps its steps and found tweets, and asks again', () => {

@@ -1,3 +1,5 @@
+import { parseListView, type ListView } from './listView'
+
 // The agent cites tweets inline as [[t:<tweet id>]]. Code, not the model,
 // decides whether a citation is valid: the id must appear in a tool result
 // from the same conversation, in this run or an earlier turn (the digest's
@@ -15,12 +17,13 @@ export const CITATION_PATTERN = /\[\[(?:t:)?(\d{1,20})\]\]/g
 export const QUOTE_PATTERN = /\[\[q:\s*(\d{1,20})\s*\|\s*([^\]\n]+?)\s*\]\]/g
 
 // When the answer is a set of posts, the agent shows them as a list where it
-// wants them: [[posts: <label> | <source>]]. The source is either tweet ids
-// (`123, 456`) or a result file in the agent's workspace (`lists/living.jsonl`),
-// which the reader resolves from the files the tools reported. Either way the
-// same rule applies to every id: a tool must have returned it.
+// wants them: [[posts: <label> | <source> | <view>]]. The source is either
+// tweet ids (`123, 456`) or a result file in the agent's workspace
+// (`lists/living.jsonl`), which the reader resolves from the files the tools
+// reported. Either way the same rule applies to every id: a tool must have
+// returned it. The label may be empty and the view left out (listView.ts).
 export const POST_LIST_PATTERN =
-  /\[\[posts:\s*([^|\]\n]*?)\s*\|\s*([^\]\n]*?)\s*\]\]/g
+  /\[\[posts:\s*([^|\]\n]*?)\s*\|\s*([^|\]\n]*?)\s*(?:\|\s*([^\]\n]*?)\s*)?\]\]/g
 
 /** A workspace path: relative, no `..`, ending in a file name. */
 export const WORKSPACE_PATH = /^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}$/
@@ -76,7 +79,14 @@ export function extractCitationIds(
 
 export type AnswerPart =
   | { type: 'text'; value: string }
-  | { type: 'list'; label: string; ids: string[]; path: string | null }
+  | {
+      type: 'list'
+      /** Null for a list with no label, shown inside the prose. */
+      label: string | null
+      ids: string[]
+      path: string | null
+      view: ListView
+    }
 
 /** Splits answer text into prose and post lists, in order. */
 export function splitPostLists(text: string): AnswerPart[] {
@@ -88,8 +98,9 @@ export function splitPostLists(text: string): AnswerPart[] {
       parts.push({ type: 'text', value: text.slice(last, index) })
     parts.push({
       type: 'list',
-      label: match[1].trim() || 'Posts',
+      label: match[1].trim() || null,
       ...listSource(match[2]),
+      view: parseListView(match[3]),
     })
     last = index + match[0].length
   }

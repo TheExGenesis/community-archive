@@ -244,6 +244,7 @@ export function AgentSearchTurn({
                       label={block.label}
                       tweets={block.tweets}
                       citations={citationNumbers}
+                      view={block.view}
                     />
                   </EvidenceBoundary>
                 ),

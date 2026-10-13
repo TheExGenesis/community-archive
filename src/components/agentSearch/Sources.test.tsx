@@ -96,7 +96,7 @@ test('tiers switch with pills, and relevant tweets not returned are counted', ()
   expect(screen.getByRole('button', { name: /@user10/ })).toBeInTheDocument()
 })
 
-test('the people view groups tweets by author with their span', () => {
+test('the people view groups tweets by author with their counts', () => {
   const tweets = [
     tweet(1, 'alice', 1),
     tweet(2, 'bob', 2),
@@ -119,7 +119,7 @@ test('the people view groups tweets by author with their span', () => {
   )
   fireEvent.click(screen.getByRole('button', { name: 'People' }))
   const alice = screen.getByRole('button', { name: /@alice/ })
-  expect(alice).toHaveTextContent('2 tweets · Jan 2025 to Jun 2025')
+  expect(alice).toHaveTextContent('2 tweets')
   fireEvent.click(alice)
   expect(
     screen.getByRole('list', { name: 'Tweets by @alice' }),

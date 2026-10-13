@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { PortalTweet } from '@/lib/portal/types'
 import { CitationList } from './CitationRail'
 import { EvidenceBoundary } from './EvidenceBoundary'
+import { GroupingToggle, type Grouping } from './GroupingToggle'
 import type { Citation } from './messageView'
 import { PeopleList, TweetRowList } from './TweetRows'
 
@@ -12,7 +13,6 @@ const FIRST_ROWS = 25
 const MORE_ROWS = 50
 
 type Tier = 'cited' | 'relevant' | 'other'
-type Grouping = 'tweets' | 'people'
 
 const count = (n: number) => n.toLocaleString('en-US')
 
@@ -114,27 +114,11 @@ export function Sources({
           {title}
         </h3>
         {tier !== 'cited' || !onlyCited ? (
-          <div
-            role="group"
-            aria-label="Group sources"
-            className="inline-flex rounded-md border border-border p-0.5 text-sm"
-          >
-            {(['tweets', 'people'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={grouping === value}
-                onClick={() => setGrouping(value)}
-                className={`min-h-[2rem] rounded px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  grouping === value
-                    ? 'bg-muted font-medium text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {value === 'tweets' ? 'Tweets' : 'People'}
-              </button>
-            ))}
-          </div>
+          <GroupingToggle
+            value={grouping}
+            onChange={setGrouping}
+            label="Group sources"
+          />
         ) : null}
       </div>
       {tiers.length > 1 && (

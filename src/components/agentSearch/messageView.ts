@@ -9,6 +9,7 @@ import {
   collectWorkspaceFiles,
   splitPostLists,
 } from '@/lib/agentSearch/citations'
+import type { ListView } from '@/lib/agentSearch/listView'
 import type { PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 import { isVerbatim } from './quotes'
 
@@ -43,7 +44,15 @@ export interface Citation {
 /** Prose, or a list of posts the agent placed in the answer. */
 export type AnswerBlock =
   | { kind: 'text'; markdown: string }
-  | { kind: 'list'; key: string; label: string; tweets: PortalTweet[] }
+  | {
+      kind: 'list'
+      key: string
+      /** Null for a list shown inside the prose, with no heading. */
+      label: string | null
+      tweets: PortalTweet[]
+      /** How the agent chose to show it; the reader can switch. */
+      view: ListView
+    }
   /** A citation alone on its line: the tweet shown whole, in place. */
   | { kind: 'tweet'; key: string; citation: Citation }
 
@@ -762,6 +771,7 @@ export function buildAnswer(
         key: `${scope}-list-${index}`,
         label: part.label,
         tweets,
+        view: part.view,
       })
     }
   })

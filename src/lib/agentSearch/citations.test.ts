@@ -62,9 +62,21 @@ describe('agent search citations', () => {
       'Intro [[t:1]]\n[[posts: Living there | 2, 3, 2]]\nThen [[posts:  | lists/a.jsonl]] end'
     expect(splitPostLists(text)).toEqual([
       { type: 'text', value: 'Intro [[t:1]]\n' },
-      { type: 'list', label: 'Living there', ids: ['2', '3'], path: null },
+      {
+        type: 'list',
+        label: 'Living there',
+        ids: ['2', '3'],
+        path: null,
+        view: { kind: 'tweets' },
+      },
       { type: 'text', value: '\nThen ' },
-      { type: 'list', label: 'Posts', ids: [], path: 'lists/a.jsonl' },
+      {
+        type: 'list',
+        label: null,
+        ids: [],
+        path: 'lists/a.jsonl',
+        view: { kind: 'tweets' },
+      },
       { type: 'text', value: ' end' },
     ])
     const files = new Map([['lists/a.jsonl', ['4', '9']]])
@@ -73,6 +85,22 @@ describe('agent search citations', () => {
       cited: ['1', '2', '3', '4'],
       invalid: ['9'],
     })
+  })
+
+  test('a list may say how to show it; its ids are read the same way', () => {
+    const text = '[[posts: Based there | lists/sg.jsonl | people, 2 each]]'
+    expect(splitPostLists(text)).toEqual([
+      {
+        type: 'list',
+        label: 'Based there',
+        ids: [],
+        path: 'lists/sg.jsonl',
+        view: { kind: 'people', showcase: 2 },
+      },
+    ])
+    expect(
+      extractCitationIds(text, new Map([['lists/sg.jsonl', ['5', '6']]])),
+    ).toEqual(['5', '6'])
   })
 
   test('refuses unsafe workspace paths and keeps the latest write of a file', () => {

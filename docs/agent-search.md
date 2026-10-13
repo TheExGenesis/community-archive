@@ -53,9 +53,14 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    `predicate` question per post, 48 requests at a time); Jev through
    OpenRouter and an LLM with structured output are alternatives. Replies are
    scored with their parent's text.
-4. The answer cites single tweets as `[[t:<id>]]` and shows sets of tweets as
-   lists, `[[posts: <label> | lists/<name>.jsonl]]` (a workspace file) or
-   `[[posts: <label> | <id>, <id>]]`. A citation or listed tweet counts only
+4. The answer cites single tweets as `[[t:<id>]]` (alone on a line, the tweet
+   shows whole), quotes them as `[[q:<id> | exact words]]` (checked word for
+   word), and shows sets of tweets as lists,
+   `[[posts: <label> | lists/<name>.jsonl | <view>]]` (a workspace file) or
+   `[[posts: <label> | <id>, <id>]]`. The label may be empty (a short list
+   inside the prose, no heading). The view (`listView.ts`) is the agent's
+   default: tweets, `by author`, `people`, or `people, <n> each`; readers can
+   switch between tweets and people. A citation or listed tweet counts only
    if its id came back from a tool in the same conversation, in this run or an
    earlier turn (`citations.ts`); a list's file resolves to the ids the
    command that wrote it reported. The page marks other ids as unverified and

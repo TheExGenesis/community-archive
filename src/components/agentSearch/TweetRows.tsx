@@ -35,11 +35,14 @@ export function TweetRow({
   tweet,
   citation,
   numbered = citation !== undefined,
+  hideAuthor = false,
 }: {
   tweet: PortalTweet
   citation?: number
   /** Keep the number's place even when this tweet is not cited. */
   numbered?: boolean
+  /** Under a person's name, the row need not say who again. */
+  hideAuthor?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = useId()
@@ -100,11 +103,13 @@ export function TweetRow({
           className={ROW_CLASS}
         >
           {chip}
-          <TweetAvatar tweet={tweet} size={28} />
+          {!hideAuthor && <TweetAvatar tweet={tweet} size={28} />}
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs text-muted-foreground">
-              @{tweet.username}
-            </span>
+            {!hideAuthor && (
+              <span className="block truncate text-xs text-muted-foreground">
+                @{tweet.username}
+              </span>
+            )}
             <span className="block truncate text-foreground">
               {firstLine(tweet.text)}
             </span>
@@ -133,6 +138,7 @@ export function TweetRowList({
   label,
   citations,
   moreLabel = (n) => `${n.toLocaleString('en-US')} more`,
+  hideAuthor = false,
 }: {
   tweets: PortalTweet[]
   first: number
@@ -140,6 +146,8 @@ export function TweetRowList({
   label: string
   citations?: ReadonlyMap<string, number>
   moreLabel?: (n: number) => string
+  /** The rows sit under their author's name. */
+  hideAuthor?: boolean
 }) {
   const [shown, setShown] = useState(first)
   const left = tweets.length - shown
@@ -152,6 +160,7 @@ export function TweetRowList({
           tweet={tweet}
           citation={citations?.get(tweet.id)}
           numbered={numbered}
+          hideAuthor={hideAuthor}
         />
       ))}
       {left > 0 && (
@@ -172,35 +181,51 @@ export function TweetRowList({
   )
 }
 
-interface Person {
+export interface Person {
   username: string
+  name: string
+  /** Their tweets in the list, in the list's order. */
   tweets: PortalTweet[]
-  from: string
-  to: string
 }
 
-/** Groups tweets by author, most tweets first; each author keeps their order. */
+/**
+ * Groups tweets by author, most tweets first; ties keep the order of each
+ * author's first tweet, and each author keeps their tweets' order.
+ */
 export function groupByPerson(tweets: PortalTweet[]): Person[] {
   const groups = new Map<string, PortalTweet[]>()
   for (const tweet of tweets) {
     groups.set(tweet.username, [...(groups.get(tweet.username) ?? []), tweet])
   }
   return Array.from(groups.entries())
-    .map(([username, list]) => {
-      const months = list
-        .map((tweet) => Date.parse(tweet.createdAt))
-        .filter(Number.isFinite)
-        .sort((a, b) => a - b)
-      return {
-        username,
-        tweets: list,
-        from: months.length ? monthFormat.format(months[0]) : '',
-        to: months.length ? monthFormat.format(months[months.length - 1]) : '',
-      }
-    })
+    .map(([username, list]) => ({ username, name: list[0].name, tweets: list }))
     .sort((a, b) => b.tweets.length - a.tweets.length)
 }
 
+const tweetCount = (n: number) =>
+  `${n.toLocaleString('en-US')} ${n === 1 ? 'tweet' : 'tweets'}`
+
+/** Who, by name and handle, with how many of their tweets the list holds. */
+function PersonLine({ person }: { person: Person }) {
+  return (
+    <>
+      <TweetAvatar tweet={person.tweets[0]} size={28} />
+      <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+        <span className="truncate font-medium text-foreground">
+          {person.name || person.username}
+        </span>
+        <span className="truncate text-muted-foreground">
+          @{person.username}
+        </span>
+      </span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {tweetCount(person.tweets.length)}
+      </span>
+    </>
+  )
+}
+
+/** A person whose tweets are folded behind their row. */
 function PersonRow({
   person,
   citations,
@@ -210,11 +235,6 @@ function PersonRow({
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = useId()
-  const count = person.tweets.length
-  const range =
-    person.from && person.from !== person.to
-      ? `${person.from} to ${person.to}`
-      : person.from
   return (
     <li className="border-b border-border">
       <button
@@ -224,14 +244,7 @@ function PersonRow({
         aria-controls={bodyId}
         className={ROW_CLASS}
       >
-        <TweetAvatar tweet={person.tweets[0]} size={28} />
-        <span className="shrink-0 font-medium text-foreground">
-          @{person.username}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-muted-foreground">
-          {count} {count === 1 ? 'tweet' : 'tweets'}
-          {range ? ` · ${range}` : ''}
-        </span>
+        <PersonLine person={person} />
         <ChevronDown
           aria-hidden="true"
           className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
@@ -244,6 +257,7 @@ function PersonRow({
             first={10}
             label={`Tweets by @${person.username}`}
             citations={citations}
+            hideAuthor
           />
         </div>
       )}
@@ -251,26 +265,99 @@ function PersonRow({
   )
 }
 
-/** One row per author: who said it, how often, over what span. */
+/** Tweets an open person shows when the agent asked for all of them. */
+const ALL_FIRST = 10
+
+/** A person with their first tweets showing under their name. */
+function PersonGroup({
+  person,
+  showcase,
+  citations,
+}: {
+  person: Person
+  showcase: number | 'all'
+  citations?: ReadonlyMap<string, number>
+}) {
+  const count = person.tweets.length
+  return (
+    <li className="border-b border-border pb-2">
+      <div className="flex min-h-[3rem] items-center gap-3 px-1 pt-2 text-sm">
+        <PersonLine person={person} />
+      </div>
+      <div className="pl-10">
+        <TweetRowList
+          tweets={person.tweets}
+          first={showcase === 'all' ? ALL_FIRST : showcase}
+          step={count}
+          label={`Tweets by @${person.username}`}
+          citations={citations}
+          moreLabel={(n) =>
+            `${n.toLocaleString('en-US')} more by @${person.username}`
+          }
+          hideAuthor
+        />
+      </div>
+    </li>
+  )
+}
+
+/** People shown before a "more people" row. */
+const FIRST_PEOPLE = 10
+
+/**
+ * The tweets grouped by author, most tweets first. With `showcase` 0 each
+ * person is one row that opens to their tweets; otherwise each person shows
+ * that many of their tweets (or all, folded past ten) under their name.
+ */
 export function PeopleList({
   tweets,
   label,
   citations,
+  showcase = 0,
 }: {
   tweets: PortalTweet[]
   label: string
   citations?: ReadonlyMap<string, number>
+  showcase?: number | 'all'
 }) {
   const people = useMemo(() => groupByPerson(tweets), [tweets])
+  const [shown, setShown] = useState(FIRST_PEOPLE)
+  const left = people.length - shown
   return (
     <ul aria-label={label} className="border-t border-border">
-      {people.map((person) => (
-        <PersonRow
-          key={person.username}
-          person={person}
-          citations={citations}
-        />
-      ))}
+      {people
+        .slice(0, shown)
+        .map((person) =>
+          showcase === 0 ? (
+            <PersonRow
+              key={person.username}
+              person={person}
+              citations={citations}
+            />
+          ) : (
+            <PersonGroup
+              key={person.username}
+              person={person}
+              showcase={showcase}
+              citations={citations}
+            />
+          ),
+        )}
+      {left > 0 && (
+        <li className="border-b border-border">
+          <button
+            type="button"
+            onClick={() => setShown(people.length)}
+            className={`${ROW_CLASS} text-muted-foreground hover:text-foreground`}
+          >
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
+              <Plus aria-hidden="true" className="h-4 w-4" />
+            </span>
+            {left.toLocaleString('en-US')} more{' '}
+            {left === 1 ? 'person' : 'people'}
+          </button>
+        </li>
+      )}
     </ul>
   )
 }

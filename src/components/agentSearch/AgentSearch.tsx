@@ -570,32 +570,28 @@ export default function AgentSearch({
         {!inThread && (
           <>
             {outOfQuestions ? limitNote : startForm}
-            <section aria-labelledby="try-questions" className="mt-8">
-              <h2
-                id="try-questions"
-                className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground [font-family:inherit]"
-              >
-                Try
-              </h2>
-              <ul className="divide-y divide-border border-y border-border">
-                {EXAMPLE_QUESTIONS.map((question) => (
-                  <li key={question}>
-                    {/* Fills the box rather than sending: one tap should not
-                        spend one of the day's questions. */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInput(question)
-                        textareaRef.current?.focus()
-                      }}
-                      className="flex min-h-[2.75rem] w-full items-center px-1 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    >
-                      {question}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            {/* Suggestions, not history: chips under the box that fill it
+                rather than send, since one tap should not spend one of the
+                day's questions. */}
+            <ul
+              aria-label="Questions to try"
+              className="mt-4 flex flex-wrap gap-2"
+            >
+              {EXAMPLE_QUESTIONS.map((question) => (
+                <li key={question}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInput(question)
+                      textareaRef.current?.focus()
+                    }}
+                    className="rounded-full border border-border px-3 py-1.5 text-left text-[13px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {question}
+                  </button>
+                </li>
+              ))}
+            </ul>
             <RecentConversations
               conversations={recent}
               onOpen={(id) => void openConversation(id)}

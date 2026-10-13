@@ -126,7 +126,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('17 projects')).toBeInTheDocument()
+    expect(screen.getByText('19 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -271,7 +271,7 @@ describe('CommunityGallery', () => {
     ])
 
     await user.click(screen.getByRole('button', { name: 'Tools' }))
-    expect(screen.getByText('9 projects')).toBeInTheDocument()
+    expect(screen.getByText('11 projects')).toBeInTheDocument()
   })
 
   it('leads each card with its one-line summary, then name and creator', () => {

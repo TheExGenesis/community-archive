@@ -15,6 +15,7 @@ import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
 import { StepLog } from './StepLog'
+import { TweetLinksInNewTab } from '@/components/portal/tweetLinks'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConversationHistory, GHOST_BUTTON } from './ConversationHistory'
 import { createReconnectingFetch } from './reconnectingFetch'
@@ -656,199 +657,203 @@ export default function AgentSearch({
 
   const inThread = hasThread || loading
 
+  // Leaving would lose the answer being read: tweets and profiles open in
+  // a new tab.
   return (
-    <main className="min-h-screen bg-background">
-      <section
-        className={`mx-auto w-full px-4 py-8 sm:px-6 sm:py-12 ${
-          inThread ? 'max-w-[84rem]' : 'max-w-2xl'
-        }`}
-      >
-        {inThread ? (
-          <div className="mb-6 flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2">
-            <h1 className="text-[15px] font-semibold text-foreground [font-family:inherit]">
+    <TweetLinksInNewTab>
+      <main className="min-h-screen bg-background">
+        <section
+          className={`mx-auto w-full px-4 py-8 sm:px-6 sm:py-12 ${
+            inThread ? 'max-w-[84rem]' : 'max-w-2xl'
+          }`}
+        >
+          {inThread ? (
+            <div className="mb-6 flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2">
+              <h1 className="text-[15px] font-semibold text-foreground [font-family:inherit]">
+                Ask the archive
+              </h1>
+              <div className="-mr-2.5 flex items-center gap-1">
+                <ConversationHistory
+                  conversations={recent}
+                  currentId={conversation.id}
+                  onOpen={(id) => void openConversation(id)}
+                  disabled={busy || loading}
+                />
+                <button
+                  type="button"
+                  onClick={startNewConversation}
+                  disabled={busy}
+                  className={GHOST_BUTTON}
+                >
+                  <Plus aria-hidden="true" className="h-4 w-4" />
+                  New question
+                </button>
+              </div>
+            </div>
+          ) : (
+            <h1 className="mb-6 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
               Ask the archive
             </h1>
-            <div className="-mr-2.5 flex items-center gap-1">
-              <ConversationHistory
-                conversations={recent}
-                currentId={conversation.id}
-                onOpen={(id) => void openConversation(id)}
-                disabled={busy || loading}
-              />
-              <button
-                type="button"
-                onClick={startNewConversation}
-                disabled={busy}
-                className={GHOST_BUTTON}
-              >
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                New question
-              </button>
+          )}
+
+          {loadError && (
+            <p
+              role="alert"
+              className="mb-6 rounded-md border border-destructive/40 px-3 py-2 text-sm text-foreground"
+            >
+              {loadError}
+            </p>
+          )}
+
+          {loading && (
+            <div
+              role="status"
+              aria-label="Opening the conversation"
+              className="max-w-3xl space-y-4"
+            >
+              <Skeleton className="h-7 w-2/3" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-11/12" />
+              <Skeleton className="h-4 w-4/5" />
             </div>
-          </div>
-        ) : (
-          <h1 className="mb-6 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Ask the archive
-          </h1>
-        )}
+          )}
 
-        {loadError && (
-          <p
-            role="alert"
-            className="mb-6 rounded-md border border-destructive/40 px-3 py-2 text-sm text-foreground"
-          >
-            {loadError}
-          </p>
-        )}
-
-        {loading && (
-          <div
-            role="status"
-            aria-label="Opening the conversation"
-            className="max-w-3xl space-y-4"
-          >
-            <Skeleton className="h-7 w-2/3" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-11/12" />
-            <Skeleton className="h-4 w-4/5" />
-          </div>
-        )}
-
-        {!inThread && (
-          <>
-            {outOfQuestions ? limitNote : startForm}
-            {/* Suggestions, not history: chips under the box that fill it
+          {!inThread && (
+            <>
+              {outOfQuestions ? limitNote : startForm}
+              {/* Suggestions, not history: chips under the box that fill it
                 rather than send, since one tap should not spend one of the
                 day's questions. */}
-            <ul
-              aria-label="Questions to try"
-              className="mt-4 flex flex-wrap gap-2"
-            >
-              {EXAMPLE_QUESTIONS.map((question) => (
-                <li key={question}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInput(question)
-                      textareaRef.current?.focus()
-                    }}
-                    className="rounded-full border border-border px-3 py-1.5 text-left text-[13px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {question}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <RecentConversations
-              conversations={recent}
-              onOpen={(id) => void openConversation(id)}
-            />
-          </>
-        )}
-
-        {hasThread && !loading && (
-          <div className="space-y-10">
-            {messages.map((message, index) => {
-              if (message.role === 'user') {
-                const reply =
-                  messages[index + 1]?.role === 'assistant' ? index + 1 : null
-                const waiting = busy && index === lastIndex
-                // Ended before any reply arrived: stopped, or the stream
-                // broke. A refused question is taken back out of the thread.
-                const endedEarly: 'stopped' | 'failed' | null =
-                  reply !== null || waiting
-                    ? null
-                    : message.id in stopped
-                      ? 'stopped'
-                      : Boolean(error) && index === lastIndex
-                        ? 'failed'
-                        : null
-                const question = messageText(message)
-                return (
-                  <div
-                    key={message.id}
-                    className="space-y-5 border-t border-border pt-6 first:border-t-0 first:pt-0"
-                  >
-                    <h2
-                      id={questionAnchor(message.id)}
-                      className="scroll-mt-24 whitespace-pre-wrap break-words text-2xl font-semibold leading-snug text-foreground sm:text-3xl"
+              <ul
+                aria-label="Questions to try"
+                className="mt-4 flex flex-wrap gap-2"
+              >
+                {EXAMPLE_QUESTIONS.map((question) => (
+                  <li key={question}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInput(question)
+                        textareaRef.current?.focus()
+                      }}
+                      className="rounded-full border border-border px-3 py-1.5 text-left text-[13px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {question}
-                    </h2>
-                    {waiting && (
-                      <StepLog
-                        mode="running"
-                        steps={[]}
-                        startedAt={runStartedAt ?? Date.now()}
-                        onStop={stopFromStatus}
-                      />
-                    )}
-                    {endedEarly && (
-                      <StepLog
-                        mode={endedEarly}
-                        steps={[]}
-                        elapsedMs={stopped[message.id] ?? null}
-                        onAskAgain={() => ask(question)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <RecentConversations
+                conversations={recent}
+                onOpen={(id) => void openConversation(id)}
+              />
+            </>
+          )}
+
+          {hasThread && !loading && (
+            <div className="space-y-10">
+              {messages.map((message, index) => {
+                if (message.role === 'user') {
+                  const reply =
+                    messages[index + 1]?.role === 'assistant' ? index + 1 : null
+                  const waiting = busy && index === lastIndex
+                  // Ended before any reply arrived: stopped, or the stream
+                  // broke. A refused question is taken back out of the thread.
+                  const endedEarly: 'stopped' | 'failed' | null =
+                    reply !== null || waiting
+                      ? null
+                      : message.id in stopped
+                        ? 'stopped'
+                        : Boolean(error) && index === lastIndex
+                          ? 'failed'
+                          : null
+                  const question = messageText(message)
+                  return (
+                    <div
+                      key={message.id}
+                      className="space-y-5 border-t border-border pt-6 first:border-t-0 first:pt-0"
+                    >
+                      <h2
+                        id={questionAnchor(message.id)}
+                        className="scroll-mt-24 whitespace-pre-wrap break-words text-2xl font-semibold leading-snug text-foreground sm:text-3xl"
+                      >
+                        {question}
+                      </h2>
+                      {waiting && (
+                        <StepLog
+                          mode="running"
+                          steps={[]}
+                          startedAt={runStartedAt ?? Date.now()}
+                          onStop={stopFromStatus}
+                        />
+                      )}
+                      {endedEarly && (
+                        <StepLog
+                          mode={endedEarly}
+                          steps={[]}
+                          elapsedMs={stopped[message.id] ?? null}
+                          onAskAgain={() => ask(question)}
+                          canAskAgain={canAskAgain}
+                        />
+                      )}
+                    </div>
+                  )
+                }
+                if (message.role !== 'assistant') return null
+                const active = busy && index === lastIndex
+                const view = views.get(index) as TurnView
+                const asked =
+                  messages[index - 1]?.role === 'user'
+                    ? messages[index - 1]
+                    : null
+                const interrupted: TurnInterruption | null = active
+                  ? null
+                  : asked && asked.id in stopped
+                    ? { kind: 'stopped', elapsedMs: stopped[asked.id] }
+                    : answerFailed && index === lastIndex
+                      ? { kind: 'failed', elapsedMs: null }
+                      : null
+                return (
+                  <div key={message.id}>
+                    <EvidenceBoundary
+                      label="turn"
+                      fallback="This answer could not be shown."
+                    >
+                      <AgentSearchTurn
+                        view={view}
+                        active={active}
+                        interrupted={interrupted}
+                        startedAt={
+                          active ? (runStartedAt ?? undefined) : undefined
+                        }
+                        onStop={stopTurn}
+                        onAskAgain={
+                          asked ? askAgainFor(messageText(asked)) : undefined
+                        }
                         canAskAgain={canAskAgain}
+                        showSources={
+                          index === lastIndex ||
+                          interrupted?.kind === 'stopped' ||
+                          view.outcome === 'stopped'
+                        }
                       />
-                    )}
+                    </EvidenceBoundary>
                   </div>
                 )
-              }
-              if (message.role !== 'assistant') return null
-              const active = busy && index === lastIndex
-              const view = views.get(index) as TurnView
-              const asked =
-                messages[index - 1]?.role === 'user'
-                  ? messages[index - 1]
-                  : null
-              const interrupted: TurnInterruption | null = active
-                ? null
-                : asked && asked.id in stopped
-                  ? { kind: 'stopped', elapsedMs: stopped[asked.id] }
-                  : answerFailed && index === lastIndex
-                    ? { kind: 'failed', elapsedMs: null }
-                    : null
-              return (
-                <div key={message.id}>
-                  <EvidenceBoundary
-                    label="turn"
-                    fallback="This answer could not be shown."
-                  >
-                    <AgentSearchTurn
-                      view={view}
-                      active={active}
-                      interrupted={interrupted}
-                      startedAt={
-                        active ? (runStartedAt ?? undefined) : undefined
-                      }
-                      onStop={stopTurn}
-                      onAskAgain={
-                        asked ? askAgainFor(messageText(asked)) : undefined
-                      }
-                      canAskAgain={canAskAgain}
-                      showSources={
-                        index === lastIndex ||
-                        interrupted?.kind === 'stopped' ||
-                        view.outcome === 'stopped'
-                      }
-                    />
-                  </EvidenceBoundary>
-                </div>
-              )
-            })}
-          </div>
-        )}
+              })}
+            </div>
+          )}
 
-        {/* Pinned to the bottom of the screen while reading a thread; it
+          {/* Pinned to the bottom of the screen while reading a thread; it
             settles into place below the last turn. Hidden while a question
             runs: Stop, in the step log, is the only action then. */}
-        {hasThread && !loading && !busy && (
-          <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-[calc(48rem+3rem)]">
-            {outOfQuestions ? limitNote : threadForm}
-          </div>
-        )}
-      </section>
-    </main>
+          {hasThread && !loading && !busy && (
+            <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-[calc(48rem+3rem)]">
+              {outOfQuestions ? limitNote : threadForm}
+            </div>
+          )}
+        </section>
+      </main>
+    </TweetLinksInNewTab>
   )
 }

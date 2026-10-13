@@ -123,6 +123,32 @@ export interface AnswerView {
    * replace those mentions.
    */
   unavailable: string[]
+  /**
+   * Citations whose sentence names one person while the cited tweet is by
+   * someone else: the model cited the wrong tweet. Each occurrence's chip
+   * carries the same warning.
+   */
+  authorMismatches: AuthorMismatch[]
+  /**
+   * A reopened answer whose prose cited tweets that are no longer available
+   * (deleted, or the author opted out): the prose is not shown, since it
+   * still names and describes them. Lists keep what is still available.
+   */
+  withheld: boolean
+  /**
+   * A reopened answer whose cited tweets are still loading (or failed to):
+   * its prose waits until they are confirmed available.
+   */
+  checking: boolean
+}
+
+export interface AuthorMismatch {
+  id: string
+  n: number
+  /** The handle the sentence names, as written. */
+  named: string
+  /** The cited tweet's author. */
+  author: string
 }
 
 export interface CoverageSearch {
@@ -977,6 +1003,43 @@ function trimPartialMarker(text: string) {
  */
 const EMBED_LINE = /^[ \t]*\[\[(?:t:)?(\d{1,20})\]\][ \t]*$/gm
 
+// An @handle not preceded by a word character, a slash or another @.
+const NAMED_HANDLE = /(^|[^\w/@])@(\w{1,15})(?!\w)/g
+// Where a chip's own clause starts: after a line break, a sentence end, or
+// the previous citation (a raw marker or a rewritten chip link).
+const CLAUSE_BREAK = /\n|[.!?](?=\s)|\]\]|\]\([^)]*\)/g
+
+/**
+ * The one person a citation's clause names before its chip, or null when it
+ * names none or several (too ambiguous to judge).
+ */
+export function namedBeforeChip(before: string): string | null {
+  let start = 0
+  for (const match of Array.from(before.matchAll(CLAUSE_BREAK))) {
+    start = (match.index ?? 0) + match[0].length
+  }
+  const handles = new Map<string, string>()
+  for (const match of Array.from(before.slice(start).matchAll(NAMED_HANDLE))) {
+    handles.set(match[2].toLowerCase(), match[2])
+  }
+  return handles.size === 1 ? Array.from(handles.values())[0] : null
+}
+
+/**
+ * Whether a clause naming `named` and citing `tweet` cites someone else: the
+ * author differs and the tweet neither mentions nor quotes the named person
+ * (a reply to them, or a quote of their tweet, is about them).
+ */
+export function citesSomeoneElse(named: string, tweet: PortalTweet) {
+  const person = named.toLowerCase()
+  if (tweet.username.toLowerCase() === person) return false
+  if (tweet.quotedTweet?.username.toLowerCase() === person) return false
+  const mentioned = new Set(
+    Array.from(tweet.text.matchAll(NAMED_HANDLE), (m) => m[2].toLowerCase()),
+  )
+  return !mentioned.has(person)
+}
+
 export function buildAnswer(
   text: string,
   found: FoundTweets,
@@ -991,6 +1054,20 @@ export function buildAnswer(
   const loading: string[] = []
   const failed: string[] = []
   const unavailable: string[] = []
+  const authorMismatches: AuthorMismatch[] = []
+  // A chip whose clause names someone other than the cited tweet's author
+  // carries a warning as its link title; the renderer marks it.
+  const chipFor = (citation: Citation, before: string) => {
+    const named = citation.tweet ? namedBeforeChip(before) : null
+    if (!named || !citation.tweet || !citesSomeoneElse(named, citation.tweet)) {
+      return `[${citation.n}](#${citation.anchor})`
+    }
+    const author = citation.tweet.username
+    if (!authorMismatches.some((item) => item.id === citation.id)) {
+      authorMismatches.push({ id: citation.id, n: citation.n, named, author })
+    }
+    return `[${citation.n}](#${citation.anchor} "${AUTHOR_MISMATCH_TITLE(author, named)}")`
+  }
   const noteMissing = (id: string, state: TweetLoad) => {
     const list =
       state === 'loading' ? loading : state === 'failed' ? failed : unavailable
@@ -1027,13 +1104,13 @@ export function buildAnswer(
   const quote = (prose: string) =>
     prose.replace(
       new RegExp(QUOTE_PATTERN.source, 'g'),
-      (_marker, id: string, words: string) => {
+      (_marker, id: string, words: string, offset: number) => {
         const citation = citationFor(id)
         const safe = words.replace(/[[\]\\]/g, '')
         if (!citation) {
           return `${safe} [unverified](${UNVERIFIED_HREF_PREFIX}${id})`
         }
-        const chip = `[${citation.n}](#${citation.anchor})`
+        const chip = chipFor(citation, prose.slice(0, offset))
         return citation.tweet && isVerbatim(words, citation.tweet.text)
           ? `[${safe}](${QUOTE_HREF_PREFIX}${citation.anchor}) ${chip}`
           : `${safe} ${chip}`
@@ -1049,7 +1126,7 @@ export function buildAnswer(
         const citation = citationFor(id)
         if (!citation)
           return `${gap}[unverified](${UNVERIFIED_HREF_PREFIX}${id})`
-        return `${gap}[${citation.n}](#${citation.anchor})`
+        return `${gap}${chipFor(citation, prose.slice(0, offset))}`
       },
     )
   }
@@ -1127,21 +1204,48 @@ export function buildAnswer(
       })
     }
   })
-  const markdown = blocks
+  // Opt-out takes precedence over a stored answer (AGENTS.md): when a tweet
+  // the prose cites is no longer available, the prose still names and
+  // describes its author, so it is not shown. The answer's lists keep what
+  // is still available; their gone tweets already dropped out above. A live
+  // answer's tweets arrive with it, so this only touches reopened ones.
+  const withheld =
+    !options.streaming &&
+    citations.some((citation) => citation.state === 'unavailable')
+  // Until every tweet the prose cites has loaded, a reopened answer's prose
+  // is held back too: it may name someone who has since opted out, and
+  // showing it first and withdrawing it later would still serve it.
+  const checking =
+    !withheld &&
+    !options.streaming &&
+    citations.some(
+      (citation) => citation.state === 'loading' || citation.state === 'failed',
+    )
+  const shown = withheld
+    ? blocks.filter((block) => block.kind === 'list')
+    : blocks
+  const markdown = shown
     .flatMap((block) => (block.kind === 'text' ? [block.markdown] : []))
     .join('\n\n')
   return {
     markdown,
-    blocks,
-    citations,
+    blocks: shown,
+    citations: withheld ? [] : citations,
     listed,
-    unverified,
+    unverified: withheld ? [] : unverified,
     missingLists,
     loading,
     failed,
     unavailable,
+    authorMismatches: withheld ? [] : authorMismatches,
+    withheld,
+    checking,
   }
 }
+
+/** The warning a chip carries when its clause names someone else. */
+export const AUTHOR_MISMATCH_TITLE = (author: string, named: string) =>
+  `This tweet is by @${author}, not @${named}`
 
 /**
  * What was searched, for people: one line per distinct search (paging of the

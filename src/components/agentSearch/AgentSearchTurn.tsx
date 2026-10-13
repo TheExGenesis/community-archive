@@ -1,6 +1,7 @@
 'use client'
 
 import { PanelRightOpen } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnswerMarkdown } from './AnswerMarkdown'
 import {
@@ -225,6 +226,22 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
     />
   )
 
+  // Lists show their own placeholders and Retry row, so the turn's line
+  // only counts tweets outside them (citations, the column, sources).
+  const inLists = { loading: 0, failed: 0 }
+  for (const block of answer.blocks) {
+    if (block.kind !== 'list') continue
+    for (const item of block.pending) {
+      if (item.state === 'loading' || item.state === 'failed') {
+        inLists[item.state] += 1
+      }
+    }
+  }
+  const elsewhere = {
+    loading: Math.max(0, view.tweets.loading - inLists.loading),
+    failed: Math.max(0, view.tweets.failed - inLists.failed),
+  }
+
   // Wide screens: the answer on the left, cited tweets in a sticky column
   // beside it so a citation and its tweet are both on screen. The answer
   // keeps a reading width; the column takes the rest, up to a width tweet
@@ -243,8 +260,37 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
               ref={answerRef}
               className="max-w-[68ch] break-words text-base text-foreground"
             >
+              {answer.checking && (
+                <div className="space-y-2" role="status" aria-live="polite">
+                  {answer.citations.some(
+                    (citation) => citation.state === 'failed',
+                  ) ? (
+                    <p className="text-sm text-muted-foreground">
+                      Couldn’t check the tweets this answer cites, so it isn’t
+                      shown yet.{' '}
+                      {onRetryTweets && (
+                        <button
+                          type="button"
+                          onClick={onRetryTweets}
+                          className="text-foreground underline underline-offset-2 hover:text-brand"
+                        >
+                          Retry
+                        </button>
+                      )}
+                    </p>
+                  ) : (
+                    <>
+                      <span className="sr-only">Checking the cited tweets</span>
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-11/12" />
+                      <Skeleton className="h-4 w-4/5" />
+                    </>
+                  )}
+                </div>
+              )}
               {answer.blocks.map((block, index) =>
-                block.kind === 'text' ? (
+                answer.checking && block.kind !== 'list' ? null : block.kind ===
+                  'text' ? (
                   <AnswerMarkdown key={`text-${index}`} people={people}>
                     {block.markdown}
                   </AnswerMarkdown>
@@ -283,21 +329,47 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
               </span>
             </p>
           )}
-          {!active && answer.unavailable.length > 0 && (
+          {!active && answer.withheld && (
+            <div className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              <p>
+                Part of this answer relied on tweets that are no longer
+                available, so it isn’t shown. Ask again for a fresh answer.
+              </p>
+              {onAskAgain && canAskAgain && (
+                <button
+                  type="button"
+                  onClick={onAskAgain}
+                  className={`mt-1 ${RETRY_BUTTON}`}
+                >
+                  Ask again
+                </button>
+              )}
+            </div>
+          )}
+          {!active && answer.authorMismatches.length > 0 && (
+            <p className="rounded-md border border-dashed border-destructive/50 px-3 py-2 text-sm text-muted-foreground">
+              {answer.authorMismatches.length === 1
+                ? `Citation ${answer.authorMismatches[0].n} points at a tweet by @${answer.authorMismatches[0].author}, not @${answer.authorMismatches[0].named}, the person its sentence names.`
+                : `${answer.authorMismatches.length} citations point at tweets by someone other than the person their sentence names: ${answer.authorMismatches
+                    .map((item) => item.n)
+                    .join(', ')}.`}
+            </p>
+          )}
+          {!active && !answer.withheld && answer.unavailable.length > 0 && (
             <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
               {answer.unavailable.length === 1
                 ? 'One tweet in this answer is no longer available: it was deleted, or its author has opted out of the archive.'
                 : `${answer.unavailable.length} tweets in this answer are no longer available: they were deleted, or their authors have opted out of the archive.`}
             </p>
           )}
-          {!active && view.tweets.loading > 0 && (
+          {!active && elsewhere.loading > 0 && (
             <p role="status" className="text-sm text-muted-foreground">
-              Loading {plural(view.tweets.loading, 'tweet')}…
+              Loading {plural(elsewhere.loading, 'tweet')}…
             </p>
           )}
-          {!active && view.tweets.loading === 0 && view.tweets.failed > 0 && (
+          {!active && elsewhere.loading === 0 && elsewhere.failed > 0 && (
             <p className="text-sm text-muted-foreground">
-              Couldn’t load {plural(view.tweets.failed, 'tweet')}
+              Couldn’t load {plural(elsewhere.failed, 'tweet')}
               {onRetryTweets && (
                 <>
                   {' '}

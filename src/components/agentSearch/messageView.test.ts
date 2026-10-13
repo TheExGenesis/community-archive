@@ -8,12 +8,14 @@ import {
   buildAnswer,
   buildCoverage,
   buildTurnView,
+  citesSomeoneElse,
   collectToolTweets,
   describeChatError,
   formatElapsed,
   latestThought,
   timelineFor,
   logSummary,
+  namedBeforeChip,
   describeCommand,
   progressLine,
   progressLines,
@@ -380,6 +382,74 @@ describe('buildAnswer', () => {
     const embed = answer.blocks[1]
     expect(embed.kind === 'tweet' && embed.citation.n).toBe(1)
     expect(answer.citations.map((c) => c.id)).toEqual(['20', '10'])
+  })
+})
+
+describe('citations of someone other than the person named', () => {
+  // The real case: a bullet about @SurenVynn cited a tweet by @sharanvkaur.
+  const found = collectToolTweets([
+    {
+      tweets: [
+        tweet('1', {
+          username: 'sharanvkaur',
+          text: 'singaporeans stupid but not that stupid',
+        }),
+        tweet('2', {
+          username: 'pachabelcanon',
+          text: 'Being Singaporean my mind lumps S and E Asians together',
+        }),
+        tweet('3', {
+          username: 'tszzl',
+          text: '@andrewho03 I was a big fan of Lee kuan yew',
+        }),
+        tweet('4', { username: 'bob', text: '@SurenVynn exactly this' }),
+      ],
+    },
+  ])
+
+  test('a clause naming one person and citing another’s tweet gets a warning on its chip', () => {
+    const answer = buildAnswer(
+      '- @SurenVynn: Singapore elections, NS, food [[t:1]]\n- @pachabelcanon: Singaporean identity [[t:2]]',
+      found,
+      'm1',
+    )
+    expect(answer.authorMismatches).toEqual([
+      { id: '1', n: 1, named: 'SurenVynn', author: 'sharanvkaur' },
+    ])
+    expect(answer.markdown).toContain(
+      '[1](#ask-m1-tweet-1 "This tweet is by @sharanvkaur, not @SurenVynn")',
+    )
+    expect(answer.markdown).toContain('[2](#ask-m1-tweet-2)')
+    expect(answer.markdown).not.toContain('[2](#ask-m1-tweet-2 "')
+  })
+
+  test('no warning when the clause names several people, none, or the tweet replies to the person named', () => {
+    const answer = buildAnswer(
+      '@tszzl and @Paul_Melman disagree [[t:3]]. Some say so [[t:2]]. @SurenVynn got a reply [[t:4]].',
+      found,
+      'm1',
+    )
+    expect(answer.authorMismatches).toEqual([])
+  })
+
+  test('each chip judges its own clause, starting after the previous chip', () => {
+    const answer = buildAnswer(
+      '@pachabelcanon on identity [[t:2]] and @SurenVynn on elections [[t:1]]',
+      found,
+      'm1',
+    )
+    expect(answer.authorMismatches.map((m) => m.id)).toEqual(['1'])
+  })
+
+  test('the clause and author rules', () => {
+    expect(namedBeforeChip('Line one @a.\n- @b talks about it ')).toBe('b')
+    expect(namedBeforeChip('@a and @b both ')).toBeNull()
+    expect(namedBeforeChip('mail me at x@a.com ')).toBeNull()
+    expect(namedBeforeChip('@a said [1](#ask-x) and later ')).toBeNull()
+    const t = tweet('9', { username: 'alice', text: 'hi' })
+    expect(citesSomeoneElse('Alice', t)).toBe(false)
+    expect(citesSomeoneElse('bob', t)).toBe(true)
+    expect(citesSomeoneElse('bob', { ...t, text: '@bob hi' })).toBe(false)
   })
 })
 
@@ -1168,29 +1238,23 @@ describe('a reopened conversation (tweets as references)', () => {
     expect(full.answer.unverified).toEqual(['777'])
   })
 
-  test('a failed fetch and a tweet the gateway no longer has are told apart from unverified', () => {
+  test('a failed fetch and a listed tweet the gateway no longer has are told apart from unverified', () => {
     const view = buildTurnView(messages, 1, {
-      supply: supply(['2', '4'], {
+      supply: supply(['2', '3', '4'], {
         '1': 'failed',
-        '3': 'unavailable',
         '5': 'unavailable',
         '6': 'failed',
       }),
     })
+    expect(view.answer.withheld).toBe(false)
     expect(view.answer.citations.map((c) => [c.id, c.state])).toEqual([
       ['2', 'loaded'],
       ['1', 'failed'],
-      ['3', 'unavailable'],
+      ['3', 'loaded'],
     ])
     expect(view.answer.failed).toEqual(['1', '6'])
-    expect(view.answer.unavailable).toEqual(['3', '5'])
+    expect(view.answer.unavailable).toEqual(['5'])
     expect(view.answer.unverified).toEqual(['777'])
-    // An embed of a gone tweet still shows its place, with its number.
-    expect(view.answer.blocks.map((b) => b.kind)).toEqual([
-      'text',
-      'tweet',
-      'list',
-    ])
     // A listed tweet that is gone drops out of the list, as before; a
     // failed one keeps its place for a retry.
     const list = view.answer.blocks.find((b) => b.kind === 'list')
@@ -1199,7 +1263,57 @@ describe('a reopened conversation (tweets as references)', () => {
       pending: [{ id: '6', state: 'failed' }],
     })
     expect(view.answer.listed).toEqual(['4', '6'])
-    expect(view.tweets).toEqual({ loading: 0, failed: 2, unavailable: 2 })
+    expect(view.tweets).toEqual({ loading: 0, failed: 2, unavailable: 1 })
+  })
+
+  test('when a tweet the prose cites is no longer available, the prose is withheld and the lists stay', () => {
+    const view = buildTurnView(messages, 1, {
+      supply: supply(['1', '2', '4', '6'], {
+        '3': 'unavailable',
+        '5': 'unavailable',
+      }),
+    })
+    // Opt-out wins over the stored answer: no prose, no chips, no embeds.
+    expect(view.answer.withheld).toBe(true)
+    expect(view.answer.markdown).toBe('')
+    expect(view.answer.citations).toEqual([])
+    expect(view.answer.unverified).toEqual([])
+    expect(view.answer.blocks.map((b) => b.kind)).toEqual(['list'])
+    const list = view.answer.blocks[0]
+    expect(list.kind === 'list' && list.tweets.map((t) => t.id)).toEqual([
+      '4',
+      '6',
+    ])
+    expect(view.answer.unavailable).toEqual(['3', '5'])
+    // A live answer is never withheld: its tweets arrive with it.
+    const live = buildTurnView(messages, 1, {
+      supply: supply(['1', '2', '4', '6'], { '3': 'unavailable' }),
+      streaming: true,
+    })
+    expect(live.answer.withheld).toBe(false)
+  })
+
+  test('a reopened answer holds its prose until every cited tweet is confirmed', () => {
+    // Nothing loaded yet: the prose waits (it may name someone who opted out).
+    expect(
+      buildTurnView(messages, 1, { supply: supply([], {}) }).answer.checking,
+    ).toBe(true)
+    // A cited tweet failed to load: still held, so it can be retried.
+    expect(
+      buildTurnView(messages, 1, {
+        supply: supply(['2', '3', '4'], { '1': 'failed' }),
+      }).answer.checking,
+    ).toBe(true)
+    // Every cited tweet in: shown.
+    expect(
+      buildTurnView(messages, 1, { supply: supply(['1', '2', '3'], {}) }).answer
+        .checking,
+    ).toBe(false)
+    // A live answer is never held.
+    expect(
+      buildTurnView(messages, 1, { supply: supply([], {}), streaming: true })
+        .answer.checking,
+    ).toBe(false)
   })
 
   test('a follow-up resolves an earlier turn’s references through the same supply', () => {

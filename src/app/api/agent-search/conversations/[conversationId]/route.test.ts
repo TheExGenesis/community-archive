@@ -85,25 +85,20 @@ describe('GET', () => {
       ),
     })
 
-  test('answers at once with the tweets as references, the cited ones it had time for, and the rest to fetch in priority order', async () => {
+  test('answers at once, without the gateway, with the tweets as references to fetch in priority order', async () => {
     store.listConversation.mockResolvedValue([
       stored(),
       run({ id: 'r2', question: 'More?', status: 'running' }),
     ])
-    // The budgeted fetch got 1, lost 2 to a timeout, and found nothing for 5.
-    jest.mocked(fetchConversationTweets).mockResolvedValue({
-      tweets: new Map([['1', tweet('1') as never]]),
-      failed: ['2'],
-    })
-    const before = Date.now()
     const response = await get()
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
     const body = await response.json()
     expect(body.runningRunId).toBe('r2')
-    expect(body.tweets).toEqual([tweet('1')])
-    expect(body.pendingTweetIds).toEqual(['2', '3', '4'])
-    expect(body.unavailableTweetIds).toEqual(['5'])
+    expect(body.tweets).toEqual([])
+    // Prose-cited first, then the list, then the rest.
+    expect(body.pendingTweetIds).toEqual(['1', '2', '5', '3', '4'])
+    expect(body.unavailableTweetIds).toEqual([])
     // The messages keep their references for the page to resolve.
     expect(body.messages.map((m: { id: string }) => m.id)).toEqual([
       'r1-question',
@@ -113,13 +108,7 @@ describe('GET', () => {
     expect(body.messages[1].parts[0].output.tweets).toEqual(
       ['1', '2', '3', '4', '5'].map((id) => ({ $t: id })),
     )
-    // Only the prose-cited tweets were tried, as full cards, briefly.
-    const [ids, cited, limits] = jest.mocked(fetchConversationTweets).mock
-      .calls[0]
-    expect(ids).toEqual(['1', '2', '5'])
-    expect(Array.from(cited)).toEqual(['1', '2', '5'])
-    expect(limits?.deadlineAt).toBeGreaterThanOrEqual(before + 1_500)
-    expect(limits?.deadlineAt).toBeLessThanOrEqual(Date.now() + 1_500)
+    expect(fetchConversationTweets).not.toHaveBeenCalled()
   })
 
   test('another member’s conversation, a missing one and a bad id look the same', async () => {

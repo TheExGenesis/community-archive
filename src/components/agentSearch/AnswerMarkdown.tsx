@@ -53,9 +53,12 @@ const CHIP_HIT_AREA =
 function CitationChip({
   href,
   children,
+  warning,
 }: {
   href: string
   children: ReactNode
+  /** Set when the chip's sentence names someone other than the author. */
+  warning?: string
 }) {
   const links = useCitationLinks()
   const anchor = href.slice(1)
@@ -89,8 +92,11 @@ function CitationChip({
         <a
           href={href}
           aria-label={`Citation ${String(children)}`}
-          title={state === 'loaded' ? undefined : tweetLoadText(state)}
+          title={
+            warning ?? (state === 'loaded' ? undefined : tweetLoadText(state))
+          }
           data-tweet-state={state === 'loaded' ? undefined : state}
+          data-author-mismatch={warning ? '' : undefined}
           onClick={(event) => {
             if (!links) return
             // Neither path follows the #anchor, so the page never jumps.
@@ -110,7 +116,9 @@ function CitationChip({
               ? 'animate-pulse motion-reduce:animate-none'
               : state !== 'loaded'
                 ? 'border border-dashed border-border text-muted-foreground'
-                : ''
+                : warning
+                  ? 'border border-dashed border-destructive/60 text-destructive'
+                  : ''
           }`}
         >
           {children}
@@ -203,7 +211,7 @@ const COMPONENTS: Components = {
       {content}
     </code>
   ),
-  a: ({ children: content, href }) => {
+  a: ({ children: content, href, title }) => {
     if (href?.startsWith(UNVERIFIED_HREF_PREFIX)) {
       return (
         <span
@@ -222,7 +230,11 @@ const COMPONENTS: Components = {
       )
     }
     if (href?.startsWith('#ask-')) {
-      return <CitationChip href={href}>{content}</CitationChip>
+      return (
+        <CitationChip href={href} warning={title}>
+          {content}
+        </CitationChip>
+      )
     }
     if (!href) return <span>{content}</span>
     if (href.startsWith('/user/')) {

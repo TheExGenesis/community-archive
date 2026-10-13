@@ -304,7 +304,8 @@ describe('a reopened conversation, its tweets still loading', () => {
       within(cited).getAllByRole('status', { name: 'Loading this tweet' }),
     ).toHaveLength(2)
     expect(within(cited).getByLabelText(/Citation 2/)).toBeInTheDocument()
-    expect(screen.getByText('Loading 5 tweets…')).toBeInTheDocument()
+    // The list holds its own three places; the turn's line counts the rest.
+    expect(screen.getByText('Loading 2 tweets…')).toBeInTheDocument()
     expect(screen.getByText('Loading 3 tweets…')).toBeInTheDocument()
     // Only the id no search returned is unverified.
     expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
@@ -327,15 +328,15 @@ describe('a reopened conversation, its tweets still loading', () => {
     expect(within(list).getByText('Post 3')).toBeInTheDocument()
   })
 
-  test('a tweet that could not be fetched offers Retry; one that is gone says so', () => {
+  test('a tweet that could not be fetched offers Retry; a listed one that is gone says so', () => {
     const onRetryTweets = jest.fn()
     render(
       <AgentSearchTurn
         view={buildTurnView(stored, 0, {
           supply: supply(['3', '4'], {
             '1': 'failed',
-            '2': 'unavailable',
-            '5': 'failed',
+            '2': 'failed',
+            '5': 'unavailable',
           }),
         })}
         active={false}
@@ -343,24 +344,43 @@ describe('a reopened conversation, its tweets still loading', () => {
       />,
     )
     const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
-    expect(
-      within(cited).getByText('Couldn’t load this tweet'),
-    ).toBeInTheDocument()
-    expect(
-      within(cited).getByText('This tweet is no longer available'),
-    ).toBeInTheDocument()
-    fireEvent.click(within(cited).getByRole('button', { name: 'Retry' }))
+    expect(within(cited).getAllByText('Couldn’t load this tweet')).toHaveLength(
+      2,
+    )
+    fireEvent.click(within(cited).getAllByRole('button', { name: 'Retry' })[0])
     expect(onRetryTweets).toHaveBeenCalledTimes(1)
-    // The list keeps a place for the failed tweet; the answer says what is gone.
+    // The gone listed tweet drops out of the list; the answer says so.
     const list = screen.getByRole('region', { name: 'All' })
-    expect(list).toHaveTextContent('All · 3 tweets')
-    expect(
-      within(list).getByText('Couldn’t load this tweet'),
-    ).toBeInTheDocument()
+    expect(list).toHaveTextContent('All · 2 tweets')
     expect(screen.getByText(/Couldn’t load 2 tweets/)).toBeInTheDocument()
     expect(
       screen.getByText(/One tweet in this answer is no longer available/),
     ).toBeInTheDocument()
     expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
+  })
+
+  test('when a tweet the prose cites is gone, the prose is withheld with Ask again; the list stays', () => {
+    const onAskAgain = jest.fn()
+    render(
+      <AgentSearchTurn
+        view={buildTurnView(stored, 0, {
+          supply: supply(['1', '3', '4', '5'], { '2': 'unavailable' }),
+        })}
+        active={false}
+        onAskAgain={onAskAgain}
+      />,
+    )
+    expect(
+      screen.getByText(/relied on tweets that are no longer available/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('complementary', { name: 'Cited tweets' }),
+    ).toBeNull()
+    expect(screen.queryByText(/marked unverified/)).toBeNull()
+    expect(screen.getByRole('region', { name: 'All' })).toHaveTextContent(
+      'All · 3 tweets',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Ask again' }))
+    expect(onAskAgain).toHaveBeenCalledTimes(1)
   })
 })

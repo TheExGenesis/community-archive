@@ -7,10 +7,11 @@ import type { LanguageModel } from 'ai'
  * `openrouter:anthropic/claude-sonnet-5.5`. OpenRouter calls carry the same
  * no-retention routing flags as the digest (`src/lib/digest/openai.ts`).
  */
-// Planner: multi-step search and weighing conflicting posts, OpenAI's stated
-// use for GPT-6.1 Sol. Scorer: high-volume yes/no judgments, GPT-6 Luna's.
-// Sources: developers.openai.com/api/docs/models and guides/model-selection.
-export const DEFAULT_AGENT_SEARCH_MODEL = 'openai:gpt-6.1-sol'
+// Planner: DeepSeek V4.1 Flash on OpenRouter (chosen 2026-10-13; GPT-6.1 Sol
+// stays available through AGENT_SEARCH_MODEL). Scorer: high-volume yes/no
+// judgments on OpenAI's Decisions API with GPT-6 Luna.
+export const DEFAULT_AGENT_SEARCH_MODEL =
+  'openrouter:deepseek/deepseek-v4.1-flash'
 export const DEFAULT_AGENT_SEARCH_SCORER_MODEL = 'openai:gpt-6-luna'
 
 export interface ModelPrice {
@@ -161,7 +162,11 @@ export function createProviderModel(spec: string): ProviderModel {
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured')
   return createOpenAICompatible({
     name: 'openrouter',
-    baseURL: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
+    // The Daily Digest's name first (shared OPENROUTER_API_KEY), then ours.
+    baseURL:
+      process.env.OPENROUTER_API_BASE_URL?.trim() ||
+      process.env.OPENROUTER_BASE_URL?.trim() ||
+      'https://openrouter.ai/api/v1',
     apiKey,
     includeUsage: true,
     fetch: async (input, init) => {

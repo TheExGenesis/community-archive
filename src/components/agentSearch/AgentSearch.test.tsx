@@ -69,7 +69,7 @@ test('a first visit is the heading and a composer that carries the facts', async
   const box = screen.getByLabelText('Your question')
   expect(box).toHaveAttribute('placeholder', 'Ask about members’ tweets')
   expect(screen.getByText('Private to you')).toBeInTheDocument()
-  expect(screen.getByText('Every claim cited')).toBeInTheDocument()
+  expect(screen.getByText('Answers cite tweets')).toBeInTheDocument()
   expect(await screen.findByText('10 left today')).toBeInTheDocument()
   expect(screen.queryByText(/Answers are private/)).toBeNull()
   expect(screen.queryByText(/Shift\+Enter/)).toBeNull()

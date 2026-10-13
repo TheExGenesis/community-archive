@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, Lock, Plus } from 'lucide-react'
+import { ArrowUp, Lock, Plus, Quote } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
@@ -438,13 +438,8 @@ export default function AgentSearch({
             Private to you
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span
-              aria-hidden="true"
-              className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-muted px-1 text-[10px] font-semibold tabular-nums text-foreground"
-            >
-              1
-            </span>
-            Every claim cited
+            <Quote aria-hidden="true" className="h-3.5 w-3.5" />
+            Answers cite tweets
           </span>
           <span className="ml-auto flex items-center gap-3">
             {quota && (

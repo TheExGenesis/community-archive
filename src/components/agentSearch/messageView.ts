@@ -143,11 +143,29 @@ export interface TurnView {
   coverage: CoverageView
   /** Distinct posts this turn's finished tool calls returned. */
   foundSoFar: number
-  /** The best few of those, for the side column while the answer is written. */
-  topFound: PortalTweet[]
+  /**
+   * A few of those for the side column while the answer is written: the
+   * most relevant once the relevance check has scored some, before that the
+   * latest command's matches.
+   */
+  topFound: FoundTweet[]
+  /** Which of the two `topFound` holds, and what the reader is told. */
+  foundPhase: FoundPhase
   /** The steps with the model's reasoning between them, in order. */
   timeline: TimelineEntry[]
 }
+
+/** A tweet in the side column, with its relevance score once it has one. */
+export interface FoundTweet {
+  tweet: PortalTweet
+  score?: number
+}
+
+export type FoundPhase =
+  /** Nothing scored yet: the newest matches, from `source` (a step's words). */
+  | { kind: 'latest'; source: string | null }
+  /** The relevance check has run; `relevant` tweets cleared its threshold. */
+  | { kind: 'relevant'; relevant: number }
 
 type LooseRecord = Record<string, unknown>
 
@@ -1129,14 +1147,59 @@ export function buildTurnView(
     },
     coverage: buildCoverage(calls),
     foundSoFar: own.results.length,
-    topFound: orderByScore(own.results, own.scores)
-      .slice(0, TOP_FOUND)
-      .map(tweetFor),
+    ...foundSoFar(calls, own),
     timeline: timelineFor(message),
   }
 }
 
-const TOP_FOUND = 3
+/** Tweets the side column shows while the answer is written. */
+const TOP_FOUND = 5
+
+/**
+ * The side column's tweets while a turn runs. Before the relevance check has
+ * scored anything, search order says little about quality, so the column
+ * shows the latest command's matches and names the command; once scores
+ * exist it shows the highest scored.
+ */
+function foundSoFar(
+  calls: ToolCallView[],
+  own: FoundTweets,
+): { topFound: FoundTweet[]; foundPhase: FoundPhase } {
+  const item = (id: string): FoundTweet => ({
+    tweet: own.byId.get(id) as PortalTweet,
+    score: own.scores.get(id),
+  })
+  const scored = own.results.filter((id) => own.scores.has(id))
+  if (scored.length) {
+    let relevant = 0
+    own.scores.forEach((p) => {
+      if (p >= KEPT_P) relevant += 1
+    })
+    return {
+      topFound: orderByScore(own.results, own.scores)
+        .slice(0, TOP_FOUND)
+        .map(item),
+      foundPhase: { kind: 'relevant', relevant },
+    }
+  }
+  // The newest call that returned tweets, in its own order; earlier
+  // results fill the column if it returned fewer.
+  for (let i = calls.length - 1; i >= 0; i--) {
+    const call = calls[i]
+    if (call.state !== 'output-available') continue
+    const latest = collectToolTweets([call.output]).results.filter((id) =>
+      own.byId.has(id),
+    )
+    if (!latest.length) continue
+    const rest = own.results.filter((id) => !latest.includes(id))
+    const text = progressFor([call])[0]?.text ?? ''
+    return {
+      topFound: [...latest, ...rest].slice(0, TOP_FOUND).map(item),
+      foundPhase: { kind: 'latest', source: text.split(' · ')[0] || null },
+    }
+  }
+  return { topFound: [], foundPhase: { kind: 'latest', source: null } }
+}
 
 /**
  * The folded step log in one line: how much searching happened and what the

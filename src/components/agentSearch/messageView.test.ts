@@ -542,6 +542,65 @@ describe('buildTurnView', () => {
     )
   })
 
+  test('the side column shows the latest matches, then the most relevant once scored', () => {
+    const searches = [
+      toolPart(
+        'search_tweets',
+        { query: 'singapore' },
+        { tweets: [tweet('1'), tweet('2')] },
+      ),
+      toolPart(
+        'search_tweets',
+        { query: 'singaporean life' },
+        { tweets: [tweet('3'), tweet('4')] },
+      ),
+    ]
+    const before = buildTurnView([assistant('a1', searches)], 0, {
+      streaming: true,
+    })
+    expect(before.foundPhase).toMatchObject({ kind: 'latest' })
+    expect(
+      before.foundPhase.kind === 'latest' && before.foundPhase.source,
+    ).toContain('singaporean life')
+    // The newest command's matches lead; earlier ones fill the column.
+    expect(before.topFound.map((item) => item.tweet.id)).toEqual([
+      '3',
+      '4',
+      '1',
+      '2',
+    ])
+    expect(before.topFound[0].score).toBeUndefined()
+
+    const after = buildTurnView(
+      [
+        assistant('a1', [
+          ...searches,
+          toolPart(
+            'bash',
+            { command: 'score s1.jsonl "Lives there?" > c1.jsonl' },
+            {
+              summary: 'Checked 3 tweets · 1 relevant',
+              exitCode: 0,
+              files: {},
+              tweets: [tweet('5')],
+              scores: { '5': 0.9, '3': 0.4 },
+            },
+          ),
+        ]),
+      ],
+      0,
+      { streaming: true },
+    )
+    expect(after.foundPhase).toEqual({ kind: 'relevant', relevant: 1 })
+    expect(after.topFound.map((item) => [item.tweet.id, item.score])).toEqual([
+      ['5', 0.9],
+      ['3', 0.4],
+      ['1', undefined],
+      ['2', undefined],
+      ['4', undefined],
+    ])
+  })
+
   test('reads agent-chosen groups from message metadata', () => {
     const messages: UIMessage[] = [
       {

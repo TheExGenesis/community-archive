@@ -308,6 +308,8 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
             citations={answer.citations}
             active={active}
             found={view.topFound}
+            foundPhase={view.foundPhase}
+            foundCount={view.foundSoFar}
             hidden={railHidden}
             onHide={() => setRailHidden(true)}
           />

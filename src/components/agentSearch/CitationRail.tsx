@@ -1,11 +1,18 @@
 'use client'
 
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { MouseEvent } from 'react'
 import { X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
-import type { Citation, TurnView } from './messageView'
+import type { Citation, FoundPhase, FoundTweet } from './messageView'
 
 const reducedMotion = () =>
   typeof window !== 'undefined' &&
@@ -13,6 +20,59 @@ const reducedMotion = () =>
 
 const railActive = () =>
   typeof window !== 'undefined' && window.matchMedia(RAIL_MEDIA).matches
+
+/** How long a tweet that just entered the column stays highlighted. */
+const FRESH_MS = 1600
+/** Tweets the column shows while the answer is written. */
+const FOUND_SHOWN = 5
+
+/**
+ * Keeps the found tweets on screen in place as the set changes: tweets
+ * already shown keep their order, new ones enter at the top, and earlier
+ * ones move down until pushed past the last place. A change of phase (latest
+ * matches to most relevant) starts over, since the heading changes with it.
+ * Returns the tweets to show and the ids that just entered.
+ */
+function useSteadyFound(found: FoundTweet[], phase: FoundPhase['kind']) {
+  const memory = useRef<{
+    found: FoundTweet[] | null
+    phase: FoundPhase['kind']
+    shown: FoundTweet[]
+    entered: string[]
+  }>({ found: null, phase, shown: [], entered: [] })
+  const steady = useMemo(() => {
+    const last = memory.current
+    // Computed once per new set, so a repeated render (Strict Mode) does
+    // not see its own update and lose the newcomers.
+    if (last.found === found) return last
+    const fresh = new Map(found.map((item) => [item.tweet.id, item]))
+    let shown: FoundTweet[]
+    let entered: string[] = []
+    if (last.phase !== phase || !last.shown.length) {
+      shown = found.slice(0, FOUND_SHOWN)
+    } else {
+      const before = new Set(last.shown.map((item) => item.tweet.id))
+      const newcomers = found.filter((item) => !before.has(item.tweet.id))
+      // Kept tweets take their latest score.
+      const kept = last.shown.map((item) => fresh.get(item.tweet.id) ?? item)
+      shown = [...newcomers, ...kept].slice(0, FOUND_SHOWN)
+      entered = newcomers.slice(0, FOUND_SHOWN).map((item) => item.tweet.id)
+    }
+    memory.current = { found, phase, shown, entered }
+    return memory.current
+  }, [found, phase])
+
+  const [highlighted, setHighlighted] = useState<ReadonlySet<string>>(new Set())
+  useEffect(() => {
+    if (!steady.entered.length) return
+    setHighlighted(new Set(steady.entered))
+    const timer = setTimeout(() => setHighlighted(new Set()), FRESH_MS)
+    return () => clearTimeout(timer)
+  }, [steady])
+  return { shown: steady.shown, highlighted }
+}
+
+const count = (n: number) => n.toLocaleString('en-US')
 
 function CitationItem({
   citation,
@@ -111,15 +171,28 @@ export const CitationRail = forwardRef<
     citations: Citation[]
     active: boolean
     /** Shown while the run is still searching and nothing is cited yet. */
-    found: TurnView['topFound']
+    found: FoundTweet[]
+    /** Whether `found` holds the latest matches or the most relevant. */
+    foundPhase?: FoundPhase
+    /** Distinct tweets the run has found so far. */
+    foundCount?: number
     /** Wide screens: the reader closed the column. */
     hidden?: boolean
     onHide?: () => void
   }
 >(function CitationRail(
-  { citations, active, found, hidden = false, onHide },
+  {
+    citations,
+    active,
+    found,
+    foundPhase = { kind: 'latest', source: null },
+    foundCount = found.length,
+    hidden = false,
+    onHide,
+  },
   ref,
 ) {
+  const steady = useSteadyFound(found, foundPhase.kind)
   const links = useCitationLinks()
   const railRef = useRef<HTMLElement | null>(null)
   const headerRef = useRef<HTMLDivElement>(null)
@@ -202,7 +275,19 @@ export const CitationRail = forwardRef<
   // Nothing cited and nothing found yet: an empty column would say nothing.
   if (!citations.length && !(active && found.length)) return null
   const showFound = active && !citations.length
-  const title = showFound ? 'Tweets found so far' : 'Cited'
+  const title = !showFound
+    ? 'Cited'
+    : foundPhase.kind === 'relevant'
+      ? 'Most relevant so far'
+      : 'Latest matches'
+  // What the column draws from, updating as the run goes.
+  const foundLine = !showFound
+    ? null
+    : foundPhase.kind === 'relevant'
+      ? `${count(foundCount)} found · ${count(foundPhase.relevant)} judged relevant`
+      : foundPhase.source
+        ? `${count(foundCount)} found · newest from ${foundPhase.source.charAt(0).toLowerCase()}${foundPhase.source.slice(1)}`
+        : `${count(foundCount)} found`
 
   const toggle = (anchor: string) =>
     setOpened((current) => {
@@ -220,7 +305,7 @@ export const CitationRail = forwardRef<
     >
       <aside
         ref={setRefs}
-        aria-label={showFound ? 'Tweets found so far' : 'Cited tweets'}
+        aria-label={showFound ? title : 'Cited tweets'}
         onScroll={onScroll}
         onPointerEnter={() => (pointerInside.current = true)}
         onPointerLeave={() => (pointerInside.current = false)}
@@ -230,14 +315,21 @@ export const CitationRail = forwardRef<
           ref={headerRef}
           className="z-20 flex min-h-[2.5rem] items-center gap-3 border-b border-border bg-background/95 py-1 backdrop-blur lg:sticky lg:top-0 lg:px-4"
         >
-          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            {title}
-            {citations.length > 0 && (
-              <span className="ml-1.5 font-normal tabular-nums">
-                · {citations.length}
-              </span>
+          <div className="min-w-0">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {title}
+              {citations.length > 0 && (
+                <span className="ml-1.5 font-normal tabular-nums">
+                  · {citations.length}
+                </span>
+              )}
+            </h3>
+            {foundLine && (
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {foundLine}
+              </p>
             )}
-          </h3>
+          </div>
           <div className="ml-auto flex items-center gap-2">
             {citations.length > 1 && (
               <span
@@ -274,9 +366,22 @@ export const CitationRail = forwardRef<
           </ol>
         ) : (
           <ul className="divide-y divide-border">
-            {found.map((tweet) => (
-              <li key={tweet.id}>
+            {steady.shown.map(({ tweet, score }) => (
+              <li
+                key={tweet.id}
+                className={`relative transition-colors duration-1000 motion-reduce:transition-none ${
+                  score !== undefined ? '[&_article]:pr-14' : ''
+                } ${steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''}`}
+              >
                 <TweetCard tweet={tweet} stacked compact showDate />
+                {score !== undefined && (
+                  <span
+                    title="Relevance score: the chance the relevance check gave that this tweet answers the question"
+                    className="absolute right-4 top-3 text-[11px] tabular-nums text-muted-foreground"
+                  >
+                    {score.toFixed(2)}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

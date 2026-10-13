@@ -26,6 +26,14 @@ available in the calendar.
   stages versions, and publishes one version per day. Its calendar covers the
   previous 12 completed months.
 
+Shared links unfurl with a generated 1200×630 card instead of the site logo.
+An edition link leads with the day's main headline, the first executive-summary
+line, with the second and third story titles in small type; a story link shows
+that story's headline and standfirst. `/digest` reuses the latest edition's
+dated image so a cached preview never shows an earlier day's headlines. The
+cards are rendered by `src/lib/digest/socialCard.tsx` from the published
+edition only.
+
 The global navigation and homepage digest card expose only published editions.
 Drafts, raw responses, prompts, and failures never cross the public RLS policy.
 

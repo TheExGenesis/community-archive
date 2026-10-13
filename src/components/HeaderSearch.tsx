@@ -9,13 +9,17 @@ import { buildSearchHref, parseSearchExpression } from '@/lib/searchParams'
 import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { AskShortcutChip } from '@/components/AskShortcutChip'
+import {
+  AskSignInPopover,
+  useAskFromSearch,
+} from '@/components/AskSignInPopover'
 
 export default function HeaderSearch() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const searchHref = buildSearchHref(query)
 
-  const ask = () => {
+  const goAsk = () => {
     if (!query.trim()) return
     capturePostHogEvent('search_interface_action', {
       action: 'ask_from_search',
@@ -25,6 +29,8 @@ export default function HeaderSearch() {
     })
     router.push(buildAskHref(query))
   }
+  // Signed out, asking explains and offers sign-in instead.
+  const { ask, explaining, setExplaining } = useAskFromSearch(goAsk)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,10 +74,15 @@ export default function HeaderSearch() {
             }}
           />
           {query.trim() && (
-            <AskShortcutChip
-              onAsk={ask}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2"
-            />
+            <AskSignInPopover
+              open={explaining}
+              onOpenChange={setExplaining}
+              question={query}
+            >
+              <span className="absolute right-1.5 top-1/2 -translate-y-1/2">
+                <AskShortcutChip onAsk={ask} />
+              </span>
+            </AskSignInPopover>
           )}
         </div>
       </form>

@@ -9,6 +9,10 @@ import { capturePostHogEvent } from '@/lib/posthog'
 import { buildSearchParams, parseSearchExpression } from '@/lib/searchParams'
 import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
 import { AskShortcutChip } from '@/components/AskShortcutChip'
+import {
+  AskSignInPopover,
+  useAskFromSearch,
+} from '@/components/AskSignInPopover'
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
 
@@ -31,7 +35,7 @@ export default function HomepageSearch() {
   }
 
   // ⌘/Ctrl+Enter, or the chip, hands the text to Ask the archive instead.
-  const ask = () => {
+  const goAsk = () => {
     const trimmed = query.trim()
     if (!trimmed) return
     capturePostHogEvent('search_interface_action', {
@@ -42,6 +46,8 @@ export default function HomepageSearch() {
     })
     router.push(buildAskHref(trimmed))
   }
+  // Signed out, asking explains and offers sign-in instead.
+  const { ask, explaining, setExplaining } = useAskFromSearch(goAsk)
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -69,10 +75,15 @@ export default function HomepageSearch() {
           }}
         />
         {query.trim() && (
-          <AskShortcutChip
-            onAsk={ask}
-            className="absolute right-16 top-1/2 -translate-y-1/2 sm:right-[4.25rem]"
-          />
+          <AskSignInPopover
+            open={explaining}
+            onOpenChange={setExplaining}
+            question={query}
+          >
+            <span className="absolute right-16 top-1/2 -translate-y-1/2 sm:right-[4.25rem]">
+              <AskShortcutChip onAsk={ask} />
+            </span>
+          </AskSignInPopover>
         )}
         <Button
           type="submit"

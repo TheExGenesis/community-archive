@@ -117,3 +117,19 @@ export const isAskShortcut = (event: {
   metaKey: boolean
   ctrlKey: boolean
 }) => event.key === 'Enter' && (event.metaKey || event.ctrlKey)
+
+/**
+ * The Ask page's own path with the parameters it reads (the conversation
+ * and a search handed over), for returning to it after signing in.
+ */
+export function askReturnPath(
+  searchParams: ParamSource & { c?: string | string[] } = {},
+) {
+  const params = new URLSearchParams()
+  for (const key of ['c', ...ASK_PREFILL_PARAMS] as const) {
+    const value = first(searchParams[key])
+    if (value) params.set(key, value)
+  }
+  const query = params.toString()
+  return query ? `/search/ask?${query}` : '/search/ask'
+}

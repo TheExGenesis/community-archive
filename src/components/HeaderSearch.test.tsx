@@ -9,6 +9,10 @@ const mockPush = jest.fn()
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
+let mockIsMember = true
+jest.mock('@/components/NavigationAudience', () => ({
+  useNavigationAudience: () => ({ isMember: mockIsMember, isAdmin: false }),
+}))
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 jest.mock('@/components/UserSearchInput', () => ({
   __esModule: true,
@@ -55,4 +59,23 @@ test('the header box shows an Ask chip once it has text, which asks', () => {
     screen.getByRole('button', { name: 'Ask the archive instead' }),
   )
   expect(mockPush).toHaveBeenCalledWith('/search/ask?q=singapore')
+})
+
+test('signed out, Ask explains and offers a sign-in that returns to the question', async () => {
+  mockIsMember = false
+  render(<HeaderSearch />)
+  const box = screen.getByRole('textbox', { name: 'Search Community Archive' })
+  fireEvent.change(box, { target: { value: 'singapore' } })
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Ask the archive instead' }),
+  )
+  expect(mockPush).not.toHaveBeenCalled()
+  expect(
+    await screen.findByText('Sign in to ask the archive'),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+    'href',
+    '/login?redirect=%2Fsearch%2Fask%3Fq%3Dsingapore',
+  )
+  mockIsMember = true
 })

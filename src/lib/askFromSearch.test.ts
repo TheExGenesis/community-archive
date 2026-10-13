@@ -4,6 +4,7 @@ import {
   buildAskHref,
   isAskShortcut,
   questionWithFilters,
+  askReturnPath,
 } from './askFromSearch'
 
 test('a search expression becomes an Ask link with the same parameters', () => {
@@ -62,4 +63,16 @@ test('⌘↵ and Ctrl↵ ask; plain Enter does not', () => {
   expect(isAskShortcut({ key: 'Enter', metaKey: false, ctrlKey: false })).toBe(
     false,
   )
+})
+
+test('the return path after sign-in keeps the conversation and the handed-over search', () => {
+  expect(askReturnPath({})).toBe('/search/ask')
+  expect(
+    askReturnPath({
+      q: 'singapore',
+      fromUser: 'visakanv',
+      c: 'abc',
+      other: 'x',
+    } as never),
+  ).toBe('/search/ask?c=abc&q=singapore&fromUser=visakanv')
 })

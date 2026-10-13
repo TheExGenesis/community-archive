@@ -1,8 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import AgentSearch from '@/components/agentSearch/AgentSearch'
-import { ASK_PREFILL_PARAMS, askPrefillFrom } from '@/lib/askFromSearch'
+import {
+  ASK_PREFILL_PARAMS,
+  askPrefillFrom,
+  askReturnPath,
+} from '@/lib/askFromSearch'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { loginHref } from '@/lib/authRedirect'
 
 // Eligibility depends on the session cookie, so this page is never cached.
 export const dynamic = 'force-dynamic'
@@ -62,7 +67,12 @@ export default async function AskTheArchivePage({
     return (
       <Gate
         title="Ask the archive"
-        action={{ href: '/login?redirect=%2Fsearch%2Fask', label: 'Sign in' }}
+        // Back to this page with its conversation and any search handed
+        // over from archive search, so the question is still there.
+        action={{
+          href: loginHref(askReturnPath(searchParams)),
+          label: 'Sign in',
+        }}
       >
         <p>
           Ask a question about the community’s tweets and get a short answer

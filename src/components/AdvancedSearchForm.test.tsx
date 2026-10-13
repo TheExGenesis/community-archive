@@ -12,6 +12,10 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
   useSearchParams: () => mockParams,
 }))
+let mockIsMember = true
+jest.mock('@/components/NavigationAudience', () => ({
+  useNavigationAudience: () => ({ isMember: mockIsMember, isAdmin: false }),
+}))
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 jest.mock('@/components/UserSearchInput', () => ({
   __esModule: true,

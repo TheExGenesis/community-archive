@@ -10,6 +10,10 @@ const mockPush = jest.fn()
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
+let mockIsMember = true
+jest.mock('@/components/NavigationAudience', () => ({
+  useNavigationAudience: () => ({ isMember: mockIsMember, isAdmin: false }),
+}))
 
 jest.mock('@/lib/posthog', () => ({
   capturePostHogEvent: jest.fn(),

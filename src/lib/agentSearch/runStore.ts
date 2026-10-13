@@ -111,6 +111,46 @@ export interface AgentSearchRunStore {
    * in development. Only the file store keeps it (`<id>.calls.jsonl`).
    */
   logModelCall?(id: string, entry: ModelCallLogEntry): Promise<void>
+  /**
+   * Deletes what the member asked and was answered in one conversation of
+   * theirs, keeping each run's accounting (when it ran, its status, tokens,
+   * cost, who paid) so deleting never frees a question or spend. Deleted
+   * runs drop out of lists and conversations. Returns how many it cleared.
+   */
+  deleteConversation(accountId: string, conversationId: string): Promise<number>
+  /** The same for every conversation of the member's. */
+  deleteAllConversations(accountId: string): Promise<number>
+}
+
+/** What deleting a run clears: everything the member wrote or was shown. */
+const CONTENT_FIELDS = [
+  'question',
+  'answer',
+  'parts',
+  'citedTweetIds',
+  'invalidCitationIds',
+  'toolCalls',
+  'error',
+] as const satisfies readonly (keyof AgentSearchRun)[]
+
+function clearedContent(deletedAt: string) {
+  return {
+    question: '',
+    answer: null,
+    parts: null,
+    citedTweetIds: [],
+    invalidCitationIds: [],
+    toolCalls: [],
+    error: null,
+    deletedAt,
+  } satisfies Partial<AgentSearchRun>
+}
+
+/** A patch without the content fields, for a run already deleted. */
+function withoutContent<T extends Partial<AgentSearchRun>>(patch: T): T {
+  const rest = { ...patch }
+  for (const field of CONTENT_FIELDS) delete rest[field]
+  return rest
 }
 
 type RunRow = Database['public']['Tables']['agent_search_runs']['Row']
@@ -289,7 +329,10 @@ export function createFileRunStore(
           costUsd: _cost,
           ...fields
         } = patch as Partial<AgentSearchRun>
-        await writeAtomic(id, { ...current, ...fields, id })
+        // A run deleted while it went on keeps its status updates, never
+        // its content: the finishing step must not write the answer back.
+        const allowed = current.deletedAt ? withoutContent(fields) : fields
+        await writeAtomic(id, { ...current, ...allowed, id })
       }),
     addUsage: (id, delta) =>
       withLock(id, async () => {
@@ -350,16 +393,45 @@ export function createFileRunStore(
     },
     async listRecent(accountId, limit) {
       return (await readAll())
-        .filter((run) => run.accountId === accountId)
+        .filter((run) => run.accountId === accountId && !run.deletedAt)
         .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
         .slice(0, limit)
     },
     async listConversation(conversationId) {
       return (await readAll())
-        .filter((run) => run.conversationId === conversationId)
+        .filter(
+          (run) => run.conversationId === conversationId && !run.deletedAt,
+        )
         .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
         .slice(-MAX_CONVERSATION_RUNS)
     },
+    deleteConversation: (accountId, conversationId) =>
+      clearRuns(
+        (run) =>
+          run.accountId === accountId && run.conversationId === conversationId,
+      ),
+    deleteAllConversations: (accountId) =>
+      clearRuns((run) => run.accountId === accountId),
+  }
+
+  async function clearRuns(match: (run: AgentSearchRun) => boolean) {
+    const deletedAt = new Date().toISOString()
+    const targets = (await readAll()).filter(
+      (run) => match(run) && !run.deletedAt,
+    )
+    await Promise.all(
+      targets.map((run) =>
+        withLock(run.id, async () => {
+          const current = await read(run.id)
+          if (!current || current.deletedAt) return
+          await writeAtomic(run.id, {
+            ...current,
+            ...clearedContent(deletedAt),
+          })
+        }),
+      ),
+    )
+    return targets.length
   }
 }
 
@@ -384,6 +456,7 @@ function toRow(run: AgentSearchRun): RunInsert {
     error: run.error,
     parts: (run.parts ?? null) as Json,
     key_source: run.keySource ?? 'house',
+    deleted_at: run.deletedAt ?? null,
   }
 }
 
@@ -407,8 +480,20 @@ function toRowPatch(patch: RunPatch): RunUpdate {
   if (patch.conversationId !== undefined)
     row.conversation_id = patch.conversationId
   if (patch.parts !== undefined) row.parts = patch.parts as Json
+  if (patch.deletedAt !== undefined) row.deleted_at = patch.deletedAt
   return row
 }
+
+/** Row columns that hold content, cleared on delete (CONTENT_FIELDS). */
+const CONTENT_COLUMNS = [
+  'question',
+  'answer',
+  'parts',
+  'cited_tweet_ids',
+  'invalid_citation_ids',
+  'tool_calls',
+  'error',
+] as const satisfies readonly (keyof RunUpdate)[]
 
 function fromRow(row: RunRow): AgentSearchRun {
   return {
@@ -434,6 +519,7 @@ function fromRow(row: RunRow): AgentSearchRun {
     costUsd: Number(row.cost_usd) || 0,
     error: row.error,
     keySource: row.key_source === 'own' ? 'own' : 'house',
+    deletedAt: row.deleted_at ?? null,
   }
 }
 
@@ -449,7 +535,7 @@ const ADMISSION_RESULTS: AdmissionResult[] = [
 
 // Lists need no answer bodies, message parts or usage.
 const SUMMARY_COLUMNS =
-  'id, workflow_run_id, account_id, conversation_id, question, status, model, started_at, completed_at, error, key_source'
+  'id, workflow_run_id, account_id, conversation_id, question, status, model, started_at, completed_at, error, key_source, deleted_at'
 
 type SummaryRow = Pick<
   RunRow,
@@ -464,6 +550,7 @@ type SummaryRow = Pick<
   | 'completed_at'
   | 'error'
   | 'key_source'
+  | 'deleted_at'
 >
 
 const withoutBodies = (row: SummaryRow): RunRow => ({
@@ -494,10 +581,29 @@ export function createSupabaseRunStore(
     },
     async update(id, patch) {
       const row = toRowPatch(patch)
-      if (Object.keys(row).length === 0) return
-      const { error } = await table().update(row).eq('id', id)
-      if (error)
-        throw new Error(`Agent search run update failed: ${error.message}`)
+      // Content is written only to runs not deleted, so a run deleted while
+      // it went on never gets its answer back; status updates always apply.
+      const content: RunUpdate = {}
+      const rest: RunUpdate = { ...row }
+      for (const column of CONTENT_COLUMNS) {
+        if (column in row) {
+          ;(content as Record<string, unknown>)[column] = row[column]
+          delete rest[column]
+        }
+      }
+      if (Object.keys(rest).length > 0) {
+        const { error } = await table().update(rest).eq('id', id)
+        if (error)
+          throw new Error(`Agent search run update failed: ${error.message}`)
+      }
+      if (Object.keys(content).length > 0) {
+        const { error } = await table()
+          .update(content)
+          .eq('id', id)
+          .is('deleted_at', null)
+        if (error)
+          throw new Error(`Agent search run update failed: ${error.message}`)
+      }
     },
     async addUsage(id, delta) {
       const { error } = await client.rpc('agent_search_add_usage', {
@@ -581,6 +687,7 @@ export function createSupabaseRunStore(
       const { data, error } = await table()
         .select(SUMMARY_COLUMNS)
         .eq('account_id', accountId)
+        .is('deleted_at', null)
         .order('started_at', { ascending: false })
         .limit(limit)
       if (error)
@@ -592,6 +699,7 @@ export function createSupabaseRunStore(
       const { data, error } = await table()
         .select('*')
         .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
         .order('started_at', { ascending: false })
         .limit(MAX_CONVERSATION_RUNS)
       if (error)
@@ -600,7 +708,30 @@ export function createSupabaseRunStore(
         )
       return (data ?? []).map(fromRow).reverse()
     },
+    async deleteConversation(accountId, conversationId) {
+      const { data, error } = await table()
+        .update(clearedRow())
+        .eq('account_id', accountId)
+        .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
+        .select('id')
+      if (error) throw new Error(`Agent search delete failed: ${error.message}`)
+      return data?.length ?? 0
+    },
+    async deleteAllConversations(accountId) {
+      const { data, error } = await table()
+        .update(clearedRow())
+        .eq('account_id', accountId)
+        .is('deleted_at', null)
+        .select('id')
+      if (error) throw new Error(`Agent search delete failed: ${error.message}`)
+      return data?.length ?? 0
+    },
   }
+}
+
+function clearedRow(): RunUpdate {
+  return toRowPatch(clearedContent(new Date().toISOString()))
 }
 
 let cachedStore: AgentSearchRunStore | null = null

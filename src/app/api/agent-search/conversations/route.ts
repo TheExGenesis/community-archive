@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { agentSearchDailyLimits } from '@/lib/agentSearch/budget'
+import { agentSearchDailyLimits, isLiveRun } from '@/lib/agentSearch/budget'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { summarizeConversations } from '@/lib/agentSearch/history'
 import { ownKeysEnabled } from '@/lib/agentSearch/openRouterKey'
@@ -52,4 +52,28 @@ export async function GET() {
     },
     { headers: noStore },
   )
+}
+
+// Deletes all of the viewer's history: questions, answers and what the
+// searches returned. Their accounting stays, so today's questions are still
+// counted (runStore.ts). Refused while an answer is being written: the run
+// would go on writing to a conversation the member deleted.
+export async function DELETE() {
+  const access = await getAgentSearchViewer()
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.reason },
+      { status: access.reason === 'signed_out' ? 401 : 403, headers: noStore },
+    )
+  }
+  const store = getAgentSearchRunStore()
+  const running = await store.listRunning(access.viewer.accountId)
+  if (running.some((run) => isLiveRun(run))) {
+    return NextResponse.json(
+      { error: 'run_in_progress' },
+      { status: 409, headers: noStore },
+    )
+  }
+  const deleted = await store.deleteAllConversations(access.viewer.accountId)
+  return NextResponse.json({ deleted }, { headers: noStore })
 }

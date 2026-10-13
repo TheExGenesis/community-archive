@@ -1,4 +1,4 @@
-import { GET } from './route'
+import { DELETE, GET } from './route'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 
@@ -23,7 +23,12 @@ jest.mock('@ai-sdk/openai-compatible', () => ({
   createOpenAICompatible: jest.fn(),
 }))
 
-const store = { listRecent: jest.fn(), countSince: jest.fn() }
+const store = {
+  listRecent: jest.fn(),
+  countSince: jest.fn(),
+  listRunning: jest.fn(),
+  deleteAllConversations: jest.fn(),
+}
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -90,4 +95,40 @@ test('refuses a viewer who may not ask', async () => {
   const response = await GET()
   expect(response.status).toBe(401)
   expect(store.countSince).not.toHaveBeenCalled()
+})
+
+describe('deleting all history', () => {
+  test('deletes the viewer’s runs, not anyone else’s', async () => {
+    store.listRunning.mockResolvedValue([])
+    store.deleteAllConversations.mockResolvedValue(4)
+    const response = await DELETE()
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(await response.json()).toEqual({ deleted: 4 })
+    expect(store.deleteAllConversations).toHaveBeenCalledWith('acct-1')
+  })
+
+  test('is refused while an answer is being written, not for a stale run', async () => {
+    store.listRunning.mockResolvedValue([
+      { status: 'running', startedAt: '2026-10-09T15:29:00.000Z' },
+    ])
+    expect((await DELETE()).status).toBe(409)
+    expect(store.deleteAllConversations).not.toHaveBeenCalled()
+
+    // A run marked running hours ago never recorded its end.
+    store.listRunning.mockResolvedValue([
+      { status: 'running', startedAt: '2026-10-09T09:00:00.000Z' },
+    ])
+    store.deleteAllConversations.mockResolvedValue(1)
+    expect((await DELETE()).status).toBe(200)
+  })
+
+  test('needs a signed-in member', async () => {
+    jest.mocked(getAgentSearchViewer).mockResolvedValue({
+      ok: false,
+      reason: 'signed_out',
+    } as never)
+    expect((await DELETE()).status).toBe(401)
+    expect(store.deleteAllConversations).not.toHaveBeenCalled()
+  })
 })

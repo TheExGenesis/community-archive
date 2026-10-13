@@ -480,6 +480,34 @@ export default function AgentSearch({
     textareaRef.current?.focus()
   }
 
+  // Deleting history: the server keeps each run's accounting, so today's
+  // questions still count. Deleting the open conversation starts a new one.
+  const deleteHistory = async (url: string, clearsOpen: boolean) => {
+    try {
+      const response = await fetch(url, { method: 'DELETE' })
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as {
+          error?: string
+        }
+        return body.error === 'run_in_progress'
+          ? 'Stop the answer being written first.'
+          : 'Could not delete. Try again.'
+      }
+    } catch {
+      return 'Could not delete. Try again.'
+    }
+    if (clearsOpen) startNewConversation()
+    await loadRecent()
+    return null
+  }
+  const deleteConversation = (id: string) =>
+    deleteHistory(
+      `/api/agent-search/conversations/${encodeURIComponent(id)}`,
+      id === conversation.id,
+    )
+  const deleteAllHistory = () =>
+    deleteHistory('/api/agent-search/conversations', true)
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     ask(input)
@@ -678,6 +706,8 @@ export default function AgentSearch({
                   currentId={conversation.id}
                   onOpen={(id) => void openConversation(id)}
                   disabled={busy || loading}
+                  onDelete={deleteConversation}
+                  onDeleteAll={deleteAllHistory}
                 />
                 <button
                   type="button"
@@ -746,6 +776,8 @@ export default function AgentSearch({
               <RecentConversations
                 conversations={recent}
                 onOpen={(id) => void openConversation(id)}
+                onDelete={deleteConversation}
+                onDeleteAll={deleteAllHistory}
               />
             </>
           )}

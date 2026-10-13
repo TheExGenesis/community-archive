@@ -98,6 +98,22 @@ export function agentSearchDailyLimits(
 export { startOfUtcDay } from './day'
 
 /**
+ * A run still marked running that may still be writing: started within the
+ * stale window, as admission counts a run in progress. An older one is a
+ * run whose end was never recorded.
+ */
+export function isLiveRun(
+  run: { status: string; startedAt: string },
+  now: number = Date.now(),
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  return (
+    run.status === 'running' &&
+    now - Date.parse(run.startedAt) < agentSearchBudgetLimits(env).staleRunMs
+  )
+}
+
+/**
  * Admits a question or says why not, and on admission stores the run as
  * running under `runId` before any workflow starts. Every account obeys the
  * caps, including the development preview account 'dev'. A question on the

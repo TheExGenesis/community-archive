@@ -15,7 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-import { RecentConversations } from './RecentConversations'
+import { RecentConversations, type DeleteHistory } from './RecentConversations'
 
 export const GHOST_BUTTON =
   'inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent'
@@ -29,11 +29,15 @@ export function ConversationHistory({
   currentId,
   onOpen,
   disabled,
+  onDelete,
+  onDeleteAll,
 }: {
   conversations: ConversationSummary[] | null
   currentId: string
   onOpen: (id: string) => void
   disabled?: boolean
+  onDelete?: (id: string) => Promise<string | null>
+  onDeleteAll?: DeleteHistory
 }) {
   // Separate states: both triggers stay mounted (one hidden by CSS), and a
   // shared one would open the modal sheet behind the popover.
@@ -51,6 +55,8 @@ export function ConversationHistory({
       currentId={currentId}
       onOpen={pick}
       variant="compact"
+      onDelete={onDelete}
+      onDeleteAll={onDeleteAll}
     />
   )
   const label = (

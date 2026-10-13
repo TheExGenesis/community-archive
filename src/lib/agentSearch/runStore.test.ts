@@ -316,6 +316,68 @@ describe('file run store', () => {
     ).toEqual(['a1', 'a2'])
   })
 
+  test('deleting a conversation clears its content but keeps its accounting', async () => {
+    const store = createFileRunStore(dir)
+    const today = '2026-10-08T00:00:00.000Z'
+    await store.create(
+      baseRun({
+        id: 'r1',
+        conversationId: 'conv-1',
+        status: 'completed',
+        answer: 'They said [[t:1]]',
+        parts: [{ type: 'text', text: 'They said' }],
+        citedTweetIds: ['1'],
+        toolCalls: [{ name: 'bash', input: { command: 'search x' } }],
+        costUsd: 0.02,
+        inputTokens: 900,
+      }),
+    )
+    await store.create(baseRun({ id: 'r2', conversationId: 'conv-2' }))
+    await store.create(
+      baseRun({ id: 'r3', accountId: '7', conversationId: 'conv-1' }),
+    )
+
+    expect(await store.deleteConversation('42', 'conv-1')).toBe(1)
+    const deleted = await store.get('r1')
+    expect(deleted).toMatchObject({
+      question: '',
+      answer: null,
+      parts: null,
+      citedTweetIds: [],
+      toolCalls: [],
+      status: 'completed',
+      costUsd: 0.02,
+      inputTokens: 900,
+      startedAt: '2026-10-08T10:00:00.000Z',
+    })
+    expect(deleted?.deletedAt).toEqual(expect.any(String))
+    // Another member's run in the same conversation id is left alone.
+    expect((await store.get('r3'))?.question).not.toBe('')
+    // Gone from lists, still counted and still spent.
+    expect((await store.listRecent('42', 10)).map((r) => r.id)).toEqual(['r2'])
+    expect(await store.listConversation('conv-1')).toHaveLength(1)
+    expect(await store.countSince('42', today)).toBe(2)
+    expect(await store.costSince(today)).toBeCloseTo(0.02)
+    // Deleting again clears nothing more.
+    expect(await store.deleteConversation('42', 'conv-1')).toBe(0)
+  })
+
+  test('a run deleted while it goes on keeps its status, never its answer', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun({ id: 'live', conversationId: 'conv-1' }))
+    await store.deleteAllConversations('42')
+    await store.update('live', {
+      status: 'completed',
+      answer: 'Written after the delete',
+      parts: [{ type: 'text', text: 'Written after the delete' }],
+    })
+    expect(await store.get('live')).toMatchObject({
+      status: 'completed',
+      answer: null,
+      parts: null,
+    })
+  })
+
   test('reads an empty or missing directory as no runs', async () => {
     const store = createFileRunStore(path.join(dir, 'not-created'))
     expect(await store.countSince('42', '2026-10-08T00:00:00.000Z')).toBe(0)
@@ -374,6 +436,7 @@ describe('supabase run store', () => {
       error: null,
       parts: null,
       key_source: 'house',
+      deleted_at: null,
     })
     expect(await store.get('wrun_01')).toMatchObject({
       accountId: '42',
@@ -384,8 +447,11 @@ describe('supabase run store', () => {
     })
   })
 
-  test('sends only the patched columns', async () => {
-    const eq = jest.fn().mockResolvedValue({ error: null })
+  test('sends only the patched columns, content only to runs not deleted', async () => {
+    const is = jest.fn().mockResolvedValue({ error: null })
+    const eq = jest.fn(() =>
+      Object.assign(Promise.resolve({ error: null }), { is }),
+    )
     const update = jest.fn(() => ({ eq }))
     const client = { from: jest.fn(() => ({ update })) }
     const store = createSupabaseRunStore(client as never)
@@ -395,12 +461,56 @@ describe('supabase run store', () => {
       error: 'upstream',
       completedAt: '2026-10-08T10:02:00.000Z',
     })
-    expect(update).toHaveBeenCalledWith({
+    // Status always applies; the error text is content, and a run the
+    // member deleted while it went on must not get it back.
+    expect(update).toHaveBeenNthCalledWith(1, {
       status: 'failed',
-      error: 'upstream',
       completed_at: '2026-10-08T10:02:00.000Z',
     })
+    expect(update).toHaveBeenNthCalledWith(2, { error: 'upstream' })
     expect(eq).toHaveBeenCalledWith('id', 'wrun_01')
+    expect(is).toHaveBeenCalledWith('deleted_at', null)
+  })
+
+  test('deleting clears content, keeps accounting, and skips deleted rows', async () => {
+    const select = jest.fn().mockResolvedValue({
+      data: [{ id: 'a' }, { id: 'b' }],
+      error: null,
+    })
+    const is = jest.fn(() => ({ select }))
+    const eq: jest.Mock = jest.fn(() => ({ eq, is }))
+    const update = jest.fn(() => ({ eq }))
+    const store = createSupabaseRunStore({
+      from: jest.fn(() => ({ update })),
+    } as never)
+
+    expect(await store.deleteConversation('42', 'conv-12345678')).toBe(2)
+    const row = (update.mock.calls[0] as unknown[])[0] as Record<
+      string,
+      unknown
+    >
+    expect(row).toMatchObject({
+      question: '',
+      answer: null,
+      parts: null,
+      cited_tweet_ids: [],
+      invalid_citation_ids: [],
+      tool_calls: [],
+      error: null,
+    })
+    expect(typeof row.deleted_at).toBe('string')
+    for (const kept of [
+      'cost_usd',
+      'input_tokens',
+      'started_at',
+      'status',
+      'key_source',
+    ]) {
+      expect(row).not.toHaveProperty(kept)
+    }
+    expect(eq).toHaveBeenCalledWith('account_id', '42')
+    expect(eq).toHaveBeenCalledWith('conversation_id', 'conv-12345678')
+    expect(is).toHaveBeenCalledWith('deleted_at', null)
   })
 
   test('admits through the database function and fails closed', async () => {

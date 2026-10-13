@@ -85,6 +85,7 @@ export type Database = {
           completed_at: string | null
           conversation_id: string | null
           cost_usd: number
+          deleted_at: string | null
           error: string | null
           id: string
           input_tokens: number
@@ -106,6 +107,7 @@ export type Database = {
           completed_at?: string | null
           conversation_id?: string | null
           cost_usd?: number
+          deleted_at?: string | null
           error?: string | null
           id: string
           input_tokens?: number
@@ -127,6 +129,7 @@ export type Database = {
           completed_at?: string | null
           conversation_id?: string | null
           cost_usd?: number
+          deleted_at?: string | null
           error?: string | null
           id?: string
           input_tokens?: number

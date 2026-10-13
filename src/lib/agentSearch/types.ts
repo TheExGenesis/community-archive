@@ -98,4 +98,10 @@ export interface AgentSearchRun {
   error: string | null
   /** Who paid for the planner; runs stored before own keys were the house. */
   keySource?: KeySource
+  /**
+   * When the member deleted it. Its question, answer and tool details are
+   * cleared then; when it ran, what it cost and who paid stay, so the daily
+   * count and the global spend cap still see it.
+   */
+  deletedAt?: string | null
 }

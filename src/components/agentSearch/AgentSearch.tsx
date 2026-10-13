@@ -3,17 +3,16 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, MessageSquareText, Plus } from 'lucide-react'
+import { ArrowUp, Lock, Plus } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
-import { AgentSearchTurn } from './AgentSearchTurn'
+import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { RecentConversations } from './RecentConversations'
-import { RunStatus } from './RunStatus'
+import { StepLog } from './StepLog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ConversationHistory } from './ConversationHistory'
-import { InterruptedNote } from './InterruptedNote'
+import { ConversationHistory, GHOST_BUTTON } from './ConversationHistory'
 import {
   buildTurnView,
   describeChatError,
@@ -81,7 +80,6 @@ export default function AgentSearch({
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [quota, setQuota] = useState<Quota | null>(null)
   const [input, setInput] = useState('')
-  const [composerFocused, setComposerFocused] = useState(false)
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
   const [stopped, setStopped] = useState<Record<string, number | null>>({})
@@ -223,7 +221,6 @@ export default function AgentSearch({
   }, [status, loadRecent])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputId = useId()
-  const hintId = useId()
 
   const busy = status === 'submitted' || status === 'streaming'
   const scrollToQuestionRef = useRef(false)
@@ -393,129 +390,152 @@ export default function AgentSearch({
     )
   })
 
-  const form = (
+  const quotaLow = quota !== null && quota.remaining <= 3
+  const limitSentence = quota
+    ? `You’ve used today’s ${quota.limit} questions. You can ask again at ${resetTime(quota.resetsAt)}.`
+    : null
+  const canAskAgain = !busy && !loading && !outOfQuestions
+
+  const errorNote = errorMessage && (
+    <p
+      role="alert"
+      className="mt-3 rounded-md border border-destructive/40 px-3 py-2 text-sm text-foreground"
+    >
+      {errorMessage}
+    </p>
+  )
+
+  const textarea = (rows: number, placeholder: string, className: string) => (
+    <textarea
+      ref={textareaRef}
+      id={inputId}
+      value={input}
+      onChange={(event) => setInput(event.target.value)}
+      onKeyDown={onKeyDown}
+      maxLength={MAX_QUESTION_LENGTH}
+      rows={rows}
+      placeholder={placeholder}
+      className={`resize-none bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none ${className}`}
+    />
+  )
+
+  // First visit: the facts that qualify asking sit beside the box, as the
+  // daily count sits beside Ask.
+  const startForm = (
     <form onSubmit={onSubmit} className="w-full">
-      <label
-        htmlFor={inputId}
-        className={
-          hasThread
-            ? 'sr-only'
-            : 'mb-2 block text-sm font-medium text-foreground'
-        }
-      >
-        {hasThread ? 'Ask a follow-up question' : 'Your question'}
+      <label htmlFor={inputId} className="sr-only">
+        Your question
       </label>
-      <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2 focus-within:ring-2 focus-within:ring-ring">
-        <textarea
-          ref={textareaRef}
-          id={inputId}
-          aria-describedby={hintId}
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={onKeyDown}
-          onFocus={() => setComposerFocused(true)}
-          onBlur={() => setComposerFocused(false)}
-          maxLength={MAX_QUESTION_LENGTH}
-          // In a thread the box stays one row while idle, so the pinned
-          // composer covers little of the answer.
-          rows={hasThread ? (composerFocused || input ? 3 : 1) : 3}
-          disabled={busy || outOfQuestions}
-          placeholder={
-            busy
-              ? 'You can ask a follow-up when this answer finishes'
-              : outOfQuestions && quota
-                ? `You’ve used today’s ${quota.limit} questions. More at ${resetTime(quota.resetsAt)}`
-                : hasThread
-                  ? 'Ask a follow-up'
-                  : 'Ask about what people in the archive have said'
-          }
-          className="min-h-[2.5rem] flex-1 resize-none bg-transparent px-2 py-1.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
-        />
-        {/* Stop lives in the status row above the answer, not here. */}
-        {!busy && !outOfQuestions && (
-          <button
-            type="submit"
-            disabled={!input.trim()}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <ArrowUp aria-hidden="true" className="h-4 w-4" />
-            Ask
-          </button>
+      <div className="rounded-xl border border-border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring">
+        {textarea(
+          3,
+          'Ask about members’ tweets',
+          'block w-full px-4 pb-1 pt-3.5',
         )}
-      </div>
-      <p id={hintId} className="mt-1.5 text-xs text-muted-foreground">
-        {quota && (
-          <span className={outOfQuestions ? 'text-foreground' : undefined}>
-            {quota.remaining} of {quota.limit}{' '}
-            {quota.limit === 1 ? 'question' : 'questions'} left today ·{' '}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <Lock aria-hidden="true" className="h-3.5 w-3.5" />
+            Private to you
           </span>
-        )}
-        Answers are private to you.
-        {/* Touch keyboards have no Shift+Enter habit to explain. */}
-        <span className="[@media(pointer:coarse)]:hidden">
-          {' '}
-          Enter to send, Shift+Enter for a new line.
-        </span>
-      </p>
-      {errorMessage && (
-        <p
-          role="alert"
-          className="mt-3 rounded-md border border-destructive/40 px-3 py-2 text-sm text-foreground"
-        >
-          {errorMessage}
-        </p>
-      )}
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-muted px-1 text-[10px] font-semibold tabular-nums text-foreground"
+            >
+              1
+            </span>
+            Every claim cited
+          </span>
+          <span className="ml-auto flex items-center gap-3">
+            {quota && (
+              <span className="tabular-nums">{quota.remaining} left today</span>
+            )}
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowUp aria-hidden="true" className="h-4 w-4" />
+              Ask
+            </button>
+          </span>
+        </div>
+      </div>
+      {errorNote}
     </form>
   )
+
+  // In a thread: one line, and the count only once few questions remain.
+  const threadForm = (
+    <form onSubmit={onSubmit} className="w-full">
+      <label htmlFor={inputId} className="sr-only">
+        Ask a follow-up
+      </label>
+      <div className="flex items-end gap-2 rounded-xl border border-border bg-card p-1.5 pl-3 shadow-sm focus-within:ring-2 focus-within:ring-ring">
+        {textarea(
+          input.includes('\n') ? 3 : 1,
+          'Ask a follow-up',
+          'min-h-[2.25rem] flex-1 py-1.5',
+        )}
+        <button
+          type="submit"
+          aria-label="Ask"
+          disabled={!input.trim()}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ArrowUp aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </div>
+      {quotaLow && quota && (
+        <p className="mt-1.5 text-xs tabular-nums text-muted-foreground">
+          {quota.remaining} left today
+        </p>
+      )}
+      {errorNote}
+    </form>
+  )
+
+  const limitNote = (
+    <p className="text-sm leading-6 text-muted-foreground">{limitSentence}</p>
+  )
+
+  const inThread = hasThread || loading
 
   return (
     <main className="min-h-screen bg-background">
       <section
         className={`mx-auto w-full px-4 py-8 sm:px-6 sm:py-12 ${
-          hasThread ? 'max-w-6xl' : 'max-w-3xl'
+          inThread ? 'max-w-6xl' : 'max-w-2xl'
         }`}
       >
-        <div className={hasThread ? 'mb-6' : 'mb-8'}>
-          <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand">
-            <MessageSquareText aria-hidden="true" className="h-3.5 w-3.5" />
-            Members
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1
-              className={`font-bold tracking-tight text-foreground ${
-                hasThread ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'
-              }`}
-            >
+        {inThread ? (
+          <div className="mb-6 flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2">
+            <h1 className="text-[15px] font-semibold text-foreground [font-family:inherit]">
               Ask the archive
             </h1>
-            {hasThread && (
-              <div className="flex items-center gap-2">
-                <ConversationHistory
-                  conversations={recent}
-                  currentId={conversation.id}
-                  onOpen={(id) => void openConversation(id)}
-                  disabled={busy || loading}
-                />
-                <button
-                  type="button"
-                  onClick={startNewConversation}
-                  disabled={busy}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Plus aria-hidden="true" className="h-4 w-4" />
-                  New question
-                </button>
-              </div>
-            )}
+            <div className="-mr-2.5 flex items-center gap-1">
+              <ConversationHistory
+                conversations={recent}
+                currentId={conversation.id}
+                onOpen={(id) => void openConversation(id)}
+                disabled={busy || loading}
+              />
+              <button
+                type="button"
+                onClick={startNewConversation}
+                disabled={busy}
+                className={GHOST_BUTTON}
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                New question
+              </button>
+            </div>
           </div>
-          {!hasThread && !loading && (
-            <p className="mt-3 text-base leading-7 text-muted-foreground sm:text-lg">
-              An agent searches members’ tweets, follows threads and quotes, and
-              writes a short answer. Every claim links to the tweet it came
-              from.
-            </p>
-          )}
-        </div>
+        ) : (
+          <h1 className="mb-6 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+            Ask the archive
+          </h1>
+        )}
 
         {loadError && (
           <p
@@ -539,14 +559,17 @@ export default function AgentSearch({
           </div>
         )}
 
-        {!hasThread && !loading && (
+        {!inThread && (
           <>
-            {form}
-            <div className="mt-6">
-              <h2 className="mb-2 text-sm font-medium text-muted-foreground">
-                Try one of these
+            {outOfQuestions ? limitNote : startForm}
+            <section aria-labelledby="try-questions" className="mt-8">
+              <h2
+                id="try-questions"
+                className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground [font-family:inherit]"
+              >
+                Try
               </h2>
-              <ul className="flex flex-wrap gap-2">
+              <ul className="divide-y divide-border border-y border-border">
                 {EXAMPLE_QUESTIONS.map((question) => (
                   <li key={question}>
                     {/* Fills the box rather than sending: one tap should not
@@ -557,15 +580,14 @@ export default function AgentSearch({
                         setInput(question)
                         textareaRef.current?.focus()
                       }}
-                      disabled={busy}
-                      className="rounded-full border border-border bg-background px-3.5 py-1.5 text-left text-sm text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                      className="flex min-h-[2.75rem] w-full items-center px-1 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     >
                       {question}
                     </button>
                   </li>
                 ))}
               </ul>
-            </div>
+            </section>
             <RecentConversations
               conversations={recent}
               onOpen={(id) => void openConversation(id)}
@@ -577,20 +599,19 @@ export default function AgentSearch({
           <div className="space-y-10">
             {messages.map((message, index) => {
               if (message.role === 'user') {
-                const waiting = busy && index === lastIndex
                 const reply =
                   messages[index + 1]?.role === 'assistant' ? index + 1 : null
-                const replyView = reply === null ? null : views.get(reply)
-                const stoppedHere = message.id in stopped
-                const failedHere =
-                  answerFailed && reply === lastIndex && !stoppedHere
-                const interrupted: 'stopped' | 'failed' | null = waiting
-                  ? null
-                  : stoppedHere || replyView?.outcome === 'stopped'
-                    ? 'stopped'
-                    : failedHere || replyView?.outcome === 'failed'
-                      ? 'failed'
-                      : null
+                const waiting = busy && index === lastIndex
+                // Ended before any reply arrived: stopped, or the stream
+                // broke. A refused question is taken back out of the thread.
+                const endedEarly: 'stopped' | 'failed' | null =
+                  reply !== null || waiting
+                    ? null
+                    : message.id in stopped
+                      ? 'stopped'
+                      : Boolean(error) && index === lastIndex
+                        ? 'failed'
+                        : null
                 const question = messageText(message)
                 return (
                   <div
@@ -599,26 +620,25 @@ export default function AgentSearch({
                   >
                     <h2
                       id={questionAnchor(message.id)}
-                      className="scroll-mt-24 whitespace-pre-wrap break-words text-xl font-semibold leading-snug text-foreground"
+                      className="scroll-mt-24 whitespace-pre-wrap break-words text-2xl font-semibold leading-snug text-foreground sm:text-3xl"
                     >
                       {question}
                     </h2>
                     {waiting && (
-                      <RunStatus
+                      <StepLog
+                        mode="running"
+                        steps={[]}
                         startedAt={runStartedAt ?? Date.now()}
-                        found={0}
-                        writing={false}
                         onStop={stopFromStatus}
                       />
                     )}
-                    {interrupted && (
-                      <InterruptedNote
-                        kind={interrupted}
+                    {endedEarly && (
+                      <StepLog
+                        mode={endedEarly}
+                        steps={[]}
                         elapsedMs={stopped[message.id] ?? null}
-                        found={replyView?.foundSoFar ?? 0}
-                        dailyLimit={quota?.limit ?? null}
-                        canAskAgain={!busy && !loading && !outOfQuestions}
                         onAskAgain={() => ask(question)}
+                        canAskAgain={canAskAgain}
                       />
                     )}
                   </div>
@@ -627,22 +647,39 @@ export default function AgentSearch({
               if (message.role !== 'assistant') return null
               const active = busy && index === lastIndex
               const view = views.get(index) as TurnView
+              const asked =
+                messages[index - 1]?.role === 'user'
+                  ? messages[index - 1]
+                  : null
+              const interrupted: TurnInterruption | null = active
+                ? null
+                : asked && asked.id in stopped
+                  ? { kind: 'stopped', elapsedMs: stopped[asked.id] }
+                  : answerFailed && index === lastIndex
+                    ? { kind: 'failed', elapsedMs: null }
+                    : null
               return (
-                <div key={message.id} className="space-y-5">
-                  {active && (
-                    <RunStatus
-                      startedAt={runStartedAt ?? Date.now()}
-                      found={view.foundSoFar}
-                      writing={Boolean(view.answer.markdown.trim())}
-                      steps={view.progress}
-                      onStop={stopFromStatus}
-                    />
-                  )}
+                <div key={message.id}>
                   <EvidenceBoundary
                     label="turn"
                     fallback="This answer could not be shown."
                   >
-                    <AgentSearchTurn view={view} active={active} />
+                    <AgentSearchTurn
+                      view={view}
+                      active={active}
+                      interrupted={interrupted}
+                      startedAt={runStartedAt ?? Date.now()}
+                      onStop={stopFromStatus}
+                      onAskAgain={
+                        asked ? () => ask(messageText(asked)) : undefined
+                      }
+                      canAskAgain={canAskAgain}
+                      showSources={
+                        index === lastIndex ||
+                        interrupted?.kind === 'stopped' ||
+                        view.outcome === 'stopped'
+                      }
+                    />
                   </EvidenceBoundary>
                 </div>
               )
@@ -651,10 +688,11 @@ export default function AgentSearch({
         )}
 
         {/* Pinned to the bottom of the screen while reading a thread; it
-            settles into place below the last turn. */}
-        {hasThread && !loading && (
-          <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-none">
-            {form}
+            settles into place below the last turn. Hidden while a question
+            runs: Stop, in the step log, is the only action then. */}
+        {hasThread && !loading && !busy && (
+          <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-none">
+            {outOfQuestions ? limitNote : threadForm}
           </div>
         )}
       </section>

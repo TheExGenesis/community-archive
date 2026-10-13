@@ -194,9 +194,10 @@ export const CitationRail = forwardRef<
     if (index >= 0) setPosition(index + 1)
   }
 
-  if (!citations.length && !active) return null
-  const showFound = active && !citations.length && found.length > 0
-  const title = showFound ? 'Posts found so far' : 'Cited'
+  // Nothing cited and nothing found yet: an empty column would say nothing.
+  if (!citations.length && !(active && found.length)) return null
+  const showFound = active && !citations.length
+  const title = showFound ? 'Tweets found so far' : 'Cited'
 
   const toggle = (anchor: string) =>
     setOpened((current) => {
@@ -207,14 +208,14 @@ export const CitationRail = forwardRef<
     })
 
   // Phones show the rail only while a run is going; once answered, cited
-  // posts move into the Cited tab under the answer.
+  // tweets move into the Cited tier of Sources under the answer.
   return (
     <div
       className={`${active ? '' : 'hidden'} lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:self-stretch lg:border-l lg:border-border lg:bg-muted/20`}
     >
       <aside
         ref={setRefs}
-        aria-label={showFound ? 'Posts found so far' : 'Cited tweets'}
+        aria-label={showFound ? 'Tweets found so far' : 'Cited tweets'}
         onScroll={onScroll}
         onPointerEnter={() => (pointerInside.current = true)}
         onPointerLeave={() => (pointerInside.current = false)}
@@ -253,7 +254,7 @@ export const CitationRail = forwardRef<
               />
             ))}
           </ol>
-        ) : showFound ? (
+        ) : (
           <ul className="divide-y divide-border">
             {found.map((tweet) => (
               <li key={tweet.id}>
@@ -261,10 +262,6 @@ export const CitationRail = forwardRef<
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="hidden px-4 py-3 text-sm text-muted-foreground lg:block">
-            Posts appear here as the answer cites them.
-          </p>
         )}
       </aside>
     </div>

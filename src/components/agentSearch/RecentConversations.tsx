@@ -1,6 +1,5 @@
 'use client'
 
-import { History } from 'lucide-react'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
 
 const dateFormat = new Intl.DateTimeFormat('en-US', {
@@ -47,9 +46,7 @@ export function RecentConversations({
   const list = (
     <ul
       className={
-        compact
-          ? 'divide-y divide-border'
-          : 'divide-y divide-border rounded-lg border border-border'
+        compact ? 'divide-y divide-border' : 'divide-y divide-border border-y'
       }
     >
       {conversations.map((conversation) => {
@@ -63,7 +60,7 @@ export function RecentConversations({
               className={`flex w-full items-baseline justify-between gap-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
                 compact
                   ? 'min-h-[2.75rem] rounded-md px-3 py-2.5'
-                  : 'px-4 py-3 first:rounded-t-lg last:rounded-b-lg'
+                  : 'min-h-[2.75rem] px-1 py-2.5'
               } ${current ? 'bg-muted' : ''}`}
             >
               <span className="line-clamp-2 min-w-0 break-words text-sm text-foreground">
@@ -84,10 +81,9 @@ export function RecentConversations({
     <section aria-labelledby="recent-conversations" className="mt-10">
       <h2
         id="recent-conversations"
-        className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
+        className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground [font-family:inherit]"
       >
-        <History aria-hidden="true" className="h-4 w-4" />
-        Your recent questions
+        Recent
       </h2>
       {list}
     </section>

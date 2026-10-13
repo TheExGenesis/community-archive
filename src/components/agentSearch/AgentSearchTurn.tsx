@@ -1,114 +1,46 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
 import { AnswerMarkdown } from './AnswerMarkdown'
-import {
-  CitationContext,
-  RAIL_MEDIA,
-  type CitationLinks,
-} from './CitationContext'
-import { CitationList, CitationRail } from './CitationRail'
+import { CitationContext, type CitationLinks } from './CitationContext'
+import { CitationRail } from './CitationRail'
 import { CitationSheet } from './CitationSheet'
 import { EvidenceBoundary } from './EvidenceBoundary'
-import { EvidenceTabs, type EvidenceTab } from './EvidenceTabs'
-import {
-  NOT_SEARCHED_LINE,
-  type CoverageView,
-  type TurnView,
-} from './messageView'
+import { logSummary, type TurnView } from './messageView'
+import { ResultList } from './ResultList'
+import { Sources } from './Sources'
+import { LogLine, StepLog } from './StepLog'
 
-export function CoverageBlock({ coverage }: { coverage: CoverageView }) {
-  const nothingRan =
-    !coverage.searches.length &&
-    !coverage.scored &&
-    !coverage.threadsRead &&
-    !coverage.quotesRead &&
-    !coverage.people.length
-  return (
-    <section
-      aria-label="How this was searched"
-      className="space-y-2 border-l-2 border-border pl-4 text-sm text-muted-foreground"
-    >
-      {nothingRan ? (
-        <p>Answered from the posts found for the earlier question.</p>
-      ) : (
-        coverage.searches.length > 0 && (
-          <ul className="space-y-1">
-            {coverage.searches.map((search) => (
-              <li key={search.label} className="break-words">
-                <span className="text-foreground">{search.label}</span>
-                {' · '}
-                {search.detail}
-              </li>
-            ))}
-          </ul>
-        )
-      )}
-      {coverage.people.length > 0 && (
-        <p>
-          Looked up {coverage.people.map((name) => `“${name}”`).join(', ')}.
-        </p>
-      )}
-      {coverage.scored > 0 && (
-        <p>
-          Checked {coverage.scored.toLocaleString('en-US')} posts against your
-          question: {coverage.kept.toLocaleString('en-US')} relevant
-          {coverage.capped ? ', stopped at the limit, so more exist' : ''}.
-        </p>
-      )}
-      {(coverage.threadsRead > 0 || coverage.quotesRead > 0) && (
-        <p>
-          Read{' '}
-          {[
-            coverage.threadsRead
-              ? `${coverage.threadsRead} ${coverage.threadsRead === 1 ? 'thread' : 'threads'}`
-              : null,
-            coverage.quotesRead
-              ? `the quotes of ${coverage.quotesRead} ${coverage.quotesRead === 1 ? 'post' : 'posts'}`
-              : null,
-          ]
-            .filter(Boolean)
-            .join(' and ')}
-          .
-        </p>
-      )}
-      <p>{NOT_SEARCHED_LINE}.</p>
-    </section>
-  )
-}
-
-function SearchDetails({ coverage }: { coverage: CoverageView }) {
-  return (
-    <details className="group mt-4">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        <ChevronRight
-          aria-hidden="true"
-          className="h-4 w-4 transition-transform group-open:rotate-90 motion-reduce:transition-none"
-        />
-        How this was searched
-      </summary>
-      <div className="mt-2">
-        <CoverageBlock coverage={coverage} />
-      </div>
-    </details>
-  )
+/** A run that ended without a full answer, as the page knows it. */
+export interface TurnInterruption {
+  kind: 'stopped' | 'failed'
+  /** How long a run stopped in this visit had run; null when unknown. */
+  elapsedMs: number | null
 }
 
 export function AgentSearchTurn({
   view,
   active,
+  interrupted = null,
+  startedAt = Date.now(),
+  onStop,
+  onAskAgain,
+  canAskAgain = true,
+  showSources = true,
 }: {
   view: TurnView
   active: boolean
+  interrupted?: TurnInterruption | null
+  /** Client clock when the question was sent or reopened, for the timer. */
+  startedAt?: number
+  onStop?: () => void
+  onAskAgain?: () => void
+  canAskAgain?: boolean
+  /** The latest turn, or one that was stopped: earlier ones keep the rest. */
+  showSources?: boolean
 }) {
   const { answer } = view
-  const hasAnswer = Boolean(answer.markdown.trim())
-  // Until the member picks a tab, open the strongest tier that has posts.
-  const [chosenTab, setTab] = useState<EvidenceTab | null>(null)
-  const tab = chosenTab ?? (view.receipt.relevant > 0 ? 'relevant' : 'other')
-  const evidenceRef = useRef<HTMLElement>(null)
-  const citedRef = useRef<HTMLElement>(null)
+  const hasAnswer = answer.blocks.length > 0
   const answerRef = useRef<HTMLDivElement>(null)
 
   const [selected, setSelected] = useState<CitationLinks['selected']>(null)
@@ -130,6 +62,11 @@ export function AgentSearchTurn({
       },
     }),
     [selected, hovered, inView],
+  )
+  const citationNumbers = useMemo(
+    () =>
+      new Map(answer.citations.map((citation) => [citation.id, citation.n])),
+    [answer.citations],
   )
 
   // The paragraph nearest the middle of the screen marks its citations, so
@@ -177,81 +114,128 @@ export function AgentSearchTurn({
     return () => observer.disconnect()
   }, [answerKey])
 
-  const showTier = (target: EvidenceTab) => {
-    // Cited posts are in the rail on wide screens and a tab on phones.
-    if (target === 'cited' && window.matchMedia(RAIL_MEDIA).matches) {
-      citedRef.current?.scrollIntoView({ block: 'start' })
-      return
-    }
-    setTab(target)
-    evidenceRef.current?.scrollIntoView({ block: 'start' })
-  }
+  // A turn that ended without a full answer keeps its steps in view.
+  const ended: TurnInterruption | null = active
+    ? null
+    : (interrupted ??
+      (view.outcome === 'done'
+        ? null
+        : { kind: view.outcome, elapsedMs: null }))
 
-  // A run stopped or failed before any search: the note above says so, and
-  // there is nothing else to show.
-  if (view.outcome !== 'done' && !active && view.progress.length === 0) {
-    return null
-  }
+  const log = active ? (
+    hasAnswer ? (
+      <LogLine
+        summary={logSummary(view, { writing: true })}
+        steps={view.progress}
+        onStop={onStop}
+      />
+    ) : (
+      <StepLog
+        mode="running"
+        steps={view.progress}
+        startedAt={startedAt}
+        onStop={onStop ?? (() => undefined)}
+      />
+    )
+  ) : ended ? (
+    <StepLog
+      mode={ended.kind}
+      steps={view.progress}
+      elapsedMs={ended.elapsedMs}
+      unavailable={ended.kind === 'failed' && view.unavailable}
+      onAskAgain={onAskAgain}
+      canAskAgain={canAskAgain}
+    />
+  ) : (
+    <LogLine
+      summary={logSummary(view)}
+      steps={view.progress}
+      cappedAt={view.receipt.cappedAt}
+    />
+  )
 
   // Wide screens: the answer on the left, cited tweets in a sticky column
   // beside it so a citation and its tweet are both on screen. Narrow screens:
-  // the cited tweets follow the answer.
+  // the cited tweets are a tier of Sources under the answer.
   return (
     <CitationContext.Provider value={links}>
       <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
         <div className="min-w-0 space-y-5 lg:col-start-1">
+          {log}
+
           {hasAnswer && (
             <div
               ref={answerRef}
               className="max-w-[68ch] break-words text-base text-foreground"
             >
-              <AnswerMarkdown>{answer.markdown}</AnswerMarkdown>
+              {answer.blocks.map((block, index) =>
+                block.kind === 'text' ? (
+                  <AnswerMarkdown key={`text-${index}`}>
+                    {block.markdown}
+                  </AnswerMarkdown>
+                ) : (
+                  <EvidenceBoundary key={block.key} label="tweet list">
+                    <ResultList
+                      label={block.label}
+                      tweets={block.tweets}
+                      citations={citationNumbers}
+                    />
+                  </EvidenceBoundary>
+                ),
+              )}
+              {ended && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Unfinished answer
+                </p>
+              )}
             </div>
           )}
 
           {!active && answer.unverified.length > 0 && (
             <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
               {answer.unverified.length === 1
-                ? 'One citation points to a post the searches never returned, so it is marked unverified: '
-                : `${answer.unverified.length} citations point to posts the searches never returned, so they are marked unverified: `}
+                ? 'One citation points to a tweet the searches never returned, so it is marked unverified: '
+                : `${answer.unverified.length} citations point to tweets the searches never returned, so they are marked unverified: `}
               <span className="break-all font-mono text-xs">
                 {answer.unverified.join(', ')}
               </span>
+            </p>
+          )}
+          {!active && answer.missingLists.length > 0 && (
+            <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              {answer.missingLists.length === 1
+                ? 'A list the answer referred to could not be found.'
+                : `${answer.missingLists.length} lists the answer referred to could not be found.`}
             </p>
           )}
         </div>
 
         <EvidenceBoundary label="cited tweets">
           <CitationRail
-            ref={citedRef}
             citations={answer.citations}
             active={active}
             found={view.topFound}
           />
         </EvidenceBoundary>
 
-        {!active && (
-          <section
-            ref={evidenceRef}
-            aria-label="Evidence"
-            className="min-w-0 scroll-mt-24 lg:col-start-1"
-          >
-            <EvidenceBoundary label="evidence">
-              <EvidenceTabs
-                tab={tab}
-                onTabChange={setTab}
+        {!active && showSources && (
+          <div className="min-w-0 scroll-mt-24 lg:col-start-1">
+            <EvidenceBoundary label="sources">
+              <Sources
+                title={
+                  ended?.kind === 'stopped'
+                    ? 'Found before you stopped'
+                    : ended
+                      ? 'Found before it stopped'
+                      : 'Sources'
+                }
                 relevant={view.relevant}
-                relevantTotal={view.receipt.relevant}
+                relevantNotShown={view.relevantNotShown}
                 otherMatches={view.otherMatches}
-                groups={view.groups}
-                cited={{
-                  count: answer.citations.length,
-                  content: <CitationList citations={answer.citations} />,
-                }}
-                footer={<SearchDetails coverage={view.coverage} />}
+                citations={answer.citations}
               />
             </EvidenceBoundary>
-          </section>
+          </div>
         )}
       </div>
       <CitationSheet

@@ -5,8 +5,8 @@
 //     scripts/agent-search/eval.ts --only recall-future-historians
 //
 // Flags: --only id,id  --class name[,name]  --limit N  --model provider:model
-//        --concurrency N  --timeout-ms N  --questions path  --dry-run
-//        --no-validate-keys  --allow-remote-gateway
+//        --tools bash|typed  --concurrency N  --timeout-ms N  --questions path
+//        --dry-run  --no-validate-keys  --allow-remote-gateway
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
@@ -65,6 +65,9 @@ interface QuestionResult {
   outputTokens: number
   plannerCostUsd: number
   classifierCostUsd: number
+  /** Tool calls that threw or (bash) exited non-zero. */
+  commandErrors: number
+  semanticCalls: number
   wallMs: number
   error: string | null
   score: Score
@@ -102,6 +105,7 @@ function parseArgs(argv: string[]) {
     classes: [] as string[],
     limit: Infinity,
     model: null as string | null,
+    tools: null as 'bash' | 'typed' | null,
     concurrency: 1,
     timeoutMs: 300_000,
     questions: join(HERE, 'questions.json'),
@@ -121,7 +125,13 @@ function parseArgs(argv: string[]) {
       args.classes = value().split(',').filter(Boolean)
     else if (flag === '--limit') args.limit = Number(value())
     else if (flag === '--model') args.model = value()
-    else if (flag === '--concurrency')
+    else if (flag === '--tools') {
+      const mode = value()
+      if (mode !== 'bash' && mode !== 'typed') {
+        throw new Error('--tools must be bash or typed')
+      }
+      args.tools = mode
+    } else if (flag === '--concurrency')
       args.concurrency = Math.max(1, Number(value()))
     else if (flag === '--timeout-ms') args.timeoutMs = Number(value())
     else if (flag === '--questions') args.questions = resolve(value())
@@ -148,17 +158,26 @@ function parseEnvFile(path: string): Record<string, string> {
   return out
 }
 
-// The gateway env comes from the local stand-in file. From .env.local only the
-// model key is taken, so production gateway or Supabase settings there can
-// never leak into an eval run. Values already in the environment win.
+// The gateway env comes from the local stand-in file. From .env.local and
+// .env only the model keys are taken, so production gateway or Supabase
+// settings there can never leak into an eval run. Values already in the
+// environment win. AGENT_SEARCH_KEYS_DIR points at another checkout's env
+// files (a worktree checkout has none of its own).
+const MODEL_KEYS = ['OPENAI_API_KEY', 'OPENROUTER_API_KEY']
+
 function loadEnv() {
   const gatewayEnv = parseEnvFile(
     process.env.AGENT_SEARCH_GATEWAY_ENV ??
       join(homedir(), 'ca-local/gateway/site.env'),
   )
-  const local = parseEnvFile(join(REPO, '.env.local'))
+  const keysDir = process.env.AGENT_SEARCH_KEYS_DIR ?? REPO
+  const local = parseEnvFile(join(keysDir, '.env.local'))
+  const shared = parseEnvFile(join(keysDir, '.env'))
   const picked: Record<string, string> = { ...gatewayEnv }
-  if (local.OPENAI_API_KEY) picked.OPENAI_API_KEY = local.OPENAI_API_KEY
+  for (const key of MODEL_KEYS) {
+    const value = local[key] || shared[key]
+    if (value) picked[key] = value
+  }
   for (const [key, value] of Object.entries(picked)) {
     if (process.env[key] === undefined) process.env[key] = value
   }
@@ -249,6 +268,9 @@ type Modules = {
   model: typeof import('@/lib/agentSearch/model')
   gateway: typeof import('@/lib/agentSearch/gateway')
   classifier: typeof import('@/lib/agentSearch/classifier')
+  toolImpl: typeof import('@/lib/agentSearch/toolImpl')
+  semantic: typeof import('@/lib/agentSearch/semantic')
+  inProcess: typeof import('@/lib/agentSearch/workspace/inProcess')
   ai: typeof import('ai')
 }
 
@@ -343,10 +365,34 @@ function score(
   }
 }
 
+/** The tools for a mode, with the per-question semantic search cap. */
+function toolsFor(
+  mods: Modules,
+  mode: 'bash' | 'typed',
+  abortSignal: AbortSignal,
+): ToolSet {
+  if (mode === 'bash') {
+    return mods.agent.createBashAgentTools(
+      mods.inProcess.createInProcessBash({ abortSignal }).execute,
+    )
+  }
+  let semanticUsed = 0
+  return mods.agent.createAgentSearchTools({
+    semantic_search: async (input, options) => {
+      if (semanticUsed >= mods.semantic.MAX_SEMANTIC_CALLS_PER_RUN) {
+        return mods.toolImpl.semanticLimitReached(input.query)
+      }
+      semanticUsed += 1
+      return mods.toolImpl.semanticSearchImpl(input, options)
+    },
+  })
+}
+
 async function runQuestion(
   mods: Modules,
   question: Question,
   modelSpec: string,
+  mode: 'bash' | 'typed',
   args: ReturnType<typeof parseArgs>,
 ): Promise<QuestionResult> {
   const started = Date.now()
@@ -380,17 +426,20 @@ async function runQuestion(
 
   if (!error) {
     try {
-      const tools: ToolSet = mods.agent.createAgentSearchTools({ steps: false })
+      const abortSignal = AbortSignal.timeout(args.timeoutMs)
       const agent = new mods.ai.ToolLoopAgent({
         model: mods.model.agentSearchModel(modelSpec),
-        instructions: mods.agent.AGENT_SEARCH_INSTRUCTIONS,
-        tools,
-        stopWhen: mods.ai.isStepCount(mods.agent.AGENT_SEARCH_MAX_STEPS),
+        instructions: mods.agent.agentSearchInstructions(undefined, mode),
+        tools: toolsFor(mods, mode, abortSignal),
+        stopWhen: [
+          mods.ai.isStepCount(mods.agent.AGENT_SEARCH_MAX_STEPS),
+          mods.agent.toolsKeepFailing,
+        ],
         prepareStep: mods.agent.agentSearchPrepareStep(),
       })
       const result = await agent.generate({
         prompt: question.question,
-        abortSignal: AbortSignal.timeout(args.timeoutMs),
+        abortSignal,
       })
       answer = mods.agent.finalAnswerText(result.steps)
       finishReason = result.finishReason
@@ -436,7 +485,25 @@ async function runQuestion(
 
   const allOutputs = outputsByCall.flat()
   const seen = mods.citations.collectToolTweetIds(allOutputs)
-  const { cited, invalid } = mods.citations.validateCitations(answer, seen)
+  // Listed tweets count as cited: lists name workspace files (or ids).
+  const { cited, invalid } = mods.citations.validateCitations(
+    answer,
+    seen,
+    mods.citations.collectWorkspaceFiles(allOutputs),
+  )
+  const commandErrors = toolCalls.filter(
+    (call) => call.error !== null || (call.counts.exitCode ?? 0) !== 0,
+  ).length
+  const semanticCalls = toolCalls.reduce(
+    (n, call) =>
+      n +
+      (call.name === 'semantic_search'
+        ? call.error === null && !('limitReached' in call.counts)
+          ? 1
+          : 0
+        : (call.counts.semanticCalls ?? 0)),
+    0,
+  )
   // Failed scoring calls carry what they spent on the error (ScoringError).
   const classifierCostUsd = [...allOutputs, ...toolErrors].reduce<number>(
     (sum, value) => {
@@ -461,6 +528,8 @@ async function runQuestion(
     outputTokens: usage.outputTokens ?? 0,
     plannerCostUsd: plannerCost(mods, modelSpec, usage),
     classifierCostUsd,
+    commandErrors,
+    semanticCalls,
     wallMs: Date.now() - started,
     error,
     score: score(
@@ -486,7 +555,7 @@ function markdownReport(
   const lines: string[] = []
   lines.push(`# Agent search eval ${meta.startedAt}`, '')
   lines.push(
-    `Model \`${meta.model}\`, scorer \`${meta.scorerModel}\`, ${results.length} questions, ` +
+    `Model \`${meta.model}\`, tools \`${meta.tools}\`, scorer \`${meta.scorerModel}\`, ${results.length} questions, ` +
       `questions file \`${meta.questions}\`.`,
     '',
   )
@@ -540,7 +609,7 @@ function markdownReport(
     `- Input tokens ${results.reduce((n, r) => n + r.inputTokens, 0)}, output tokens ${results.reduce((n, r) => n + r.outputTokens, 0)}`,
     `- Planner cost $${results.reduce((n, r) => n + r.plannerCostUsd, 0).toFixed(4)}, scorer cost $${results.reduce((n, r) => n + r.classifierCostUsd, 0).toFixed(4)} (list prices, src/lib/agentSearch/model.ts)`,
     `- Wall time p50 ${((quantile(wall, 0.5) ?? 0) / 1000).toFixed(1)}s, p95 ${((quantile(wall, 0.95) ?? 0) / 1000).toFixed(1)}s`,
-    `- Tool calls ${results.reduce((n, r) => n + r.toolCalls.length, 0)}, errors ${results.filter((r) => r.error).length}`,
+    `- Tool calls ${results.reduce((n, r) => n + r.toolCalls.length, 0)}, failed or non-zero exits ${results.reduce((n, r) => n + r.commandErrors, 0)}, semantic searches ${results.reduce((n, r) => n + r.semanticCalls, 0)}, run errors ${results.filter((r) => r.error).length}`,
     `- Key ids dropped by gateway re-validation: ${results.reduce((n, r) => n + r.keyDropped.length, 0)}`,
     '',
     'Partial keys: recall is against a hand-picked subset, and cited ids outside the key are unjudged, not wrong. ' +
@@ -567,6 +636,9 @@ async function main() {
     model: await import('@/lib/agentSearch/model'),
     gateway: await import('@/lib/agentSearch/gateway'),
     classifier: await import('@/lib/agentSearch/classifier'),
+    toolImpl: await import('@/lib/agentSearch/toolImpl'),
+    semantic: await import('@/lib/agentSearch/semantic'),
+    inProcess: await import('@/lib/agentSearch/workspace/inProcess'),
     ai: await import('ai'),
   }
 
@@ -584,14 +656,19 @@ async function main() {
   }
 
   const modelSpec = args.model ?? mods.model.agentSearchModelSpec()
+  const mode = args.tools ?? mods.agent.agentSearchToolMode()
   if (!process.env.OPENAI_API_KEY && modelSpec.startsWith('openai:')) {
     throw new Error('OPENAI_API_KEY is not set (expected in .env.local)')
+  }
+  if (!process.env.OPENROUTER_API_KEY && modelSpec.startsWith('openrouter:')) {
+    throw new Error('OPENROUTER_API_KEY is not set (expected in .env)')
   }
   const startedAt = new Date().toISOString()
   const scorer = mods.classifier.agentSearchScorer()
   const meta = {
     startedAt,
     model: modelSpec,
+    tools: mode,
     scorerModel:
       scorer === 'decisions'
         ? `openai:${mods.classifier.DECISIONS_MODEL} (Decisions API)`
@@ -627,7 +704,7 @@ async function main() {
       const index = next++
       const q = questions[index]
       console.log(`[${index + 1}/${questions.length}] ${q.id}`)
-      const result = await runQuestion(mods, q, modelSpec, args)
+      const result = await runQuestion(mods, q, modelSpec, mode, args)
       results[index] = result
       write()
       const s = result.score

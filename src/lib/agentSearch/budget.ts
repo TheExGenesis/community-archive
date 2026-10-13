@@ -6,6 +6,7 @@ import {
   resolveModelPrice,
   scorerPriceEnv,
 } from './model'
+import { OWN_KEY_LIMIT_MULTIPLIER, type KeySource } from './ownKey'
 import type { AdmissionRequest, AgentSearchRunStore } from './runStore'
 
 /**
@@ -86,12 +87,22 @@ export function agentSearchBudgetLimits(
   }
 }
 
+/** Questions a day for each key source: the house limit, and ten times it. */
+export function agentSearchDailyLimits(
+  env: NodeJS.ProcessEnv = process.env,
+): Record<KeySource, number> {
+  const house = agentSearchBudgetLimits(env).dailyLimit
+  return { house, own: house * OWN_KEY_LIMIT_MULTIPLIER }
+}
+
 export { startOfUtcDay } from './day'
 
 /**
  * Admits a question or says why not, and on admission stores the run as
  * running under `runId` before any workflow starts. Every account obeys the
- * caps, including the development preview account 'dev'. A running run older
+ * caps, including the development preview account 'dev'. A question on the
+ * member's own key gets ten times the daily limit; it still counts against
+ * the global spend cap, since its scorer calls are on the house. A running run older
  * than the stale window no longer blocks, so a lost run cannot lock a member
  * out for the day; the start route first closes runs whose workflow ended
  * (runs.ts). Store errors propagate: the caller must refuse to start.
@@ -100,9 +111,11 @@ export async function admitAgentSearchRun(
   store: Pick<AgentSearchRunStore, 'admit'>,
   request: Omit<AdmissionRequest, keyof AgentSearchBudgetLimits>,
 ): Promise<AgentSearchBudgetResult> {
+  const limits = agentSearchBudgetLimits()
   const result = await store.admit({
     ...request,
-    ...agentSearchBudgetLimits(),
+    ...limits,
+    dailyLimit: agentSearchDailyLimits()[request.keySource],
   })
   return result === 'ok' ? { ok: true } : { ok: false, reason: result }
 }

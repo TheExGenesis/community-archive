@@ -89,6 +89,7 @@ export type Database = {
           id: string
           input_tokens: number
           invalid_citation_ids: string[]
+          key_source: string
           model: string
           output_tokens: number
           parts: Json | null
@@ -109,6 +110,7 @@ export type Database = {
           id: string
           input_tokens?: number
           invalid_citation_ids?: string[]
+          key_source?: string
           model: string
           output_tokens?: number
           parts?: Json | null
@@ -129,6 +131,7 @@ export type Database = {
           id?: string
           input_tokens?: number
           invalid_citation_ids?: string[]
+          key_source?: string
           model?: string
           output_tokens?: number
           parts?: Json | null
@@ -2039,6 +2042,7 @@ export type Database = {
           p_daily_limit: number
           p_global_daily_usd: number
           p_stale_after_seconds: number
+          p_key_source: string
         }
         Returns: string
       }

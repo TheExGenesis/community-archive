@@ -96,6 +96,7 @@ describe('admitAgentSearchRun', () => {
     conversationId: 'conv-1234',
     question: 'Who?',
     model: 'openai:gpt-6.1-sol',
+    keySource: 'house' as const,
   }
   const storeAnswering = (result: string) => ({
     admit: jest.fn().mockResolvedValue(result),
@@ -136,6 +137,15 @@ describe('admitAgentSearchRun', () => {
       ).resolves.toEqual({ ok: false, reason })
     },
   )
+
+  test("a question on the member's own key gets ten times the daily limit", async () => {
+    process.env.AGENT_SEARCH_DAILY_LIMIT = '4'
+    const store = storeAnswering('ok')
+    await admitAgentSearchRun(store, { ...request, keySource: 'own' })
+    expect(store.admit).toHaveBeenCalledWith(
+      expect.objectContaining({ keySource: 'own', dailyLimit: 40 }),
+    )
+  })
 
   test('fails closed when the store cannot answer', async () => {
     const store = { admit: jest.fn().mockRejectedValue(new Error('down')) }

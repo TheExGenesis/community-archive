@@ -1,4 +1,5 @@
 import type { PortalTweet } from '@/lib/portal/types'
+import type { KeySource } from './ownKey'
 
 /** A tweet as agent tools return it to the page: a PortalTweet plus edges. */
 export interface AgentTweet extends PortalTweet {
@@ -88,6 +89,13 @@ export interface AgentSearchRun {
   }>
   inputTokens: number
   outputTokens: number
+  /**
+   * What the house paid: every model call and scorer call on the house's
+   * keys. Planner calls on the member's own key are theirs and are not
+   * counted, so the global daily cap only counts house spend.
+   */
   costUsd: number
   error: string | null
+  /** Who paid for the planner; runs stored before own keys were the house. */
+  keySource?: KeySource
 }

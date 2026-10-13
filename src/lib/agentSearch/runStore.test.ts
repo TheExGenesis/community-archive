@@ -200,6 +200,7 @@ describe('file run store', () => {
       conversationId: 'conv-1234',
       question: 'Who?',
       model: 'openai:gpt-6.1-sol',
+      keySource: 'house' as const,
       dailyLimit: 3,
       globalDailyUsd: 25,
       staleRunMs: 600_000,
@@ -256,6 +257,20 @@ describe('file run store', () => {
         'not_found',
       )
       expect(decide([{}, {}, {}])).toBe('daily_limit')
+      // Own-key questions do not use up house questions; an own-key question
+      // counts every question today against its own limit.
+      expect(decide([{ keySource: 'own' }, { keySource: 'own' }, {}])).toBe(
+        'ok',
+      )
+      expect(
+        decide([{ keySource: 'own' }, {}, {}], {
+          keySource: 'own',
+          dailyLimit: 3,
+        }),
+      ).toBe('daily_limit')
+      expect(decide([{}, {}, {}], { keySource: 'own', dailyLimit: 30 })).toBe(
+        'ok',
+      )
       // Yesterday's runs do not count.
       expect(decide([{ startedAt: '2026-10-07T23:59:59.000Z' }])).toBe('ok')
       expect(
@@ -358,11 +373,14 @@ describe('supabase run store', () => {
       cost_usd: 0,
       error: null,
       parts: null,
+      key_source: 'house',
     })
     expect(await store.get('wrun_01')).toMatchObject({
       accountId: '42',
       startedAt: '2026-10-08T10:00:00+00:00',
       costUsd: 0.125,
+      // Rows from before own keys have no key source: the house paid.
+      keySource: 'house',
     })
   })
 
@@ -395,7 +413,8 @@ describe('supabase run store', () => {
         conversationId: 'conv-1234',
         question: 'Who?',
         model: 'openai:gpt-6.1-sol',
-        dailyLimit: 10,
+        keySource: 'own',
+        dailyLimit: 100,
         globalDailyUsd: 25,
         staleRunMs: 600_000,
       }),
@@ -406,9 +425,10 @@ describe('supabase run store', () => {
       p_conversation_id: 'conv-1234',
       p_question: 'Who?',
       p_model: 'openai:gpt-6.1-sol',
-      p_daily_limit: 10,
+      p_daily_limit: 100,
       p_global_daily_usd: 25,
       p_stale_after_seconds: 600,
+      p_key_source: 'own',
     })
     rpc.mockResolvedValueOnce({ data: null, error: { message: 'down' } })
     await expect(store.admit({} as never)).rejects.toThrow('admission failed')

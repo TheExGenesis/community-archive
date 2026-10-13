@@ -13,6 +13,7 @@ import path from 'path'
 import type { Database, Json } from '@/database-types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { startOfUtcDay } from './day'
+import type { KeySource } from './ownKey'
 import type { AgentSearchRun } from './types'
 
 export const MAX_CONVERSATION_RUNS = 50
@@ -40,6 +41,8 @@ export interface ModelCallLogEntry {
   servedBy?: string
   /** OpenRouter only: what it actually charged. */
   providerCostUsd?: number
+  /** Paid with the member's own key, so not counted in the run's cost. */
+  ownKey?: boolean
 }
 
 /** Fields only addUsage may change, so a status patch never resets spend. */
@@ -53,6 +56,13 @@ export interface AdmissionRequest {
   conversationId: string
   question: string
   model: string
+  /**
+   * Who pays for the planner. A house question counts against the member's
+   * house questions today; an own-key question against all their questions
+   * today, under its own, higher daily limit.
+   */
+  keySource: KeySource
+  /** The limit for this question's key source. */
   dailyLimit: number
   globalDailyUsd: number
   /** A running run older than this no longer blocks a new one. */
@@ -80,7 +90,12 @@ export interface AgentSearchRunStore {
    */
   admit(request: AdmissionRequest): Promise<AdmissionResult>
   get(id: string): Promise<AgentSearchRun | null>
-  countSince(accountId: string, sinceIso: string): Promise<number>
+  /** The member's runs since then; only house-paid ones when asked. */
+  countSince(
+    accountId: string,
+    sinceIso: string,
+    keySource?: KeySource,
+  ): Promise<number>
   /** The member's runs still marked running, whatever their age. */
   listRunning(accountId: string): Promise<AgentSearchRun[]>
   costSince(sinceIso: string): Promise<number>
@@ -144,8 +159,12 @@ export function newRunRecord(
     outputTokens: 0,
     costUsd: 0,
     error: null,
+    keySource: request.keySource,
   }
 }
+
+const keySourceOf = (run: Pick<AgentSearchRun, 'keySource'>): KeySource =>
+  run.keySource ?? 'house'
 
 /** The admission rules, shared by the file store and its tests. */
 export function admissionDecision(
@@ -165,12 +184,12 @@ export function admissionDecision(
   ) {
     return 'not_found'
   }
-  if (
-    own.filter((run) => Date.parse(run.startedAt) >= since).length >=
-    request.dailyLimit
-  ) {
-    return 'daily_limit'
-  }
+  const today = own.filter(
+    (run) =>
+      Date.parse(run.startedAt) >= since &&
+      (request.keySource === 'own' || keySourceOf(run) === 'house'),
+  )
+  if (today.length >= request.dailyLimit) return 'daily_limit'
   if (
     own.some(
       (run) =>
@@ -293,11 +312,13 @@ export function createFileRunStore(
         'utf8',
       )
     },
-    async countSince(accountId, sinceIso) {
+    async countSince(accountId, sinceIso, keySource) {
       const since = Date.parse(sinceIso)
       return (await readAll()).filter(
         (run) =>
-          run.accountId === accountId && Date.parse(run.startedAt) >= since,
+          run.accountId === accountId &&
+          Date.parse(run.startedAt) >= since &&
+          (!keySource || keySourceOf(run) === keySource),
       ).length
     },
     // One admission at a time in this process, like the database function's
@@ -362,6 +383,7 @@ function toRow(run: AgentSearchRun): RunInsert {
     cost_usd: run.costUsd,
     error: run.error,
     parts: (run.parts ?? null) as Json,
+    key_source: run.keySource ?? 'house',
   }
 }
 
@@ -411,6 +433,7 @@ function fromRow(row: RunRow): AgentSearchRun {
     // PostgREST may return numeric as a string when it exceeds JS precision.
     costUsd: Number(row.cost_usd) || 0,
     error: row.error,
+    keySource: row.key_source === 'own' ? 'own' : 'house',
   }
 }
 
@@ -426,7 +449,7 @@ const ADMISSION_RESULTS: AdmissionResult[] = [
 
 // Lists need no answer bodies, message parts or usage.
 const SUMMARY_COLUMNS =
-  'id, workflow_run_id, account_id, conversation_id, question, status, model, started_at, completed_at, error'
+  'id, workflow_run_id, account_id, conversation_id, question, status, model, started_at, completed_at, error, key_source'
 
 type SummaryRow = Pick<
   RunRow,
@@ -440,6 +463,7 @@ type SummaryRow = Pick<
   | 'started_at'
   | 'completed_at'
   | 'error'
+  | 'key_source'
 >
 
 const withoutBodies = (row: SummaryRow): RunRow => ({
@@ -494,11 +518,13 @@ export function createSupabaseRunStore(
         throw new Error(`Agent search run read failed: ${error.message}`)
       return data ? fromRow(data) : null
     },
-    async countSince(accountId, sinceIso) {
-      const { count, error } = await table()
+    async countSince(accountId, sinceIso, keySource) {
+      let query = table()
         .select('id', { count: 'exact', head: true })
         .eq('account_id', accountId)
         .gte('started_at', sinceIso)
+      if (keySource) query = query.eq('key_source', keySource)
+      const { count, error } = await query
       if (error)
         throw new Error(`Agent search run count failed: ${error.message}`)
       return count ?? 0
@@ -513,6 +539,7 @@ export function createSupabaseRunStore(
         p_daily_limit: Math.floor(request.dailyLimit),
         p_global_daily_usd: request.globalDailyUsd,
         p_stale_after_seconds: Math.ceil(request.staleRunMs / 1000),
+        p_key_source: request.keySource,
       })
       if (error)
         throw new Error(`Agent search admission failed: ${error.message}`)

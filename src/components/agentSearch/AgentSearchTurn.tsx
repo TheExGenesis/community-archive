@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { PortalTweet } from '@/lib/portal/types'
-import { AnswerMarkdown, type Person } from './AnswerMarkdown'
+import { AnswerMarkdown } from './AnswerMarkdown'
 import { CitationContext, type CitationLinks } from './CitationContext'
 import { CitationRail } from './CitationRail'
 import { CitationSheet } from './CitationSheet'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { logSummary, type TurnView } from './messageView'
-import { ResultList } from './ResultList'
+import { peopleFromTweets } from './profileLinks'
+import { EmbeddedTweet, ResultList } from './ResultList'
 import { Sources } from './Sources'
 import { LogLine, StepLog } from './StepLog'
 
@@ -58,24 +58,18 @@ export function AgentSearchTurn({
   )
   // Handles in the answer link to profiles only for people whose tweets the
   // run returned, so a misspelt or invented handle stays plain text.
-  const people = useMemo(() => {
-    const known = new Map<string, Person>()
-    const add = (tweets: PortalTweet[]) => {
-      for (const tweet of tweets) {
-        known.set(tweet.username.toLowerCase(), {
-          username: tweet.username,
-          accountId: tweet.accountId,
-        })
-      }
-    }
-    add(answer.citations.map((citation) => citation.tweet))
-    for (const block of answer.blocks) {
-      if (block.kind === 'list') add(block.tweets)
-    }
-    add(view.relevant)
-    add(view.otherMatches)
-    return known
-  }, [answer.citations, answer.blocks, view.relevant, view.otherMatches])
+  const people = useMemo(
+    () =>
+      peopleFromTweets([
+        answer.citations.map((citation) => citation.tweet),
+        ...answer.blocks.flatMap((block) =>
+          block.kind === 'list' ? [block.tweets] : [],
+        ),
+        view.relevant,
+        view.otherMatches,
+      ]),
+    [answer.citations, answer.blocks, view.relevant, view.otherMatches],
+  )
   const links = useMemo<CitationLinks>(
     () => ({
       selected,
@@ -204,6 +198,10 @@ export function AgentSearchTurn({
                   <AnswerMarkdown key={`text-${index}`} people={people}>
                     {block.markdown}
                   </AnswerMarkdown>
+                ) : block.kind === 'tweet' ? (
+                  <EvidenceBoundary key={block.key} label="tweet">
+                    <EmbeddedTweet citation={block.citation} />
+                  </EvidenceBoundary>
                 ) : (
                   <EvidenceBoundary key={block.key} label="tweet list">
                     <ResultList

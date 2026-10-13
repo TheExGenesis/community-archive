@@ -1,6 +1,8 @@
 'use client'
 
+import TweetCard from '@/components/TweetCard'
 import type { PortalTweet } from '@/lib/portal/types'
+import type { Citation } from './messageView'
 import { TweetRowList } from './TweetRows'
 
 /** A list shows this many rows before the rest fold. */
@@ -38,5 +40,25 @@ export function ResultList({
         moreLabel={(n) => `${n.toLocaleString('en-US')} more in this list`}
       />
     </section>
+  )
+}
+
+/**
+ * One tweet the agent showed whole, where its full words matter, with the
+ * citation number it shares with the chips and the rail.
+ */
+export function EmbeddedTweet({ citation }: { citation: Citation }) {
+  return (
+    <figure className="my-5 flex items-start gap-2 rounded-lg border border-border py-1 pl-3 pr-1">
+      <span
+        aria-label={`Cited as ${citation.n}`}
+        className="mt-3 inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-foreground"
+      >
+        {citation.n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <TweetCard tweet={citation.tweet} showDate showExternalLink />
+      </div>
+    </figure>
   )
 }

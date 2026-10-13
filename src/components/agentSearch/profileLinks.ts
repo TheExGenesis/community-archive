@@ -1,15 +1,62 @@
 import { userProfileHref } from '@/lib/navigation'
+import type { PortalTweet } from '@/lib/portal/types'
 
 /** Someone whose tweets the run returned, keyed by lower-case handle. */
 export interface Person {
   username: string
   accountId?: string
+  name?: string
+  avatar?: string | null
+  /** One of their tweets, which their avatar is loaded through. */
+  tweetId?: string
+  /** How many of their tweets the run returned. */
+  tweets?: number
+  /** Earliest and latest of those tweets, ISO dates. */
+  firstAt?: string
+  lastAt?: string
+}
+
+/** The people behind a run's tweets, each tweet counted once. */
+export function peopleFromTweets(
+  groups: readonly (readonly PortalTweet[])[],
+): Map<string, Person> {
+  const people = new Map<string, Person>()
+  const seen = new Set<string>()
+  for (const tweets of groups) {
+    for (const tweet of tweets) {
+      if (!tweet.username || seen.has(tweet.id)) continue
+      seen.add(tweet.id)
+      const key = tweet.username.toLowerCase()
+      const person = people.get(key) ?? {
+        username: tweet.username,
+        accountId: tweet.accountId,
+        name: tweet.name,
+        avatar: tweet.avatar,
+        tweetId: tweet.id,
+        tweets: 0,
+      }
+      person.tweets = (person.tweets ?? 0) + 1
+      person.accountId ??= tweet.accountId
+      if (!person.avatar && tweet.avatar) {
+        person.avatar = tweet.avatar
+        person.tweetId = tweet.id
+      }
+      const at = Number.isFinite(Date.parse(tweet.createdAt))
+        ? tweet.createdAt
+        : undefined
+      if (at && (!person.firstAt || at < person.firstAt)) person.firstAt = at
+      if (at && (!person.lastAt || at > person.lastAt)) person.lastAt = at
+      people.set(key, person)
+    }
+  }
+  return people
 }
 
 export interface MdNode {
   type: string
   value?: string
   url?: string
+  data?: Record<string, unknown>
   children?: MdNode[]
 }
 

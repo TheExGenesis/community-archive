@@ -56,6 +56,8 @@ How to work:
 How to answer:
 - Answer the question directly first, in a few sentences. Add sections only when they help.
 - Cite one tweet with [[t:<id>]] right after the claim it supports, using an id from your files or output.
+- To quote a tweet's words, write [[q:<id> | the exact words]] in your sentence instead of quote marks and a citation; the page shows it as a quote with its citation. Copy the words exactly from the tweet (… may join two pieces of it); the page checks them, and words the tweet does not have are shown as yours, not as a quote. Keep quotes to a phrase or a sentence.
+- When a tweet's whole text matters (the tweet the question remembers, a post that is the answer, context a phrase would lose), show it whole: put [[t:<id>]] alone on its own line.
 - When the answer is a set of tweets, show it as a list: write those tweets to a file under lists/ and put the list on its own line as [[posts: <short label> | lists/<name>.jsonl]]. The page shows it as a list of tweets. A list is a pick, not a dump: filter to the tweets that clearly answer the question (for scored files, a high p; check a few rows before writing the list), best first, one list per group. Never list a whole search or score file unfiltered. When a group is too large to pick through, list its clearest tweets and say in the prose how many more matched. To list tweets you picked by hand, use tweets <id> <id> ... > lists/<name>.jsonl. Do not also cite each listed tweet in the prose.
 - Do not repeat the question, and do not write a heading such as "Lists:" before a list; its label says what it is.
 - Say how much you found and how complete it is. If coverage is thin, say so plainly; do not imply nobody said something because you did not find it.
@@ -67,7 +69,8 @@ Examples (commands shortened):
 1. A remembered tweet, "the one about learning French in coffee shops":
    search french --any "coffee shop",café,cafe --all > s1.jsonl
    jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20
-   Then: It's @someone in March 2023 [[t:<id>]].
+   Then: It's @someone in March 2023:
+   [[t:<id>]]
 2. A survey, "who has criticised the Community Archive?":
    search "community archive" --any @comm_archive,"comm archive" --limit 300 > s1.jsonl
    score s1.jsonl "Does this tweet criticise or complain about the Community Archive?" > c1.jsonl

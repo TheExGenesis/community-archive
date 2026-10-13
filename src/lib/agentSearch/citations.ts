@@ -10,6 +10,10 @@
 // eval it did so for 3 of 8 typed-tool answers, so the prefix is optional.
 export const CITATION_PATTERN = /\[\[(?:t:)?(\d{1,20})\]\]/g
 
+// A quote names its tweet: [[q:<id> | the tweet's own words]]. The page checks
+// the words against that tweet before showing them as a quote.
+export const QUOTE_PATTERN = /\[\[q:\s*(\d{1,20})\s*\|\s*([^\]\n]+?)\s*\]\]/g
+
 // When the answer is a set of posts, the agent shows them as a list where it
 // wants them: [[posts: <label> | <source>]]. The source is either tweet ids
 // (`123, 456`) or a result file in the agent's workspace (`lists/living.jsonl`),
@@ -49,7 +53,10 @@ export function extractCitationIds(
   files: WorkspaceFiles = new Map(),
 ): string[] {
   const ids: string[] = []
-  const markers = Array.from(text.matchAll(CITATION_PATTERN))
+  const markers = [
+    ...Array.from(text.matchAll(CITATION_PATTERN)),
+    ...Array.from(text.matchAll(QUOTE_PATTERN)),
+  ]
     .map((match) => ({ index: match.index ?? 0, ids: [match[1]] }))
     .concat(
       Array.from(text.matchAll(POST_LIST_PATTERN)).map((match) => {

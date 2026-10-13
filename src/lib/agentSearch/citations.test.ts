@@ -20,6 +20,13 @@ describe('agent search citations', () => {
     ).toEqual(['12', '34', '5'])
   })
 
+  test('a quote marker cites its tweet', () => {
+    expect(extractCitationIds('A [[q:7 | their words]] then [[t:8]]')).toEqual([
+      '7',
+      '8',
+    ])
+  })
+
   test('accepts only ids that a tool returned in the same run', () => {
     const seen = collectToolTweetIds([
       { tweets: [{ id: '12', text: 'x' }] },

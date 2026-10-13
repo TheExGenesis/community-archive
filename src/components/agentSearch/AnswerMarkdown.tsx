@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import Link from 'next/link'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import TweetCard from '@/components/TweetCard'
@@ -10,7 +9,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
-import { UNVERIFIED_HREF_PREFIX } from './messageView'
+import { QUOTE_HREF_PREFIX, UNVERIFIED_HREF_PREFIX } from './messageView'
+import { ProfileLink, ProfilePeopleContext } from './ProfilePreview'
 import { remarkProfileLinks, type Person } from './profileLinks'
 
 export type { Person }
@@ -118,6 +118,32 @@ function CitationChip({
   )
 }
 
+/**
+ * A quote the page checked against the tweet it cites: the tweet's own
+ * words. Hovering it lights up its citation, as hovering the chip does.
+ */
+function CheckedQuote({
+  anchor,
+  children,
+}: {
+  anchor: string
+  children: ReactNode
+}) {
+  const links = useCitationLinks()
+  const lit = links?.hovered === anchor || links?.selected?.anchor === anchor
+  return (
+    <q
+      onMouseEnter={() => links?.hover(anchor)}
+      onMouseLeave={() => links?.hover(null)}
+      className={`rounded-sm px-0.5 text-foreground transition-colors [box-decoration-break:clone] before:text-muted-foreground before:content-[open-quote] after:text-muted-foreground after:content-[close-quote] ${
+        lit ? 'bg-brand/15' : 'bg-brand/[0.06]'
+      }`}
+    >
+      {children}
+    </q>
+  )
+}
+
 // Module-level so every render passes the same component types. A fresh
 // object per render would remount the whole answer, which loses the reader's
 // selection and detaches the nodes the turn observes for reading position.
@@ -173,19 +199,19 @@ const COMPONENTS: Components = {
         </span>
       )
     }
+    if (href?.startsWith(QUOTE_HREF_PREFIX)) {
+      return (
+        <CheckedQuote anchor={href.slice(QUOTE_HREF_PREFIX.length)}>
+          {content}
+        </CheckedQuote>
+      )
+    }
     if (href?.startsWith('#ask-')) {
       return <CitationChip href={href}>{content}</CitationChip>
     }
     if (!href) return <span>{content}</span>
     if (href.startsWith('/user/')) {
-      return (
-        <Link
-          href={href}
-          className="rounded-sm underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        >
-          {content}
-        </Link>
-      )
+      return <ProfileLink href={href}>{content}</ProfileLink>
     }
     return (
       <a
@@ -217,14 +243,16 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
     [people],
   )
   return (
-    <ReactMarkdown
-      allowedElements={ALLOWED_ELEMENTS}
-      remarkPlugins={remarkPlugins}
-      skipHtml
-      unwrapDisallowed
-      components={COMPONENTS}
-    >
-      {children}
-    </ReactMarkdown>
+    <ProfilePeopleContext.Provider value={people}>
+      <ReactMarkdown
+        allowedElements={ALLOWED_ELEMENTS}
+        remarkPlugins={remarkPlugins}
+        skipHtml
+        unwrapDisallowed
+        components={COMPONENTS}
+      >
+        {children}
+      </ReactMarkdown>
+    </ProfilePeopleContext.Provider>
   )
 })

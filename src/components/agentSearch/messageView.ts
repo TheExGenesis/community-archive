@@ -5,10 +5,12 @@
 import type { UIMessage } from 'ai'
 import {
   CITATION_PATTERN,
+  QUOTE_PATTERN,
   collectWorkspaceFiles,
   splitPostLists,
 } from '@/lib/agentSearch/citations'
 import type { PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
+import { isVerbatim } from './quotes'
 
 export const NOT_SEARCHED_LINE =
   "Not searched: live X, people who never joined the archive (except in members' threads), deleted tweets"
@@ -42,6 +44,8 @@ export interface Citation {
 export type AnswerBlock =
   | { kind: 'text'; markdown: string }
   | { kind: 'list'; key: string; label: string; tweets: PortalTweet[] }
+  /** A citation alone on its line: the tweet shown whole, in place. */
+  | { kind: 'tweet'; key: string; citation: Citation }
 
 export interface AnswerView {
   /** The prose, each marker rewritten to a citation-chip link; no lists. */
@@ -625,12 +629,15 @@ export function citationAnchor(scope: string, tweetId: string) {
 }
 
 export const UNVERIFIED_HREF_PREFIX = '#ask-unverified-'
+/** A quote checked against its tweet links here, with the tweet's anchor. */
+export const QUOTE_HREF_PREFIX = '#quote-'
 
 /** A partial marker at the end of a streaming answer would flash as raw text. */
 // While streaming, an unfinished marker would flash as raw syntax.
 function trimPartialMarker(text: string) {
   return text
     .replace(/\[\[posts:[^\]]*\]?$/, '')
+    .replace(/\[\[q(?::[^\]]*)?\]?$/, '')
     .replace(/\[(?:\[(?:t(?::\d*)?)?)?\]?$/, '')
 }
 
@@ -639,6 +646,8 @@ function trimPartialMarker(text: string) {
  * markdown link the renderer turns into a chip. Ids absent from every tool
  * output are unverified: the model named them, the tools never returned them.
  */
+const EMBED_LINE = /^[ \t]*\[\[(?:t:)?(\d{1,20})\]\][ \t]*$/gm
+
 export function buildAnswer(
   text: string,
   found: FoundTweets,
@@ -650,37 +659,81 @@ export function buildAnswer(
   const unverified: string[] = []
   const listed: string[] = []
   const missingLists: string[] = []
-  const cite = (prose: string) =>
+  // The citation for a tweet a tool returned, numbered on first use; an id
+  // no tool returned is noted as unverified.
+  const citationFor = (id: string) => {
+    const tweet = found.byId.get(id)
+    if (!tweet) {
+      if (!unverified.includes(id)) unverified.push(id)
+      return null
+    }
+    let citation = citations.find((item) => item.id === id)
+    if (!citation) {
+      citation = {
+        id,
+        n: citations.length + 1,
+        tweet,
+        anchor: citationAnchor(scope, id),
+      }
+      citations.push(citation)
+    }
+    return citation
+  }
+  // A quote the tweet has word for word is shown as a quote; one it does not
+  // have is shown as the agent's words, without quote marks. Either way the
+  // tweet is cited.
+  const quote = (prose: string) =>
     prose.replace(
+      new RegExp(QUOTE_PATTERN.source, 'g'),
+      (_marker, id: string, words: string) => {
+        const citation = citationFor(id)
+        const safe = words.replace(/[[\]\\]/g, '')
+        if (!citation) {
+          return `${safe} [unverified](${UNVERIFIED_HREF_PREFIX}${id})`
+        }
+        const chip = `[${citation.n}](#${citation.anchor})`
+        return isVerbatim(words, citation.tweet.text)
+          ? `[${safe}](${QUOTE_HREF_PREFIX}${citation.anchor}) ${chip}`
+          : `${safe} ${chip}`
+      },
+    )
+  const cite = (value: string) => {
+    const prose = quote(value)
+    return prose.replace(
       new RegExp(CITATION_PATTERN.source, 'g'),
       (_marker, id: string, offset: number) => {
         // Chips need a gap from the word or chip before them, but no double space.
         const gap = offset > 0 && !/\s/.test(prose[offset - 1]) ? ' ' : ''
-        const tweet = found.byId.get(id)
-        if (!tweet) {
-          if (!unverified.includes(id)) unverified.push(id)
+        const citation = citationFor(id)
+        if (!citation)
           return `${gap}[unverified](${UNVERIFIED_HREF_PREFIX}${id})`
-        }
-        let citation = citations.find((item) => item.id === id)
-        if (!citation) {
-          citation = {
-            id,
-            n: citations.length + 1,
-            tweet,
-            anchor: citationAnchor(scope, id),
-          }
-          citations.push(citation)
-        }
         return `${gap}[${citation.n}](#${citation.anchor})`
       },
     )
+  }
 
   const blocks: AnswerBlock[] = []
   splitPostLists(source).forEach((part, index) => {
     if (part.type === 'text') {
-      if (part.value.trim()) {
-        blocks.push({ kind: 'text', markdown: cite(part.value) })
+      const prose = (value: string) => {
+        if (value.trim()) blocks.push({ kind: 'text', markdown: cite(value) })
       }
+      // A citation alone on its line shows the whole tweet there.
+      let last = 0
+      for (const match of Array.from(part.value.matchAll(EMBED_LINE))) {
+        const start = match.index ?? 0
+        prose(part.value.slice(last, start))
+        last = start + match[0].length
+        const citation = citationFor(match[1])
+        if (citation) {
+          blocks.push({
+            kind: 'tweet',
+            key: `${scope}-tweet-${index}-${start}`,
+            citation,
+          })
+        }
+      }
+      prose(part.value.slice(last))
       return
     }
     // A list naming a workspace file no tool reported is not shown, and

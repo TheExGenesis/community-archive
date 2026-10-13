@@ -329,6 +329,41 @@ describe('buildAnswer', () => {
     expect(
       buildAnswer('Claim [[t:12', found, 'm1', { streaming: true }).markdown,
     ).toBe('Claim ')
+    expect(
+      buildAnswer('Says [[q:10 | Pos', found, 'm1', { streaming: true })
+        .markdown,
+    ).toBe('Says ')
+  })
+
+  test('a quote the tweet has is shown as a quote; one it lacks, as plain words', () => {
+    const answer = buildAnswer(
+      'They wrote [[q:10 | post 10]], later [[q:20 | something else]].',
+      found,
+      'm1',
+    )
+    expect(answer.markdown).toBe(
+      'They wrote [post 10](#quote-ask-m1-tweet-10) [1](#ask-m1-tweet-10), later something else [2](#ask-m1-tweet-20).',
+    )
+    expect(answer.citations.map((c) => c.id)).toEqual(['10', '20'])
+    expect(buildAnswer('Said [[q:99 | hi]]', found, 'm1').unverified).toEqual([
+      '99',
+    ])
+  })
+
+  test('a citation alone on its line shows the whole tweet there', () => {
+    const answer = buildAnswer(
+      'It is this one:\n[[t:20]]\nAnd it cites [[t:10]] inline.',
+      found,
+      'm1',
+    )
+    expect(answer.blocks.map((block) => block.kind)).toEqual([
+      'text',
+      'tweet',
+      'text',
+    ])
+    const embed = answer.blocks[1]
+    expect(embed.kind === 'tweet' && embed.citation.n).toBe(1)
+    expect(answer.citations.map((c) => c.id)).toEqual(['20', '10'])
   })
 })
 
@@ -718,7 +753,9 @@ describe('workspace steps and the folded log line', () => {
       [assistant('a2', [search, text('A [[t:1]]\n[[posts: All | 1, 2]]')])],
       0,
     )
-    expect(logSummary(listed)).toBe('1 step · 2 tweets in the answer · 1 more found')
+    expect(logSummary(listed)).toBe(
+      '1 step · 2 tweets in the answer · 1 more found',
+    )
     const empty = buildTurnView(
       [
         assistant('a3', [

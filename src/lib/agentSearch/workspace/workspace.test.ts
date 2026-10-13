@@ -120,6 +120,31 @@ describe('the bash workspace', () => {
     expect(second.summary).toBe('Wrote lists/alice.jsonl · 2 tweets')
   })
 
+  test('other code in the process can still set process.env while a command awaits', async () => {
+    // A command waiting on the gateway leaves the event loop to other
+    // requests; with defense-in-depth on, Next then failed to set process.env.
+    let release: () => void = () => {}
+    ;(searchTweets as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ tweets: [], nextOffset: null })
+        }),
+    )
+    const pending = run('search singapore > s1.jsonl')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(() => {
+      process.env.AGENT_SEARCH_WORKSPACE_TEST = '1'
+    }).not.toThrow()
+    delete process.env.AGENT_SEARCH_WORKSPACE_TEST
+    release()
+    expect((await pending).exitCode).toBe(0)
+  })
+
+  test('only text tools run, and a failure inside a pipe is not hidden', async () => {
+    expect((await run('sqlite3 :memory: "select 1"')).exitCode).not.toBe(0)
+    expect((await run('cat missing.jsonl | head -1')).exitCode).not.toBe(0)
+  })
+
   test('jq and awk handle a few thousand tweets (the hardened caps stopped at 10,000 iterations)', async () => {
     const ids = Array.from({ length: 3000 }, (_, i) => String(1000 + i))
     for (const id of ids) archive.set(id, tweet(id))

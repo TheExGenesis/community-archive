@@ -9,7 +9,16 @@ const nextConfig = {
     // just-bash (the agent search workspace) ships ES-module worker files that
     // webpack would copy in as assets and fail to minify; Node loads it at
     // runtime instead.
-    serverComponentsExternalPackages: ['just-bash'],
+    serverComponentsExternalPackages: [
+      'just-bash',
+      // just-bash's own dependencies, per its Next.js guidance.
+      '@mongodb-js/zstd',
+      'node-liblzma',
+      'seek-bzip',
+      'sql.js',
+      'run',
+      'guarded-fetch',
+    ],
     outputFileTracingIncludes: {
       '/user/*/opengraph-image': [
         './src/app/user/*/community-archive-logo-white.png',

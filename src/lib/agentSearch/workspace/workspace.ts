@@ -1,4 +1,4 @@
-import { Bash } from 'just-bash'
+import { Bash, type CommandName } from 'just-bash'
 import { WORKSPACE_PATH } from '../citations'
 import { boundedTimeoutMs, type RunLimits } from '../deadline'
 import type { AgentTweet } from '../types'
@@ -16,6 +16,46 @@ import {
 } from './manifest'
 import type { BashToolOutput } from './output'
 import { formatRows, toRow, uniqueIds } from './rows'
+
+/** The built-in tools the agent may use alongside the archive commands. */
+const SHELL_COMMANDS: CommandName[] = [
+  'cat',
+  'head',
+  'tail',
+  'jq',
+  'grep',
+  'egrep',
+  'fgrep',
+  'rg',
+  'sort',
+  'uniq',
+  'wc',
+  'cut',
+  'awk',
+  'sed',
+  'tr',
+  'ls',
+  'find',
+  'echo',
+  'printf',
+  'mkdir',
+  'cp',
+  'mv',
+  'rm',
+  'tee',
+  'xargs',
+  'comm',
+  'join',
+  'paste',
+  'nl',
+  'seq',
+  'true',
+  'false',
+  'tac',
+  'pwd',
+  'basename',
+  'dirname',
+]
 
 // One shell command in the agent's workspace (the `bash` tool). The shell is
 // just-bash: bash interpreted in TypeScript over an in-memory filesystem, with
@@ -126,6 +166,16 @@ export async function runBashCommand({
     cwd: WORKSPACE_ROOT,
     files,
     customCommands: archiveCommands(state),
+    // Off: while a script runs, this layer patches process-wide globals
+    // (process, Function, timers), and our commands await network calls, so
+    // other requests in the same server ran against the patches and failed
+    // (Next could no longer set process.env). It is documented as secondary;
+    // the boundary here is the bash-only interpreter, an in-memory filesystem,
+    // no network, no JS or Python runtimes, and our own commands.
+    defenseInDepth: false,
+    // Text tools only: sqlite3 breaks when Next loads just-bash with require
+    // (just-bash#385), and curl and html-to-markdown need the network.
+    commands: SHELL_COMMANDS,
     executionLimitProfile: 'hardened',
     // The hardened profile's iteration caps (10,000) stop a jq projection
     // over a 1,000-tweet file, and a failure inside a pipe still exits 0;
@@ -144,7 +194,11 @@ export async function runBashCommand({
     },
   })
   const touched = trackWrites(bash.fs)
-  const result = await bash.exec(command, { signal: limits.abortSignal })
+  // pipefail: a limit or error inside a pipe exits non-zero, so the model
+  // sees the failure instead of an empty result.
+  const result = await bash.exec(`set -o pipefail; ${command}`, {
+    signal: limits.abortSignal,
+  })
 
   // Whatever the command wrote under the workspace, as manifest changes.
   const workspace: ManifestChanges = {}

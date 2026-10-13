@@ -177,3 +177,45 @@ describe('the conversation in the URL', () => {
     expect(mockChat.resumeStream).not.toHaveBeenCalled()
   })
 })
+
+describe('an answer whose stream ended early', () => {
+  test('reads on when the server says its run is still going, and passes reconnect settings to the transport', async () => {
+    mockChat.messages = thread
+    mockChat.status = 'ready'
+    mockChat.resumeStream.mockClear()
+    global.fetch = jest.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('/conversations/')
+          ? { messages: [], runningRunId: 'asr_live' }
+          : { conversations: [] },
+    })) as unknown as typeof fetch
+    render(<AgentSearch />)
+    await waitFor(() => expect(mockChat.resumeStream).toHaveBeenCalledTimes(1))
+    const options = mockTransport.options as unknown as {
+      maxConsecutiveErrors: number
+      fetch: unknown
+    }
+    expect(options.maxConsecutiveErrors).toBeGreaterThan(3)
+    expect(typeof options.fetch).toBe('function')
+  })
+
+  test('leaves a finished answer alone', async () => {
+    mockChat.messages = thread
+    mockChat.status = 'ready'
+    mockChat.resumeStream.mockClear()
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ conversations: [], runningRunId: null }),
+    })) as unknown as typeof fetch
+    render(<AgentSearch />)
+    await waitFor(() =>
+      expect(
+        (global.fetch as jest.Mock).mock.calls.some(([url]) =>
+          String(url).includes('/conversations/'),
+        ),
+      ).toBe(true),
+    )
+    expect(mockChat.resumeStream).not.toHaveBeenCalled()
+  })
+})

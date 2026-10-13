@@ -126,6 +126,7 @@ function slimBash(output: unknown): unknown {
     workspace: tweetFilesOnly(output.workspace),
     tweets: Array.isArray(output.tweets) ? output.tweets : [],
     ...(typeof output.costUsd === 'number' ? { costUsd: output.costUsd } : {}),
+    ...(isRecord(output.scores) ? { scores: output.scores } : {}),
   }
 }
 

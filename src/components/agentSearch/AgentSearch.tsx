@@ -13,6 +13,7 @@ import { RecentConversations } from './RecentConversations'
 import { StepLog } from './StepLog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConversationHistory, GHOST_BUTTON } from './ConversationHistory'
+import { createReconnectingFetch } from './reconnectingFetch'
 import {
   buildTurnView,
   describeChatError,
@@ -28,6 +29,10 @@ export const EXAMPLE_QUESTIONS = [
 ]
 
 const MAX_QUESTION_LENGTH = 1000
+/** Failed reads of a run's stream in a row before the transport gives up. */
+const STREAM_READ_ATTEMPTS = 8
+/** Times one run is picked up again after its stream ended early. */
+const MAX_RECOVERIES = 3
 
 const newConversationId = () => crypto.randomUUID()
 
@@ -127,6 +132,10 @@ export default function AgentSearch({
             ? `/api/agent-search/${encodeURIComponent(runIdRef.current)}/stream`
             : api,
         }),
+        // Spaced reconnects, refusals asked again (reconnectingFetch.ts),
+        // and more of them before the transport gives up.
+        fetch: createReconnectingFetch(),
+        maxConsecutiveErrors: STREAM_READ_ATTEMPTS,
       }),
     [],
   )
@@ -267,6 +276,54 @@ export default function AgentSearch({
     textareaRef.current?.focus()
   }, [error, messages, setMessages])
 
+  // A stream can end or fail while its run goes on (a dropped connection, a
+  // function time limit, a rebuild in development). When an answer's stream
+  // ends, ask the server whether the run is still going before leaving the
+  // answer as stopped, and read on if it is. A Stop closes the run first, so
+  // a stopped answer is never resumed. The partial answer is replaced by the
+  // replay, which starts from the beginning.
+  const recoveriesRef = useRef(new Map<string, number>())
+  // Runs the member stopped: their cancel may not have reached the server
+  // when the stream closes, so they are never picked up again.
+  const stoppedRunsRef = useRef(new Set<string>())
+  const endedIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (status !== 'ready' && status !== 'error') return
+    const last = messages[messages.length - 1]
+    if (last?.role !== 'assistant' || endedIdRef.current === last.id) return
+    endedIdRef.current = last.id
+    const id = conversation.id
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/agent-search/conversations/${encodeURIComponent(id)}`,
+          { cache: 'no-store' },
+        )
+        if (!response.ok || cancelled) return
+        const body = (await response.json()) as { runningRunId?: string | null }
+        const runId = body.runningRunId
+        if (!runId || cancelled || stoppedRunsRef.current.has(runId)) return
+        const tries = recoveriesRef.current.get(runId) ?? 0
+        if (tries >= MAX_RECOVERIES) return
+        recoveriesRef.current.set(runId, tries + 1)
+        runIdRef.current = runId
+        clearError()
+        setMessages((current) =>
+          current[current.length - 1]?.id === last.id
+            ? current.slice(0, -1)
+            : current,
+        )
+        void resumeStream()
+      } catch {
+        // The answer stays as it is; Ask again still works.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [status, messages, conversation.id, clearError, setMessages, resumeStream])
+
   // Stop cancels the workflow, not just the stream. Until the server has
   // returned the run id, aborting the request would leave the run going with
   // no way to cancel it, so Stop is remembered and runs again when the id
@@ -279,6 +336,7 @@ export default function AgentSearch({
     }
     stopPendingRef.current = false
     if (runId) {
+      stoppedRunsRef.current.add(runId)
       void fetch(`/api/agent-search/${encodeURIComponent(runId)}/cancel`, {
         method: 'POST',
       })

@@ -37,11 +37,12 @@ jest.mock('../semantic', () => ({
 import { getTweetsByIds, searchTweets } from '../gateway'
 import { semanticSearch } from '../semantic'
 import { applyChanges, type WorkspaceManifest } from './manifest'
-import { bashModelOutput } from './output'
+import { bashModelOutput, streamedBashOutput } from './output'
 import {
   WorkspaceUnavailableError,
   idsInOutput,
   runBashCommand,
+  scoresInOutput,
 } from './workspace'
 
 const tweet = (id: string, username = 'alice') => ({
@@ -176,6 +177,22 @@ describe('the bash workspace', () => {
     expect((getTweetsByIds as jest.Mock).mock.calls[0][0]).toEqual(['1'])
   })
 
+  test('scores of the files written and of rows printed go to the page', async () => {
+    const first = await run('search singapore > s1.jsonl')
+    const out = await run(
+      'score s1.jsonl "Does this tweet talk about living in Singapore?" > c1.jsonl; echo \'{"id":"9","p":0.333}\'',
+      applyChanges({}, first.workspace),
+    )
+    expect(out.scores).toEqual({
+      '1': 0.9,
+      '2': 0.2,
+      '3': 0.2,
+      '4': 0.2,
+      '9': 0.33,
+    })
+    expect(scoresInOutput('{"id":"5","p":1.5}\nnot json')).toEqual({})
+  })
+
   test('score keeps the scores in the file and reports what it spent', async () => {
     const first = await run('search singapore > s1.jsonl')
     const out = await run(
@@ -256,6 +273,27 @@ describe('the bash workspace', () => {
       '12',
       '123456789012345678',
     ])
+  })
+})
+
+describe('what the page receives of a command', () => {
+  test('a tweet already sent in the run goes as its id; stdout is cut after the model view is fixed', async () => {
+    const sent = new Set<string>()
+    const first = streamedBashOutput(
+      await run('search singapore > s1.jsonl'),
+      sent,
+    )
+    expect(first.tweets.map((t) => t.id)).toEqual(['1', '2', '3', '4'])
+
+    const raw = await run(
+      `search singapore | head -2; printf '%.0sx\\n' $(seq 1 3000)`,
+    )
+    const second = streamedBashOutput(raw, sent)
+    // Both tweets were sent by the first command: ids stay in the rows.
+    expect(second.tweets).toEqual([])
+    expect(second.stdout.length).toBeLessThanOrEqual(2000)
+    // The model sees exactly what it would have seen of the full output.
+    expect(bashModelOutput(second)).toEqual(bashModelOutput(raw))
   })
 })
 

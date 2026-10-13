@@ -21,6 +21,17 @@ export interface BashToolOutput {
   costUsd: number
   /** Semantic searches this command ran (a question may run only a few). */
   semanticCalls: number
+  /**
+   * Relevance scores (the scorer's p, two decimals) for tweets in the files
+   * written and rows printed with a p, so the page can sort by relevance.
+   */
+  scores?: Record<string, number>
+  /**
+   * What the model sees of this command, worked out before the stream
+   * output is slimmed (streamedBashOutput), so trimming stdout for the page
+   * cannot change it.
+   */
+  model?: { output: string; exitCode: number }
 }
 
 const MODEL_OUTPUT_CHARS = 4000
@@ -34,6 +45,13 @@ export function bashModelOutput(output: Partial<BashToolOutput>): {
   output: string
   exitCode: number
 } {
+  if (
+    output.model &&
+    typeof output.model.output === 'string' &&
+    typeof output.model.exitCode === 'number'
+  ) {
+    return output.model
+  }
   const exitCode = typeof output.exitCode === 'number' ? output.exitCode : 0
   if (typeof output.stdout !== 'string') {
     const files = Object.entries(output.files ?? {}).map(
@@ -62,3 +80,29 @@ export function bashModelOutput(output: Partial<BashToolOutput>): {
 }
 
 const STDERR_CHARS = 1000
+
+/** The page shows only a command's first printed line. */
+const PAGE_STDOUT_CHARS = 2000
+
+/**
+ * The output as it goes to the page and the run record. A run's stream is
+ * replayed from the start on every reconnect, and commands re-print the same
+ * tweets (a 27-command run sent 8,255 tweets, 2,591 of them distinct), so a
+ * tweet already sent earlier in the run goes as its id only: the page keeps
+ * every tweet it has seen in the run. Stdout is cut to what the page shows,
+ * after the model's view of it is fixed in `model`. `sent` collects the ids
+ * sent so far; the caller keeps it for the run.
+ */
+export function streamedBashOutput(
+  output: BashToolOutput,
+  sent: Set<string>,
+): BashToolOutput {
+  const tweets = output.tweets.filter((tweet) => !sent.has(tweet.id))
+  for (const tweet of tweets) sent.add(tweet.id)
+  return {
+    ...output,
+    model: output.model ?? bashModelOutput(output),
+    stdout: output.stdout.slice(0, PAGE_STDOUT_CHARS),
+    tweets,
+  }
+}

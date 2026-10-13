@@ -49,6 +49,7 @@ import {
   describeManifest,
   type WorkspaceManifest,
 } from '@/lib/agentSearch/workspace/manifest'
+import { streamedBashOutput } from '@/lib/agentSearch/workspace/output'
 import { runBashCommand } from '@/lib/agentSearch/workspace/workspace'
 
 // Each tool runs as a durable step, recorded in the run's event log and never
@@ -265,6 +266,8 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   let workspace: WorkspaceManifest = {}
   // A question may run only a few semantic searches (each about 14 s).
   let semanticUsed = 0
+  // Tweets already sent to the page in this run (streamedBashOutput).
+  const sentTweetIds = new Set<string>()
   const tools =
     toolMode === 'bash'
       ? createBashAgentTools(async (args) => {
@@ -277,7 +280,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
           )
           workspace = applyChanges(workspace, output.workspace)
           semanticUsed += output.semanticCalls ?? 0
-          return output
+          return streamedBashOutput(output, sentTweetIds)
         })
       : createAgentSearchTools({
           find_people: (args) => findPeopleStep(args, deadlineAt),

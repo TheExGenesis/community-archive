@@ -126,6 +126,23 @@ function trackWrites(fs: Bash['fs']) {
   return touched
 }
 
+const round2 = (p: number) => Math.round(p * 100) / 100
+
+/** Scores printed in rows on stdout: lines with an `"id"` and a `"p"`. */
+export function scoresInOutput(stdout: string): Record<string, number> {
+  const scores: Record<string, number> = {}
+  for (const line of stdout.split('\n')) {
+    const id = line.match(/"id"\s*:\s*"(\d{1,20})"/)
+    const p = line.match(/"p"\s*:\s*(\d*\.?\d+(?:e-?\d+)?)/)
+    if (!id || !p) continue
+    const value = Number(p[1])
+    if (Number.isFinite(value) && value >= 0 && value <= 1) {
+      scores[id[1]] = round2(value)
+    }
+  }
+  return scores
+}
+
 /** Tweet ids in command output: `"id":"…"` in rows, or bare ids on a line. */
 export function idsInOutput(stdout: string): string[] {
   const ids = new Set<string>()
@@ -202,6 +219,8 @@ export async function runBashCommand({
 
   // Whatever the command wrote under the workspace, as manifest changes.
   const workspace: ManifestChanges = {}
+  // Rows printed with a p first; a file the command wrote has the last word.
+  const scores = scoresInOutput(result.stdout)
   const changedFiles: Record<string, string[]> = {}
   for (const absolute of Array.from(touched)) {
     const path = relative(absolute)
@@ -214,7 +233,12 @@ export async function runBashCommand({
     if (!stat.isFile) continue
     const file = manifestFileFor(await bash.fs.readFile(absolute))
     workspace[path] = file
-    if (file?.kind === 'tweets') changedFiles[path] = uniqueIds(file.rows)
+    if (file?.kind === 'tweets') {
+      changedFiles[path] = uniqueIds(file.rows)
+      for (const row of file.rows) {
+        if (typeof row.p === 'number') scores[row.id] = round2(row.p)
+      }
+    }
   }
 
   if (state.calls > 0 && state.failures === state.calls) {
@@ -252,5 +276,6 @@ export async function runBashCommand({
     workspace,
     costUsd: state.costUsd,
     semanticCalls: state.semanticCalls,
+    ...(Object.keys(scores).length ? { scores } : {}),
   }
 }

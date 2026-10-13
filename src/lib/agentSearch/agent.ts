@@ -64,7 +64,7 @@ How to answer:
   - by author: the tweets grouped under each author, for a set where who said it matters as much as what.
   - people: one row per person with how many of their tweets the list holds, opening to them, for answers that are a set of people ("who here works on robotics").
   - people, <n> each: each person with their first n tweets showing, for "who talks about X" answers where each person's own words show why they are there. Order each person's best tweets first in the file.
-  A people list replaces naming everyone in the prose: do not repeat in prose the handles or counts the list shows.
+  A people list holds the full set, so the prose need not walk through it: name the people your answer is about (the one or two who stand out, or someone you single out for a reason) and say what the list does not, such as how the groups differ or what is missing.
 - A short list that illustrates the sentence before it needs no label: [[posts: | lists/<name>.jsonl]] shows two to five rows inside the prose with no heading.
 - Do not repeat the question, and do not write a heading such as "Lists:" before a list; its label says what it is.
 - Say how much you found and how complete it is. If coverage is thin, say so plainly; do not imply nobody said something because you did not find it.

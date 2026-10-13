@@ -45,8 +45,14 @@ test('a row shows who, when and the first line, and opens in place', () => {
   expect(row).toHaveTextContent('First line 1')
   expect(row).not.toHaveTextContent('second line')
   fireEvent.click(row)
-  expect(row).toHaveAttribute('aria-expanded', 'true')
+  // The open card replaces the row rather than repeating it above the card.
   expect(screen.getByText('Full card 1')).toBeInTheDocument()
+  expect(screen.queryByText('First line 1')).toBeNull()
+  const close = screen.getByRole('button', { name: 'Collapse tweet by @user1' })
+  expect(close).toHaveAttribute('aria-expanded', 'true')
+  expect(close).toHaveFocus()
+  fireEvent.click(close)
+  expect(screen.getByRole('button', { name: /@user1/ })).toHaveFocus()
 })
 
 test('sources show 25 rows, then a row that opens more in place', () => {

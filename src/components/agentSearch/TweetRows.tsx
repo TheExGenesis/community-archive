@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Plus } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { TweetAvatar } from '@/components/TweetAvatar'
@@ -27,8 +27,9 @@ const ROW_CLASS =
   'flex min-h-[3rem] w-full items-center gap-3 px-1 py-2 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring'
 
 /**
- * One tweet as a single line (who, when, how it starts) that opens in place
- * to the full card. A tweet the answer cites carries its citation number.
+ * One tweet as a row led by what it says, with who and when in small type,
+ * that opens in place into the full card. A tweet the answer cites carries
+ * its citation number.
  */
 export function TweetRow({
   tweet,
@@ -39,42 +40,76 @@ export function TweetRow({
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = useId()
+  // The row and the open card have different buttons; keep focus on
+  // whichever one now toggles, but not on first render.
+  const rowRef = useRef<HTMLButtonElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const toggled = useRef(false)
+  useEffect(() => {
+    if (!toggled.current) return
+    ;(open ? closeRef : rowRef).current?.focus()
+  }, [open])
+  const toggle = () => {
+    toggled.current = true
+    setOpen((value) => !value)
+  }
+  const chip = citation !== undefined && (
+    <span
+      aria-label={`Cited as ${citation}`}
+      className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-foreground"
+    >
+      {citation}
+    </span>
+  )
   return (
     <li className="border-b border-border">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-controls={bodyId}
-        className={ROW_CLASS}
-      >
-        <TweetAvatar tweet={tweet} size={28} />
-        <span className="shrink-0 font-medium text-foreground">
-          @{tweet.username}
-        </span>
-        <span className="shrink-0 text-muted-foreground">
-          {monthOf(tweet.createdAt)}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-muted-foreground">
-          {firstLine(tweet.text)}
-        </span>
-        {citation !== undefined && (
-          <span
-            aria-label={`Cited as ${citation}`}
-            className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-foreground"
-          >
-            {citation}
-          </span>
-        )}
-        <ChevronDown
-          aria-hidden="true"
-          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div id={bodyId} className="pb-3 pl-10">
-          <TweetCard tweet={tweet} showDate showExternalLink />
+      {open ? (
+        <div id={bodyId} className="flex items-start gap-2 py-1 pr-1">
+          <div className="min-w-0 flex-1">
+            <TweetCard tweet={tweet} showDate showExternalLink />
+          </div>
+          <div className="flex shrink-0 items-center gap-3 pt-3">
+            {chip}
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={toggle}
+              aria-expanded
+              aria-controls={bodyId}
+              aria-label={`Collapse tweet by @${tweet.username}`}
+              className="rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronDown aria-hidden="true" className="h-4 w-4 rotate-180" />
+            </button>
+          </div>
         </div>
+      ) : (
+        <button
+          ref={rowRef}
+          type="button"
+          onClick={toggle}
+          aria-expanded={false}
+          aria-controls={bodyId}
+          className={ROW_CLASS}
+        >
+          <TweetAvatar tweet={tweet} size={28} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs text-muted-foreground">
+              @{tweet.username}
+            </span>
+            <span className="block truncate text-foreground">
+              {firstLine(tweet.text)}
+            </span>
+          </span>
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            {monthOf(tweet.createdAt)}
+          </span>
+          {chip}
+          <ChevronDown
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+          />
+        </button>
       )}
     </li>
   )

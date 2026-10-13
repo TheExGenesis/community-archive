@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext } from 'react'
+import type { PortalTweet } from '@/lib/portal/types'
 
 /**
  * Links an answer's citation chips to its cited-posts rail. Keys are the
@@ -20,6 +21,8 @@ export interface CitationLinks {
   hover: (anchor: string | null) => void
   /** Narrow screens: open the post in a sheet; focus returns to `chip`. */
   openSheet: (anchor: string, chip: HTMLElement) => void
+  /** The cited tweet, for the card a chip shows on hover. */
+  tweetFor: (anchor: string) => PortalTweet | undefined
 }
 
 export const CitationContext = createContext<CitationLinks | null>(null)

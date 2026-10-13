@@ -1,9 +1,19 @@
-import { memo } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import TweetCard from '@/components/TweetCard'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
 import { UNVERIFIED_HREF_PREFIX } from './messageView'
+import { remarkProfileLinks, type Person } from './profileLinks'
+
+export type { Person }
 
 // Model-written markdown, so raw HTML is skipped and only reading elements are
 // kept. Images are dropped: an answer should point at tweets, not embed URLs.
@@ -49,27 +59,62 @@ function CitationChip({
   const links = useCitationLinks()
   const anchor = href.slice(1)
   const lit = links?.hovered === anchor || links?.selected?.anchor === anchor
+  const tweet = links?.tweetFor(anchor)
+  // On a pointer that can hover, the tweet opens in a card after a short
+  // pause and stays while the pointer moves onto it.
+  const [open, setOpen] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const later = (next: boolean, ms: number) => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => setOpen(next), ms)
+  }
+  const enter = () => {
+    links?.hover(anchor)
+    if (tweet && window.matchMedia('(hover: hover)').matches) later(true, 250)
+  }
+  const leave = () => {
+    links?.hover(null)
+    later(false, 150)
+  }
   return (
-    <a
-      href={href}
-      aria-label={`Citation ${String(children)}`}
-      onClick={(event) => {
-        if (!links) return
-        // Neither path follows the #anchor, so the page never jumps.
-        event.preventDefault()
-        if (window.matchMedia(RAIL_MEDIA).matches) links.select(anchor)
-        else links.openSheet(anchor, event.currentTarget)
-      }}
-      onMouseEnter={() => links?.hover(anchor)}
-      onMouseLeave={() => links?.hover(null)}
-      onFocus={() => links?.hover(anchor)}
-      onBlur={() => links?.hover(null)}
-      className={`${CHIP} ${CHIP_HIT_AREA} transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        lit ? 'bg-brand text-brand-foreground' : 'bg-muted text-foreground'
-      }`}
-    >
-      {children}
-    </a>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <a
+          href={href}
+          aria-label={`Citation ${String(children)}`}
+          onClick={(event) => {
+            if (!links) return
+            // Neither path follows the #anchor, so the page never jumps.
+            event.preventDefault()
+            if (window.matchMedia(RAIL_MEDIA).matches) links.select(anchor)
+            else links.openSheet(anchor, event.currentTarget)
+          }}
+          onMouseEnter={enter}
+          onMouseLeave={leave}
+          onFocus={() => links?.hover(anchor)}
+          onBlur={() => links?.hover(null)}
+          className={`${CHIP} ${CHIP_HIT_AREA} transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            lit ? 'bg-brand text-brand-foreground' : 'bg-muted text-foreground'
+          }`}
+        >
+          {children}
+        </a>
+      </PopoverTrigger>
+      {tweet && (
+        <PopoverContent
+          side="top"
+          align="start"
+          className="w-[22rem] p-0"
+          onMouseEnter={() => clearTimeout(timer.current)}
+          onMouseLeave={() => later(false, 150)}
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
+          <TweetCard tweet={tweet} stacked compact showDate />
+        </PopoverContent>
+      )}
+    </Popover>
   )
 }
 
@@ -132,6 +177,16 @@ const COMPONENTS: Components = {
       return <CitationChip href={href}>{content}</CitationChip>
     }
     if (!href) return <span>{content}</span>
+    if (href.startsWith('/user/')) {
+      return (
+        <Link
+          href={href}
+          className="rounded-sm underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          {content}
+        </Link>
+      )
+    }
     return (
       <a
         href={href}
@@ -147,15 +202,24 @@ const COMPONENTS: Components = {
 
 const REMARK_PLUGINS = [remarkGfm]
 
+const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
+
 export const AnswerMarkdown = memo(function AnswerMarkdown({
   children,
+  people = NO_PEOPLE,
 }: {
   children: string
+  /** People whose @handles link to their profiles. */
+  people?: ReadonlyMap<string, Person>
 }) {
+  const remarkPlugins = useMemo(
+    () => [...REMARK_PLUGINS, remarkProfileLinks(people)],
+    [people],
+  )
   return (
     <ReactMarkdown
       allowedElements={ALLOWED_ELEMENTS}
-      remarkPlugins={REMARK_PLUGINS}
+      remarkPlugins={remarkPlugins}
       skipHtml
       unwrapDisallowed
       components={COMPONENTS}

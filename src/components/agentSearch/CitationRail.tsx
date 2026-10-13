@@ -228,7 +228,7 @@ export const CitationRail = forwardRef<
       >
         <div
           ref={headerRef}
-          className="z-20 flex items-center gap-3 border-b border-border bg-background/95 py-2.5 backdrop-blur lg:sticky lg:top-0 lg:px-4"
+          className="z-20 flex min-h-[2.5rem] items-center gap-3 border-b border-border bg-background/95 py-1 backdrop-blur lg:sticky lg:top-0 lg:px-4"
         >
           <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             {title}

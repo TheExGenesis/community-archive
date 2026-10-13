@@ -118,7 +118,7 @@ function RunningLog({
       ]
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex min-h-[2.5rem] items-center justify-between gap-4">
         <p className="text-sm font-medium text-foreground">
           Searching
           <span

@@ -95,3 +95,22 @@ test('without delete handlers the list offers no delete', () => {
   )
   expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull()
 })
+
+test('while the list loads it shows its place; once loaded and empty, nothing', () => {
+  const { rerender } = render(
+    <RecentConversations conversations={null} loading onOpen={jest.fn()} />,
+  )
+  expect(
+    screen.getByRole('status', { name: 'Loading your past questions' }),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Recent' })).toBeInTheDocument()
+  rerender(
+    <RecentConversations
+      conversations={[]}
+      loading={false}
+      onOpen={jest.fn()}
+    />,
+  )
+  expect(screen.queryByRole('status')).toBeNull()
+  expect(screen.queryByRole('heading', { name: 'Recent' })).toBeNull()
+})

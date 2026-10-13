@@ -360,3 +360,38 @@ describe('a search handed over from archive search', () => {
     expect(screen.queryByText('From @visakanv')).toBeNull()
   })
 })
+
+test('arrival fetches the list once, with placeholders until it lands', async () => {
+  let release: () => void = () => {}
+  const fetchMock = jest.fn(
+    (_url: string) =>
+      new Promise((resolve) => {
+        release = () =>
+          resolve({
+            ok: true,
+            json: async () => ({
+              conversations: [],
+              dailyLimit: 10,
+              remainingToday: 9,
+              resetsAt: new Date(Date.now() + 6 * 3600_000).toISOString(),
+            }),
+          })
+      }),
+  )
+  global.fetch = fetchMock as unknown as typeof fetch
+  render(<AgentSearch />)
+  expect(
+    screen.getByRole('status', { name: 'Loading your past questions' }),
+  ).toBeInTheDocument()
+  expect(screen.queryByText(/left today/)).toBeNull()
+  release()
+  expect(await screen.findByText('9 left today')).toBeInTheDocument()
+  expect(
+    screen.queryByRole('status', { name: 'Loading your past questions' }),
+  ).toBeNull()
+  expect(
+    fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith('/api/agent-search/conversations'),
+    ),
+  ).toHaveLength(1)
+})

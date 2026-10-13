@@ -31,8 +31,11 @@ export function ConversationHistory({
   disabled,
   onDelete,
   onDeleteAll,
+  loading = false,
 }: {
   conversations: ConversationSummary[] | null
+  /** The list has not arrived yet: the button shows, the list shows its place. */
+  loading?: boolean
   currentId: string
   onOpen: (id: string) => void
   disabled?: boolean
@@ -43,7 +46,7 @@ export function ConversationHistory({
   // shared one would open the modal sheet behind the popover.
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
-  if (!conversations?.length) return null
+  if (!loading && !conversations?.length) return null
   const pick = (id: string) => {
     setPopoverOpen(false)
     setSheetOpen(false)
@@ -52,6 +55,7 @@ export function ConversationHistory({
   const list = (
     <RecentConversations
       conversations={conversations}
+      loading={loading}
       currentId={currentId}
       onOpen={pick}
       variant="compact"

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
 
 const dateFormat = new Intl.DateTimeFormat('en-US', {
@@ -109,8 +110,11 @@ export function RecentConversations({
   variant = 'section',
   onDelete,
   onDeleteAll,
+  loading = false,
 }: {
   conversations: ConversationSummary[] | null
+  /** The list has not arrived yet: show its place, not an empty history. */
+  loading?: boolean
   onOpen: (id: string) => void
   currentId?: string
   variant?: 'section' | 'compact'
@@ -118,8 +122,41 @@ export function RecentConversations({
   onDeleteAll?: DeleteHistory
 }) {
   const [confirming, setConfirming] = useState<string | null>(null)
-  if (!conversations?.length) return null
   const compact = variant === 'compact'
+  if (loading && !conversations) {
+    const rows = (
+      <div
+        role="status"
+        aria-label="Loading your past questions"
+        className={
+          compact ? 'space-y-1 p-2' : 'divide-y divide-border border-y'
+        }
+      >
+        {[72, 56, 64].map((width) => (
+          <div
+            key={width}
+            className={`flex min-h-[2.75rem] items-center justify-between gap-4 ${compact ? 'px-1' : 'px-1 py-2.5'}`}
+          >
+            <Skeleton className="h-4" style={{ width: `${width}%` }} />
+            <Skeleton className="h-3 w-12" />
+          </div>
+        ))}
+      </div>
+    )
+    if (compact) return rows
+    return (
+      <section aria-labelledby="recent-conversations" className="mt-10">
+        <h2
+          id="recent-conversations"
+          className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground [font-family:inherit]"
+        >
+          Recent
+        </h2>
+        {rows}
+      </section>
+    )
+  }
+  if (!conversations?.length) return null
   const ALL = ':all'
 
   const list = (

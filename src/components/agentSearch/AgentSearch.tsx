@@ -136,6 +136,9 @@ export default function AgentSearch({
   const [loading, setLoading] = useState(Boolean(initialConversationId))
   const [loadError, setLoadError] = useState<string | null>(null)
   const [recent, setRecent] = useState<ConversationSummary[] | null>(null)
+  // The list and the quota arrive together; until then both show
+  // placeholders, so "no history yet" is never shown while loading.
+  const [recentLoaded, setRecentLoaded] = useState(false)
   // Client clock when the current answer was asked for (or reopened), for the
   // status row's timer.
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
@@ -264,7 +267,18 @@ export default function AgentSearch({
     stop,
   } = useChat({ id: conversation.id, transport })
 
-  const loadRecent = useCallback(async () => {
+  // One request at a time: arrival fires both the mount and the status
+  // effects (twice each under Strict Mode), and they share the request.
+  const recentRequestRef = useRef<Promise<void> | null>(null)
+  const loadRecent = useCallback(() => {
+    recentRequestRef.current ??= fetchRecent().finally(() => {
+      recentRequestRef.current = null
+    })
+    return recentRequestRef.current
+    // fetchRecent only sets state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const fetchRecent = async () => {
     try {
       const response = await fetch('/api/agent-search/conversations', {
         cache: 'no-store',
@@ -314,8 +328,10 @@ export default function AgentSearch({
       }
     } catch {
       // The list is a convenience; the page works without it.
+    } finally {
+      setRecentLoaded(true)
     }
-  }, [])
+  }
 
   const openConversation = useCallback(async (id: string) => {
     shownConversationRef.current = id
@@ -773,7 +789,14 @@ export default function AgentSearch({
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-1 text-xs text-muted-foreground">
           <span className="ml-auto flex items-center gap-3">
-            {today && <QuestionsLeft today={today} />}
+            {today ? (
+              <QuestionsLeft today={today} />
+            ) : (
+              !recentLoaded && (
+                // Holds the count's place until the quota arrives.
+                <Skeleton aria-hidden="true" className="h-4 w-20" />
+              )
+            )}
             <button
               type="submit"
               disabled={!input.trim()}
@@ -873,6 +896,7 @@ export default function AgentSearch({
               <div className="-mr-2.5 flex items-center gap-1">
                 <ConversationHistory
                   conversations={recent}
+                  loading={!recentLoaded}
                   currentId={conversation.id}
                   onOpen={(id) => void openConversation(id)}
                   disabled={busy || loading}
@@ -945,6 +969,7 @@ export default function AgentSearch({
               </ul>
               <RecentConversations
                 conversations={recent}
+                loading={!recentLoaded}
                 onOpen={(id) => void openConversation(id)}
                 onDelete={deleteConversation}
                 onDeleteAll={deleteAllHistory}

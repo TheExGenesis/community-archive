@@ -6,6 +6,7 @@ import {
   readFile,
   readdir,
   rename,
+  stat,
   unlink,
   writeFile,
 } from 'fs/promises'
@@ -297,11 +298,26 @@ export function createFileRunStore(
     }
   }
 
+  // Parsed runs by file, reused while the file is unchanged. Lists and
+  // counts read every run, and some runs are megabytes of JSON; a write
+  // renames a new file into place, so its inode, size or time changes.
+  const parsed = new Map<string, { key: string; run: AgentSearchRun }>()
+
   const read = async (id: string): Promise<AgentSearchRun | null> => {
+    const file = fileFor(id)
     try {
-      return JSON.parse(await readFile(fileFor(id), 'utf8')) as AgentSearchRun
+      const info = await stat(file)
+      const key = `${info.ino}:${info.size}:${Math.trunc(info.mtimeMs)}`
+      const cached = parsed.get(file)
+      if (cached?.key === key) return cached.run
+      const run = JSON.parse(await readFile(file, 'utf8')) as AgentSearchRun
+      parsed.set(file, { key, run })
+      return run
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        parsed.delete(file)
+        return null
+      }
       throw error
     }
   }

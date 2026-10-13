@@ -1,3 +1,4 @@
+import * as fsPromises from 'fs/promises'
 import { mkdtemp, readFile, readdir, rm } from 'fs/promises'
 import os from 'os'
 import path from 'path'
@@ -69,6 +70,25 @@ describe('file run store', () => {
     expect(await store.get('missing')).toBeNull()
     // Atomic writes leave no temp files behind.
     expect(await readdir(dir)).toEqual(['wrun_01.json'])
+  })
+
+  test('lists reuse parsed runs until their file changes', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun({ id: 'wrun_a', question: 'first version' }))
+    const file = path.join(dir, 'wrun_a.json')
+    expect((await store.listRecent('42', 10))[0].question).toBe('first version')
+    // Rewrite the file in place with the same size and time: the store
+    // serves its parsed copy rather than reading the file again.
+    const before = await fsPromises.stat(file)
+    const text = await readFile(file, 'utf8')
+    await fsPromises.writeFile(file, text.replace('first', 'other'), 'utf8')
+    await fsPromises.utimes(file, before.atimeMs / 1000, before.mtimeMs / 1000)
+    expect((await store.listRecent('42', 10))[0].question).toBe('first version')
+    expect(await store.countSince('42', '2026-01-01T00:00:00.000Z')).toBe(1)
+    // Once the file changes, the change shows.
+    await store.update('wrun_a', { status: 'completed' })
+    const [run] = await store.listRecent('42', 10)
+    expect(run.status).toBe('completed')
   })
 
   test('adds every usage increment when they overlap', async () => {

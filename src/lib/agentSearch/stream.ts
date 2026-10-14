@@ -6,7 +6,9 @@ import { RunExpiredError } from 'workflow/errors'
 // route's stream stayed open until its 300 s limit after a cancel), a run that
 // ends without its own finish closes without one, and a run past Workflow's
 // retention throws RunExpiredError when read. Any of these would keep the page
-// waiting or polling, so these streams always end with a finish chunk.
+// waiting or polling, so these streams end with a finish chunk once the source
+// has closed, and fail (so the page reconnects) when they cannot tell that the
+// page has everything the run wrote.
 
 const FINISH: UIMessageChunk = { type: 'finish' }
 const TERMINAL = new Set(['completed', 'failed', 'cancelled'])
@@ -29,9 +31,14 @@ export const isTerminalStatus = (status: string | null | undefined) =>
 
 /**
  * Passes the run's chunks through and ends with a finish chunk when the
- * source closes without one, has expired, or stays silent while `runEnded`
- * reports the run over (checked every `pollMs` while a read waits). Any other
- * read error still fails the response, so the page reconnects and tries again.
+ * source closes without one, or has expired. While a read waits, `runEnded`
+ * is checked every `pollMs`: once the run is over, chunks already written may
+ * still be arriving, so reading goes on until the source closes or has been
+ * quiet for a moment. A source still open then is not trusted to have given
+ * everything, so the stream fails instead of finishing: the page reconnects
+ * from where it was, and a cancelled or expired run answers that reconnect
+ * with a plain finish (the stream route). Any other read error also fails the
+ * response, so the page reconnects and tries again.
  */
 export function endWithFinish(
   source: ReadableStream<UIMessageChunk>,
@@ -63,8 +70,6 @@ export function endWithFinish(
   // A read that lost a race stays pending and is reused, so no chunk is lost.
   let pendingRead: Promise<ReadableStreamReadResult<UIMessageChunk>> | null =
     null
-  // Once the run is over, chunks already written may still be arriving:
-  // keep reading until the source is quiet for DRAIN_MS.
   let draining = false
   const quiet = () =>
     new Promise<'ended'>((resolve) =>
@@ -85,7 +90,13 @@ export function endWithFinish(
               continue
             }
             void reader.cancel().catch(() => undefined)
-            return end(controller)
+            // Its own finish already went through: nothing is missing.
+            if (finished) return end(controller)
+            stopped = true
+            controller.error(
+              new Error('The run is over; its stream stayed open'),
+            )
+            return
           }
           pendingRead = null
           if (next.done) return end(controller)
@@ -106,30 +117,24 @@ export function endWithFinish(
   })
 }
 
-/** How long a closed stream waits for its run's status to catch up. */
-const SETTLE_MS = 2_000
-
 /**
  * Lets a run's stream close only once the run is over. The run's readable
  * can close while the run goes on (with the local world it closed after
  * 45 to 110 s while the workflow kept calling the model), and the UI chunk
  * transform answers any close with a finish chunk, which tells the page the
  * answer is done. Failing the stream instead makes the page reconnect and
- * read on from where it was. A run whose status lags its last chunk gets a
- * short grace before the stream fails.
+ * read on from where it was. A close seen while the run is still going fails
+ * even if the run ends a moment later: the page cannot have the chunks
+ * written after the close, and the reconnect replays them.
  */
 export function closeWhenRunEnds<T>(
   source: ReadableStream<T>,
   runEnded: () => Promise<boolean>,
-  settleMs: number = SETTLE_MS,
 ): ReadableStream<T> {
-  const ended = () => runEnded().catch(() => false)
   return source.pipeThrough(
     new TransformStream<T, T>({
       async flush(controller) {
-        if (await ended()) return
-        await new Promise((resolve) => setTimeout(resolve, settleMs))
-        if (await ended()) return
+        if (await runEnded().catch(() => false)) return
         controller.error(
           new Error('The run is still going; its stream closed early'),
         )

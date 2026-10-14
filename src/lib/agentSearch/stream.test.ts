@@ -76,19 +76,49 @@ describe('agent search streams', () => {
     ).rejects.toThrow('network')
   })
 
-  test('a stream left open after its run ended, as on cancel, still finishes', async () => {
+  test('a stream left open after its run ended, as on cancel, fails so the page reconnects', async () => {
+    let cancelled = false
     const open = new ReadableStream<UIMessageChunk>({
       start(controller) {
         controller.enqueue({ type: 'start' })
       },
+      cancel() {
+        cancelled = true
+      },
     })
     let checks = 0
     const ended = async () => ++checks >= 2
-    expect(await read(endWithFinish(open, ended, 5))).toEqual([
-      'start',
-      'finish',
-    ])
+    const out: string[] = []
+    const reader = endWithFinish(open, ended, 5).getReader()
+    out.push((await reader.read()).value?.type as string)
+    // The reconnect gets a plain finish from the stream route; this stream
+    // cannot say whether anything was still on its way.
+    await expect(reader.read()).rejects.toThrow(/stayed open/)
+    expect(out).toEqual(['start'])
     expect(checks).toBe(2)
+    expect(cancelled).toBe(true)
+  })
+
+  test('a chunk still on its way after the run ended is not cut off by a finish', async () => {
+    // The run is over; its last words land after the quiet window.
+    let late: NodeJS.Timeout | undefined
+    const source = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: 'text-delta', id: 't', delta: 'Partial' })
+        late = setTimeout(() => {
+          controller.enqueue({ type: 'text-delta', id: 't', delta: ' end' })
+          controller.close()
+        }, 1_150)
+      },
+      cancel() {
+        clearTimeout(late)
+      },
+    })
+    const out: UIMessageChunk[] = []
+    const reader = endWithFinish(source, async () => true, 5).getReader()
+    out.push((await reader.read()).value as UIMessageChunk)
+    await expect(reader.read()).rejects.toThrow(/stayed open/)
+    expect(out).toEqual([{ type: 'text-delta', id: 't', delta: 'Partial' }])
   })
 
   test('keeps chunks that arrive while it checks whether the run ended', async () => {
@@ -134,22 +164,25 @@ describe('a run stream that closes early', () => {
   }
 
   test('closes when the run is over', async () => {
-    expect(
-      await drain(closeWhenRunEnds(raw(1, 2), async () => true, 0)),
-    ).toEqual([1, 2])
+    expect(await drain(closeWhenRunEnds(raw(1, 2), async () => true))).toEqual([
+      1, 2,
+    ])
   })
 
   test('fails, so the page reconnects, when the run is still going', async () => {
     const out: number[] = []
-    const reader = closeWhenRunEnds(raw(1), async () => false, 0).getReader()
+    const reader = closeWhenRunEnds(raw(1), async () => false).getReader()
     out.push((await reader.read()).value as number)
     await expect(reader.read()).rejects.toThrow(/still going/)
     expect(out).toEqual([1])
   })
 
-  test('waits briefly for a status that lags the last chunk', async () => {
+  test('a close seen while the run is going fails even when the run ends right after', async () => {
+    // The chunks written after the close are only on the replay.
     let calls = 0
     const ended = async () => ++calls > 1
-    expect(await drain(closeWhenRunEnds(raw(1), ended, 0))).toEqual([1])
+    const reader = closeWhenRunEnds(raw(1), ended).getReader()
+    expect((await reader.read()).value).toBe(1)
+    await expect(reader.read()).rejects.toThrow(/still going/)
   })
 })

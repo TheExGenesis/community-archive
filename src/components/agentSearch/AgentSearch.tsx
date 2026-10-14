@@ -23,7 +23,10 @@ import { QuestionHandling } from './QuestionHandling'
 import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { SIDEBAR_ROOM } from './CitationSidebar'
-import { closeCitationSidebar, useCitationSidebar } from './citationSidebarStore'
+import {
+  closeCitationSidebar,
+  useCitationSidebar,
+} from './citationSidebarStore'
 import { RecentConversations } from './RecentConversations'
 import { StepLog } from './StepLog'
 import { TweetLinksInNewTab } from '@/components/portal/tweetLinks'
@@ -31,7 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ConversationHistory, GHOST_BUTTON } from './ConversationHistory'
 import { createReconnectingFetch } from './reconnectingFetch'
 import {
-  buildTurnView,
+  createTurnViewBuilder,
   describeChatError,
   messageText,
   type TurnView,
@@ -817,21 +820,18 @@ export default function AgentSearch({
   // Each answer's view, by message index; a question needs its reply's.
   // Built only when the messages change, or more of a reopened
   // conversation's tweets arrive: typing in the box re-renders the page, and
-  // rebuilding every answer per keystroke made typing lag.
-  const views = useMemo(() => {
-    const built = new Map<number, TurnView>()
-    messages.forEach((message, index) => {
-      if (message.role !== 'assistant') return
-      built.set(
-        index,
-        buildTurnView(messages, index, {
-          streaming: busy && index === messages.length - 1,
-          supply,
-        }),
-      )
-    })
-    return built
-  }, [messages, busy, supply])
+  // rebuilding every answer per keystroke made typing lag. Finished answers
+  // keep their view across a streamed update, so only the answer being
+  // written is rebuilt and rendered per chunk.
+  const buildViews = useMemo(createTurnViewBuilder, [])
+  const views = useMemo(
+    () =>
+      buildViews(messages, {
+        streaming: busy ? messages.length - 1 : null,
+        supply,
+      }),
+    [buildViews, messages, busy, supply],
+  )
   // Stable handlers for the answers, so a memoized turn skips re-rendering
   // while the member types; each calls the latest ask or stop.
   const askRef = useRef(ask)

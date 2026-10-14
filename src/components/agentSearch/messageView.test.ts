@@ -8,6 +8,7 @@ import {
   buildAnswer,
   buildCoverage,
   buildTurnView,
+  createTurnViewBuilder,
   citesSomeoneElse,
   collectToolTweets,
   describeChatError,
@@ -698,6 +699,51 @@ describe('buildTurnView', () => {
       { label: 'Moved early', tweets: [expect.objectContaining({ id: '1' })] },
     ])
     expect(buildTurnView([assistant('a2', [text('x')])], 0).groups).toBeNull()
+  })
+})
+
+describe('views kept between builds', () => {
+  const search = (id: string) =>
+    toolPart('search_tweets', { query: id }, { tweets: [tweet(id)] })
+  const first = assistant('a1', [search('1'), text('First [[t:1]]')])
+
+  test('a finished turn keeps its view while a later one streams, and is built again when what it rests on changes', () => {
+    const build = createTurnViewBuilder()
+    // As the page holds them: only the answer being written changes.
+    const asked = [user('u1', 'Who?'), user('u2', 'And?')]
+    const thread = (answer: string) => [
+      asked[0],
+      first,
+      asked[1],
+      assistant('a2', [text(answer)]),
+    ]
+    const streamed = build(thread('Second'), { streaming: 3 })
+    const next = build(thread('Second, more'), { streaming: 3 })
+    expect(next.get(1)).toBe(streamed.get(1))
+    expect(next.get(3)).not.toBe(streamed.get(3))
+    expect(next.get(3)?.answer.markdown).toBe('Second, more')
+    // The stream ends: the last turn is built once more, as finished.
+    const finished = thread('Second, more')
+    const done = build(finished, {})
+    expect(done.get(1)).toBe(streamed.get(1))
+    expect(done.get(3)).not.toBe(next.get(3))
+    expect(build(finished, {}).get(3)).toBe(done.get(3))
+    // More tweets for a reopened conversation rebuild every answer.
+    const supply = { tweets: new Map(), states: new Map() }
+    const supplied = build(finished, { supply })
+    expect(supplied.get(1)).not.toBe(done.get(1))
+    expect(build(finished, { supply }).get(1)).toBe(supplied.get(1))
+    // An earlier message changing rebuilds the turns after it, which cite
+    // through it.
+    const earlier = [
+      asked[0],
+      assistant('a1', [search('2'), text('First [[t:2]]')]),
+      finished[2],
+      finished[3],
+    ]
+    const changed = build(earlier, { supply })
+    expect(changed.get(1)).not.toBe(supplied.get(1))
+    expect(changed.get(3)).not.toBe(supplied.get(3))
   })
 })
 

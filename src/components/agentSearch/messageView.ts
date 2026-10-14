@@ -901,6 +901,7 @@ export function collectToolTweets(
   const byId = new Map<string, PortalTweet>()
   const full = new Set<string>()
   const results: string[] = []
+  const listed = new Set<string>()
   const scores = new Map<string, number>()
   const missing = new Map<string, TweetLoad>()
 
@@ -944,7 +945,10 @@ export function collectToolTweets(
             : quotedAsPortal(value as unknown as PortalQuotedTweet),
         )
       }
-      if (!embedded && !results.includes(id)) results.push(id)
+      if (!embedded && !listed.has(id)) {
+        listed.add(id)
+        results.push(id)
+      }
       const p = asNumber(value.p)
       if (p !== undefined) scores.set(id, Math.max(p, scores.get(id) ?? 0))
     }
@@ -1048,8 +1052,9 @@ export function buildAnswer(
 ): AnswerView {
   const source = options.streaming ? trimPartialMarker(text) : text
   const citations: Citation[] = []
-  const unverified: string[] = []
-  const listed: string[] = []
+  const byCitedId = new Map<string, Citation>()
+  const unverified = new Set<string>()
+  const listed = new Set<string>()
   const missingLists: string[] = []
   const loading: string[] = []
   const failed: string[] = []
@@ -1080,10 +1085,10 @@ export function buildAnswer(
     const tweet = found.byId.get(id) ?? null
     const missing = found.missing.get(id)
     if (!tweet && !missing) {
-      if (!unverified.includes(id)) unverified.push(id)
+      unverified.add(id)
       return null
     }
-    let citation = citations.find((item) => item.id === id)
+    let citation = byCitedId.get(id)
     if (!citation) {
       if (missing) noteMissing(id, missing)
       const base = {
@@ -1095,6 +1100,7 @@ export function buildAnswer(
         ? { ...base, tweet, state: 'loaded' }
         : { ...base, tweet: null, state: missing as TweetLoad }
       citations.push(citation)
+      byCitedId.set(id, citation)
     }
     return citation
   }
@@ -1174,18 +1180,18 @@ export function buildAnswer(
       if (!tweet) {
         const missing = found.missing.get(id)
         if (!missing) {
-          if (!unverified.includes(id)) unverified.push(id)
+          unverified.add(id)
           continue
         }
         noteMissing(id, missing)
         if (missing !== 'unavailable') {
           pending.push({ id, state: missing })
-          if (!listed.includes(id)) listed.push(id)
+          listed.add(id)
         }
         continue
       }
       tweets.push(tweet)
-      if (!listed.includes(id)) listed.push(id)
+      listed.add(id)
     }
     if (tweets.length || pending.length) {
       const scores = new Map<string, number>()
@@ -1231,8 +1237,8 @@ export function buildAnswer(
     markdown,
     blocks: shown,
     citations: withheld ? [] : citations,
-    listed,
-    unverified: withheld ? [] : unverified,
+    listed: Array.from(listed),
+    unverified: withheld ? [] : Array.from(unverified),
     missingLists,
     loading,
     failed,
@@ -1392,6 +1398,67 @@ export interface TurnViewOptions {
   supply?: TweetSupply
 }
 
+// Earlier turns' tool outputs are read for every turn built after them; a
+// finished message keeps the same object, so its outputs are parsed once.
+const outputsByMessage = new WeakMap<UIMessage, unknown[]>()
+function toolOutputs(message: UIMessage): unknown[] {
+  let outputs = outputsByMessage.get(message)
+  if (!outputs) {
+    outputs = toolCalls(message).map((call) => call.output)
+    outputsByMessage.set(message, outputs)
+  }
+  return outputs
+}
+
+/**
+ * Builds the views of every answer in a conversation, by message index. A
+ * finished turn keeps its view from the last build as long as nothing it
+ * rests on has changed: its message, the messages before it (a follow-up
+ * cites through them) and the tweet supply. Each streamed update then
+ * rebuilds only the turn being written, and the turns that kept their view
+ * are not rendered again.
+ */
+export function createTurnViewBuilder() {
+  let last: {
+    messages: UIMessage[]
+    supply: TweetSupply | undefined
+    views: Map<number, TurnView>
+    /** The turn built as still streaming; it is built again once done. */
+    streaming: number | null
+  } | null = null
+  return (
+    messages: UIMessage[],
+    options: {
+      /** The index of the turn being written, if one is. */
+      streaming?: number | null
+      supply?: TweetSupply
+    } = {},
+  ): Map<number, TurnView> => {
+    const streaming = options.streaming ?? null
+    const views = new Map<number, TurnView>()
+    // Whether every message so far is the one the last build saw.
+    let unchanged = last !== null && last.supply === options.supply
+    messages.forEach((message, index) => {
+      unchanged &&= last!.messages[index] === message
+      if (message.role !== 'assistant') return
+      const kept =
+        unchanged && index !== streaming && index !== last!.streaming
+          ? last!.views.get(index)
+          : undefined
+      views.set(
+        index,
+        kept ??
+          buildTurnView(messages, index, {
+            streaming: index === streaming,
+            supply: options.supply,
+          }),
+      )
+    })
+    last = { messages, supply: options.supply, views, streaming }
+    return views
+  }
+}
+
 /**
  * Builds the view for the assistant message at `index`. Citations resolve
  * against tool outputs from this and earlier turns, since a follow-up answer
@@ -1407,7 +1474,7 @@ export function buildTurnView(
   const priorOutputs = messages
     .slice(0, index)
     .filter((item) => item.role === 'assistant')
-    .flatMap((item) => toolCalls(item).map((call) => call.output))
+    .flatMap(toolOutputs)
   const ownOutputs = calls.map((call) => call.output)
   const found = collectToolTweets(
     [...ownOutputs, ...priorOutputs],
@@ -1538,7 +1605,8 @@ function foundSoFar(
       own.byId.has(id),
     )
     if (!latest.length) continue
-    const rest = own.results.filter((id) => !latest.includes(id))
+    const inLatest = new Set(latest)
+    const rest = own.results.filter((id) => !inLatest.has(id))
     const text = progressFor([call])[0]?.text ?? ''
     return {
       topFound: [...latest, ...rest].slice(0, TOP_FOUND).map(item),

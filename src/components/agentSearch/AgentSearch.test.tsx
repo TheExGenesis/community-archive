@@ -213,6 +213,41 @@ describe('the conversation in the URL', () => {
       String(url).includes('/conversations/'),
     ).length
 
+  test('a conversation opened from the list gets its own history entry, so Back returns to the list', async () => {
+    window.history.replaceState(null, '', '/search/ask')
+    global.fetch = jest.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        String(url).includes('/conversations/')
+          ? { messages: thread, runningRunId: null }
+          : {
+              conversations: [
+                {
+                  id: 'c1',
+                  title: 'Who tweets about Singapore?',
+                  startedAt: '2026-10-09T10:00:00.000Z',
+                  updatedAt: '2026-10-09T10:00:00.000Z',
+                  turns: 1,
+                  status: 'completed',
+                },
+              ],
+              dailyLimit: 10,
+              remainingToday: 9,
+            },
+    })) as unknown as typeof fetch
+    render(<AgentSearch />)
+    const entries = window.history.length
+    fireEvent.click(await screen.findByText('Who tweets about Singapore?'))
+    await waitFor(() => expect(window.location.search).toBe('?c=c1'))
+    expect(window.history.length).toBe(entries + 1)
+
+    window.history.back()
+    await waitFor(() => expect(window.location.search).toBe(''))
+    await waitFor(() =>
+      expect(mockChat.setMessages).toHaveBeenLastCalledWith([]),
+    )
+  })
+
   test('opening a running conversation resumes it once, even when the page renders again', async () => {
     runningConversation()
     const { rerender } = render(

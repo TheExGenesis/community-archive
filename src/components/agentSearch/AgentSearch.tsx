@@ -137,14 +137,21 @@ function storedSettles(live: UIMessage, stored: UIMessage, broke: boolean) {
   return !written || (kept.length > written.length && kept.startsWith(written))
 }
 
-/** Points the address bar at a conversation (or none) without a navigation. */
-function showConversationInUrl(id: string | null) {
+/**
+ * Points the address bar at a conversation (or none) without a navigation.
+ * `push` adds a history entry, so Back returns to what was on screen.
+ */
+function showConversationInUrl(id: string | null, push = false) {
   const url = new URL(window.location.href)
   if (id) url.searchParams.set('c', id)
   else url.searchParams.delete('c')
+  if (url.href === window.location.href) return
   // Null state, not window.history.state: Next's router skips entries that
-  // carry its own marker, then puts its old URL back on the next render.
-  window.history.replaceState(null, '', url)
+  // carry its own marker, then puts its old URL back on the next render. It
+  // also ignores Back and Forward onto entries without its state, so the
+  // page follows those itself (the popstate effect).
+  if (push) window.history.pushState(null, '', url)
+  else window.history.replaceState(null, '', url)
 }
 
 /** Drops a handed-over search from the address bar, so a reload asks fresh. */
@@ -537,7 +544,8 @@ export default function AgentSearch({
     return loadRef.current
   }
 
-  const openConversation = useCallback(async (id: string) => {
+  // `push`: opened by the reader, so Back returns to what was on screen.
+  const openConversation = useCallback(async (id: string, push = false) => {
     const load = leaveLoadBehind()
     const current = () => loadRef.current === load
     shownConversationRef.current = id
@@ -557,7 +565,7 @@ export default function AgentSearch({
       setInput(prefillRef.current?.text ?? '')
       setAskFilters(prefillRef.current?.filters ?? [])
       prefillRef.current = null
-      showConversationInUrl(id)
+      showConversationInUrl(id, push)
     } catch {
       if (!current()) return
       setLoadError('That conversation could not be opened.')
@@ -873,7 +881,9 @@ export default function AgentSearch({
       ?.scrollIntoView({ block: 'start' })
   }, [messages])
 
-  const startNewConversation = () => {
+  // How the address bar follows: a new entry when the reader starts one, the
+  // same entry when the open one was deleted, unchanged after Back or Forward.
+  const resetConversation = (url: 'push' | 'replace' | 'keep') => {
     if (busy) return
     if (error) clearError()
     leaveLoadBehind()
@@ -884,9 +894,32 @@ export default function AgentSearch({
     stopTweetLoader()
     setSupply(EMPTY_SUPPLY)
     setConversation({ id: fresh, pending: [], runningRunId: null })
-    showConversationInUrl(null)
+    if (url !== 'keep') showConversationInUrl(null, url === 'push')
     textareaRef.current?.focus()
   }
+  const startNewConversation = () => resetConversation('push')
+  const resetConversationRef = useRef(resetConversation)
+  resetConversationRef.current = resetConversation
+
+  // Back and Forward between conversations on this page. While an answer is
+  // being written the conversation stays, as the history menu does; the
+  // address goes back to it.
+  useEffect(() => {
+    const askPath = window.location.pathname
+    const onPopState = () => {
+      if (window.location.pathname !== askPath) return
+      const id = new URL(window.location.href).searchParams.get('c')
+      if (id === shownConversationRef.current) return
+      if (busyRef.current) {
+        showConversationInUrl(shownConversationRef.current)
+        return
+      }
+      if (id) void openConversation(id)
+      else resetConversationRef.current('keep')
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [openConversation])
 
   // Deleting history: the server keeps each run's accounting, so today's
   // questions still count. Deleting the open conversation starts a new one.
@@ -904,7 +937,7 @@ export default function AgentSearch({
     } catch {
       return 'Could not delete. Try again.'
     }
-    if (clearsOpen) startNewConversation()
+    if (clearsOpen) resetConversation('replace')
     await loadRecent()
     return null
   }
@@ -1194,7 +1227,7 @@ export default function AgentSearch({
                   conversations={recent}
                   loading={!recentLoaded}
                   currentId={conversation.id}
-                  onOpen={(id) => void openConversation(id)}
+                  onOpen={(id) => void openConversation(id, true)}
                   disabled={busy || loading}
                   onDelete={deleteConversation}
                   onDeleteAll={deleteAllHistory}
@@ -1266,7 +1299,7 @@ export default function AgentSearch({
               <RecentConversations
                 conversations={recent}
                 loading={!recentLoaded}
-                onOpen={(id) => void openConversation(id)}
+                onOpen={(id) => void openConversation(id, true)}
                 onDelete={deleteConversation}
                 onDeleteAll={deleteAllHistory}
               />

@@ -2,7 +2,8 @@
 // a few failed reads, and it treats a refused reconnect (a 409 while the run
 // starts, a 503 while the archive or the dev server is busy) as final. In dev
 // both ended answers the run went on to finish. This fetch spaces reconnects
-// that come close together and retries the refusals that pass.
+// that come close together and retries the refusals that pass, and the
+// reconnects that never reached the server (the network dropped).
 
 /** A reconnect to a run's stream, as the transport builds it. */
 const STREAM_URL = /\/stream\?startIndex=\d+$/
@@ -32,6 +33,9 @@ const wait = (ms: number, signal?: AbortSignal | null) =>
 const backoff = (attempt: number) =>
   attempt <= 0 ? 0 : Math.min(FIRST_DELAY_MS * 2 ** (attempt - 1), MAX_DELAY_MS)
 
+const isAbort = (error: unknown) =>
+  error instanceof Error && error.name === 'AbortError'
+
 export function createReconnectingFetch(
   base: typeof fetch = (...args) => fetch(...args),
   now: () => number = Date.now,
@@ -46,6 +50,7 @@ export function createReconnectingFetch(
           ? input.href
           : input.url
     const method = (init?.method ?? 'GET').toUpperCase()
+    // The question itself (the paid POST) is never sent twice.
     if (method !== 'GET' || !STREAM_URL.test(url)) return base(input, init)
 
     const started = now()
@@ -54,7 +59,17 @@ export function createReconnectingFetch(
     await wait(backoff(streak), init?.signal)
 
     for (let refusal = 0; ; refusal++) {
-      const response = await base(input, init)
+      let response: Response
+      try {
+        response = await base(input, init)
+      } catch (error) {
+        // No answer at all (the network dropped): asked again like a
+        // refusal. A Stop ends it at once.
+        if (init?.signal?.aborted || isAbort(error) || refusal >= MAX_REFUSALS)
+          throw error
+        await wait(backoff(refusal + 1), init?.signal)
+        continue
+      }
       if (
         response.ok ||
         !RETRY_STATUSES.has(response.status) ||

@@ -7,11 +7,13 @@ const mockChat: {
   status: 'ready' | 'submitted' | 'streaming' | 'error'
   resumeStream: jest.Mock
   sendMessage: jest.Mock
+  setMessages: jest.Mock
 } = {
   messages: [],
   status: 'ready',
   resumeStream: jest.fn(),
   sendMessage: jest.fn(),
+  setMessages: jest.fn(),
 }
 const mockTransport: {
   options?: {
@@ -24,7 +26,7 @@ jest.mock('@ai-sdk/react', () => ({
     messages: mockChat.messages,
     status: mockChat.status,
     error: undefined,
-    setMessages: jest.fn(),
+    setMessages: mockChat.setMessages,
     sendMessage: mockChat.sendMessage,
     resumeStream: mockChat.resumeStream,
     clearError: jest.fn(),
@@ -57,6 +59,9 @@ const quota = (remaining: number) => {
   })) as unknown as typeof fetch
 }
 
+/** The id the page gave its conversation, as the server echoes it. */
+let lastConversationId = ''
+
 const thread: UIMessage[] = [
   { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Who?' }] },
   { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: 'Them.' }] },
@@ -68,7 +73,7 @@ beforeAll(() => {
   let n = 0
   Object.defineProperty(globalThis.crypto, 'randomUUID', {
     configurable: true,
-    value: () => `conversation-${++n}`,
+    value: () => (lastConversationId = `conversation-${++n}`),
   })
 })
 
@@ -77,6 +82,7 @@ beforeEach(() => {
   mockChat.status = 'ready'
   mockChat.resumeStream = jest.fn()
   mockChat.sendMessage = jest.fn()
+  mockChat.setMessages = jest.fn()
 })
 
 test('a first visit is the heading and a composer that carries the facts', async () => {
@@ -239,18 +245,26 @@ describe('the conversation in the URL', () => {
 })
 
 describe('an answer whose stream ended early', () => {
-  test('reads on when the server says its run is still going, and passes reconnect settings to the transport', async () => {
+  // The answer streams, the server names its run, then the stream ends.
+  const streamThenEnd = (stored: unknown) => {
     mockChat.messages = thread
-    mockChat.status = 'ready'
-    mockChat.resumeStream.mockClear()
+    mockChat.status = 'streaming'
     global.fetch = jest.fn(async (url: string) => ({
       ok: true,
       json: async () =>
-        url.includes('/conversations/')
-          ? { messages: [], runningRunId: 'asr_live' }
-          : { conversations: [] },
+        url.includes('/conversations/') ? stored : { conversations: [] },
     })) as unknown as typeof fetch
-    render(<AgentSearch />)
+    const { rerender } = render(<AgentSearch />)
+    mockTransport.options?.onChatSendMessage(
+      new Response(null, { headers: { 'x-workflow-run-id': 'asr_1' } }),
+      { chatId: lastConversationId },
+    )
+    mockChat.status = 'ready'
+    rerender(<AgentSearch />)
+  }
+
+  test('reads on when the server says its run is still going, and passes reconnect settings to the transport', async () => {
+    streamThenEnd({ messages: [thread[0]], runningRunId: 'asr_1' })
     await waitFor(() => expect(mockChat.resumeStream).toHaveBeenCalledTimes(1))
     const options = mockTransport.options as unknown as {
       maxConsecutiveErrors: number
@@ -260,15 +274,14 @@ describe('an answer whose stream ended early', () => {
     expect(typeof options.fetch).toBe('function')
   })
 
-  test('leaves a finished answer alone', async () => {
-    mockChat.messages = thread
-    mockChat.status = 'ready'
-    mockChat.resumeStream.mockClear()
-    global.fetch = jest.fn(async () => ({
-      ok: true,
-      json: async () => ({ conversations: [], runningRunId: null }),
-    })) as unknown as typeof fetch
-    render(<AgentSearch />)
+  test('leaves a finished answer alone when the server has the same one', async () => {
+    streamThenEnd({
+      messages: [
+        thread[0],
+        { ...thread[1], id: 'asr_1', metadata: { outcome: 'done' } },
+      ],
+      runningRunId: null,
+    })
     await waitFor(() =>
       expect(
         (global.fetch as jest.Mock).mock.calls.some(([url]) =>
@@ -276,7 +289,9 @@ describe('an answer whose stream ended early', () => {
         ),
       ).toBe(true),
     )
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(mockChat.resumeStream).not.toHaveBeenCalled()
+    expect(mockChat.setMessages).not.toHaveBeenCalled()
   })
 })
 

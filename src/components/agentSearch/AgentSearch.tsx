@@ -34,9 +34,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ConversationHistory, GHOST_BUTTON } from './ConversationHistory'
 import { createReconnectingFetch } from './reconnectingFetch'
 import {
+  answerText,
   createTurnViewBuilder,
   describeChatError,
+  messageOutcome,
   messageText,
+  withOutcome,
   type TurnView,
   type TweetLoad,
   type TweetSupply,
@@ -119,6 +122,20 @@ function mergeSupply(
 }
 
 const questionAnchor = (messageId: string) => `ask-question-${messageId}`
+
+/**
+ * Whether a run's stored answer should take the place of what its stream
+ * gave: the stream broke, the run failed (the page cannot tell a cut-off
+ * finish from a finish), nothing was written, or the stream ended short of
+ * what the run wrote. An answer that streamed whole stays as it is, with
+ * its tweets in hand.
+ */
+function storedSettles(live: UIMessage, stored: UIMessage, broke: boolean) {
+  if (broke || messageOutcome(stored) !== 'done') return true
+  const written = answerText(live).trim()
+  const kept = answerText(stored).trim()
+  return !written || (kept.length > written.length && kept.startsWith(written))
+}
 
 /** Points the address bar at a conversation (or none) without a navigation. */
 function showConversationInUrl(id: string | null) {
@@ -306,6 +323,21 @@ export default function AgentSearch({
   // Whether the chat is reading a stream, for effects that must not start
   // another one.
   const busyRef = useRef(false)
+  // Whether the server accepted the question being answered. A refused one
+  // (a limit, eligibility) goes back in the box; an accepted one whose
+  // answer could not be read stays in the thread, as the server has it.
+  const acceptedRef = useRef(true)
+  // The answer last settled with the server once its stream ended, so it is
+  // settled once (see the recovery effect).
+  const endedRef = useRef<{ messageId: string; conversationId: string } | null>(
+    null,
+  )
+  // The partial answer a replay replaces. It gives way only once the replay's
+  // stream has connected, so a replay that never does leaves it in place.
+  const replacedByReplayRef = useRef<string | null>(null)
+  const setMessagesRef = useRef<
+    (update: (current: UIMessage[]) => UIMessage[]) => void
+  >(() => {})
   const transport = useMemo(
     () =>
       new WorkflowChatTransport<UIMessage>({
@@ -325,6 +357,7 @@ export default function AgentSearch({
         },
         onChatSendMessage: (response, { chatId }) => {
           runIdRef.current = response.headers.get('x-workflow-run-id')
+          acceptedRef.current = true
           shownConversationRef.current = chatId
           // Only an accepted question makes the conversation worth linking to.
           if (response.ok) showConversationInUrl(chatId)
@@ -337,7 +370,20 @@ export default function AgentSearch({
         }),
         // Spaced reconnects, refusals asked again (reconnectingFetch.ts),
         // and more of them before the transport gives up.
-        fetch: createReconnectingFetch(),
+        fetch: createReconnectingFetch(undefined, undefined, {
+          // A replay starts from the beginning: the partial answer it
+          // replaces goes now, so the replay's answer takes its place.
+          onStream: () => {
+            const replaced = replacedByReplayRef.current
+            if (!replaced) return
+            replacedByReplayRef.current = null
+            setMessagesRef.current((current) =>
+              current[current.length - 1]?.id === replaced
+                ? current.slice(0, -1)
+                : current,
+            )
+          },
+        }),
         maxConsecutiveErrors: STREAM_READ_ATTEMPTS,
       }),
     [],
@@ -360,6 +406,7 @@ export default function AgentSearch({
     // limit, the chat records the error and stops reading mid-answer.
     throttle: 50,
   })
+  setMessagesRef.current = setMessages
 
   // One request at a time: arrival fires both the mount and the status
   // effects (twice each under Strict Mode), and they share the request.
@@ -450,6 +497,14 @@ export default function AgentSearch({
       loaderRef.current = loader
       loader.load(pendingTweetIds)
     }
+    // The stored answers are the server's own: nothing to settle with it,
+    // and a Stop can only be for the run still going.
+    runIdRef.current = body.runningRunId ?? null
+    const last = body.messages[body.messages.length - 1]
+    endedRef.current =
+      last?.role === 'assistant'
+        ? { messageId: last.id, conversationId: id }
+        : null
     setConversation({
       id,
       pending: body.messages,
@@ -516,6 +571,7 @@ export default function AgentSearch({
     setMessages(conversation.pending)
     if (conversation.runningRunId && !busyRef.current) {
       runIdRef.current = conversation.runningRunId
+      acceptedRef.current = true
       setRunStartedAt(Date.now())
       void resumeStream()
     }
@@ -585,8 +641,10 @@ export default function AgentSearch({
 
   // A refused POST (limit, eligibility) leaves the question with no reply.
   // Drop it from the thread and put it back in the box so nothing is lost.
+  // A question the server accepted stays, however its answer's read ended:
+  // the server has it, and its turn says the answer stopped.
   useEffect(() => {
-    if (!error) return
+    if (!error || acceptedRef.current) return
     const last = messages[messages.length - 1]
     if (last?.role !== 'user') return
     setMessages((current) => current.slice(0, -1))
@@ -595,51 +653,82 @@ export default function AgentSearch({
   }, [error, messages, setMessages])
 
   // A stream can end or fail while its run goes on (a dropped connection, a
-  // function time limit, a rebuild in development). When an answer's stream
-  // ends, ask the server whether the run is still going before leaving the
-  // answer as stopped, and read on if it is. A Stop closes the run first, so
-  // a stopped answer is never resumed. The partial answer is replaced by the
-  // replay, which starts from the beginning.
+  // function time limit, a rebuild in development), or end as if done while
+  // the run went on to write more, or fail. When an answer's stream ends,
+  // the run is settled with the server: read on if it is still going (the
+  // replay starts from the beginning and takes the partial answer's place
+  // once it connects), and when it is over and stored, show the stored
+  // answer wherever the stream broke, ended short, or the run failed. A
+  // stored answer goes through the same checks as a reopened one: its prose
+  // waits for its cited tweets, and is withheld if one is gone. A Stop
+  // closes the run first, so a stopped answer is never resumed.
   const recoveriesRef = useRef(new Map<string, number>())
   // Runs the member stopped: their cancel may not have reached the server
   // when the stream closes, so they are never picked up again.
   const stoppedRunsRef = useRef(new Set<string>())
-  const endedIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (status !== 'ready' && status !== 'error') return
     const last = messages[messages.length - 1]
-    if (last?.role !== 'assistant' || endedIdRef.current === last.id) return
-    endedIdRef.current = last.id
-    const id = conversation.id
-    let cancelled = false
+    if (last?.role !== 'assistant') return
+    const ended = { messageId: last.id, conversationId: conversation.id }
+    if (
+      endedRef.current?.messageId === ended.messageId &&
+      endedRef.current.conversationId === ended.conversationId
+    ) {
+      return
+    }
+    endedRef.current = ended
+    replacedByReplayRef.current = null
+    const broke = status === 'error'
+    // A broken stream leaves a partial answer: marked failed on the message
+    // itself, so the mark outlives the chat's error (a follow-up clears it).
+    if (broke && messageOutcome(last) !== 'failed') {
+      setMessages((current) =>
+        current[current.length - 1]?.id === last.id
+          ? [...current.slice(0, -1), withOutcome(last, 'failed')]
+          : current,
+      )
+    }
+    const runId = runIdRef.current
+    if (!runId || stoppedRunsRef.current.has(runId)) return
+    // Still the answer to settle: no new question, no other conversation.
+    const current = () =>
+      endedRef.current === ended &&
+      !busyRef.current &&
+      shownConversationRef.current === ended.conversationId
     void (async () => {
       try {
         const response = await fetch(
-          `/api/agent-search/conversations/${encodeURIComponent(id)}`,
+          `/api/agent-search/conversations/${encodeURIComponent(
+            ended.conversationId,
+          )}`,
           { cache: 'no-store' },
         )
-        if (!response.ok || cancelled) return
-        const body = (await response.json()) as { runningRunId?: string | null }
-        const runId = body.runningRunId
-        if (!runId || cancelled || stoppedRunsRef.current.has(runId)) return
-        const tries = recoveriesRef.current.get(runId) ?? 0
-        if (tries >= MAX_RECOVERIES) return
-        recoveriesRef.current.set(runId, tries + 1)
-        runIdRef.current = runId
-        clearError()
-        setMessages((current) =>
-          current[current.length - 1]?.id === last.id
-            ? current.slice(0, -1)
-            : current,
+        if (!response.ok || !current()) return
+        const body = (await response.json()) as StoredConversation
+        if (!current()) return
+        if (body.runningRunId === runId) {
+          const tries = recoveriesRef.current.get(runId) ?? 0
+          if (tries >= MAX_RECOVERIES) return
+          recoveriesRef.current.set(runId, tries + 1)
+          acceptedRef.current = true
+          replacedByReplayRef.current = last.id
+          clearError()
+          void resumeStream()
+          return
+        }
+        const stored = body.messages.find(
+          (message) => message.id === runId && message.role === 'assistant',
         )
-        void resumeStream()
+        if (!stored || !storedSettles(last, stored, broke)) return
+        clearError()
+        installStored(ended.conversationId, body)
       } catch {
         // The answer stays as it is; Ask again still works.
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    // installStored only sets state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, messages, conversation.id, clearError, setMessages, resumeStream])
 
   // Stop cancels the workflow, not just the stream. Until the server has
@@ -692,6 +781,7 @@ export default function AgentSearch({
     // The run before is over, however its stream ended; a Stop from here on
     // is for the new run, whose id the server has yet to return.
     runIdRef.current = null
+    acceptedRef.current = false
     // Shown at once; the next refresh replaces it with the stored count.
     const less = (n: number | null) => (n === null ? null : Math.max(0, n - 1))
     setQuota((current) =>

@@ -39,6 +39,10 @@ const isAbort = (error: unknown) =>
 export function createReconnectingFetch(
   base: typeof fetch = (...args) => fetch(...args),
   now: () => number = Date.now,
+  options: {
+    /** A reconnect that reached the run's stream, before it is read. */
+    onStream?: (response: Response) => void
+  } = {},
 ): typeof fetch {
   let lastStart = -Infinity
   let streak = 0
@@ -75,6 +79,7 @@ export function createReconnectingFetch(
         !RETRY_STATUSES.has(response.status) ||
         refusal >= MAX_REFUSALS
       ) {
+        if (response.ok) options.onStream?.(response)
         return response
       }
       await wait(backoff(refusal + 1), init?.signal)

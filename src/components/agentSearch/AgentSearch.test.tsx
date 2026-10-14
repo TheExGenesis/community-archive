@@ -248,6 +248,27 @@ describe('the conversation in the URL', () => {
     )
   })
 
+  test('the caret by the heading goes back to Ask’s start, as a new entry', async () => {
+    window.history.replaceState(null, '', '/search/ask?c=c1')
+    global.fetch = jest.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        String(url).includes('/conversations/')
+          ? { messages: thread, runningRunId: null }
+          : { conversations: [], dailyLimit: 10, remainingToday: 9 },
+    })) as unknown as typeof fetch
+    mockChat.messages = thread
+    render(<AgentSearch initialConversationId="c1" />)
+    // A pushed entry, so the browser's Back returns to the conversation.
+    const push = jest.spyOn(window.history, 'pushState')
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Back to Ask the archive' }),
+    )
+    expect(window.location.search).toBe('')
+    expect(push).toHaveBeenCalledTimes(1)
+    push.mockRestore()
+  })
+
   test('opening a running conversation resumes it once, even when the page renders again', async () => {
     runningConversation()
     const { rerender } = render(

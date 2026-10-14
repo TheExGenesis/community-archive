@@ -81,8 +81,12 @@ export function ConversationHistory({
           </PopoverTrigger>
           <PopoverContent
             align="end"
+            aria-label="Past questions"
             className="max-h-[70vh] w-96 overflow-y-auto p-1"
           >
+            <p className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+              Past questions
+            </p>
             {list}
           </PopoverContent>
         </Popover>

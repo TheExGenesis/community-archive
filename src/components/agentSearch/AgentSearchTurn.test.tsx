@@ -186,6 +186,10 @@ test('renders the answer with its list, its cited tweets and the sources', () =>
   const list = screen.getByRole('region', { name: 'Shared' })
   expect(list).toHaveTextContent('Shared · 2 tweets')
   expect(within(list).getByLabelText('Cited as 1')).toBeInTheDocument()
+  // The number goes to where the answer cites the tweet.
+  fireEvent.click(within(list).getByRole('button', { name: 'Cited as 1' }))
+  expect(document.activeElement?.getAttribute('href')).toMatch(/-tweet-1$/)
+  expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
 
   // Sources hold only what the answer neither cites nor lists.
   const sources = screen.getByRole('region', { name: 'Sources' })

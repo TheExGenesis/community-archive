@@ -27,27 +27,68 @@ const firstLine = (text: string) =>
     .map((line) => line.trim())
     .find(Boolean) ?? ''
 
+/**
+ * A row's text: the tweet's first line, with an ellipsis when more follows
+ * (a line that runs past two lines gets one from the clamp).
+ */
+const rowText = (text: string) => {
+  const first = firstLine(text)
+  return text.trim().length > first.length ? `${first} …` : first
+}
+
 const ROW_CLASS =
   'flex min-h-[3rem] w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring'
 // Under a person's name: one line per tweet, no rules between them.
 const NESTED_ROW_CLASS =
   'flex min-h-[2.25rem] w-full items-center gap-3 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring'
 
+// A cross-reference, quieter than what the row says; brand on hover, as
+// its chip in the answer.
+const BADGE =
+  'inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground'
+
+/**
+ * Scrolls to the chip in the same answer that cites this tweet and focuses
+ * it, which lights the chip and the tweet up together.
+ */
+function showCitationInAnswer(from: HTMLElement, tweetId: string) {
+  const chip = from
+    .closest('[data-answer]')
+    ?.querySelector<HTMLElement>(`a[href$="-tweet-${tweetId}"]`)
+  if (!chip) return
+  const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  chip.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+  chip.focus({ preventScroll: true })
+}
+
+/** A cited tweet's number; a button that goes to where the answer cites it. */
+function CitationBadge({ n, tweetId }: { n: number; tweetId: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={`Cited as ${n}`}
+      title="Show where the answer cites it"
+      onClick={(event) => showCitationInAnswer(event.currentTarget, tweetId)}
+      className={`${BADGE} transition-colors hover:bg-brand hover:text-brand-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+    >
+      {n}
+    </button>
+  )
+}
+
 /**
  * One tweet as a row led by what it says, with who and when in small type,
  * that opens in place into the full card. A tweet the answer cites carries
- * its citation number.
+ * its citation number beside the date: a cross-reference, so it takes no
+ * room on rows the answer does not cite.
  */
 export function TweetRow({
   tweet,
   citation,
-  numbered = citation !== undefined,
   nested = false,
 }: {
   tweet: PortalTweet
   citation?: number
-  /** Keep the number's place even when this tweet is not cited. */
-  numbered?: boolean
   /** Under a person's name: a lighter row that need not say who again. */
   nested?: boolean
 }) {
@@ -66,29 +107,19 @@ export function TweetRow({
     toggled.current = true
     setOpen((value) => !value)
   }
-  const chip = numbered && (
-    <span className="inline-flex w-6 shrink-0 justify-center">
-      {citation !== undefined && (
-        <span
-          aria-label={`Cited as ${citation}`}
-          className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold tabular-nums text-foreground"
-        >
-          {citation}
-        </span>
-      )}
-    </span>
+  const badge = citation !== undefined && (
+    <CitationBadge n={citation} tweetId={tweet.id} />
   )
   return (
     <li className={nested ? '' : 'border-b border-border'}>
       {open ? (
-        // The open card keeps the row's geometry: its avatar, the citation
-        // number and the collapse button sit where the row's avatar, number
-        // and expand button were.
+        // The open card keeps the row's geometry: its avatar where the row's
+        // was, the number and the collapse button where the number and the
+        // expand button were.
         <div
           id={bodyId}
           className={`flex items-start gap-3 ${nested ? 'px-2' : 'px-4'}`}
         >
-          {chip && <div className={nested ? 'pt-2' : 'pt-[14px]'}>{chip}</div>}
           <div
             className={`min-w-0 flex-1 [&>article]:pl-0 [&>article]:pr-0 ${
               nested ? '[&>article]:pt-px' : '[&>article]:pt-[7px]'
@@ -96,7 +127,10 @@ export function TweetRow({
           >
             <TweetCard tweet={tweet} showDate showExternalLink />
           </div>
-          <div className={`shrink-0 ${nested ? 'pt-2.5' : 'pt-4'}`}>
+          <div
+            className={`flex shrink-0 items-center gap-3 ${nested ? 'pt-2' : 'pt-3.5'}`}
+          >
+            {badge}
             <button
               ref={closeRef}
               type="button"
@@ -111,34 +145,64 @@ export function TweetRow({
           </div>
         </div>
       ) : (
-        <button
-          ref={rowRef}
-          type="button"
-          onClick={toggle}
-          aria-expanded={false}
-          aria-controls={bodyId}
-          className={nested ? NESTED_ROW_CLASS : ROW_CLASS}
+        // The whole row opens the card; its button (who and what) is the
+        // keyboard's way in, and the number is a button of its own, which a
+        // button could not hold.
+        // What a reader weighs, strongest first: what was said (full colour,
+        // the row's width, up to two lines), who said it (the name, then the
+        // handle), when (faintest). The number and the chevron stay quiet
+        // until pointed at.
+        <div
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest('button')) return
+            toggle()
+          }}
+          className={`group/row ${nested ? NESTED_ROW_CLASS : ROW_CLASS} cursor-pointer`}
         >
-          {chip}
-          {!nested && <TweetAvatar tweet={tweet} size={28} />}
-          <span className="min-w-0 flex-1">
+          <button
+            ref={rowRef}
+            type="button"
+            onClick={toggle}
+            aria-expanded={false}
+            aria-controls={bodyId}
+            // Under a person the date gives way to what they said; it shows
+            // here on hover and in the opened card.
+            title={nested ? monthOf(tweet.createdAt) : undefined}
+            className="flex min-w-0 flex-1 gap-3 self-stretch rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             {!nested && (
-              <span className="block truncate text-xs text-muted-foreground">
-                @{tweet.username}
+              <span className="mt-0.5 shrink-0">
+                <TweetAvatar tweet={tweet} size={28} />
               </span>
             )}
-            <span className="block truncate text-foreground">
-              {firstLine(tweet.text)}
+            <span className="min-w-0 flex-1 self-center">
+              {!nested && (
+                <span className="mb-0.5 flex min-w-0 items-baseline gap-1.5 text-xs">
+                  <span className="truncate font-medium text-foreground">
+                    {tweet.name}
+                  </span>
+                  <span className="truncate text-muted-foreground">
+                    @{tweet.username}
+                  </span>
+                  <span aria-hidden="true" className="text-muted-foreground/60">
+                    ·
+                  </span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground/70">
+                    {monthOf(tweet.createdAt)}
+                  </span>
+                </span>
+              )}
+              <span className="line-clamp-2 break-words leading-snug text-foreground">
+                {rowText(tweet.text)}
+              </span>
             </span>
-          </span>
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {monthOf(tweet.createdAt)}
-          </span>
+          </button>
+          {badge}
           <ChevronDown
             aria-hidden="true"
-            className="h-4 w-4 shrink-0 text-muted-foreground"
+            className="h-4 w-4 shrink-0 text-muted-foreground/40 transition-colors group-hover/row:text-muted-foreground"
           />
-        </button>
+        </div>
       )}
     </li>
   )
@@ -225,7 +289,6 @@ export function TweetRowList({
   citations,
   moreLabel = (n) => `${n.toLocaleString('en-US')} more`,
   nested = false,
-  numbered: numberedAcross,
 }: {
   tweets: PortalTweet[]
   first: number
@@ -235,17 +298,9 @@ export function TweetRowList({
   moreLabel?: (n: number) => string
   /** The rows sit under their author's name. */
   nested?: boolean
-  /**
-   * Keep a place for citation numbers on every row. Defaults to whether any
-   * of these tweets is cited; a grouped list decides once for all groups so
-   * their rows line up.
-   */
-  numbered?: boolean
 }) {
   const [shown, setShown] = useState(first)
   const left = tweets.length - shown
-  const numbered =
-    numberedAcross ?? tweets.some((tweet) => citations?.has(tweet.id))
   return (
     <ul
       aria-label={label}
@@ -261,7 +316,6 @@ export function TweetRowList({
           key={tweet.id}
           tweet={tweet}
           citation={citations?.get(tweet.id)}
-          numbered={numbered}
           nested={nested}
         />
       ))}
@@ -319,7 +373,14 @@ const tweetCount = (n: number) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? 'tweet' : 'tweets'}`
 
 /** Who, by name and handle, with how many of their tweets the list holds. */
-function PersonLine({ person }: { person: Person }) {
+function PersonLine({
+  person,
+  count = true,
+}: {
+  person: Person
+  /** Off where the person's tweets show under them (they count themselves). */
+  count?: boolean
+}) {
   return (
     <>
       <TweetAvatar tweet={person.tweets[0]} size={28} />
@@ -331,9 +392,11 @@ function PersonLine({ person }: { person: Person }) {
           @{person.username}
         </span>
       </span>
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-        {tweetCount(person.tweets.length)}
-      </span>
+      {count && (
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {tweetCount(person.tweets.length)}
+        </span>
+      )}
     </>
   )
 }
@@ -386,18 +449,16 @@ function PersonGroup({
   person,
   showcase,
   citations,
-  numbered,
 }: {
   person: Person
   showcase: number | 'all'
   citations?: ReadonlyMap<string, number>
-  numbered: boolean
 }) {
   const count = person.tweets.length
   return (
     <li className="py-2">
-      <div className="flex min-h-[2.5rem] items-center gap-3 px-1 text-sm">
-        <PersonLine person={person} />
+      <div className="flex min-h-[2rem] items-center gap-3 px-1 text-sm">
+        <PersonLine person={person} count={false} />
       </div>
       <TweetRowList
         tweets={person.tweets}
@@ -408,7 +469,6 @@ function PersonGroup({
         moreLabel={(n) =>
           `${n.toLocaleString('en-US')} more by @${person.username}`
         }
-        numbered={numbered}
         nested
       />
     </li>
@@ -445,7 +505,6 @@ export function PeopleList({
   )
   const [shown, setShown] = useState(FIRST_PEOPLE)
   const left = people.length - shown
-  const numbered = tweets.some((tweet) => citations?.has(tweet.id))
   return (
     <ul
       aria-label={label}
@@ -470,7 +529,6 @@ export function PeopleList({
               person={person}
               showcase={showcase}
               citations={citations}
-              numbered={numbered}
             />
           ),
         )}

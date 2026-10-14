@@ -41,7 +41,8 @@ test('a row shows who, when and the first line, and opens in place', () => {
     />,
   )
   const row = screen.getByRole('button', { name: /@user1/ })
-  expect(row).toHaveTextContent('Jan 2025')
+  // The date sits beside the row's button, with the citation number.
+  expect(row.closest('li')).toHaveTextContent('Jan 2025')
   expect(row).toHaveTextContent('First line 1')
   expect(row).not.toHaveTextContent('second line')
   fireEvent.click(row)

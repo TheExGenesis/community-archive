@@ -94,12 +94,18 @@ function CitationItem({
   expanded,
   onToggle,
   linkTarget = false,
+  hang = false,
 }: {
   citation: Citation
   expanded: boolean
   onToggle: () => void
   /** Carries the citation's anchor id; only one list on the page may. */
   linkTarget?: boolean
+  /**
+   * Under the answer, from sm up: the number hangs in the column's margin,
+   * as a footnote's does, so the tweets line up with the prose above.
+   */
+  hang?: boolean
 }) {
   const links = useCitationLinks()
   const lit =
@@ -122,8 +128,22 @@ function CitationItem({
       onClick={onClick}
       onMouseEnter={() => links?.hover(citation.anchor)}
       onMouseLeave={() => links?.hover(null)}
-      className={`flex scroll-mt-14 items-start gap-1 pl-3 transition-colors focus:outline-none [&_article]:hover:bg-transparent ${
-        lit ? 'bg-brand/10' : near ? 'bg-muted/60' : 'hover:bg-muted/40'
+      // One band per row: the card's own hover is turned off so it cannot
+      // paint a second, offset band beside the number. Pointing at a row (or
+      // its chip in the answer) lights it; the paragraph in view marks its
+      // rows more quietly. The number carries the brand colour, as its chip.
+      className={`flex scroll-mt-14 items-start gap-1 pl-3 transition-colors duration-150 focus:outline-none [&_article]:!bg-transparent ${
+        hang ? 'relative sm:block sm:pl-0 sm:[&_article]:pl-0' : ''
+      } ${
+        // A hanging number's row lights into the margin behind it too; a
+        // shadow, so the bleed takes no room and never scrolls the page.
+        hang && lit
+          ? 'sm:shadow-[-1.75rem_0_0_0_hsl(var(--muted)/0.7)]'
+          : hang && near
+            ? 'sm:shadow-[-1.75rem_0_0_0_hsl(var(--muted)/0.3)]'
+            : ''
+      } ${
+        lit ? 'bg-muted/70' : near ? 'bg-muted/30' : ''
       } ${expanded ? '' : 'cursor-pointer'}`}
     >
       <button
@@ -132,6 +152,11 @@ function CitationItem({
         aria-expanded={expanded}
         aria-label={`Citation ${citation.n}: ${expanded ? 'show less' : 'show the full post'}`}
         className={`mt-3 inline-flex h-6 min-w-[1.5rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          // Pinned by its right edge, so a longer number grows into the margin.
+          hang
+            ? 'sm:absolute sm:right-full sm:top-[14px] sm:mr-1 sm:mt-0 sm:h-5 sm:min-w-[1.25rem] sm:px-1'
+            : ''
+        } ${
           lit
             ? 'bg-brand text-brand-foreground'
             : 'bg-muted text-foreground hover:bg-accent'
@@ -179,6 +204,7 @@ export function CitationList({
           key={citation.id}
           citation={citation}
           linkTarget={linkTarget}
+          hang
           expanded={opened.has(citation.anchor)}
           onToggle={() =>
             setOpened((current) => {

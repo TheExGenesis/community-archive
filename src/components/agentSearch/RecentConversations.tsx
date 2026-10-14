@@ -160,11 +160,7 @@ export function RecentConversations({
   const ALL = ':all'
 
   const list = (
-    <ul
-      className={
-        compact ? 'divide-y divide-border' : 'divide-y divide-border border-y'
-      }
-    >
+    <ul className={compact ? 'space-y-0.5' : 'divide-y divide-border border-y'}>
       {conversations.map((conversation) => {
         const current = conversation.id === currentId
         if (onDelete && confirming === conversation.id) {
@@ -180,23 +176,30 @@ export function RecentConversations({
             </li>
           )
         }
+        // The row is one band, delete included: the open conversation is
+        // marked by it, the others light it on hover.
         return (
-          <li key={conversation.id} className="group flex items-stretch">
+          <li
+            key={conversation.id}
+            className={`group flex items-stretch transition-colors ${
+              compact ? 'rounded-md' : ''
+            } ${current ? 'bg-muted' : 'hover:bg-accent'}`}
+          >
             <button
               type="button"
               onClick={() => onOpen(conversation.id)}
               aria-current={current ? 'page' : undefined}
-              className={`flex min-w-0 flex-1 items-baseline justify-between gap-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
+              className={`flex min-h-[2.75rem] min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
                 compact
-                  ? 'min-h-[2.75rem] rounded-md px-3 py-2.5'
-                  : 'min-h-[2.75rem] px-1 py-2.5'
-              } ${current ? 'bg-muted' : ''}`}
+                  ? 'flex-col justify-center gap-0.5 rounded-md py-2 pl-3 pr-1'
+                  : 'items-baseline justify-between gap-4 px-1 py-2.5'
+              }`}
             >
               <span className="line-clamp-2 min-w-0 break-words text-sm text-foreground">
                 {conversation.title}
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">
-                {current ? 'Open now' : detail(conversation)}
+                {detail(conversation)}
               </span>
             </button>
             {/* Delete shows on the row's hover or keyboard focus, and
@@ -207,7 +210,7 @@ export function RecentConversations({
                 onClick={() => setConfirming(conversation.id)}
                 aria-label={`Delete “${conversation.title}”`}
                 title="Delete"
-                className="flex w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
+                className="flex w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-focus-within:opacity-100 group-hover:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
               >
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
               </button>
@@ -228,8 +231,21 @@ export function RecentConversations({
         onCancel={() => setConfirming(null)}
         compact={compact}
       />
+    ) : compact ? (
+      // In the popover and sheet: a row of its own under one rule, the
+      // list's inset and height, quiet until pointed at.
+      <div className="mt-1 border-t border-border pt-1">
+        <button
+          type="button"
+          onClick={() => setConfirming(ALL)}
+          className="flex min-h-[2.25rem] w-full items-center gap-2 rounded-md px-3 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+          Delete all history
+        </button>
+      </div>
     ) : (
-      <div className={compact ? 'px-3 py-2' : 'px-1 py-2'}>
+      <div className="px-1 py-2">
         <button
           type="button"
           onClick={() => setConfirming(ALL)}

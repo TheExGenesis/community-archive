@@ -144,7 +144,8 @@ function CitationChip({
 
 /**
  * A quote the page checked against the tweet it cites: the tweet's own
- * words. Hovering it lights up its citation, as hovering the chip does.
+ * words. Hovering it lights up its citation, and clicking it opens the
+ * tweet, as the chip does; the chip stays the keyboard's way in.
  */
 function CheckedQuote({
   anchor,
@@ -159,7 +160,20 @@ function CheckedQuote({
     <q
       onMouseEnter={() => links?.hover(anchor)}
       onMouseLeave={() => links?.hover(null)}
-      className={`rounded-sm px-0.5 text-foreground transition-colors [box-decoration-break:clone] before:text-muted-foreground before:content-[open-quote] after:text-muted-foreground after:content-[close-quote] ${
+      onClick={(event) => {
+        if (!links) return
+        // Selecting words to copy is not a click on the quote.
+        if (window.getSelection()?.toString()) return
+        // Focus comes back to the chip, the quote's control.
+        const chip =
+          event.currentTarget.parentElement?.querySelector<HTMLElement>(
+            `a[href="#${CSS.escape(anchor)}"]`,
+          ) ?? event.currentTarget
+        if (window.matchMedia(SIDEBAR_MEDIA).matches) {
+          links.openSidebar(anchor, chip)
+        } else links.openSheet(anchor, chip)
+      }}
+      className={`cursor-pointer rounded-sm px-0.5 text-foreground transition-colors [box-decoration-break:clone] before:text-muted-foreground before:content-[open-quote] after:text-muted-foreground after:content-[close-quote] ${
         lit ? 'bg-brand/15' : 'bg-brand/[0.06]'
       }`}
     >

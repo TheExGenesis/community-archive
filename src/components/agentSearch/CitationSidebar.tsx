@@ -2,11 +2,19 @@
 
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import type { ReactNode } from 'react'
-import { citationSidebarOpener, closeCitationSidebar } from './citationSidebarStore'
+import {
+  citationSidebarOpener,
+  closeCitationSidebar,
+} from './citationSidebarStore'
 
 /** The sidebar's width, and the room the page leaves for it. */
 export const SIDEBAR_WIDTH = 'lg:w-[26rem] xl:w-[30rem]'
-export const SIDEBAR_ROOM = 'lg:pr-[26rem] xl:pr-[30rem]'
+// The page moves over only as far as the panel would cover the thread
+// column (51rem, centred; its own side padding is the gutter): padding p
+// re-centres it, and its right edge clears the panel when
+// p >= 51rem + 2 × panel - viewport. Wide screens barely move.
+export const SIDEBAR_ROOM =
+  'lg:pr-[min(26rem,max(0px,calc(103rem_-_100vw)))] xl:pr-[min(30rem,max(0px,calc(111rem_-_100vw)))]'
 
 /**
  * Wide screens: the cited tweets in a panel along the right edge, under the

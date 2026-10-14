@@ -265,7 +265,8 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
           {hasAnswer && (
             <div
               ref={answerRef}
-              className="max-w-[68ch] break-words text-base text-foreground"
+              data-answer=""
+              className="break-words text-base text-foreground"
             >
               {answer.checking && (
                 <div className="space-y-2" role="status" aria-live="polite">

@@ -362,6 +362,10 @@ export function TweetRow({
   const canExpand =
     isPreview ||
     (collapsible && !noClamp && tweet.text.length > (compact ? 140 : 280))
+  // A compact card's Read more ends its second line, after the cut text,
+  // instead of taking a line of its own.
+  const inlineMore =
+    compact && canExpand && !isExpanded && !noClamp && !isPreview
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
@@ -435,15 +439,28 @@ export function TweetRow({
       } ${
         noClamp || isPreview
           ? ''
-          : compact
-            ? canExpand && isExpanded
-              ? ''
-              : 'line-clamp-2'
-            : canExpand && !isExpanded
-              ? 'line-clamp-5'
-              : ''
+          : inlineMore
+            ? // Two lines, and room kept at the end of the second for Read
+              // more: a spacer floats down to the last line and the
+              // placeholder below it takes the button's width.
+              "max-h-[2lh] w-full overflow-hidden before:float-right before:h-[calc(100%-1lh)] before:content-['']"
+            : compact
+              ? canExpand && isExpanded
+                ? ''
+                : 'line-clamp-2'
+              : canExpand && !isExpanded
+                ? 'line-clamp-5'
+                : ''
       }`}
     >
+      {inlineMore && (
+        <span
+          aria-hidden="true"
+          className="invisible float-right clear-both ml-1 text-[12px] font-semibold"
+        >
+          … Read more
+        </span>
+      )}
       <HighlightedText
         text={decodeTweetText(tweet.text)}
         query={highlightQuery}
@@ -459,9 +476,23 @@ export function TweetRow({
         captureAction(isExpanded ? 'collapse' : 'expand')
         setIsExpanded((expanded) => !expanded)
       }}
-      className="mt-1 shrink-0 self-start text-[12px] font-semibold text-brand"
+      className={
+        inlineMore
+          ? // Over the placeholder at the end of the second line, on the
+            // text's own line box so the baselines meet.
+            'absolute bottom-0 right-0 text-[13.5px] font-semibold leading-relaxed text-brand'
+          : 'mt-1 shrink-0 self-start text-[12px] font-semibold text-brand'
+      }
     >
-      {isExpanded ? 'Show less' : 'Read more'}
+      {inlineMore ? (
+        <span className="text-[12px]">
+          <span aria-hidden="true">… </span>Read more
+        </span>
+      ) : isExpanded ? (
+        'Show less'
+      ) : (
+        'Read more'
+      )}
     </button>
   ) : null
 
@@ -531,15 +562,18 @@ export function TweetRow({
           previewCollapsed ? 'min-h-0 flex-1 overflow-hidden' : undefined
         }
       >
-        <Link
-          {...linkTarget}
-          href={href}
-          onClick={() => captureAction('open')}
-          className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        >
-          {tweetContent}
-        </Link>
-        {!isPreview && expandButton}
+        <div className={inlineMore ? 'relative' : undefined}>
+          <Link
+            {...linkTarget}
+            href={href}
+            onClick={() => captureAction('open')}
+            className={`${inlineMore ? 'flex' : 'block'} rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+          >
+            {tweetContent}
+          </Link>
+          {inlineMore && expandButton}
+        </div>
+        {!isPreview && !inlineMore && expandButton}
         <TweetImages
           media={tweet.media}
           compact={compact}

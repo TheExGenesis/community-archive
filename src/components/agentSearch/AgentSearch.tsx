@@ -3,9 +3,10 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, Lock, Plus, Quote, X } from 'lucide-react'
+import { ArrowUp, ChevronLeft, Lock, Plus, Quote, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
+import { useSearchParams } from 'next/navigation'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
 import type { AgentTweet } from '@/lib/agentSearch/types'
 import {
@@ -138,10 +139,17 @@ function storedSettles(live: UIMessage, stored: UIMessage, broke: boolean) {
 }
 
 /**
+ * The conversation this page last put in the address bar, so a change it
+ * made itself is not mistaken for a navigation to follow.
+ */
+let conversationInUrl: string | null = null
+
+/**
  * Points the address bar at a conversation (or none) without a navigation.
  * `push` adds a history entry, so Back returns to what was on screen.
  */
 function showConversationInUrl(id: string | null, push = false) {
+  conversationInUrl = id
   const url = new URL(window.location.href)
   if (id) url.searchParams.set('c', id)
   else url.searchParams.delete('c')
@@ -898,28 +906,39 @@ export default function AgentSearch({
     textareaRef.current?.focus()
   }
   const startNewConversation = () => resetConversation('push')
-  const resetConversationRef = useRef(resetConversation)
-  resetConversationRef.current = resetConversation
 
-  // Back and Forward between conversations on this page. While an answer is
-  // being written the conversation stays, as the history menu does; the
-  // address goes back to it.
+  // The page follows the conversation in the address bar when something else
+  // changed it: Back and Forward, or a link to Ask the archive from the site's
+  // menus while a conversation is open. While an answer is being written the
+  // conversation stays, as the history menu does; the address goes back to it.
+  const followUrlRef = useRef<(id: string | null) => void>(() => {})
+  followUrlRef.current = (id) => {
+    conversationInUrl = id
+    if (id === shownConversationRef.current) return
+    if (busyRef.current) {
+      showConversationInUrl(shownConversationRef.current)
+      return
+    }
+    if (id) void openConversation(id)
+    else resetConversation('keep')
+  }
   useEffect(() => {
     const askPath = window.location.pathname
     const onPopState = () => {
       if (window.location.pathname !== askPath) return
-      const id = new URL(window.location.href).searchParams.get('c')
-      if (id === shownConversationRef.current) return
-      if (busyRef.current) {
-        showConversationInUrl(shownConversationRef.current)
-        return
-      }
-      if (id) void openConversation(id)
-      else resetConversationRef.current('keep')
+      followUrlRef.current(new URL(window.location.href).searchParams.get('c'))
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [openConversation])
+  }, [])
+  // Next's router navigations raise no popstate; its search params show them.
+  const searchParams = useSearchParams()
+  const urlConversation = searchParams ? searchParams.get('c') : undefined
+  useEffect(() => {
+    if (urlConversation === undefined || urlConversation === conversationInUrl)
+      return
+    followUrlRef.current(urlConversation)
+  }, [urlConversation])
 
   // Deleting history: the server keeps each run's accounting, so today's
   // questions still count. Deleting the open conversation starts a new one.
@@ -1219,9 +1238,23 @@ export default function AgentSearch({
         >
           {inThread ? (
             <div className="mb-6 flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2">
-              <h1 className="text-[15px] font-semibold text-foreground [font-family:inherit]">
-                Ask the archive
-              </h1>
+              {/* The caret leaves the conversation for Ask's start page, as a
+                  new history entry, so the browser's Back returns to it. */}
+              <div className="-ml-2 flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={startNewConversation}
+                  disabled={busy}
+                  aria-label="Back to Ask the archive"
+                  title="Back to Ask the archive"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+                </button>
+                <h1 className="text-[15px] font-semibold text-foreground [font-family:inherit]">
+                  Ask the archive
+                </h1>
+              </div>
               <div className="-mr-2.5 flex items-center gap-1">
                 <ConversationHistory
                   conversations={recent}

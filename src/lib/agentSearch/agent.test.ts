@@ -7,16 +7,41 @@ import {
   agentRunFailure,
   agentSearchInstructions,
   agentSearchPrepareStep,
+  agentSearchPrepareStepOptions,
+  agentSearchPromptVariant,
+  bashInstructions,
+  bashInstructionsV2,
   agentSearchToolMode,
   ARCHIVE_UNAVAILABLE_ERROR,
   createBashAgentTools,
   FINAL_STEP_NOTE,
   finalAnswerText,
+  STALL_NOTE,
+  stallSteps,
   questionWithWorkspace,
   toolsKeepFailing,
 } from './agent'
 
 describe('agentSearchPrepareStep', () => {
+  test('the reasoning and stall flags are on unless set to off', () => {
+    expect(agentSearchPrepareStepOptions({} as NodeJS.ProcessEnv)).toEqual({
+      keepReasoning: true,
+      stallReminder: true,
+    })
+    expect(
+      agentSearchPrepareStepOptions({
+        AGENT_SEARCH_KEEP_REASONING: 'off',
+        AGENT_SEARCH_STALL_REMINDER: 'off',
+      } as unknown as NodeJS.ProcessEnv),
+    ).toEqual({ keepReasoning: false, stallReminder: false })
+  })
+
+  test('the bash prompt is v2 with examples unless another is chosen', () => {
+    expect(agentSearchPromptVariant(undefined)).toBe('v2-examples')
+    expect(agentSearchPromptVariant('v1')).toBe('v1')
+    expect(agentSearchPromptVariant('v2')).toBe('v2')
+  })
+
   test('lets the model call tools until the last allowed step', () => {
     const prepare = agentSearchPrepareStep()
     expect(prepare({ stepNumber: 0 })).toEqual({})
@@ -51,7 +76,129 @@ describe('agentSearchPrepareStep', () => {
       stepNumber: AGENT_SEARCH_MAX_STEPS,
       messages: forced.messages,
     })
-    expect(again.messages).toHaveLength(2)
+    // Already there: the messages are left as they are.
+    expect(again.messages).toBeUndefined()
+  })
+})
+
+describe('the conversation each step sees', () => {
+  const tweetRow = (id: string) => ({ id, text: `tweet ${id}` })
+  const step = (
+    callId: string,
+    command: string,
+    ids: string[],
+    reasoningText?: string,
+  ) => ({
+    reasoningText,
+    toolCalls: [{ toolCallId: callId, input: { command } }],
+    toolResults: [
+      { toolCallId: callId, output: { tweets: ids.map(tweetRow) } },
+    ],
+  })
+  const turn = (callId: string) => [
+    {
+      role: 'assistant',
+      content: [{ type: 'tool-call', toolCallId: callId, toolName: 'bash' }],
+    },
+    {
+      role: 'tool',
+      content: [{ type: 'tool-result', toolCallId: callId, toolName: 'bash' }],
+    },
+  ]
+  const question = { role: 'user', content: [{ type: 'text', text: 'Q?' }] }
+
+  test('each tool call carries the reasoning that led to it', () => {
+    const prepare = agentSearchPrepareStep(undefined, undefined, {
+      keepReasoning: true,
+    })
+    const messages = [question, ...turn('c1')]
+    const steps = [step('c1', 'search a', ['1'], 'Look for a first.')]
+    const result = prepare({ stepNumber: 1, messages, steps })
+    expect(result.messages?.[1].content).toEqual([
+      { type: 'reasoning', text: 'Look for a first.' },
+      { type: 'tool-call', toolCallId: 'c1', toolName: 'bash' },
+    ])
+    // Kept by the workflow and seen again: nothing more to change.
+    expect(
+      prepare({ stepNumber: 2, messages: result.messages, steps }).messages,
+    ).toBeUndefined()
+  })
+
+  test('a reminder follows the third command in a row that found nothing new', () => {
+    const steps = [
+      step('c1', 'search a', ['1', '2']),
+      step('c2', 'search b', ['2']),
+      step('c3', 'search c', []),
+      step('c4', 'search d', ['1']),
+    ]
+    expect(stallSteps(steps)).toEqual([3])
+    const messages = [
+      question,
+      ...steps.flatMap((s) => turn(s.toolCalls[0].toolCallId)),
+    ]
+    const prepare = agentSearchPrepareStep(undefined, undefined, {
+      stallReminder: true,
+    })
+    const result = prepare({ stepNumber: 4, messages, steps })
+    const texts = result.messages!.map((m) => JSON.stringify(m.content))
+    expect(texts[texts.length - 1]).toContain(STALL_NOTE)
+    // Rebuilt the same way on the next step, never twice.
+    const again = prepare({ stepNumber: 5, messages: result.messages, steps })
+    expect(again.messages).toBeUndefined()
+  })
+
+  test('both are off by default, so production is unchanged', () => {
+    const steps = [
+      step('c1', 'search a', ['1'], 'Look for a first.'),
+      step('c2', 'search a', ['1']),
+    ]
+    const messages = [question, ...turn('c1'), ...turn('c2')]
+    expect(
+      agentSearchPrepareStep(
+        undefined,
+        undefined,
+        {},
+      )({
+        stepNumber: 2,
+        messages,
+        steps,
+      }),
+    ).toEqual({})
+  })
+
+  test('a repeated command is a stall; new tweets are not', () => {
+    expect(
+      stallSteps([
+        step('c1', 'search a', ['1']),
+        step('c2', 'search b', ['2']),
+        step('c3', 'search a', ['3']),
+      ]),
+    ).toEqual([2])
+    expect(
+      stallSteps([
+        step('c1', 'search a', ['1']),
+        step('c2', 'search b', ['2']),
+        step('c3', 'search c', ['3']),
+      ]),
+    ).toEqual([])
+  })
+})
+
+describe('the v2 instructions', () => {
+  test('replace how to work, keep the answer rules, and drop examples unless asked', () => {
+    const v1 = bashInstructions('2026-10-14')
+    const v2 = bashInstructionsV2('2026-10-14')
+    const withExamples = bashInstructionsV2('2026-10-14', true)
+    expect(v2).not.toContain('How to work:')
+    expect(v2).toContain('Working:')
+    expect(v2).toContain('Not finding a statement is not evidence')
+    expect(v2).not.toContain('Examples (commands shortened):')
+    expect(withExamples).toContain('Examples (commands shortened):')
+    const answerRules = v1.slice(
+      v1.indexOf('How to answer:'),
+      v1.indexOf('Examples (commands shortened):'),
+    )
+    expect(v2).toContain(answerRules.trimEnd())
   })
 })
 

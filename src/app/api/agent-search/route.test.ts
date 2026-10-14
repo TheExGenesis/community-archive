@@ -14,6 +14,11 @@ jest.mock('workflow/api', () => ({ start: jest.fn(), getRun: jest.fn() }))
 jest.mock('@/workflows/agentSearch', () => ({ agentSearchWorkflow: {} }))
 jest.mock('@/lib/agentSearch/agent', () => ({
   agentSearchToolMode: () => 'bash',
+  agentSearchPromptVariant: () => 'v2-examples',
+  agentSearchPrepareStepOptions: () => ({
+    keepReasoning: true,
+    stallReminder: true,
+  }),
 }))
 jest.mock('@/lib/agentSearch/eligibility', () => ({
   getAgentSearchAccess: jest.fn(),

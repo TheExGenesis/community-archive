@@ -4,6 +4,7 @@ import {
   AGENT_SEARCH_TOOL_EXECUTORS,
   type AgentSearchToolExecutors,
 } from './toolImpl'
+import { collectToolTweetIds } from './citations'
 import { compactTweet, type AgentTweet } from './types'
 import { bashModelOutput, type BashToolOutput } from './workspace/output'
 
@@ -34,7 +35,7 @@ export const bashInstructions = (
 
 The shell:
 - Each bash call runs one command line (pipes, && and ; work). The working directory is /work, and files you write there stay for the rest of the conversation, including later questions.
-- Tweet files are JSON Lines, one tweet per line: {"id","author","date","likes","reposts","replyTo","quotes","media","p","text"}. The text is always the full tweet.
+- Tweet files are JSON Lines, one tweet per line: {"id","author","date","likes","reposts","replyTo","replyToAuthor","quotes","media","p","text"}. The text is always the full tweet.
 - Output longer than about 4,000 characters is cut, so never cat a big file: count with wc -l, summarise with jq, and preview with jq -c '{id,author,date,text:.text[:200]}' file | head.
 
 Archive commands (rows on stdout, a one-line summary on stderr, so you see the summary even when you redirect to a file):
@@ -42,7 +43,7 @@ Archive commands (rows on stdout, a one-line summary on stderr, so you see the s
 - semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes about 14 seconds and a question gets only 2, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision.
 - people <name or handle>: matching members, to get the right handle.
 - score <file> "<yes/no question about one tweet>": asks the question of every tweet in the file (a reply is read with its parent) and prints the rows with p, the probability of yes, highest first. p ≥ 0.5 means yes. Use it when a search returns more tweets than you can read.
-- thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), read <id> (one tweet in full, with what it quotes).
+- thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), show <id> (one tweet in full, with what it quotes).
 - Also: jq, grep, sort, uniq, head, tail, wc, cut, awk, sed, mkdir.
 
 How to work:
@@ -118,10 +119,74 @@ How to answer:
 - If the question is ambiguous (for example an abbreviation with several meanings), say which meaning you used, or ask one short clarifying question if you cannot tell.`
 
 /** The instructions for a tool mode. */
+/**
+ * Prompt variants for the bash workspace, chosen by AGENT_SEARCH_PROMPT:
+ * `v1` above; `v2` states the goal and when the work is done instead of a
+ * numbered procedure, describes what the archive records and semantic
+ * search's limits, separates stated from inferred answers, and has no worked
+ * examples; `v2-examples` (the default) is v2 with them. On the crush
+ * benchmark with Flash it named the answer in 2 of 6 turns, v1 in 0 of 6.
+ */
+export type AgentSearchPromptVariant = 'v1' | 'v2' | 'v2-examples'
+
+export function agentSearchPromptVariant(
+  value = process.env.AGENT_SEARCH_PROMPT,
+): AgentSearchPromptVariant {
+  const variant = value?.trim()
+  return variant === 'v1' || variant === 'v2' ? variant : 'v2-examples'
+}
+
+const V2_SEMANTIC = `- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: finds tweets anywhere in the archive that express an idea in other words; rows carry distance (higher is closer), closest first. Use it to locate an idea when you don't know the words people used, then follow what it surfaces with search. A question gets 2, and each takes 15 seconds or more. Its results are broad: score them for precision. With --from it returns only that person's tweets that also rank near the top archive-wide, so an empty result does not mean they never said it.`
+
+const V2_WORKING = `What the archive shows:
+Each tweet row has its author, date, text, likes and reposts, and, for a reply, the tweet and author it answers (replyTo, replyToAuthor). So the archive records what people said and also what they did: whom they talk to, how often, and how that changed. Some answers are written in a tweet; others only show in patterns across many.
+
+Working:
+Aim for the answer the evidence supports best, not the first one that fits. Keep candidate answers open until the evidence separates them; when one line of search stops producing anything new, look at a different kind of evidence rather than more of the same. You are done when more searching would not change your answer. You have about 20 commands; keep the last two for lists and the answer.
+- If the question names a person or account, run people first (a project may have its own account; the archive's is @comm_archive).
+- search matches words, so use the words that would signal an answer and the forms people write: variants, abbreviations, handles, jargon. Rephrase before concluding nothing was said.
+- Save results to files (search … > s1.jsonl) and inspect them with small outputs. Add --since/--until only when the question asks about a period.
+- For an answer that is a set of tweets across the archive, gather broadly into one file (combine files with cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl), score it with a precise criterion, work from select(.p >= 0.5), and say when coverage is partial.
+
+`
+
+const V2_INFERENCE = `- Keep what tweets state apart from what you infer from patterns, and say how sure you are. Not finding a statement is not evidence that the opposite is true.
+`
+
+/** Cuts `text` at its markers, failing loudly if v1 changed under v2. */
+function section(text: string, from: string, to?: string) {
+  const start = text.indexOf(from)
+  const end = to === undefined ? text.length : text.indexOf(to, start)
+  if (start === -1 || end === -1)
+    throw new Error(`Prompt marker missing: ${from}`)
+  return [text.slice(0, start), text.slice(start, end), text.slice(end)]
+}
+
+/** v2 of the bash instructions, built from v1 so shared text stays shared. */
+export function bashInstructionsV2(date: string = today(), examples = false) {
+  const v1 = bashInstructions(date)
+  const [beforeSemantic, , afterSemantic] = section(
+    v1,
+    '- semantic "',
+    '\n- people',
+  )
+  const withSemantic = beforeSemantic + V2_SEMANTIC + afterSemantic
+  const [head, , rest] = section(withSemantic, 'How to work:', 'How to answer:')
+  const [answer, exampleText] = section(rest, 'Examples (commands shortened):')
+  const examplesPart = examples ? `\n${exampleText.trimEnd()}` : ''
+  return `${head}${V2_WORKING}${answer.trimEnd()}\n${V2_INFERENCE}${examplesPart}`.trimEnd()
+}
+
 export const agentSearchInstructions = (
   date: string = today(),
   mode: AgentSearchToolMode = 'bash',
-) => (mode === 'typed' ? typedInstructions(date) : bashInstructions(date))
+  variant: AgentSearchPromptVariant = agentSearchPromptVariant(),
+) =>
+  mode === 'typed'
+    ? typedInstructions(date)
+    : variant === 'v1'
+      ? bashInstructions(date)
+      : bashInstructionsV2(date, variant === 'v2-examples')
 
 export const AGENT_SEARCH_INSTRUCTIONS = agentSearchInstructions()
 
@@ -155,36 +220,160 @@ export function createBashAgentTools(
   }
 }
 
+/** What prepareStep reads of a finished step. */
+export interface PreparedStep {
+  reasoningText?: string
+  toolCalls?: Array<{ toolCallId: string; input?: unknown }>
+  toolResults?: Array<{ toolCallId: string; output?: unknown }>
+}
+
+type Message = { role: string; content: unknown }
+type Part = { type?: string; toolCallId?: string }
+
+const parts = (message: Message): Part[] =>
+  Array.isArray(message.content) ? (message.content as Part[]) : []
+
+const sameMessage = (a: Message, b: Message) =>
+  JSON.stringify(a) === JSON.stringify(b)
+
+/** Commands in a row that found no tweet an earlier command had not. */
+const STALLED_COMMANDS = 3
+
 /**
- * Per-step settings: the last allowed step, and any step after the run's
- * deadline, may not call tools, so the run still ends with an answer. In a
- * workflow, `now` is the replayed event time, so this stays deterministic.
+ * The steps after which the model is reminded to take stock: a command that
+ * repeats an earlier one, or every third command in a row that found no
+ * tweet the run had not already seen.
  */
+export function stallSteps(steps: PreparedStep[]): number[] {
+  const seenInputs = new Set<string>()
+  const seenIds = new Set<string>()
+  const stalls: number[] = []
+  let quiet = 0
+  steps.forEach((step, index) => {
+    let stalled = false
+    for (const call of step.toolCalls ?? []) {
+      const input = JSON.stringify(call.input ?? null)
+      if (seenInputs.has(input)) stalled = true
+      seenInputs.add(input)
+      const output = step.toolResults?.find(
+        (result) => result.toolCallId === call.toolCallId,
+      )?.output
+      const ids = collectToolTweetIds([output])
+      const fresh = Array.from(ids).some((id) => !seenIds.has(id))
+      ids.forEach((id) => seenIds.add(id))
+      quiet = fresh ? 0 : quiet + 1
+      if (quiet > 0 && quiet % STALLED_COMMANDS === 0) stalled = true
+    }
+    if (stalled) stalls.push(index)
+  })
+  return stalls
+}
+
+/**
+ * The conversation as the next model call should see it, rebuilt the same
+ * way on every step so the in-process agent and the workflow (which keeps
+ * what prepareStep returns) agree:
+ * - each tool-calling turn carries the reasoning that led to it. The workflow
+ *   agent drops reasoning between steps, and DeepSeek expects it back.
+ * - a stall reminder follows the tool results of each step stallSteps names.
+ */
+function rebuildMessages<M extends Message>(
+  messages: M[],
+  steps: PreparedStep[],
+  { keepReasoning = false, stallReminder = false }: PrepareStepOptions,
+): M[] {
+  const reasoningByCall = new Map<string, string>()
+  for (const step of keepReasoning ? steps : []) {
+    const first = step.toolCalls?.[0]
+    if (first && step.reasoningText)
+      reasoningByCall.set(first.toolCallId, step.reasoningText)
+  }
+  const rebuilt = messages
+    .filter((message) => !sameMessage(message, STALL_MESSAGE))
+    .map((message) => {
+      if (message.role !== 'assistant') return message
+      const content = parts(message)
+      if (content.some((part) => part.type === 'reasoning')) return message
+      const call = content.find((part) => part.type === 'tool-call')
+      const reasoning = call?.toolCallId
+        ? reasoningByCall.get(call.toolCallId)
+        : undefined
+      if (!reasoning) return message
+      return {
+        ...message,
+        content: [{ type: 'reasoning', text: reasoning }, ...content],
+      }
+    })
+  for (const index of stallReminder ? stallSteps(steps).reverse() : []) {
+    const calls = steps[index].toolCalls ?? []
+    const lastCall = calls[calls.length - 1]?.toolCallId
+    const at = rebuilt.findIndex(
+      (message) =>
+        message.role === 'tool' &&
+        parts(message).some((part) => part.toolCallId === lastCall),
+    )
+    if (at !== -1) rebuilt.splice(at + 1, 0, STALL_MESSAGE as M)
+  }
+  return rebuilt
+}
+
+/**
+ * Per-step settings. The conversation is rebuilt (rebuildMessages), and the
+ * last allowed step, and any step after the run's deadline, may not call
+ * tools, so the run still ends with an answer. In a workflow, `now` is the
+ * replayed event time, so this stays deterministic.
+ */
+export interface PrepareStepOptions {
+  /** Put each step's reasoning back on its tool call (AGENT_SEARCH_KEEP_REASONING). */
+  keepReasoning?: boolean
+  /** Remind the model to take stock when it stalls (AGENT_SEARCH_STALL_REMINDER). */
+  stallReminder?: boolean
+}
+
+const flag = (value: string | undefined) => value?.trim() !== 'off'
+
+/** Both on unless their env flag is `off`. */
+export function agentSearchPrepareStepOptions(
+  env: NodeJS.ProcessEnv = process.env,
+): PrepareStepOptions {
+  return {
+    keepReasoning: flag(env.AGENT_SEARCH_KEEP_REASONING),
+    stallReminder: flag(env.AGENT_SEARCH_STALL_REMINDER),
+  }
+}
+
 export function agentSearchPrepareStep(
   deadlineAt?: number,
   now: () => number = Date.now,
+  options: PrepareStepOptions = agentSearchPrepareStepOptions(),
 ) {
-  return <M extends { role: string; content: unknown }>({
+  return <M extends Message>({
     stepNumber,
     messages,
+    steps = [],
   }: {
     stepNumber: number
     messages?: M[]
+    steps?: PreparedStep[]
   }): { toolChoice?: 'none'; messages?: M[] } => {
     const mustAnswer =
       stepNumber >= AGENT_SEARCH_MAX_STEPS - 1 ||
       (deadlineAt !== undefined && now() >= deadlineAt)
-    if (!mustAnswer) return {}
-    if (!messages) return { toolChoice: 'none' }
-    // DeepSeek V4.1 Flash ignores toolChoice 'none': in a probe it called a
-    // tool 6 times of 6, with or without tools sent, and in the eval it wrote
-    // its tool-call markup as the answer. A closing user message got an
-    // answer 3 times of 3.
-    const last = messages[messages.length - 1]
-    const noted = JSON.stringify(last) === JSON.stringify(FINAL_STEP_MESSAGE)
+    if (!messages) return mustAnswer ? { toolChoice: 'none' } : {}
+    let next = rebuildMessages(messages, steps, options)
+    if (mustAnswer) {
+      // DeepSeek V4.1 Flash ignores toolChoice 'none': in a probe it called a
+      // tool 6 times of 6, with or without tools sent, and in the eval it
+      // wrote its tool-call markup as the answer. A closing user message got
+      // an answer 3 times of 3.
+      const last = next[next.length - 1]
+      if (!last || !sameMessage(last, FINAL_STEP_MESSAGE))
+        next = [...next, FINAL_STEP_MESSAGE as M]
+    }
+    const changed = JSON.stringify(next) !== JSON.stringify(messages)
     return {
-      toolChoice: 'none',
-      messages: noted ? messages : [...messages, FINAL_STEP_MESSAGE as M],
+      ...(mustAnswer ? { toolChoice: 'none' as const } : {}),
+      ...(changed ? { messages: next } : {}),
     }
   }
 }
@@ -195,6 +384,14 @@ export const FINAL_STEP_NOTE =
 const FINAL_STEP_MESSAGE = {
   role: 'user',
   content: [{ type: 'text', text: FINAL_STEP_NOTE }],
+}
+
+export const STALL_NOTE =
+  'Your recent commands repeated earlier work or found no tweets you had not already seen. Take stock before the next one: what is your best answer so far, and what evidence you have not looked at could confirm or overturn it? If nothing would change your answer, write it now.'
+
+const STALL_MESSAGE = {
+  role: 'user',
+  content: [{ type: 'text', text: STALL_NOTE }],
 }
 
 /** Where a model's tool-call markup leaked into its text begins. */

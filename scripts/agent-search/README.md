@@ -34,7 +34,10 @@ Then, from the repo root:
 Other flags: `--model provider:model` (default `AGENT_SEARCH_MODEL` or
 `openrouter:deepseek/deepseek-v4.1-flash`), `--tools bash|typed` (default `AGENT_SEARCH_TOOLS`
 or `bash`: the shell workspace, or the typed tools), `--timeout-ms` (per question, default
-300000), `--questions <file>`, `--no-validate-keys`, `--allow-remote-gateway`.
+300000), `--questions <file>`, `--no-validate-keys`, `--allow-remote-gateway`, `--traces <dir>` (one JSON
+per question with each step's reasoning, commands, the output the model saw and the answer). The
+prompt variant and step options come from `AGENT_SEARCH_PROMPT` (`v1`, `v2`, `v2-examples`),
+`AGENT_SEARCH_KEEP_REASONING=on` and `AGENT_SEARCH_STALL_REMINDER=on`; each result file records them.
 
 Environment: the script reads `~/ca-local/gateway/site.env` (override the path with
 `AGENT_SEARCH_GATEWAY_ENV`) and takes only the model keys, `OPENAI_API_KEY` and

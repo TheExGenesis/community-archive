@@ -7,7 +7,11 @@ import {
   admitAgentSearchRun,
   agentSearchPricingProblem,
 } from '@/lib/agentSearch/budget'
-import { agentSearchToolMode } from '@/lib/agentSearch/agent'
+import {
+  agentSearchPrepareStepOptions,
+  agentSearchPromptVariant,
+  agentSearchToolMode,
+} from '@/lib/agentSearch/agent'
 import { agentSearchRunDeadlineMs } from '@/lib/agentSearch/deadline'
 import {
   agentSearchAccessStatus,
@@ -179,6 +183,8 @@ export async function POST(request: Request) {
         date: new Date().toISOString().slice(0, 10),
         deadlineAt: Date.now() + agentSearchRunDeadlineMs(),
         toolMode: agentSearchToolMode(),
+        promptVariant: agentSearchPromptVariant(),
+        stepOptions: agentSearchPrepareStepOptions(),
         ...(sealedKey ? { sealedKey } : {}),
       },
     ])

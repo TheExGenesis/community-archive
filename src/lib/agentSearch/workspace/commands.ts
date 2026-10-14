@@ -217,7 +217,7 @@ export const USAGE: Record<string, string> = {
   thread: 'usage: thread <tweet id>',
   quotes: 'usage: quotes <tweet id> [--limit N]',
   tweets: 'usage: tweets <tweet id>... (or ids on stdin)',
-  read: 'usage: read <tweet id>',
+  show: 'usage: show <tweet id>',
 }
 
 async function search(
@@ -538,7 +538,7 @@ async function tweetsById(
   }
 }
 
-async function read(
+async function show(
   state: CommandState,
   args: string[],
 ): Promise<CommandResult> {
@@ -549,7 +549,7 @@ async function read(
     state.cache.get(id) ??
     null
   if (!tweet)
-    return { stdout: '', stderr: `read ${id}: not found\n`, exitCode: 1 }
+    return { stdout: '', stderr: `show ${id}: not found\n`, exitCode: 1 }
   remember(state, [tweet])
   const lines = [
     `@${tweet.username} · ${tweet.createdAt.slice(0, 10)} · ${tweet.likes} likes · id ${tweet.id}`,
@@ -582,6 +582,6 @@ export function archiveCommands(state: CommandState) {
     archiveCommand(state, 'tweets', (args, ctx) =>
       tweetsById(state, args, ctx.stdin),
     ),
-    archiveCommand(state, 'read', (args) => read(state, args)),
+    archiveCommand(state, 'show', (args) => show(state, args)),
   ]
 }

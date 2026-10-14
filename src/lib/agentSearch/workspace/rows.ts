@@ -13,6 +13,7 @@ export interface TweetRow {
   likes: number
   reposts: number
   replyTo?: string
+  replyToAuthor?: string
   quotes?: string
   media?: number
   p?: number
@@ -20,7 +21,12 @@ export interface TweetRow {
   [extra: string]: unknown
 }
 
-/** Fields rebuilt from the gateway when a file is rehydrated. */
+/**
+ * Fields rebuilt from the gateway when a file is rehydrated. replyToAuthor is
+ * left out on purpose: the id lookup that rebuilds files does not return it,
+ * so the manifest carries it with the row like other small fields (a handle,
+ * never tweet text).
+ */
 export const ROW_FIELDS = new Set([
   'id',
   'author',
@@ -46,6 +52,8 @@ export function toRow(tweet: AgentTweet, p?: number): TweetRow {
     text: tweet.text,
   }
   if (tweet.replyToTweetId) row.replyTo = tweet.replyToTweetId
+  if (tweet.replyToTweetId && tweet.replyToUsername)
+    row.replyToAuthor = `@${tweet.replyToUsername}`
   if (tweet.quoteTweetId) row.quotes = tweet.quoteTweetId
   if (tweet.media?.length) row.media = tweet.media.length
   if (p !== undefined) row.p = Math.round(p * 1000) / 1000

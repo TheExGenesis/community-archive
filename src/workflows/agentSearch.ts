@@ -11,7 +11,9 @@ import {
   finalAnswerText,
   questionWithWorkspace,
   toolsKeepFailing,
+  type AgentSearchPromptVariant,
   type AgentSearchToolMode,
+  type PrepareStepOptions,
   type BashInput,
 } from '@/lib/agentSearch/agent'
 import {
@@ -255,6 +257,10 @@ export interface AgentSearchWorkflowInput {
   deadlineAt: number
   /** How the agent searches; runs started before modes existed used typed tools. */
   toolMode?: AgentSearchToolMode
+  /** The bash prompt; runs started before variants existed used v1. */
+  promptVariant?: AgentSearchPromptVariant
+  /** Reasoning kept between steps and the stall reminder; off for older runs. */
+  stepOptions?: PrepareStepOptions
   /**
    * The member's own OpenRouter key, sealed for this run (ownKey.ts). The
    * workflow's inputs are kept in its event log, so the key never enters it
@@ -308,7 +314,11 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   const agent = new WorkflowAgent({
     // Each planner call records its own usage on this run.
     model: agentSearchModel(input.modelSpec, runId, input.sealedKey ?? null),
-    instructions: agentSearchInstructions(input.date, toolMode),
+    instructions: agentSearchInstructions(
+      input.date,
+      toolMode,
+      input.promptVariant ?? 'v1',
+    ),
     tools,
   })
 
@@ -342,7 +352,11 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       messages: [...context.messages, { role: 'user', content: question }],
       writable: getWritable<ModelCallStreamPart>(),
       stopWhen: [isStepCount(AGENT_SEARCH_MAX_STEPS), toolsKeepFailing],
-      prepareStep: agentSearchPrepareStep(deadlineAt),
+      prepareStep: agentSearchPrepareStep(
+        deadlineAt,
+        undefined,
+        input.stepOptions ?? {},
+      ),
     })
     for (const step of result.steps) {
       // A tool that failed after its retries is missing from toolResults

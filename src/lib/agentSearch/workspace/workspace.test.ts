@@ -34,8 +34,9 @@ jest.mock('../semantic', () => ({
   semanticSearch: jest.fn(),
 }))
 
-import { getTweetsByIds, searchTweets } from '../gateway'
+import { getTweetDetails, getTweetsByIds, searchTweets } from '../gateway'
 import { semanticSearch } from '../semantic'
+import { USAGE } from './commands'
 import { applyChanges, type WorkspaceManifest } from './manifest'
 import { bashModelOutput, streamedBashOutput } from './output'
 import {
@@ -55,8 +56,8 @@ const tweet = (id: string, username = 'alice') => ({
   createdAt: `2025-01-0${(Number(id) % 9) + 1}T00:00:00.000Z`,
   likes: Number(id),
   rts: 0,
-  replyToTweetId: null,
-  replyToUsername: null,
+  replyToTweetId: null as string | null,
+  replyToUsername: null as string | null,
   quoteTweetId: null,
 })
 
@@ -273,6 +274,48 @@ describe('the bash workspace', () => {
       '12',
       '123456789012345678',
     ])
+  })
+})
+
+describe('the archive command names', () => {
+  test('no archive command is shadowed by a shell builtin', async () => {
+    // A builtin runs before a custom command of the same name: `read <id>`
+    // ran bash's read and failed on every call.
+    for (const name of Object.keys(USAGE)) {
+      const result = await run(`type -t ${name}`)
+      expect([name, result.stdout.trim()]).not.toEqual([name, 'builtin'])
+      expect([name, result.stdout.trim()]).not.toEqual([name, 'keyword'])
+    }
+  })
+
+  test('a reply keeps the author it answers when its file is rebuilt', async () => {
+    archive.set('2', {
+      ...tweet('2'),
+      replyToTweetId: '4',
+      replyToUsername: 'bob',
+    })
+    const first = await run('search singapore > s1.jsonl')
+    // Files are rebuilt through the id lookup, which has no reply author.
+    ;(getTweetsByIds as jest.Mock).mockImplementation(async (ids: string[]) =>
+      ids.flatMap((id) =>
+        archive.has(id)
+          ? [{ ...archive.get(id)!, replyToUsername: null }]
+          : [],
+      ),
+    )
+    const second = await run(
+      "jq -r 'select(.replyTo) | .replyToAuthor' s1.jsonl",
+      applyChanges({}, first.workspace),
+    )
+    expect(second.stdout.trim()).toBe('@bob')
+  })
+
+  test('show prints one tweet in full', async () => {
+    ;(getTweetDetails as jest.Mock).mockResolvedValue([tweet('3')])
+    const result = await run('show 3')
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('@alice')
+    expect(result.stdout).toContain('tweet 3 about singapore')
   })
 })
 

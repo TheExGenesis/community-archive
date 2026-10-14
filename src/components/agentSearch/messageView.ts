@@ -543,7 +543,7 @@ export function describeCommand(command: string): string {
         return 'Reading thread'
       case 'quotes':
         return 'Reading quotes'
-      case 'read':
+      case 'show':
         return 'Reading a tweet in full'
       case 'tweets':
         return 'Collecting tweets'

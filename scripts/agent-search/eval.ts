@@ -6,7 +6,9 @@
 //
 // Flags: --only id,id  --class name[,name]  --limit N  --model provider:model
 //        --tools bash|typed  --concurrency N  --timeout-ms N  --questions path
-//        --dry-run  --no-validate-keys  --allow-remote-gateway
+//        --dry-run  --no-validate-keys  --allow-remote-gateway  --traces dir
+// Env: AGENT_SEARCH_PROMPT (v1|v2|v2-examples), AGENT_SEARCH_KEEP_REASONING=on,
+//      AGENT_SEARCH_STALL_REMINDER=on.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
@@ -112,6 +114,7 @@ function parseArgs(argv: string[]) {
     dryRun: false,
     validateKeys: true,
     allowRemoteGateway: false,
+    traces: null as string | null,
   }
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i]
@@ -138,6 +141,7 @@ function parseArgs(argv: string[]) {
     else if (flag === '--dry-run') args.dryRun = true
     else if (flag === '--no-validate-keys') args.validateKeys = false
     else if (flag === '--allow-remote-gateway') args.allowRemoteGateway = true
+    else if (flag === '--traces') args.traces = resolve(value())
     else throw new Error(`Unknown flag: ${flag}`)
   }
   return args
@@ -365,6 +369,84 @@ function score(
   }
 }
 
+const clip = (value: unknown, max: number) => {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? null)
+  return text.length > max
+    ? `${text.slice(0, max)}…[${text.length} chars]`
+    : text
+}
+
+/**
+ * One question's full run for reading later (--traces): each step's
+ * reasoning, every command with the output the model could see (about the
+ * first 4,000 characters), and the answer.
+ */
+function writeTrace(
+  dir: string,
+  question: Question,
+  result: {
+    finishReason?: string
+    usage?: unknown
+    steps: Array<{
+      reasoningText?: string
+      text: string
+      toolCalls: Array<{ toolCallId: string; input: unknown }>
+      content: Array<{
+        type: string
+        toolCallId?: string
+        output?: unknown
+        error?: unknown
+      }>
+    }>
+  },
+) {
+  mkdirSync(dir, { recursive: true })
+  const steps = result.steps.map((step) => ({
+    reasoning: step.reasoningText ?? '',
+    text: step.text,
+    calls: step.toolCalls.map((call) => {
+      const part = step.content.find(
+        (p) =>
+          (p.type === 'tool-result' || p.type === 'tool-error') &&
+          p.toolCallId === call.toolCallId,
+      )
+      const output = (part?.type === 'tool-result' ? part.output : null) as {
+        stdout?: string
+        stderr?: string
+        exitCode?: number
+      } | null
+      return {
+        input: call.input,
+        ...(output && typeof output.stdout === 'string'
+          ? {
+              stdout: clip(output.stdout, 4000),
+              stderr: clip(output.stderr ?? '', 1000),
+              exitCode: output.exitCode,
+            }
+          : { output: clip(output, 4000) }),
+        ...(part?.type === 'tool-error'
+          ? { error: clip(part.error, 500) }
+          : {}),
+      }
+    }),
+  }))
+  writeFileSync(
+    join(dir, `${question.id}.json`),
+    JSON.stringify(
+      {
+        id: question.id,
+        class: question.class,
+        question: question.question,
+        finishReason: result.finishReason,
+        usage: result.usage,
+        steps,
+      },
+      null,
+      2,
+    ),
+  )
+}
+
 /** The tools for a mode, with the per-question semantic search cap. */
 function toolsFor(
   mods: Modules,
@@ -448,6 +530,7 @@ async function runQuestion(
       error = mods.agent.agentRunFailure(result)
       steps = result.steps.length
       usage = result.usage
+      if (args.traces) writeTrace(args.traces, question, result)
       for (const step of result.steps) {
         const toolMs = step.performance?.toolExecutionMs ?? {}
         const settled = new Map<string, { output?: unknown; error?: unknown }>()
@@ -677,6 +760,9 @@ async function main() {
           : mods.model.agentSearchScorerModelSpec(),
     scorer,
     maxSteps: mods.agent.AGENT_SEARCH_MAX_STEPS,
+    prompt: mods.agent.agentSearchPromptVariant(),
+    prepareStep: mods.agent.agentSearchPrepareStepOptions(),
+    traces: args.traces,
     questions: args.questions,
     gateway: process.env.CLICKHOUSE_ANALYTICS_API_URL,
     filters: { only: args.only, classes: args.classes, limit: args.limit },

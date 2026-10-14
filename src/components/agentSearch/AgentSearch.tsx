@@ -428,44 +428,67 @@ export default function AgentSearch({
     }
   }
 
+  // Puts a stored conversation on screen: its messages at once, with their
+  // tweets' places held, and the tweets in batches after, cited ones first.
+  const installStored = (id: string, body: StoredConversation) => {
+    stopTweetLoader()
+    setSupply({
+      tweets: new Map((body.tweets ?? []).map((tweet) => [tweet.id, tweet])),
+      states: new Map(
+        (body.unavailableTweetIds ?? []).map((tweetId) => [
+          tweetId,
+          'unavailable' as const,
+        ]),
+      ),
+    })
+    const pendingTweetIds = body.pendingTweetIds ?? []
+    if (pendingTweetIds.length) {
+      const loader = createTweetLoader({
+        fetchBatch: (ids, signal) => fetchConversationTweets(id, ids, signal),
+        onBatch: (tweets, states) =>
+          setSupply((current) => mergeSupply(current, tweets, states)),
+      })
+      loaderRef.current = loader
+      loader.load(pendingTweetIds)
+    }
+    setConversation({
+      id,
+      pending: body.messages,
+      runningRunId: body.runningRunId,
+    })
+  }
+
+  // One load at a time. Opening another conversation, or starting a new
+  // one, leaves the load under way behind: its answer, arriving late, must
+  // not replace what the member chose after it, nor move the address back.
+  const loadRef = useRef<{ generation: number; controller: AbortController }>({
+    generation: 0,
+    controller: new AbortController(),
+  })
+  const leaveLoadBehind = () => {
+    loadRef.current.controller.abort()
+    loadRef.current = {
+      generation: loadRef.current.generation + 1,
+      controller: new AbortController(),
+    }
+    return loadRef.current
+  }
+
   const openConversation = useCallback(async (id: string) => {
+    const load = leaveLoadBehind()
+    const current = () => loadRef.current === load
     shownConversationRef.current = id
     setLoading(true)
     setLoadError(null)
     try {
       const response = await fetch(
         `/api/agent-search/conversations/${encodeURIComponent(id)}`,
-        { cache: 'no-store' },
+        { cache: 'no-store', signal: load.controller.signal },
       )
       if (!response.ok) throw new Error(String(response.status))
       const body = (await response.json()) as StoredConversation
-      stopTweetLoader()
-      setSupply({
-        tweets: new Map((body.tweets ?? []).map((tweet) => [tweet.id, tweet])),
-        states: new Map(
-          (body.unavailableTweetIds ?? []).map((tweetId) => [
-            tweetId,
-            'unavailable' as const,
-          ]),
-        ),
-      })
-      // The answers show at once with their tweets' places held; the tweets
-      // follow in batches, cited ones first, and fill them in.
-      const pendingTweetIds = body.pendingTweetIds ?? []
-      if (pendingTweetIds.length) {
-        const loader = createTweetLoader({
-          fetchBatch: (ids, signal) => fetchConversationTweets(id, ids, signal),
-          onBatch: (tweets, states) =>
-            setSupply((current) => mergeSupply(current, tweets, states)),
-        })
-        loaderRef.current = loader
-        loader.load(pendingTweetIds)
-      }
-      setConversation({
-        id,
-        pending: body.messages,
-        runningRunId: body.runningRunId,
-      })
+      if (!current()) return
+      installStored(id, body)
       // A draft from another conversation would be sent into this one; a
       // search handed over with this conversation becomes its follow-up.
       setInput(prefillRef.current?.text ?? '')
@@ -473,6 +496,7 @@ export default function AgentSearch({
       prefillRef.current = null
       showConversationInUrl(id)
     } catch {
+      if (!current()) return
       setLoadError('That conversation could not be opened.')
       const fresh = newConversationId()
       shownConversationRef.current = fresh
@@ -481,8 +505,10 @@ export default function AgentSearch({
       setConversation({ id: fresh, pending: [], runningRunId: null })
       showConversationInUrl(null)
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
+    // installStored and the loader only set state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Messages load after the chat for the new id exists, so they land in it.
@@ -723,6 +749,8 @@ export default function AgentSearch({
   const startNewConversation = () => {
     if (busy) return
     if (error) clearError()
+    leaveLoadBehind()
+    setLoading(false)
     setLoadError(null)
     const fresh = newConversationId()
     shownConversationRef.current = fresh

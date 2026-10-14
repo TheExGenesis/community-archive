@@ -344,7 +344,15 @@ export default function AgentSearch({
     error,
     clearError,
     stop,
-  } = useChat({ id: conversation.id, transport })
+  } = useChat({
+    id: conversation.id,
+    transport,
+    // One render per chunk turns a burst (a fast answer, a reconnect's
+    // replay) into dozens of synchronous renders; effects that set state on
+    // every render (Radix's Popper anchors) then trip React's nested-update
+    // limit, the chat records the error and stops reading mid-answer.
+    throttle: 50,
+  })
 
   // One request at a time: arrival fires both the mount and the status
   // effects (twice each under Strict Mode), and they share the request.

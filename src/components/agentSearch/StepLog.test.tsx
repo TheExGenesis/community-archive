@@ -27,6 +27,44 @@ test('a running log shows its steps, a timer and Stop', () => {
   expect(onStop).toHaveBeenCalled()
 })
 
+test('Stop waits for the server to confirm, and says when the cancel was refused', () => {
+  const onStop = jest.fn()
+  const { rerender } = render(
+    <StepLog
+      mode="running"
+      steps={[]}
+      startedAt={Date.now()}
+      onStop={onStop}
+      stopState="pending"
+    />,
+  )
+  expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+  rerender(
+    <StepLog
+      mode="running"
+      steps={[]}
+      startedAt={Date.now()}
+      onStop={onStop}
+      stopState="failed"
+    />,
+  )
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Couldn’t stop. Try again.',
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+  expect(onStop).toHaveBeenCalled()
+  // The folded line while the answer is written carries the same Stop.
+  rerender(
+    <LogLine
+      summary="2 steps · writing the answer"
+      steps={[done(1)]}
+      onStop={onStop}
+      stopState="pending"
+    />,
+  )
+  expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+})
+
 test('a running log with no steps yet is reading the question', () => {
   render(
     <StepLog

@@ -206,14 +206,45 @@ function useElapsed(startedAt: number) {
 }
 
 const STOP_CLASS =
-  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60'
 
-function StopButton({ onStop }: { onStop: () => void }) {
+/**
+ * Where a Stop stands with the server: asked and not yet confirmed, or
+ * refused, in which case the run goes on and Stop can be pressed again.
+ */
+export type StopState = 'pending' | 'failed'
+
+function StopButton({
+  onStop,
+  state = null,
+}: {
+  onStop: () => void
+  state?: StopState | null
+}) {
   return (
-    <button type="button" onClick={onStop} className={STOP_CLASS}>
-      <Square aria-hidden="true" className="h-3 w-3 fill-current" />
-      Stop
-    </button>
+    <span className="flex shrink-0 items-center gap-3">
+      {state === 'failed' && (
+        <span role="alert" className="text-xs text-muted-foreground">
+          Couldn’t stop. Try again.
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={onStop}
+        disabled={state === 'pending'}
+        className={STOP_CLASS}
+      >
+        {state === 'pending' ? (
+          <Loader2
+            aria-hidden="true"
+            className="h-3 w-3 animate-spin motion-reduce:animate-none"
+          />
+        ) : (
+          <Square aria-hidden="true" className="h-3 w-3 fill-current" />
+        )}
+        {state === 'pending' ? 'Stopping…' : 'Stop'}
+      </button>
+    </span>
   )
 }
 
@@ -227,11 +258,13 @@ function RunningLog({
   timeline,
   startedAt,
   onStop,
+  stopState = null,
 }: {
   steps: ProgressLine[]
   timeline?: TimelineEntry[]
   startedAt: number
   onStop: () => void
+  stopState?: StopState | null
 }) {
   const elapsed = useElapsed(startedAt)
   const [open, setOpen] = useState(true)
@@ -274,7 +307,7 @@ function RunningLog({
             · {formatElapsed(elapsed)}
           </span>
         </button>
-        <StopButton onStop={onStop} />
+        <StopButton onStop={onStop} state={stopState} />
       </div>
       <div aria-live="polite" aria-label="Search progress">
         {open ? (
@@ -427,6 +460,8 @@ export type StepLogProps =
       timeline?: TimelineEntry[]
       startedAt: number
       onStop: () => void
+      /** A Stop the server has yet to confirm, or refused. */
+      stopState?: StopState | null
     }
   | {
       mode: 'stopped' | 'failed'
@@ -452,6 +487,7 @@ export function StepLog(props: StepLogProps) {
         timeline={props.timeline}
         startedAt={props.startedAt}
         onStop={props.onStop}
+        stopState={props.stopState}
       />
     )
   }
@@ -478,6 +514,7 @@ export function LogLine({
   timeline,
   cappedAt,
   onStop,
+  stopState = null,
   more,
 }: {
   summary: string
@@ -488,6 +525,8 @@ export function LogLine({
   cappedAt?: number | null
   /** Set while the answer is still being written. */
   onStop?: () => void
+  /** A Stop the server has yet to confirm, or refused. */
+  stopState?: StopState | null
   /** Tweets found but not in the answer, which open below it. */
   more?: {
     count: number
@@ -531,7 +570,7 @@ export function LogLine({
             </span>
           </button>
         )}
-        {onStop && <StopButton onStop={onStop} />}
+        {onStop && <StopButton onStop={onStop} state={stopState} />}
       </div>
       {open && (
         <div

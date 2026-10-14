@@ -16,23 +16,35 @@ jest.mock('./AgentSearchTurn', () => ({
     interrupted,
     active,
     onStop,
+    stopState,
   }: {
     view: TurnView
     interrupted?: TurnInterruption | null
     active: boolean
     onStop?: () => void
+    stopState?: string | null
   }) => (
     <div data-testid="turn">
       {view.answer.checking ? '[checking]' : view.answer.markdown}|
       {interrupted?.kind ?? view.outcome}|
       {active ? <button onClick={onStop}>Stop</button> : 'idle'}
+      {stopState && `|${stopState}`}
     </div>
   ),
 }))
 jest.mock('./StepLog', () => ({
-  StepLog: ({ mode, onStop }: { mode: string; onStop?: () => void }) => (
+  StepLog: ({
+    mode,
+    onStop,
+    stopState,
+  }: {
+    mode: string
+    onStop?: () => void
+    stopState?: string | null
+  }) => (
     <div data-testid="log">
       {mode}
+      {stopState && `|${stopState}`}
       {onStop && <button onClick={onStop}>Stop</button>}
     </div>
   ),
@@ -446,6 +458,90 @@ describe('an answer whose stream ended', () => {
 })
 
 describe('Stop', () => {
+  test('shows as stopping until the server confirms, then the answer is stopped and not picked up again', async () => {
+    const stream = sse('asr_1')
+    const cancel = deferred<Response>()
+    let settles = 0
+    let reconnects = 0
+    fetchMock.mockImplementation(async (input: unknown, init?: RequestInit) => {
+      if (url(input).endsWith('/cancel')) return cancel.promise
+      if (init?.method === 'POST') return stream.response
+      if (url(input).includes('/stream?')) {
+        reconnects++
+        return stream.response
+      }
+      if (url(input).includes('/conversations/')) {
+        settles++
+        return json({ messages: [question()], runningRunId: 'asr_1' })
+      }
+      return defaultFetch(input)
+    })
+    render(<AgentSearch />)
+    await ask()
+    stream.push({ type: 'start' })
+    stream.push({ type: 'text-start', id: 't' })
+    stream.push({ type: 'text-delta', id: 't', delta: 'Partial' })
+    await tick()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    await tick()
+    // Still reading while the server has not answered.
+    expect(screen.getByTestId('turn')).toHaveTextContent(
+      'Partial|done|Stop|pending',
+    )
+    stream.push({ type: 'text-delta', id: 't', delta: ' more' })
+    await tick()
+    expect(screen.getByTestId('turn')).toHaveTextContent(
+      'Partial more|done|Stop|pending',
+    )
+    cancel.resolve(json({ status: 'failed' }))
+    await tick(150)
+    expect(screen.getByTestId('turn')).toHaveTextContent(
+      'Partial more|stopped|idle',
+    )
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
+    expect(settles).toBe(0)
+    expect(reconnects).toBe(0)
+  })
+
+  test('a cancel the server refuses says so and keeps Stop, while the answer goes on', async () => {
+    const stream = sse('asr_1')
+    const cancels: number[] = []
+    fetchMock.mockImplementation(async (input: unknown, init?: RequestInit) => {
+      if (url(input).endsWith('/cancel')) {
+        cancels.push(cancels.length)
+        return cancels.length === 1
+          ? json({ error: 'unavailable' }, 503)
+          : json({ status: 'failed' })
+      }
+      if (init?.method === 'POST') return stream.response
+      return defaultFetch(input)
+    })
+    render(<AgentSearch />)
+    await ask()
+    stream.push({ type: 'start' })
+    stream.push({ type: 'text-start', id: 't' })
+    stream.push({ type: 'text-delta', id: 't', delta: 'Partial' })
+    await tick()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    await tick(100)
+    expect(cancels).toHaveLength(1)
+    expect(screen.getByTestId('turn')).toHaveTextContent(
+      'Partial|done|Stop|failed',
+    )
+    stream.push({ type: 'text-delta', id: 't', delta: ' goes on' })
+    await tick()
+    expect(screen.getByTestId('turn')).toHaveTextContent(
+      'Partial goes on|done|Stop|failed',
+    )
+    // Pressed again, the cancel goes through.
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    await tick(150)
+    expect(cancels).toHaveLength(2)
+    expect(screen.getByTestId('turn')).toHaveTextContent(
+      'Partial goes on|stopped|idle',
+    )
+  })
+
   test('pressed on a new question after a run whose stream broke, Stop waits for the new run and cancels that one', async () => {
     const first = sse('asr_1')
     const second = sse('asr_2')

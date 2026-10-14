@@ -21,7 +21,7 @@ import { logSummary, type TurnView } from './messageView'
 import { peopleFromTweets } from './profileLinks'
 import { EmbeddedTweet, ResultList } from './ResultList'
 import { Sources } from './Sources'
-import { LogLine, StepLog } from './StepLog'
+import { LogLine, StepLog, type StopState } from './StepLog'
 import { RETRY_BUTTON } from './TweetPlaceholder'
 
 const plural = (n: number, word: string) =>
@@ -41,6 +41,8 @@ interface AgentSearchTurnProps {
   /** Client clock when the question was sent or reopened, for the timer. */
   startedAt?: number
   onStop?: () => void
+  /** A Stop the server has yet to confirm, or refused. */
+  stopState?: StopState | null
   onAskAgain?: () => void
   canAskAgain?: boolean
   /** The latest turn, or one that was stopped: earlier ones keep the rest. */
@@ -55,6 +57,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   interrupted = null,
   startedAt = Date.now(),
   onStop,
+  stopState = null,
   onAskAgain,
   canAskAgain = true,
   showSources = true,
@@ -200,6 +203,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         steps={view.progress}
         timeline={view.timeline}
         onStop={onStop}
+        stopState={stopState}
       />
     ) : (
       <StepLog
@@ -208,6 +212,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         timeline={view.timeline}
         startedAt={startedAt}
         onStop={onStop ?? (() => undefined)}
+        stopState={stopState}
       />
     )
   ) : ended ? (
@@ -487,6 +492,7 @@ function sameTurn(a: AgentSearchTurnProps, b: AgentSearchTurnProps) {
     a.active === b.active &&
     a.startedAt === b.startedAt &&
     a.onStop === b.onStop &&
+    a.stopState === b.stopState &&
     a.onAskAgain === b.onAskAgain &&
     a.canAskAgain === b.canAskAgain &&
     a.showSources === b.showSources &&

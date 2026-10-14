@@ -28,7 +28,7 @@ import {
   useCitationSidebar,
 } from './citationSidebarStore'
 import { RecentConversations } from './RecentConversations'
-import { StepLog } from './StepLog'
+import { StepLog, type StopState } from './StepLog'
 import { TweetLinksInNewTab } from '@/components/portal/tweetLinks'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConversationHistory, GHOST_BUTTON } from './ConversationHistory'
@@ -289,6 +289,15 @@ export default function AgentSearch({
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
   const [stopped, setStopped] = useState<Record<string, number | null>>({})
+  // A Stop pressed and not yet confirmed by the server, or refused by it:
+  // which question, how long it had run, and whether the cancel failed.
+  const [stopping, setStopping] = useState<{
+    questionId: string
+    elapsedMs: number | null
+    failed: boolean
+  } | null>(null)
+  const stoppingRef = useRef(stopping)
+  stoppingRef.current = stopping
   // A reopened conversation keeps its tweets as references; these are the
   // ones fetched so far, and why the others are not. Each batch that lands
   // rebuilds the answers' views with more of them (messageView.ts).
@@ -734,27 +743,47 @@ export default function AgentSearch({
   // Stop cancels the workflow, not just the stream. Until the server has
   // returned the run id, aborting the request would leave the run going with
   // no way to cancel it, so Stop is remembered and runs again when the id
-  // arrives. A cancel that fails keeps the id, so Stop can be pressed again.
+  // arrives. The stream is read on until the server confirms the cancel:
+  // only then is the answer stopped, and the run never picked up again. A
+  // cancel that fails says so, and Stop can be pressed again while the run,
+  // still going, keeps writing. A run that had finished before the cancel
+  // reached it is left to finish on the page too.
   const stopRun = () => {
     const runId = runIdRef.current
-    if (!runId && status === 'submitted') {
+    if (!runId) {
       stopPendingRef.current = true
       return
     }
     stopPendingRef.current = false
-    if (runId) {
-      stoppedRunsRef.current.add(runId)
-      void fetch(`/api/agent-search/${encodeURIComponent(runId)}/cancel`, {
-        method: 'POST',
+    const pressed = stoppingRef.current
+    void fetch(`/api/agent-search/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Cancel refused: ${response.status}`)
+        const body = (await response.json().catch(() => ({}))) as {
+          status?: string
+        }
+        // Another question has been asked meanwhile.
+        if (runIdRef.current !== runId) return
+        if (body.status === 'completed') {
+          setStopping(null)
+          return
+        }
+        stoppedRunsRef.current.add(runId)
+        if (pressed) {
+          setStopped((current) => ({
+            ...current,
+            [pressed.questionId]: pressed.elapsedMs,
+          }))
+        }
+        setStopping(null)
+        void stop()
       })
-        .then((response) => {
-          if (response.ok && runIdRef.current === runId) {
-            runIdRef.current = null
-          }
-        })
-        .catch(() => undefined)
-    }
-    void stop()
+      .catch(() => {
+        if (runIdRef.current !== runId) return
+        setStopping((current) => current && { ...current, failed: true })
+      })
   }
   stopRunRef.current = stopRun
 
@@ -762,14 +791,20 @@ export default function AgentSearch({
   // cancel the run.
   const stopFromStatus = () => {
     const question = [...messages].reverse().find((m) => m.role === 'user')
-    if (question) {
-      setStopped((current) => ({
-        ...current,
-        [question.id]: runStartedAt === null ? null : Date.now() - runStartedAt,
-      }))
+    if (!question) return
+    const pressed = {
+      questionId: question.id,
+      elapsedMs: runStartedAt === null ? null : Date.now() - runStartedAt,
+      failed: false,
     }
+    stoppingRef.current = pressed
+    setStopping(pressed)
     stopRun()
   }
+  // The answer ended on its own, or the stop went through: nothing pending.
+  useEffect(() => {
+    if (!busy) setStopping(null)
+  }, [busy])
 
   const ask = (question: string) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
@@ -937,6 +972,13 @@ export default function AgentSearch({
 
   const hasThread = messages.length > 0
   const lastIndex = messages.length - 1
+  // Where a Stop pressed on this question stands with the server.
+  const stopStateFor = (questionId: string): StopState | null =>
+    stopping?.questionId === questionId
+      ? stopping.failed
+        ? 'failed'
+        : 'pending'
+      : null
   // Each answer's view, by message index; a question needs its reply's.
   // Built only when the messages change, or more of a reopened
   // conversation's tweets arrive: typing in the box re-renders the page, and
@@ -1266,6 +1308,7 @@ export default function AgentSearch({
                           steps={[]}
                           startedAt={runStartedAt ?? Date.now()}
                           onStop={stopFromStatus}
+                          stopState={stopStateFor(message.id)}
                         />
                       )}
                       {endedEarly && (
@@ -1308,6 +1351,7 @@ export default function AgentSearch({
                           active ? (runStartedAt ?? undefined) : undefined
                         }
                         onStop={stopTurn}
+                        stopState={asked ? stopStateFor(asked.id) : null}
                         onAskAgain={
                           asked ? askAgainFor(messageText(asked)) : undefined
                         }

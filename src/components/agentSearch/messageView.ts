@@ -1487,19 +1487,16 @@ export function buildTurnView(
   own.missing.forEach((state) => {
     tweets[state] += 1
   })
-  const text = answerText(message)
-  let outcome = turnOutcome(text)
+  const written = answerText(message)
+  let outcome = turnOutcome(message, written)
   // A finished turn with no answer did not finish properly, however the
   // stream ended.
+  const text = withoutClosingNote(written)
   if (outcome === 'done' && !options.streaming && !text.trim()) {
     outcome = 'failed'
   }
-  const answer = buildAnswer(
-    outcome === 'done' ? text : '',
-    found,
-    message.id,
-    options,
-  )
+  // An unfinished turn keeps whatever answer it managed to write.
+  const answer = buildAnswer(text, found, message.id, options)
   // Sources below the answer hold what the answer neither cites nor lists.
   const cited = new Set([
     ...answer.citations.map((citation) => citation.id),
@@ -1647,12 +1644,41 @@ export function logSummary(
   return parts.join(' · ')
 }
 
-// A saved run that ended without an answer is closed with one of these
-// lines (history.ts); the page shows its own banner instead.
+// A saved run that did not finish ends with one of these lines (history.ts);
+// the page shows its own banner instead.
 const STOPPED_CLOSING = /^_?This answer was stopped before it finished\._?$/
 const FAILED_CLOSING = /^_?This answer failed before it finished\._?$/
+const CLOSING_NOTE =
+  /\s*_?This answer (?:was stopped|failed) before it finished\._?\s*$/
 
-function turnOutcome(text: string): TurnOutcome {
+/** The answer without the note a saved unfinished run ends with. */
+const withoutClosingNote = (text: string) => text.replace(CLOSING_NOTE, '')
+
+/**
+ * How a turn ended, as its message says. A saved answer carries its run's
+ * outcome (history.ts); a live answer whose stream broke is marked by the
+ * page (withOutcome). Without either, a closing note alone is read.
+ */
+export function messageOutcome(message: UIMessage): TurnOutcome | null {
+  const metadata = isRecord(message.metadata) ? message.metadata : {}
+  const outcome = metadata.outcome
+  return outcome === 'done' || outcome === 'stopped' || outcome === 'failed'
+    ? outcome
+    : null
+}
+
+/** The message marked with how its turn ended. */
+export function withOutcome(
+  message: UIMessage,
+  outcome: TurnOutcome,
+): UIMessage {
+  const metadata = isRecord(message.metadata) ? message.metadata : {}
+  return { ...message, metadata: { ...metadata, outcome } }
+}
+
+function turnOutcome(message: UIMessage, text: string): TurnOutcome {
+  const marked = messageOutcome(message)
+  if (marked) return marked
   const trimmed = text.trim()
   if (STOPPED_CLOSING.test(trimmed)) return 'stopped'
   if (FAILED_CLOSING.test(trimmed)) return 'failed'

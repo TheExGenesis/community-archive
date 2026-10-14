@@ -1,5 +1,10 @@
 import type { UIMessage } from 'ai'
-import type { AgentTweet, ScoredTweet } from '@/lib/agentSearch/types'
+import { conversationMessages } from '@/lib/agentSearch/history'
+import type {
+  AgentSearchRun,
+  AgentTweet,
+  ScoredTweet,
+} from '@/lib/agentSearch/types'
 import {
   NOT_SEARCHED_LINE,
   answerText,
@@ -16,12 +21,14 @@ import {
   latestThought,
   timelineFor,
   logSummary,
+  messageOutcome,
   namedBeforeChip,
   describeCommand,
   progressLine,
   progressLines,
   searchSubject,
   toolCalls,
+  withOutcome,
 } from './messageView'
 
 const tweet = (id: string, extra: Partial<AgentTweet> = {}): AgentTweet => ({
@@ -614,6 +621,26 @@ describe('buildTurnView', () => {
     expect(buildTurnView([assistant('a3', [text('Answer')])], 0).outcome).toBe(
       'done',
     )
+  })
+
+  test('a saved run that failed part way keeps its partial answer and reads as failed', () => {
+    const [, saved] = conversationMessages([
+      {
+        id: 'asr_1',
+        question: 'Who?',
+        status: 'failed',
+        error: 'The answer was cut off at the output token limit',
+        parts: [{ type: 'text', text: 'Half an answer' }],
+      } as unknown as AgentSearchRun,
+    ])
+    const view = buildTurnView([saved], 0)
+    expect(view.outcome).toBe('failed')
+    expect(view.answer.markdown).toBe('Half an answer')
+    // A live answer whose stream broke is marked the same way by the page.
+    const marked = withOutcome(assistant('a1', [text('Half')]), 'failed')
+    expect(messageOutcome(marked)).toBe('failed')
+    expect(buildTurnView([marked], 0).outcome).toBe('failed')
+    expect(buildTurnView([marked], 0).answer.markdown).toBe('Half')
   })
 
   test('the side column shows the latest matches, then the most relevant once scored', () => {

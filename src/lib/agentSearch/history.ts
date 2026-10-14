@@ -211,12 +211,25 @@ export function summarizeConversations(
 const STOPPED_TEXT = '_This answer was stopped before it finished._'
 const FAILED_TEXT = '_This answer failed before it finished._'
 
+/** How a stored run ended: finished, stopped by the member, or failed. */
+export type RunOutcome = 'done' | 'stopped' | 'failed'
+
+export function runOutcome(
+  run: Pick<AgentSearchRun, 'status' | 'error'>,
+): RunOutcome {
+  if (run.status !== 'failed') return 'done'
+  return run.error?.startsWith('Stopped') ? 'stopped' : 'failed'
+}
+
 /**
  * Rebuilds a conversation's messages from stored runs. With `tweets` (every
  * referenced tweet the gateway still returns) the references are replaced
  * by tweets; without it they stay as stored, for a page that resolves them
  * itself as the tweets arrive (messageView.ts). A run still in progress gets
- * no assistant message; the caller reconnects to its stream instead.
+ * no assistant message; the caller reconnects to its stream instead. Each
+ * answer carries how its run ended as metadata; an unfinished one also ends
+ * with a note saying so, which the model reads as part of the context
+ * (context.ts) and the page leaves out of the answer.
  */
 export function conversationMessages(
   runs: AgentSearchRun[],
@@ -239,16 +252,18 @@ export function conversationMessages(
         : []
     // A failed run may still have stored a partial answer; say it is one.
     const hasText = stored.some((part) => part.type === 'text')
+    const outcome = runOutcome(run)
     const note =
-      run.status === 'failed'
-        ? run.error?.startsWith('Stopped')
-          ? STOPPED_TEXT
-          : FAILED_TEXT
-        : null
+      outcome === 'stopped'
+        ? STOPPED_TEXT
+        : outcome === 'failed'
+          ? FAILED_TEXT
+          : null
     const closing = note && (hasText ? `\n\n${note}` : note)
     messages.push({
       id: run.id,
       role: 'assistant',
+      metadata: { outcome },
       parts: closing ? [...stored, { type: 'text', text: closing }] : stored,
     })
   }

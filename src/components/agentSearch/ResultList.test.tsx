@@ -85,6 +85,42 @@ test('a plain people list folds every person behind their row', () => {
   expect(screen.getAllByText(/by alice$/)).toHaveLength(3)
 })
 
+test('a reopened people list opens as people once its tweets land, and keeps the reader’s switch', () => {
+  const list = (
+    shown: PortalTweet[],
+    pending: Array<{ id: string; state: 'loading' }>,
+  ) => (
+    <ResultList
+      label="Who"
+      tweets={shown}
+      citations={noCitations}
+      view={{ kind: 'people', showcase: 0 }}
+      pending={pending}
+    />
+  )
+  // The list mounts with its tweets still loading, then they arrive.
+  const { rerender } = render(
+    list(
+      [],
+      [
+        { id: '1', state: 'loading' },
+        { id: '2', state: 'loading' },
+      ],
+    ),
+  )
+  rerender(list([tweet('1', 'bob'), tweet('2', 'alice')], []))
+  expect(screen.getByRole('button', { name: 'People' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Tweets' }))
+  rerender(list(tweets, []))
+  expect(screen.getByRole('button', { name: 'Tweets' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+})
+
 test('a list with no label sits in the prose: no heading and no switch', () => {
   render(<ResultList label={null} tweets={tweets} citations={noCitations} />)
   expect(screen.queryByRole('region')).toBeNull()

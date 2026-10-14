@@ -115,8 +115,9 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   )
 
   // The paragraph nearest the middle of the screen marks its citations, so
-  // the sidebar can follow the reader.
-  const answerKey = active ? '' : answer.markdown
+  // the sidebar can follow the reader. Prose held back while its tweets are
+  // checked has no paragraphs yet; the observer attaches once it shows.
+  const answerKey = active || answer.checking ? '' : answer.markdown
   useEffect(() => {
     const root = answerRef.current
     if (!root || !answerKey || typeof IntersectionObserver === 'undefined') {

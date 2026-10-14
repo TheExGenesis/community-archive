@@ -3,7 +3,7 @@ jest.mock('@/components/TweetCard', () => ({
   default: ({ tweet }: { tweet: { text: string } }) => <div>{tweet.text}</div>,
 }))
 
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { PortalTweet } from '@/lib/portal/types'
 import { CitationContext, type CitationLinks } from './CitationContext'
 import { CitationRail } from './CitationRail'
@@ -69,6 +69,23 @@ test('names the phase and keeps tweets on screen in place as new ones arrive', (
   ).toHaveTextContent('600 found · 41 judged relevant')
   expect(shown()).toEqual(['Tweet 7', 'Tweet 3'])
   expect(screen.getByText('0.92')).toBeInTheDocument()
+})
+
+test('a newcomer’s highlight clears even when the same tweets come again', () => {
+  jest.useFakeTimers()
+  try {
+    const latest: FoundPhase = { kind: 'latest', source: null }
+    const { rerender } = render(rail([item('1')], latest, 1))
+    rerender(rail([item('2'), item('1')], latest, 2))
+    const row = () => screen.getByText('Tweet 2').closest('li')
+    expect(row()).toHaveClass('bg-brand/10')
+    // The same tweets in a fresh array, as each streamed update gives.
+    rerender(rail([item('2'), item('1')], latest, 2))
+    act(() => jest.advanceTimersByTime(5_000))
+    expect(row()).not.toHaveClass('bg-brand/10')
+  } finally {
+    jest.useRealTimers()
+  }
 })
 
 test('shows at most five', () => {

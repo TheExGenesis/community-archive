@@ -40,7 +40,9 @@ function useSteadyFound(found: FoundTweet[], phase: FoundPhase['kind']) {
     phase: FoundPhase['kind']
     shown: FoundTweet[]
     entered: string[]
-  }>({ found: null, phase, shown: [], entered: [] })
+    /** Counts the sets that brought newcomers. */
+    seq: number
+  }>({ found: null, phase, shown: [], entered: [], seq: 0 })
   const steady = useMemo(() => {
     const last = memory.current
     // Computed once per new set, so a repeated render (Strict Mode) does
@@ -59,17 +61,29 @@ function useSteadyFound(found: FoundTweet[], phase: FoundPhase['kind']) {
       shown = [...newcomers, ...kept].slice(0, FOUND_SHOWN)
       entered = newcomers.slice(0, FOUND_SHOWN).map((item) => item.tweet.id)
     }
-    memory.current = { found, phase, shown, entered }
+    memory.current = {
+      found,
+      phase,
+      shown,
+      entered,
+      seq: entered.length ? last.seq + 1 : last.seq,
+    }
     return memory.current
   }, [found, phase])
 
   const [highlighted, setHighlighted] = useState<ReadonlySet<string>>(new Set())
+  // Armed once per set that brought newcomers. A later set without any (the
+  // same tweets again, as each streamed update rebuilds them) leaves the
+  // timer alone, so the highlight still clears.
+  const { entered, seq } = steady
   useEffect(() => {
-    if (!steady.entered.length) return
-    setHighlighted(new Set(steady.entered))
+    if (!entered.length) return
+    setHighlighted(new Set(entered))
     const timer = setTimeout(() => setHighlighted(new Set()), FRESH_MS)
     return () => clearTimeout(timer)
-  }, [steady])
+    // entered belongs to the set seq counts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seq])
   return { shown: steady.shown, highlighted }
 }
 

@@ -49,9 +49,12 @@ export function ResultList({
     () => new Set(tweets.map((tweet) => tweet.username)).size,
     [tweets],
   )
-  const [grouping, setGrouping] = useState<Grouping>(
-    view.kind === 'people' && authors > 1 ? 'people' : 'tweets',
-  )
+  // The agent's view holds until the reader switches; a reopened list's
+  // people arrive with its tweets, so the choice is made from what is here
+  // now, not from what had landed when the list first showed.
+  const [chosen, setChosen] = useState<Grouping | null>(null)
+  const grouping: Grouping =
+    chosen ?? (view.kind === 'people' && authors > 1 ? 'people' : 'tweets')
   const [sort, setSort] = useState<ListSort>(DEFAULT_SORT)
   // Most tweets only means something once tweets are grouped by person.
   const sortKey: ListSort =
@@ -129,7 +132,7 @@ export function ResultList({
           {authors > 1 && (
             <GroupingToggle
               value={grouping}
-              onChange={setGrouping}
+              onChange={setChosen}
               label={`Show ${label} as`}
             />
           )}

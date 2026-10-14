@@ -26,8 +26,16 @@ jest.mock('@/components/TweetAvatar', () => ({
   TweetAvatar: () => <span />,
 }))
 // react-markdown is ESM-only; the answer text itself is covered in messageView.
+// A paragraph with its chips as links, as the real renderer gives.
 jest.mock('./AnswerMarkdown', () => ({
-  AnswerMarkdown: ({ children }: { children: string }) => <div>{children}</div>,
+  AnswerMarkdown: ({ children }: { children: string }) => (
+    <p>
+      {children}
+      {Array.from(children.matchAll(/\]\(#(ask-[^)\s"]+)/g), (match) => (
+        <a key={match[1]} href={`#${match[1]}`} />
+      ))}
+    </p>
+  ),
 }))
 
 // jsdom does not lay out, so it has no scrollIntoView.
@@ -382,6 +390,37 @@ describe('a reopened conversation, its tweets still loading', () => {
     const list = screen.getByRole('region', { name: 'All' })
     expect(list).toHaveTextContent('All · 3 tweets')
     expect(within(list).getByText('Post 3')).toBeInTheDocument()
+  })
+
+  test('the sidebar follows the reader once the held-back prose shows', () => {
+    const observe = jest.fn()
+    const original = global.IntersectionObserver
+    global.IntersectionObserver = class {
+      observe = observe
+      unobserve = jest.fn()
+      disconnect = jest.fn()
+    } as unknown as typeof IntersectionObserver
+    try {
+      const { rerender } = render(
+        <AgentSearchTurn
+          view={buildTurnView(stored, 0, { supply: supply([]) })}
+          active={false}
+        />,
+      )
+      // Nothing to watch while the prose waits on its tweets.
+      expect(observe).not.toHaveBeenCalled()
+      rerender(
+        <AgentSearchTurn
+          view={buildTurnView(stored, 0, {
+            supply: supply(['1', '2', '3', '4', '5']),
+          })}
+          active={false}
+        />,
+      )
+      expect(observe).toHaveBeenCalled()
+    } finally {
+      global.IntersectionObserver = original
+    }
   })
 
   test('a tweet that could not be fetched offers Retry; a listed one that is gone says so', () => {

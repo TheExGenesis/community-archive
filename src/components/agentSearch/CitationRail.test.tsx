@@ -3,10 +3,11 @@ jest.mock('@/components/TweetCard', () => ({
   default: ({ tweet }: { tweet: { text: string } }) => <div>{tweet.text}</div>,
 }))
 
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import type { PortalTweet } from '@/lib/portal/types'
+import { CitationContext, type CitationLinks } from './CitationContext'
 import { CitationRail } from './CitationRail'
-import type { FoundPhase, FoundTweet } from './messageView'
+import type { Citation, FoundPhase, FoundTweet } from './messageView'
 
 const tweet = (id: string): PortalTweet => ({
   id,
@@ -74,4 +75,46 @@ test('shows at most five', () => {
   const many = ['1', '2', '3', '4', '5', '6'].map((id) => item(id))
   render(rail(many, { kind: 'latest', source: null }, 6))
   expect(shown()).toHaveLength(5)
+})
+
+test('a chosen citation opens once: rebuilt citations do not reopen a tweet the reader closed', () => {
+  const cite = (n: number): Citation =>
+    ({
+      id: String(n),
+      n,
+      anchor: `ask-a1-tweet-${n}`,
+      tweet: tweet(String(n)),
+      state: 'loaded',
+    }) as Citation
+  const links = (seq: number): CitationLinks => ({
+    selected: { anchor: 'ask-a1-tweet-2', seq },
+    hovered: null,
+    inView: new Set(),
+    hover: () => undefined,
+    openSidebar: () => undefined,
+    openSheet: () => undefined,
+    citationFor: () => undefined,
+  })
+  const sidebar = (seq: number) => (
+    <CitationContext.Provider value={links(seq)}>
+      <CitationRail
+        citations={[cite(1), cite(2)]}
+        active={false}
+        found={[]}
+        variant="sidebar"
+      />
+    </CitationContext.Provider>
+  )
+  const { rerender } = render(sidebar(1))
+  const toggle = () => screen.getByRole('button', { name: /^Citation 2:/ })
+  expect(toggle()).toHaveAttribute('aria-expanded', 'true')
+  fireEvent.click(toggle())
+  expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+  // The same choice with a fresh citations array, as each streamed update
+  // or tweet batch gives: it stays closed.
+  rerender(sidebar(1))
+  expect(toggle()).toHaveAttribute('aria-expanded', 'false')
+  // Clicking the chip again opens it again.
+  rerender(sidebar(2))
+  expect(toggle()).toHaveAttribute('aria-expanded', 'true')
 })

@@ -11,7 +11,7 @@ import {
 import type { MouseEvent } from 'react'
 import { X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
-import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
+import { SIDEBAR_MEDIA, useCitationLinks } from './CitationContext'
 import type { Citation, FoundPhase, FoundTweet } from './messageView'
 import { TweetPlaceholder } from './TweetPlaceholder'
 
@@ -20,7 +20,7 @@ const reducedMotion = () =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const railActive = () =>
-  typeof window !== 'undefined' && window.matchMedia(RAIL_MEDIA).matches
+  typeof window !== 'undefined' && window.matchMedia(SIDEBAR_MEDIA).matches
 
 /** How long a tweet that just entered the column stays highlighted. */
 const FRESH_MS = 1600
@@ -148,8 +148,15 @@ function CitationItem({
   )
 }
 
-/** Cited posts as compact rows that open in full; the phone Cited tab. */
-export function CitationList({ citations }: { citations: Citation[] }) {
+/** Cited tweets as compact rows that open in full, under the answer. */
+export function CitationList({
+  citations,
+  linkTarget = false,
+}: {
+  citations: Citation[]
+  /** Carries the citations' anchor ids; only one list on the page may. */
+  linkTarget?: boolean
+}) {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   return (
     <ol className="divide-y divide-border border-y border-border">
@@ -157,6 +164,7 @@ export function CitationList({ citations }: { citations: Citation[] }) {
         <CitationItem
           key={citation.id}
           citation={citation}
+          linkTarget={linkTarget}
           expanded={opened.has(citation.anchor)}
           onToggle={() =>
             setOpened((current) => {
@@ -173,10 +181,11 @@ export function CitationList({ citations }: { citations: Citation[] }) {
 }
 
 /**
- * The cited posts beside the answer. On wide screens it is its own rail:
- * a hairline edge and faint surface for the whole turn, and a list pinned
- * under the site header that scrolls by itself, so following a citation
- * never moves the answer.
+ * A turn's cited tweets, or while it still searches, the tweets found so
+ * far. `sidebar`: the list fills the wide-screen sidebar a chip opens and
+ * scrolls by itself, following the chosen citation and the paragraph being
+ * read, so the answer never moves. `inline`: under the step log while the
+ * run searches.
  */
 export const CitationRail = forwardRef<
   HTMLElement,
@@ -189,8 +198,8 @@ export const CitationRail = forwardRef<
     foundPhase?: FoundPhase
     /** Distinct tweets the run has found so far. */
     foundCount?: number
-    /** Wide screens: the reader closed the column. */
-    hidden?: boolean
+    variant?: 'sidebar' | 'inline'
+    /** The sidebar's close button. */
     onHide?: () => void
   }
 >(function CitationRail(
@@ -200,11 +209,12 @@ export const CitationRail = forwardRef<
     found,
     foundPhase = { kind: 'latest', source: null },
     foundCount = found.length,
-    hidden = false,
+    variant = 'inline',
     onHide,
   },
   ref,
 ) {
+  const inSidebar = variant === 'sidebar'
   const steady = useSteadyFound(found, foundPhase.kind)
   const links = useCitationLinks()
   const railRef = useRef<HTMLElement | null>(null)
@@ -248,13 +258,21 @@ export const CitationRail = forwardRef<
     [],
   )
 
-  // A chip click opens its post and brings it into the rail.
+  // A chip click opens its tweet and brings it into view, once per click.
+  // The citations are rebuilt as the answer streams and its tweets load;
+  // that must not reopen a tweet the reader closed or scroll back to it.
   const selected = links?.selected ?? null
+  const appliedSeq = useRef<number | null>(null)
   useEffect(() => {
-    if (!selected) return
+    if (!selected || appliedSeq.current === selected.seq) return
     const citation = citations.find((item) => item.anchor === selected.anchor)
     if (!citation) return
-    setOpened((current) => new Set(current).add(selected.anchor))
+    appliedSeq.current = selected.seq
+    setOpened((current) =>
+      current.has(selected.anchor)
+        ? current
+        : new Set(current).add(selected.anchor),
+    )
     setPosition(citation.n)
     holdPositionUntil.current = Date.now() + 1000
     // After the card has grown to its full size.
@@ -310,96 +328,93 @@ export const CitationRail = forwardRef<
       return next
     })
 
-  // Phones show the rail only while a run is going; once answered, cited
-  // tweets move into the Cited tier of Sources under the answer.
   return (
-    <div
-      className={`${active ? '' : 'hidden'} lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-stretch ${hidden ? 'lg:hidden' : 'lg:block'}`}
+    <aside
+      ref={setRefs}
+      aria-label={showFound ? title : 'Cited tweets'}
+      onScroll={inSidebar ? onScroll : undefined}
+      onPointerEnter={() => (pointerInside.current = true)}
+      onPointerLeave={() => (pointerInside.current = false)}
+      className={
+        inSidebar ? 'h-full overflow-y-auto overscroll-contain' : 'scroll-mt-24'
+      }
     >
-      <aside
-        ref={setRefs}
-        aria-label={showFound ? title : 'Cited tweets'}
-        onScroll={onScroll}
-        onPointerEnter={() => (pointerInside.current = true)}
-        onPointerLeave={() => (pointerInside.current = false)}
-        className="scroll-mt-24 lg:sticky lg:top-14 lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto lg:overscroll-contain"
+      <div
+        ref={headerRef}
+        className={`z-20 flex min-h-[2.5rem] items-center gap-3 border-b border-border bg-background/95 py-1 backdrop-blur ${
+          inSidebar ? 'sticky top-0 px-4' : ''
+        }`}
       >
-        <div
-          ref={headerRef}
-          className="z-20 flex min-h-[2.5rem] items-center gap-3 border-b border-border bg-background/95 py-1 backdrop-blur lg:sticky lg:top-0 lg:px-4"
-        >
-          <div className="min-w-0">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {title}
-              {citations.length > 0 && (
-                <span className="ml-1.5 font-normal tabular-nums">
-                  · {citations.length}
-                </span>
-              )}
-            </h3>
-            {foundLine && (
-              <p className="truncate text-xs tabular-nums text-muted-foreground">
-                {foundLine}
-              </p>
-            )}
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            {citations.length > 1 && (
-              <span
-                aria-hidden="true"
-                className="hidden text-xs tabular-nums text-muted-foreground lg:inline"
-              >
-                {Math.min(position, citations.length)} of {citations.length}
+        <div className="min-w-0">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {title}
+            {citations.length > 0 && (
+              <span className="ml-1.5 font-normal tabular-nums">
+                · {citations.length}
               </span>
             )}
-            {onHide && (
-              <button
-                type="button"
-                onClick={onHide}
-                aria-label="Close cited tweets"
-                title="Close"
-                className="-mr-1.5 hidden h-7 w-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:inline-flex"
-              >
-                <X aria-hidden="true" className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          </h3>
+          {foundLine && (
+            <p className="truncate text-xs tabular-nums text-muted-foreground">
+              {foundLine}
+            </p>
+          )}
         </div>
-        {citations.length ? (
-          <ol className="divide-y divide-border">
-            {citations.map((citation) => (
-              <CitationItem
-                key={citation.id}
-                citation={citation}
-                expanded={opened.has(citation.anchor)}
-                onToggle={() => toggle(citation.anchor)}
-                linkTarget
-              />
-            ))}
-          </ol>
-        ) : (
-          <ul className="divide-y divide-border">
-            {steady.shown.map(({ tweet, score }) => (
-              <li
-                key={tweet.id}
-                className={`relative transition-colors duration-1000 motion-reduce:transition-none ${
-                  score !== undefined ? '[&_article]:pr-14' : ''
-                } ${steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''}`}
-              >
-                <TweetCard tweet={tweet} stacked compact collapsible showDate />
-                {score !== undefined && (
-                  <span
-                    title="Relevance score: the chance the relevance check gave that this tweet answers the question"
-                    className="absolute right-4 top-3 text-[11px] tabular-nums text-muted-foreground"
-                  >
-                    {score.toFixed(2)}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </aside>
-    </div>
+        <div className="ml-auto flex items-center gap-2">
+          {inSidebar && citations.length > 1 && (
+            <span
+              aria-hidden="true"
+              className="text-xs tabular-nums text-muted-foreground"
+            >
+              {Math.min(position, citations.length)} of {citations.length}
+            </span>
+          )}
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              aria-label="Close cited tweets"
+              title="Close"
+              className="-mr-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+      {citations.length ? (
+        <ol className="divide-y divide-border">
+          {citations.map((citation) => (
+            <CitationItem
+              key={citation.id}
+              citation={citation}
+              expanded={opened.has(citation.anchor)}
+              onToggle={() => toggle(citation.anchor)}
+            />
+          ))}
+        </ol>
+      ) : (
+        <ul className="divide-y divide-border">
+          {steady.shown.map(({ tweet, score }) => (
+            <li
+              key={tweet.id}
+              className={`relative transition-colors duration-1000 motion-reduce:transition-none ${
+                score !== undefined ? '[&_article]:pr-14' : ''
+              } ${steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''}`}
+            >
+              <TweetCard tweet={tweet} stacked compact collapsible showDate />
+              {score !== undefined && (
+                <span
+                  title="Relevance score: the chance the relevance check gave that this tweet answers the question"
+                  className="absolute right-4 top-3 text-[11px] tabular-nums text-muted-foreground"
+                >
+                  {score.toFixed(2)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </aside>
   )
 })

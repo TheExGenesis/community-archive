@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { RAIL_MEDIA, useCitationLinks } from './CitationContext'
+import { SIDEBAR_MEDIA, useCitationLinks } from './CitationContext'
 import { QUOTE_HREF_PREFIX, UNVERIFIED_HREF_PREFIX } from './messageView'
 import { ProfileLink, ProfilePeopleContext } from './ProfilePreview'
 import { remarkProfileLinks, type Person } from './profileLinks'
@@ -47,8 +47,9 @@ const CHIP_HIT_AREA =
   "relative after:absolute after:-inset-x-[3px] after:-inset-y-1.5 after:content-[''] [@media(pointer:coarse)]:ml-1.5"
 
 /**
- * A numbered citation. With the rail beside the answer, a click brings the
- * post into the rail without moving the page, and hovering lights both up.
+ * A numbered citation. On wide screens a click opens the tweet in the
+ * sidebar without moving the page, and hovering lights both up; on narrow
+ * ones it opens in a sheet.
  */
 function CitationChip({
   href,
@@ -101,8 +102,8 @@ function CitationChip({
             if (!links) return
             // Neither path follows the #anchor, so the page never jumps.
             event.preventDefault()
-            if (links.railShown && window.matchMedia(RAIL_MEDIA).matches) {
-              links.select(anchor)
+            if (window.matchMedia(SIDEBAR_MEDIA).matches) {
+              links.openSidebar(anchor, event.currentTarget)
             } else links.openSheet(anchor, event.currentTarget)
           }}
           onMouseEnter={enter}

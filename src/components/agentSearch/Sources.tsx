@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import type { PortalTweet } from '@/lib/portal/types'
-import { CitationList } from './CitationRail'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { GroupingToggle, type Grouping } from './GroupingToggle'
 import type { Citation } from './messageView'
@@ -12,7 +11,7 @@ import { PeopleList, TweetRowList } from './TweetRows'
 const FIRST_ROWS = 25
 const MORE_ROWS = 50
 
-type Tier = 'cited' | 'relevant' | 'other'
+type Tier = 'relevant' | 'other'
 
 const count = (n: number) => n.toLocaleString('en-US')
 
@@ -21,8 +20,8 @@ const PILL =
 
 /**
  * What the search found that the answer neither cites nor lists, by tier:
- * judged relevant, or other matches. Phones also get the cited tweets here,
- * since they have no rail. Each tier reads as tweets or grouped by person.
+ * judged relevant, or other matches. Each tier reads as tweets or grouped by
+ * person; tweets the answer cites carry their number.
  */
 export function Sources({
   title,
@@ -40,14 +39,7 @@ export function Sources({
   otherMatches: PortalTweet[]
   citations: Citation[]
 }) {
-  const tiers: Array<{ id: Tier; label: string; phoneOnly?: boolean }> = []
-  if (citations.length) {
-    tiers.push({
-      id: 'cited',
-      label: `Cited (${count(citations.length)})`,
-      phoneOnly: true,
-    })
-  }
+  const tiers: Array<{ id: Tier; label: string }> = []
   if (relevant.length || relevantNotShown) {
     tiers.push({
       id: 'relevant',
@@ -60,22 +52,17 @@ export function Sources({
       label: `Other matches (${count(otherMatches.length)})`,
     })
   }
-  const fallback: Tier = tiers.find((tier) => !tier.phoneOnly)?.id ?? 'cited'
   const [chosen, setChosen] = useState<Tier | null>(null)
   const [grouping, setGrouping] = useState<Grouping>('tweets')
   if (!tiers.length) return null
-  const tier = chosen && tiers.some((t) => t.id === chosen) ? chosen : fallback
-  // Desktop never shows the phone-only Cited tier; it falls back there.
-  const desktopTier = tier === 'cited' ? fallback : tier
-  const tweetsFor = (id: Tier) =>
-    id === 'relevant' ? relevant : id === 'other' ? otherMatches : []
+  const tier =
+    chosen && tiers.some((t) => t.id === chosen) ? chosen : tiers[0].id
+  const tweetsFor = (id: Tier) => (id === 'relevant' ? relevant : otherMatches)
   const citationNumbers = new Map(
     citations.map((citation) => [citation.id, citation.n]),
   )
-  const onlyCited = tiers.every((t) => t.phoneOnly)
 
   const body = (id: Tier) => {
-    if (id === 'cited') return <CitationList citations={citations} />
     const tweets = tweetsFor(id)
     const label = id === 'relevant' ? 'Relevant tweets' : 'Other matches'
     return (
@@ -103,43 +90,33 @@ export function Sources({
   }
 
   return (
-    <section
-      aria-label={title}
-      className={`space-y-3 ${onlyCited ? 'lg:hidden' : ''}`}
-    >
+    <section aria-label={title} className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3
           className={`text-base font-semibold text-foreground ${titleClassName}`}
         >
           {title}
         </h3>
-        {tier !== 'cited' || !onlyCited ? (
-          <GroupingToggle
-            value={grouping}
-            onChange={setGrouping}
-            label="Group sources"
-          />
-        ) : null}
+        <GroupingToggle
+          value={grouping}
+          onChange={setGrouping}
+          label="Group sources"
+        />
       </div>
       {tiers.length > 1 && (
         <div role="group" aria-label="Which tweets" className="flex gap-1">
           {tiers.map((t) => {
             const selected = t.id === tier
-            const selectedOnDesktop = t.id === desktopTier
             return (
               <button
                 key={t.id}
                 type="button"
                 aria-pressed={selected}
                 onClick={() => setChosen(t.id)}
-                className={`${PILL} ${t.phoneOnly ? 'lg:hidden' : ''} ${
+                className={`${PILL} ${
                   selected
                     ? 'bg-muted font-medium text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
-                } ${
-                  !t.phoneOnly && selectedOnDesktop && !selected
-                    ? 'lg:bg-muted lg:font-medium lg:text-foreground'
-                    : ''
                 }`}
               >
                 {t.label}
@@ -148,18 +125,7 @@ export function Sources({
           })}
         </div>
       )}
-      <EvidenceBoundary label="sources">
-        {tier === 'cited' ? (
-          <>
-            <div className="lg:hidden">{body('cited')}</div>
-            {desktopTier !== 'cited' && (
-              <div className="hidden lg:block">{body(desktopTier)}</div>
-            )}
-          </>
-        ) : (
-          body(tier)
-        )}
-      </EvidenceBoundary>
+      <EvidenceBoundary label="sources">{body(tier)}</EvidenceBoundary>
     </section>
   )
 }

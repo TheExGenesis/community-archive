@@ -1,8 +1,19 @@
 import '@testing-library/jest-dom'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import type { UIMessage } from 'ai'
 import type { PortalTweet } from '@/lib/portal/types'
 import { AgentSearchTurn } from './AgentSearchTurn'
+import {
+  closeCitationSidebar,
+  openCitationSidebar,
+} from './citationSidebarStore'
 import { buildTurnView } from './messageView'
 
 jest.mock('@/components/TweetCard', () => ({
@@ -23,6 +34,8 @@ jest.mock('./AnswerMarkdown', () => ({
 beforeAll(() => {
   Element.prototype.scrollIntoView = jest.fn()
 })
+// The citation sidebar is one for the page; each test starts with it shut.
+afterEach(() => act(() => closeCitationSidebar()))
 
 const tweet = (id: string, username = `user${id}`) => ({
   id,
@@ -127,7 +140,7 @@ test('folds the steps into one line once the answer is being written', () => {
   expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument()
 })
 
-test('renders the answer with its list, the cited rail and the sources', () => {
+test('renders the answer with its list, its cited tweets and the sources', () => {
   const messages: UIMessage[] = [
     {
       id: 'a1',
@@ -157,7 +170,7 @@ test('renders the answer with its list, the cited rail and the sources', () => {
   expect(screen.getByText(/Searched “community archive”/)).toBeInTheDocument()
   expect(screen.getByText(/Not searched: live X/)).toBeInTheDocument()
 
-  const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
+  const cited = screen.getByRole('region', { name: 'Cited tweets' })
   expect(cited).toHaveTextContent('Post 1')
   expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
 
@@ -168,13 +181,56 @@ test('renders the answer with its list, the cited rail and the sources', () => {
 
   // Sources hold only what the answer neither cites nor lists.
   const sources = screen.getByRole('region', { name: 'Sources' })
-  expect(
-    within(sources).getByRole('button', { name: 'Other matches (2)' }),
-  ).toHaveAttribute('aria-pressed', 'true')
+  // Cited tweets sit under the answer, not in a Sources tier.
+  expect(within(sources).queryByRole('button', { name: /Cited/ })).toBeNull()
   expect(within(sources).getByText('@shared')).toBeInTheDocument()
   expect(within(sources).getByText('@user4')).toBeInTheDocument()
   fireEvent.click(within(sources).getByRole('button', { name: 'People' }))
   expect(within(sources).getAllByText(/1 tweet$/)).toHaveLength(2)
+})
+
+test('a chip opens the cited tweets in a sidebar that closes with its button or Escape', async () => {
+  const messages: UIMessage[] = [
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [
+        search('output-available', found),
+        { type: 'text', text: 'People said things [[t:1]] [[t:2]]' },
+      ],
+    },
+  ]
+  render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
+  // Closed by default: the cited tweets sit under the answer.
+  const cited = screen.getByRole('region', { name: 'Cited tweets' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  const rows = cited.querySelectorAll<HTMLElement>('[data-anchor]')
+  expect(rows).toHaveLength(2)
+  // What a chip click does on a wide screen (AnswerMarkdown).
+  const chip = document.createElement('a')
+  chip.href = '#chip'
+  document.body.append(chip)
+  act(() => openCitationSidebar(rows[1].dataset.anchor!, chip))
+  const sidebar = screen.getByRole('dialog', { name: 'Cited tweets' })
+  expect(
+    within(sidebar).getByRole('complementary', { name: 'Cited tweets' }),
+  ).toHaveTextContent('Post 2')
+  // Its post opens in full, and the chip's tweet is lit in the list.
+  expect(
+    within(sidebar).getByRole('button', { name: /Citation 2: show less/ }),
+  ).toBeInTheDocument()
+
+  fireEvent.click(
+    within(sidebar).getByRole('button', { name: 'Close cited tweets' }),
+  )
+  expect(screen.queryByRole('dialog')).toBeNull()
+  // Back to the chip, once the panel has gone.
+  await waitFor(() => expect(chip).toHaveFocus())
+
+  act(() => openCitationSidebar(rows[0].dataset.anchor!, chip))
+  fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  chip.remove()
 })
 
 test('a stopped turn keeps its steps and found tweets, and asks again', () => {
@@ -299,7 +355,7 @@ describe('a reopened conversation, its tweets still loading', () => {
     expect(
       screen.getByRole('button', { name: '1 step · 5 tweets in the answer' }),
     ).toBeInTheDocument()
-    const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
+    const cited = screen.getByRole('region', { name: 'Cited tweets' })
     expect(
       within(cited).getAllByRole('status', { name: 'Loading this tweet' }),
     ).toHaveLength(2)
@@ -343,7 +399,7 @@ describe('a reopened conversation, its tweets still loading', () => {
         onRetryTweets={onRetryTweets}
       />,
     )
-    const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
+    const cited = screen.getByRole('region', { name: 'Cited tweets' })
     expect(within(cited).getAllByText('Couldn’t load this tweet')).toHaveLength(
       2,
     )
@@ -373,9 +429,7 @@ describe('a reopened conversation, its tweets still loading', () => {
     expect(
       screen.getByText(/relied on tweets that are no longer available/),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('complementary', { name: 'Cited tweets' }),
-    ).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Cited tweets' })).toBeNull()
     expect(screen.queryByText(/marked unverified/)).toBeNull()
     expect(screen.getByRole('region', { name: 'All' })).toHaveTextContent(
       'All · 3 tweets',

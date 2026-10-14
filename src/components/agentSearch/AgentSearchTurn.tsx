@@ -1,21 +1,25 @@
 'use client'
 
-import { PanelRightOpen } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnswerMarkdown } from './AnswerMarkdown'
 import {
   CitationContext,
-  RAIL_MEDIA,
+  SIDEBAR_MEDIA,
   type CitationLinks,
 } from './CitationContext'
-import { CitationRail } from './CitationRail'
+import { CitationList, CitationRail } from './CitationRail'
 import { CitationSheet } from './CitationSheet'
+import { CitationSidebar } from './CitationSidebar'
+import {
+  closeCitationSidebar,
+  openCitationSidebar,
+  useCitationSidebar,
+} from './citationSidebarStore'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { logSummary, type TurnView } from './messageView'
 import { peopleFromTweets } from './profileLinks'
 import { EmbeddedTweet, ResultList } from './ResultList'
-import { useCitedColumnHidden } from './railPreference'
 import { Sources } from './Sources'
 import { LogLine, StepLog } from './StepLog'
 import { RETRY_BUTTON } from './TweetPlaceholder'
@@ -60,7 +64,6 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   const hasAnswer = answer.blocks.length > 0
   const answerRef = useRef<HTMLDivElement>(null)
 
-  const [selected, setSelected] = useState<CitationLinks['selected']>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [inView, setInView] = useState<ReadonlySet<string>>(new Set())
   const [sheetAnchor, setSheetAnchor] = useState<string | null>(null)
@@ -86,16 +89,16 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
       ]),
     [answer.citations, answer.blocks, view.relevant, view.otherMatches],
   )
-  const [railHidden, setRailHidden] = useCitedColumnHidden()
+  // The page's one sidebar, when it shows one of this answer's citations.
+  const sidebar = useCitationSidebar()
+  const selected = sidebar && citedByAnchor.has(sidebar.anchor) ? sidebar : null
   const links = useMemo<CitationLinks>(
     () => ({
-      railShown: !railHidden,
       selected,
       hovered,
       inView,
-      select: (anchor) =>
-        setSelected((current) => ({ anchor, seq: (current?.seq ?? 0) + 1 })),
       hover: setHovered,
+      openSidebar: openCitationSidebar,
       openSheet: (anchor, chip) => {
         sheetChipRef.current = chip
         setSheetAnchor(anchor)
@@ -103,7 +106,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
       citationFor: (anchor) => citedByAnchor.get(anchor),
       retryTweets: onRetryTweets,
     }),
-    [selected, hovered, inView, citedByAnchor, railHidden, onRetryTweets],
+    [selected, hovered, inView, citedByAnchor, onRetryTweets],
   )
   const citationNumbers = useMemo(
     () =>
@@ -112,7 +115,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   )
 
   // The paragraph nearest the middle of the screen marks its citations, so
-  // the rail can follow the reader.
+  // the sidebar can follow the reader.
   const answerKey = active ? '' : answer.markdown
   useEffect(() => {
     const root = answerRef.current
@@ -165,7 +168,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         : { kind: view.outcome, elapsedMs: null }))
 
   // Tweets found but not in the answer open below it from the log line's
-  // count. Phones always show them, since they also hold the cited tier.
+  // count. Phones always show them.
   const [moreOpen, setMoreOpen] = useState(false)
   const sourcesRef = useRef<HTMLDivElement>(null)
   const sourcesId = useId()
@@ -177,7 +180,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
           open: moreOpen,
           controls: sourcesId,
           onToggle: () => {
-            const wide = window.matchMedia?.(RAIL_MEDIA).matches ?? false
+            const wide = window.matchMedia?.(SIDEBAR_MEDIA).matches ?? false
             const opening = !wide || !moreOpen
             if (wide) setMoreOpen(opening)
             if (opening) {
@@ -242,17 +245,15 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
     failed: Math.max(0, view.tweets.failed - inLists.failed),
   }
 
-  // Wide screens: the answer on the left, cited tweets in a sticky column
-  // beside it so a citation and its tweet are both on screen. The answer
-  // keeps a reading width; the column takes the rest, up to a width tweet
-  // cards still read well at. Narrow screens: the cited tweets are a tier of
-  // Sources under the answer.
+  // One column: the answer at a reading width, its cited tweets under it,
+  // then what else the search found. A citation chip opens its tweet in the
+  // sidebar on wide screens and in a sheet on narrow ones. While the run
+  // still searches, the tweets found so far sit where the cited ones will.
+  const cited = answer.citations.length
   return (
     <CitationContext.Provider value={links}>
-      <div
-        className={`space-y-5 lg:grid ${railHidden ? 'lg:grid-cols-[minmax(0,48rem)_auto]' : 'lg:grid-cols-[minmax(0,48rem)_minmax(21rem,32rem)]'} lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0`}
-      >
-        <div className="min-w-0 space-y-5 lg:col-start-1">
+      <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           {log}
 
           {hasAnswer && (
@@ -394,43 +395,37 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
           )}
         </div>
 
-        {railHidden &&
-          (answer.citations.length > 0 ||
-            (active && view.topFound.length > 0)) && (
-            // Where the closed column was, so it reopens from the same spot.
-            <div className="hidden lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block">
-              <button
-                type="button"
-                onClick={() => setRailHidden(false)}
-                className="sticky top-16 inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-md px-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <PanelRightOpen aria-hidden="true" className="h-4 w-4" />
-                {answer.citations.length ? 'Cited' : 'Found so far'}
-                {answer.citations.length > 0 && (
-                  <span className="font-normal tabular-nums">
-                    · {answer.citations.length}
-                  </span>
-                )}
-              </button>
-            </div>
-          )}
-        <EvidenceBoundary label="cited tweets">
-          <CitationRail
-            citations={answer.citations}
-            active={active}
-            found={view.topFound}
-            foundPhase={view.foundPhase}
-            foundCount={view.foundSoFar}
-            hidden={railHidden}
-            onHide={() => setRailHidden(true)}
-          />
-        </EvidenceBoundary>
+        {cited > 0 ? (
+          <section aria-label="Cited tweets" className="min-w-0 space-y-2">
+            <h3 className="text-base font-semibold text-foreground">
+              Cited{' '}
+              <span className="font-normal tabular-nums text-muted-foreground">
+                · {cited}
+              </span>
+            </h3>
+            <EvidenceBoundary label="cited tweets">
+              <CitationList citations={answer.citations} linkTarget />
+            </EvidenceBoundary>
+          </section>
+        ) : (
+          active && (
+            <EvidenceBoundary label="found tweets">
+              <CitationRail
+                citations={answer.citations}
+                active={active}
+                found={view.topFound}
+                foundPhase={view.foundPhase}
+                foundCount={view.foundSoFar}
+              />
+            </EvidenceBoundary>
+          )
+        )}
 
         {!active && showSources && (
           <div
             ref={sourcesRef}
             id={sourcesId}
-            className={`min-w-0 scroll-mt-24 lg:col-start-1 ${
+            className={`min-w-0 scroll-mt-24 ${
               moreControl && !moreOpen ? 'lg:hidden' : ''
             }`}
           >
@@ -463,6 +458,19 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         returnFocusTo={sheetChipRef.current}
         onRetry={onRetryTweets}
       />
+      {cited > 0 && (
+        <CitationSidebar open={Boolean(selected)}>
+          <EvidenceBoundary label="cited tweets">
+            <CitationRail
+              citations={answer.citations}
+              active={active}
+              found={view.topFound}
+              variant="sidebar"
+              onHide={closeCitationSidebar}
+            />
+          </EvidenceBoundary>
+        </CitationSidebar>
+      )}
     </CitationContext.Provider>
   )
 }, sameTurn)

@@ -22,6 +22,8 @@ import { QuestionsLeft, type QuestionsToday } from './QuestionsLeft'
 import { QuestionHandling } from './QuestionHandling'
 import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
+import { SIDEBAR_ROOM } from './CitationSidebar'
+import { closeCitationSidebar, useCitationSidebar } from './citationSidebarStore'
 import { RecentConversations } from './RecentConversations'
 import { StepLog } from './StepLog'
 import { TweetLinksInNewTab } from '@/components/portal/tweetLinks'
@@ -277,6 +279,9 @@ export default function AgentSearch({
     loaderRef.current = null
   }
   useEffect(() => stopTweetLoader, [])
+  // The citation sidebar shows a citation of the conversation on screen:
+  // opening another one, or leaving the page, closes it.
+  useEffect(() => closeCitationSidebar, [conversation.id])
   const retryTweets = useCallback(() => loaderRef.current?.retry(), [])
 
   // The run id of the answer in progress, so Stop can cancel the workflow
@@ -1000,15 +1005,21 @@ export default function AgentSearch({
   )
 
   const inThread = hasThread || loading
+  // The citation sidebar sits beside the page, so the page makes room for it.
+  const sidebarOpen = useCitationSidebar() !== null
 
   // Leaving would lose the answer being read: tweets and profiles open in
   // a new tab.
   return (
     <TweetLinksInNewTab>
-      <main className="min-h-screen bg-background">
+      <main
+        className={`min-h-screen bg-background transition-[padding] duration-300 motion-reduce:transition-none ${
+          sidebarOpen ? SIDEBAR_ROOM : ''
+        }`}
+      >
         <section
           className={`mx-auto w-full px-4 py-8 sm:px-6 sm:py-12 ${
-            inThread ? 'max-w-[84rem]' : 'max-w-2xl'
+            inThread ? 'max-w-[51rem]' : 'max-w-2xl'
           }`}
         >
           {inThread ? (
@@ -1199,7 +1210,7 @@ export default function AgentSearch({
             settles into place below the last turn. Hidden while a question
             runs: Stop, in the step log, is the only action then. */}
           {hasThread && !loading && !busy && (
-            <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6 lg:mr-[23rem] lg:max-w-[calc(48rem+3rem)]">
+            <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6">
               {paused ? pausedNote : outOfQuestions ? limitNote : threadForm}
             </div>
           )}

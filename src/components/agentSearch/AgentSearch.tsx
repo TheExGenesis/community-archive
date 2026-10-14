@@ -287,9 +287,11 @@ export default function AgentSearch({
   useEffect(() => closeCitationSidebar, [conversation.id])
   const retryTweets = useCallback(() => loaderRef.current?.retry(), [])
 
-  // The run id of the answer in progress, so Stop can cancel the workflow
-  // instead of only closing the stream, and a reopened conversation can
-  // reconnect to an answer that is still being written.
+  // The run id of the latest answer, so Stop can cancel the workflow instead
+  // of only closing the stream, and a reopened conversation can reconnect to
+  // an answer that is still being written. It stays once the answer ends;
+  // a new question clears it (ask) until the server names the new run, so
+  // Stop never cancels the run before.
   const runIdRef = useRef<string | null>(null)
   // Stop pressed before the server returned the run id: cancel as soon as it
   // arrives (stopRun reads this when onChatSendMessage calls it).
@@ -327,9 +329,6 @@ export default function AgentSearch({
           // Only an accepted question makes the conversation worth linking to.
           if (response.ok) showConversationInUrl(chatId)
           if (stopPendingRef.current) stopRunRef.current()
-        },
-        onChatEnd: () => {
-          runIdRef.current = null
         },
         prepareReconnectToStreamRequest: ({ api }) => ({
           api: runIdRef.current
@@ -690,6 +689,9 @@ export default function AgentSearch({
     setLoadError(null)
     setInput('')
     setRunStartedAt(Date.now())
+    // The run before is over, however its stream ended; a Stop from here on
+    // is for the new run, whose id the server has yet to return.
+    runIdRef.current = null
     // Shown at once; the next refresh replaces it with the stored count.
     const less = (n: number | null) => (n === null ? null : Math.max(0, n - 1))
     setQuota((current) =>

@@ -133,6 +133,54 @@ async function ask(text = 'Question') {
   await tick()
 }
 
+describe('Stop', () => {
+  test('pressed on a new question after a run whose stream broke, Stop waits for the new run and cancels that one', async () => {
+    const first = sse('asr_1')
+    const second = sse('asr_2')
+    const headers = deferred<Response>()
+    let posts = 0
+    let secondSignal: AbortSignal | undefined
+    const cancelled: string[] = []
+    fetchMock.mockImplementation(async (input: unknown, init?: RequestInit) => {
+      if (url(input).endsWith('/cancel')) {
+        cancelled.push(url(input))
+        return json({ status: 'failed' })
+      }
+      if (init?.method === 'POST') {
+        if (++posts === 1) return first.response
+        secondSignal = init.signal ?? undefined
+        return headers.promise
+      }
+      if (url(input).includes('/conversations/')) {
+        return json({ runningRunId: null })
+      }
+      return defaultFetch(input)
+    })
+    render(<AgentSearch />)
+    await ask()
+    first.push({ type: 'start' })
+    first.push({ type: 'text-start', id: 't' })
+    first.push({ type: 'text-delta', id: 't', delta: 'Partial' })
+    await tick()
+    first.push({ type: 'error', errorText: 'The stream broke' })
+    await tick(150)
+    expect(screen.getByTestId('turn')).toHaveTextContent('Partial|failed|idle')
+
+    const box = screen.getByLabelText('Ask a follow-up')
+    fireEvent.change(box, { target: { value: 'Next question' } })
+    fireEvent.submit(box.closest('form')!)
+    await tick()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    await tick()
+    // Nothing to cancel yet: the first run is over, the second has no id.
+    expect(cancelled).toEqual([])
+    expect(secondSignal?.aborted).toBe(false)
+    headers.resolve(second.response)
+    await tick()
+    expect(cancelled).toEqual(['/api/agent-search/asr_2/cancel'])
+  })
+})
+
 describe('opening conversations', () => {
   test('a slow load of one conversation cannot replace a later one, or come back after New question', async () => {
     const a = deferred<Response>()

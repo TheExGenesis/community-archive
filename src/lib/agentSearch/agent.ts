@@ -5,6 +5,7 @@ import {
   type AgentSearchToolExecutors,
 } from './toolImpl'
 import { collectToolTweetIds } from './citations'
+import { MAX_SEMANTIC_CALLS_PER_RUN } from './semantic'
 import { compactTweet, type AgentTweet } from './types'
 import { bashModelOutput, type BashToolOutput } from './workspace/output'
 
@@ -40,7 +41,7 @@ The shell:
 
 Archive commands (rows on stdout, a one-line summary on stderr, so you see the summary even when you redirect to a file):
 - search <words> [--any w1,w2] [--all] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match as an exact phrase unless you add --all; --any adds alternative words or phrases. Retweets are excluded.
-- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes about 14 seconds and a question gets only 2, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision.
+- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes a second or two and a question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision.
 - people <name or handle>: matching members, to get the right handle.
 - score <file> "<yes/no question about one tweet>": asks the question of every tweet in the file (a reply is read with its parent) and prints the rows with p, the probability of yes, highest first. p ≥ 0.5 means yes. Use it when a search returns more tweets than you can read.
 - thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), show <id> (one tweet in full, with what it quotes).
@@ -106,7 +107,7 @@ How to work:
    Search matches text, not meaning, so try the forms people actually write: word variants (Greek and Greece, ban and banned), abbreviations, handles, and the specific names or jargon the topic would use. If a search finds nothing, rephrase before concluding.
    Leave optional fields out unless you need them. Add since/until only when the question asks about a time period.
 3. Use collect_and_score only when the answer is a set of posts spread across the archive (who criticised something, what people think about a topic) and searches show more matching posts than you can read, many of them off-topic. Give 2 to 8 terms that signal the answer and a precise yes/no criterion. It checks up to 300 posts by default; raise maxTweets (up to 1000) only when the question needs the long tail. If the result says capped, posts past the limit were not checked: narrow the terms or dates, or say so in the answer. Do not use it to find one remembered tweet or when a few searches already answer the question.
-4. Use semantic_search for ideas people express in their own words (survey and investigative questions), at most twice per question since each takes about 14 seconds; keep search_tweets for names, handles, exact phrases and dates. Score semantic results with score_tweets when precision matters.
+4. Use semantic_search for ideas people express in their own words (survey and investigative questions), at most ${MAX_SEMANTIC_CALLS_PER_RUN} times per question; keep search_tweets for names, handles, exact phrases and dates. Score semantic results with score_tweets when precision matters.
 5. Follow conversations when they matter: get_thread for replies and context, get_quote_posts for reactions. Use score_tweets to score posts you found this way.
 6. Stop searching once more searches stop turning up new relevant posts. Do not repeat the same search.
 
@@ -136,7 +137,7 @@ export function agentSearchPromptVariant(
   return variant === 'v1' || variant === 'v2' ? variant : 'v2-examples'
 }
 
-const V2_SEMANTIC = `- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: finds tweets anywhere in the archive that express an idea in other words; rows carry distance (higher is closer), closest first. Use it to locate an idea when you don't know the words people used, then follow what it surfaces with search. A question gets 2, and each takes 15 seconds or more. Its results are broad: score them for precision. With --from it returns only that person's tweets that also rank near the top archive-wide, so an empty result does not mean they never said it.`
+const V2_SEMANTIC = `- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: finds tweets anywhere in the archive that express an idea in other words; rows carry distance (higher is closer), closest first. Use it to locate an idea when you don't know the words people used, then follow what it surfaces with search. A question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, and each takes a second or two. Its results are broad: score them for precision. With --from it searches all of that person's tweets.`
 
 const V2_WORKING = `What the archive shows:
 Each tweet row has its author, date, text, likes and reposts, and, for a reply, the tweet and author it answers (replyTo, replyToAuthor). So the archive records what people said and also what they did: whom they talk to, how often, and how that changed. Some answers are written in a tweet; others only show in patterns across many.
@@ -541,7 +542,7 @@ export function createAgentSearchTools(
     }),
     semantic_search: tool({
       description:
-        'Search tweets by meaning, for ideas people express in different words. Slow (about 14 s) and limited to 2 per question; use search_tweets for names, handles, exact phrases and dates.',
+        `Search tweets by meaning, for ideas people express in different words. Limited to ${MAX_SEMANTIC_CALLS_PER_RUN} per question; use search_tweets for names, handles, exact phrases and dates.`,
       inputSchema: z.object({
         query: z.string().min(3).max(300),
         fromUser: z.string().max(40).optional(),

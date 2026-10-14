@@ -13,14 +13,17 @@ export const DEFAULT_SEMANTIC_SEARCH_URL =
   'https://embed.tweetstack.app/embeddings/search'
 const USER_AGENT =
   'CommunityArchive-AskTheArchive/1.0 (+https://www.community-archive.org)'
-// Measured at 13–14 s per call (2026-10-13); allow for a slow one, within
-// the run's deadline.
-const SEMANTIC_TIMEOUT_MS = 45_000
+// Measured at about 1 s per call, 2–5 s for a filter on a prolific member
+// or under concurrent load (2026-10-14); allow for a slow one, within the
+// run's deadline.
+const SEMANTIC_TIMEOUT_MS = 20_000
 export const SEMANTIC_DEFAULT_K = 50
 const MAX_K = 1000
 export const SEMANTIC_DEFAULT_THRESHOLD = 0.65
-/** Semantic searches one question may run; each takes about 14 s. */
-export const MAX_SEMANTIC_CALLS_PER_RUN = 2
+/** Semantic searches one question may run. */
+// At 1–5 s each, 6 calls stay within about a tenth of the run deadline and
+// leave most of the 20 steps for keyword search, reading and scoring.
+export const MAX_SEMANTIC_CALLS_PER_RUN = 6
 export const SEMANTIC_LIMIT_MESSAGE = `This question has used its ${MAX_SEMANTIC_CALLS_PER_RUN} semantic searches; use keyword search instead.`
 
 const TWEET_ID = /^\d{1,20}$/
@@ -63,6 +66,9 @@ export async function semanticSearch(
     searchTerm: query,
     k: clamp(Math.round(input.k ?? SEMANTIC_DEFAULT_K), 1, MAX_K),
     threshold: clamp(input.threshold ?? SEMANTIC_DEFAULT_THRESHOLD, 0, 1),
+    // Only ids and distances are used, and text-free results are about four
+    // times cheaper for the API to gate.
+    with_payload: false,
     ...(handle
       ? { filter: { must: [{ key: 'username', match: { value: handle } }] } }
       : {}),

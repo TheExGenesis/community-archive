@@ -35,7 +35,7 @@ jest.mock('../semantic', () => ({
 }))
 
 import { getTweetDetails, getTweetsByIds, searchTweets } from '../gateway'
-import { semanticSearch } from '../semantic'
+import { MAX_SEMANTIC_CALLS_PER_RUN, semanticSearch } from '../semantic'
 import { USAGE } from './commands'
 import { applyChanges, type WorkspaceManifest } from './manifest'
 import { bashModelOutput, streamedBashOutput } from './output'
@@ -241,13 +241,17 @@ describe('the bash workspace', () => {
     expect(out.stderr).toContain('--since must be YYYY-MM-DD')
   })
 
-  test('semantic search writes rows with distance, at most twice a question', async () => {
+  test('semantic search writes rows with distance, up to the per-question limit', async () => {
     ;(semanticSearch as jest.Mock).mockResolvedValue({
       query: 'moving there',
       matched: 1,
       tweets: [{ ...tweet('3'), distance: 0.91 }],
     })
-    const out = await run('semantic "moving there for work" > m1.jsonl', {}, 1)
+    const out = await run(
+      'semantic "moving there for work" > m1.jsonl',
+      {},
+      MAX_SEMANTIC_CALLS_PER_RUN - 1,
+    )
     expect(out.semanticCalls).toBe(1)
     expect(out.workspace['m1.jsonl']).toEqual({
       kind: 'tweets',
@@ -255,7 +259,7 @@ describe('the bash workspace', () => {
     })
     expect(out.stderr).toContain('0 semantic searches left')
 
-    const capped = await run('semantic "again"', {}, 2)
+    const capped = await run('semantic "again"', {}, MAX_SEMANTIC_CALLS_PER_RUN)
     expect(capped.exitCode).toBe(1)
     expect(capped.stderr).toContain('use keyword search instead')
     expect(semanticSearch).toHaveBeenCalledTimes(1)

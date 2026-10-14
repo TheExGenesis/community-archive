@@ -57,6 +57,7 @@ describe('semantic search', () => {
       searchTerm: 'moving there for work',
       k: 1000,
       threshold: 1,
+      with_payload: false,
       filter: { must: [{ key: 'username', match: { value: 'alice' } }] },
     })
     expect(getTweetsByIds).toHaveBeenCalledWith(['3', '2', '1'], {})

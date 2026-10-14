@@ -65,10 +65,11 @@ test('names the phase and keeps tweets on screen in place as new ones arrive', (
     ),
   )
   expect(
-    screen.getByRole('complementary', { name: 'Most relevant so far' }),
-  ).toHaveTextContent('600 found · 41 judged relevant')
+    screen.getByRole('complementary', { name: '41 relevant so far' }),
+  ).toHaveTextContent('41 relevant so far · of 600 found')
   expect(shown()).toEqual(['Tweet 7', 'Tweet 3'])
-  expect(screen.getByText('0.92')).toBeInTheDocument()
+  // Sorted by it already, the score is not shown.
+  expect(screen.queryByText('0.92')).toBeNull()
 })
 
 test('a newcomer’s highlight clears even when the same tweets come again', () => {

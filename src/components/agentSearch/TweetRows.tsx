@@ -86,11 +86,14 @@ export function TweetRow({
   tweet,
   citation,
   nested = false,
+  className = '',
 }: {
   tweet: PortalTweet
   citation?: number
   /** Under a person's name: a lighter row that need not say who again. */
   nested?: boolean
+  /** On the row's list item, e.g. a newcomer's highlight. */
+  className?: string
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = useId()
@@ -111,7 +114,7 @@ export function TweetRow({
     <CitationBadge n={citation} tweetId={tweet.id} />
   )
   return (
-    <li className={nested ? '' : 'border-b border-border'}>
+    <li className={`${nested ? '' : 'border-b border-border'} ${className}`}>
       {open ? (
         // The open card keeps the row's geometry: its avatar where the row's
         // was, the number and the collapse button where the number and the

@@ -143,13 +143,19 @@ export function scoresInOutput(stdout: string): Record<string, number> {
   return scores
 }
 
-/** Tweet ids in command output: `"id":"…"` in rows, or bare ids on a line. */
+/**
+ * Tweet ids in command output: `"id":"…"` in rows, a bare id on a line, or
+ * an id leading a line of fields (jq's `"\(.id)\t\(.date)…"`, CSV, columns).
+ * A long number inside a sentence is not taken for one.
+ */
 export function idsInOutput(stdout: string): string[] {
   const ids = new Set<string>()
   for (const match of Array.from(stdout.matchAll(/"id"\s*:\s*"(\d{1,20})"/g))) {
     ids.add(match[1])
   }
-  for (const match of Array.from(stdout.matchAll(/^\s*(\d{15,20})\s*$/gm))) {
+  for (const match of Array.from(
+    stdout.matchAll(/^\s*"?(\d{15,20})"?(?=\s*$|[\t ,|])/gm),
+  )) {
     ids.add(match[1])
   }
   return Array.from(ids)
@@ -248,12 +254,14 @@ export async function runBashCommand({
     )
   }
 
-  // The page gets the tweets of the files written and of the rows the model
-  // saw on stdout, so a tweet it cites from either can be shown and checked.
+  // The page gets the tweets of the rows the model saw on stdout and of the
+  // files written, so a tweet it cites from either can be shown and checked.
+  // What it saw comes first: a big file must not push past the cap the ids
+  // the model could cite.
   const ids = Array.from(
     new Set([
-      ...Object.values(changedFiles).flat(),
       ...idsInOutput(result.stdout),
+      ...Object.values(changedFiles).flat(),
     ]),
   ).slice(0, MAX_PAGE_TWEETS)
   const tweets = ids.length ? await fetchTweets(state, ids).catch(() => []) : []

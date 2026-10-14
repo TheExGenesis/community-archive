@@ -277,6 +277,31 @@ describe('the bash workspace', () => {
   })
 })
 
+describe('the tweet ids a command printed', () => {
+  test('come from rows, bare lines, and lines of fields an id leads', () => {
+    const stdout = [
+      '{"id":"1111111111111111111","text":"a"}',
+      '2222222222222222222',
+      '3333333333333333333\t2026-10-06\tsome text',
+      '"4444444444444444444",2026-10-06,"csv"',
+      '5555555555555555555 2026-10-06 columns',
+    ].join('\n')
+    expect(idsInOutput(stdout).sort()).toEqual([
+      '1111111111111111111',
+      '2222222222222222222',
+      '3333333333333333333',
+      '4444444444444444444',
+      '5555555555555555555',
+    ])
+  })
+
+  test('but not a long number inside a sentence or a count', () => {
+    expect(
+      idsInOutput('found 1234567890123456789 matches\n2026-10-06 300 tweets'),
+    ).toEqual([])
+  })
+})
+
 describe('the archive command names', () => {
   test('no archive command is shadowed by a shell builtin', async () => {
     // A builtin runs before a custom command of the same name: `read <id>`
@@ -298,9 +323,7 @@ describe('the archive command names', () => {
     // Files are rebuilt through the id lookup, which has no reply author.
     ;(getTweetsByIds as jest.Mock).mockImplementation(async (ids: string[]) =>
       ids.flatMap((id) =>
-        archive.has(id)
-          ? [{ ...archive.get(id)!, replyToUsername: null }]
-          : [],
+        archive.has(id) ? [{ ...archive.get(id)!, replyToUsername: null }] : [],
       ),
     )
     const second = await run(

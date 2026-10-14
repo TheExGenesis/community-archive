@@ -14,6 +14,7 @@ import TweetCard from '@/components/TweetCard'
 import { SIDEBAR_MEDIA, useCitationLinks } from './CitationContext'
 import type { Citation, FoundPhase, FoundTweet } from './messageView'
 import { TweetPlaceholder } from './TweetPlaceholder'
+import { TweetRow } from './TweetRows'
 
 const reducedMotion = () =>
   typeof window !== 'undefined' &&
@@ -241,6 +242,8 @@ export const CitationRail = forwardRef<
     variant?: 'sidebar' | 'inline'
     /** The sidebar's close button. */
     onHide?: () => void
+    /** The answer is being written: the found tweets fold to their count. */
+    folded?: boolean
   }
 >(function CitationRail(
   {
@@ -251,6 +254,7 @@ export const CitationRail = forwardRef<
     foundCount = found.length,
     variant = 'inline',
     onHide,
+    folded = false,
   },
   ref,
 ) {
@@ -346,16 +350,19 @@ export const CitationRail = forwardRef<
   // Nothing cited and nothing found yet: an empty column would say nothing.
   if (!citations.length && !(active && found.length)) return null
   const showFound = active && !citations.length
+  // What the column holds, in a sentence: its count first, then what it
+  // draws from, quieter, updating as the run goes.
   const title = !showFound
     ? 'Cited'
     : foundPhase.kind === 'relevant'
-      ? 'Most relevant so far'
+      ? `${count(foundPhase.relevant)} relevant so far`
       : 'Latest matches'
-  // What the column draws from, updating as the run goes.
-  const foundLine = !showFound
-    ? null
+  const titleDetail = !showFound
+    ? citations.length > 0
+      ? count(citations.length)
+      : null
     : foundPhase.kind === 'relevant'
-      ? `${count(foundCount)} found · ${count(foundPhase.relevant)} judged relevant`
+      ? `of ${count(foundCount)} found`
       : foundPhase.source
         ? `${count(foundCount)} found · newest from ${foundPhase.source.charAt(0).toLowerCase()}${foundPhase.source.slice(1)}`
         : `${count(foundCount)} found`
@@ -385,21 +392,15 @@ export const CitationRail = forwardRef<
           inSidebar ? 'sticky top-0 px-4' : ''
         }`}
       >
-        <div className="min-w-0">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            {title}
-            {citations.length > 0 && (
-              <span className="ml-1.5 font-normal tabular-nums">
-                · {citations.length}
-              </span>
-            )}
-          </h3>
-          {foundLine && (
-            <p className="truncate text-xs tabular-nums text-muted-foreground">
-              {foundLine}
-            </p>
+        <h3 className="min-w-0 truncate text-sm font-medium text-foreground">
+          {title}
+          {titleDetail && (
+            <span className="font-normal tabular-nums text-muted-foreground">
+              {' '}
+              · {titleDetail}
+            </span>
           )}
-        </div>
+        </h3>
         <div className="ml-auto flex items-center gap-2">
           {inSidebar && citations.length > 1 && (
             <span
@@ -433,25 +434,18 @@ export const CitationRail = forwardRef<
             />
           ))}
         </ol>
-      ) : (
-        <ul className="divide-y divide-border">
-          {steady.shown.map(({ tweet, score }) => (
-            <li
+      ) : folded ? null : (
+        // Interim evidence, drawn lighter than the answer that replaces it:
+        // the list's rows, best first, without scores.
+        <ul>
+          {steady.shown.map(({ tweet }) => (
+            <TweetRow
               key={tweet.id}
-              className={`relative transition-colors duration-1000 motion-reduce:transition-none ${
-                score !== undefined ? '[&_article]:pr-14' : ''
-              } ${steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''}`}
-            >
-              <TweetCard tweet={tweet} stacked compact collapsible showDate />
-              {score !== undefined && (
-                <span
-                  title="Relevance score: the chance the relevance check gave that this tweet answers the question"
-                  className="absolute right-4 top-3 text-[11px] tabular-nums text-muted-foreground"
-                >
-                  {score.toFixed(2)}
-                </span>
-              )}
-            </li>
+              tweet={tweet}
+              className={`transition-colors duration-1000 motion-reduce:transition-none ${
+                steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''
+              }`}
+            />
           ))}
         </ul>
       )}

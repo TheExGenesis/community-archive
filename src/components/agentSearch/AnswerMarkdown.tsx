@@ -231,7 +231,7 @@ const COMPONENTS: Components = {
       return (
         <span
           className={`${CHIP} border border-dashed border-border text-muted-foreground`}
-          title="The agent cited a post its searches never returned"
+          title="The agent pointed to a tweet it never actually found, so this can’t be checked"
         >
           unverified
         </span>

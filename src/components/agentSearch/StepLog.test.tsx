@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { LogLine, StepLog } from './StepLog'
 import type { ProgressLine, TimelineEntry } from './messageView'
 
@@ -19,10 +19,14 @@ test('a running log shows its steps, a timer and Stop', () => {
       onStop={onStop}
     />,
   )
-  expect(screen.getByText(/Searching/)).toHaveTextContent('Searching · 0:25')
+  // The step under way leads; the count and the clock sit beside Stop.
   const progress = screen.getByLabelText('Search progress')
   expect(progress).toHaveAttribute('aria-live', 'polite')
   expect(progress).toHaveTextContent('Reading thread')
+  expect(progress).not.toHaveTextContent('0:25')
+  expect(screen.getByText('0:25').parentElement).toHaveTextContent(
+    '2 steps · 0:25',
+  )
   fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
   expect(onStop).toHaveBeenCalled()
 })
@@ -79,7 +83,7 @@ test('a running log with no steps yet is reading the question', () => {
   )
 })
 
-test('a slow run says it is still searching', () => {
+test('a slow run says it is taking longer than most, beside its clock', () => {
   render(
     <StepLog
       mode="running"
@@ -88,11 +92,9 @@ test('a slow run says it is still searching', () => {
       onStop={jest.fn()}
     />,
   )
-  expect(
-    screen.getByText(
-      'Most questions finish within a minute. This one is still searching.',
-    ),
-  ).toBeInTheDocument()
+  expect(screen.getByText('2:00').parentElement).toHaveTextContent(
+    '1 step · 2:00 · longer than most',
+  )
 })
 
 test('a stopped log keeps its latest six steps and folds the earlier ones', () => {
@@ -213,15 +215,22 @@ test('reasoning being written shows in full; earlier reasoning is folded', () =>
       onStop={jest.fn()}
     />,
   )
-  const progress = screen.getByLabelText('Search progress')
-  // The latest reasoning is open, whole.
+  // The live line has the newest sentence; the log below it, opened, has
+  // the reasoning being written in full.
+  const header = screen.getAllByRole('button', { name: /Thinking/ })[0]
+  expect(screen.getByLabelText('Search progress')).toHaveTextContent(
+    'Thinking · Read the thread around it.',
+  )
+  const progress = document.getElementById(
+    header.getAttribute('aria-controls') ?? '',
+  ) as HTMLElement
   expect(progress).toHaveTextContent(
     'One reply looks relevant. Read the thread around it.',
   )
   // Earlier reasoning folds to its first sentence and opens on request.
   expect(progress).toHaveTextContent('Thinking · Start with the word itself.')
   expect(progress).not.toHaveTextContent('Then widen.')
-  const [first] = screen.getAllByRole('button', { name: /Thinking/ })
+  const [first] = within(progress).getAllByRole('button', { name: /Thinking/ })
   fireEvent.click(first)
   expect(progress).toHaveTextContent('Then widen.')
 
@@ -240,9 +249,15 @@ test('reasoning being written shows in full; earlier reasoning is folded', () =>
       onStop={jest.fn()}
     />,
   )
-  expect(progress).toHaveTextContent('Thinking · One reply looks relevant.')
-  expect(progress).not.toHaveTextContent('Read the thread around it.')
-  expect(progress).toHaveTextContent('Then widen.')
+  const log = document.getElementById(
+    screen
+      .getByLabelText('Search progress')
+      .querySelector('button')
+      ?.getAttribute('aria-controls') ?? '',
+  ) as HTMLElement
+  expect(log).toHaveTextContent('Thinking · One reply looks relevant.')
+  expect(log).not.toHaveTextContent('Read the thread around it.')
+  expect(log).toHaveTextContent('Then widen.')
 })
 
 test('the running log folds to the entry under way and its newest sentence', () => {
@@ -258,7 +273,9 @@ test('the running log folds to the entry under way and its newest sentence', () 
       onStop={jest.fn()}
     />,
   )
-  const header = screen.getByRole('button', { name: /Searching/ })
+  const header = within(screen.getByLabelText('Search progress')).getByRole(
+    'button',
+  )
   expect(header).toHaveAttribute('aria-expanded', 'true')
   fireEvent.click(header)
   expect(header).toHaveAttribute('aria-expanded', 'false')

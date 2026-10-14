@@ -121,10 +121,14 @@ test("a live search shows the model's reasoning before the step it led to", () =
       onStop={jest.fn()}
     />,
   )
-  // Followed by a step, the reasoning has folded to its first sentence.
+  // The step leads; the reasoning before it has folded to its first
+  // sentence in the log below.
   expect(screen.getByLabelText('Search progress')).toHaveTextContent(
-    'Thinking · The question names the archive.Searching “community archive”',
+    'Searching “community archive”',
   )
+  expect(
+    screen.getByRole('button', { name: /Thinking · The question names/ }),
+  ).toBeInTheDocument()
 })
 
 test('folds the steps into one line once the answer is being written', () => {
@@ -180,7 +184,9 @@ test('renders the answer with its list, its cited tweets and the sources', () =>
 
   const cited = screen.getByRole('region', { name: 'Cited tweets' })
   expect(cited).toHaveTextContent('Post 1')
-  expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
+  expect(screen.getByText(/marked unverified/)).toHaveTextContent(
+    'One reference in this answer couldn’t be checked',
+  )
 
   // The agent's list, with the cited tweet carrying its number.
   const list = screen.getByRole('region', { name: 'Shared' })
@@ -376,7 +382,9 @@ describe('a reopened conversation, its tweets still loading', () => {
     expect(screen.getByText('Loading 2 tweets…')).toBeInTheDocument()
     expect(screen.getByText('Loading 3 tweets…')).toBeInTheDocument()
     // Only the id no search returned is unverified.
-    expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
+    expect(screen.getByText(/marked unverified/)).toHaveTextContent(
+      'One reference in this answer couldn’t be checked',
+    )
     expect(screen.queryByText(/no longer available/)).toBeNull()
 
     rerender(
@@ -455,7 +463,9 @@ describe('a reopened conversation, its tweets still loading', () => {
     expect(
       screen.getByText(/One tweet in this answer is no longer available/),
     ).toBeInTheDocument()
-    expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')
+    expect(screen.getByText(/marked unverified/)).toHaveTextContent(
+      'One reference in this answer couldn’t be checked',
+    )
   })
 
   test('when a tweet the prose cites is gone, the prose is withheld with Ask again; the list stays', () => {

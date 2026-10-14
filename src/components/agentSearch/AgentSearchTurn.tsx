@@ -329,12 +329,10 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
 
           {!active && answer.unverified.length > 0 && (
             <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+              {/* What it means for trusting the answer, not which ids. */}
               {answer.unverified.length === 1
-                ? 'One citation points to a tweet the searches never returned, so it is marked unverified: '
-                : `${answer.unverified.length} citations point to tweets the searches never returned, so they are marked unverified: `}
-              <span className="break-all font-mono text-xs">
-                {answer.unverified.join(', ')}
-              </span>
+                ? 'One reference in this answer couldn’t be checked: the agent pointed to a tweet it never actually found. That claim is marked unverified, so treat it with care.'
+                : `${answer.unverified.length} references in this answer couldn’t be checked: the agent pointed to tweets it never actually found. Those claims are marked unverified, so treat them with care.`}
             </p>
           )}
           {!active && answer.withheld && (
@@ -423,6 +421,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
                 found={view.topFound}
                 foundPhase={view.foundPhase}
                 foundCount={view.foundSoFar}
+                folded={hasAnswer}
               />
             </EvidenceBoundary>
           )

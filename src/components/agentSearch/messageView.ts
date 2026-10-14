@@ -28,10 +28,26 @@ export interface ToolCallView {
   errorText?: string
 }
 
+/** What a step did, for its icon in the log. */
+export type StepKind =
+  | 'question'
+  | 'search'
+  | 'semantic'
+  | 'people'
+  | 'score'
+  | 'thread'
+  | 'quotes'
+  | 'tweets'
+  | 'show'
+  | 'files'
+  | 'other'
+
 export interface ProgressLine {
   id: string
   text: string
   status: 'running' | 'done' | 'error'
+  /** What the step did; `other` when it is not known. */
+  kind?: StepKind
   /**
    * The same keyword search on the archive's search page, when the step was
    * one the page can express (no OR lists, no semantic or scoring steps).
@@ -517,14 +533,41 @@ function commandWords(segment: string): string[] {
   return kept
 }
 
+const ARCHIVE_COMMANDS = new Set([
+  'search',
+  'semantic',
+  'people',
+  'score',
+  'thread',
+  'quotes',
+  'show',
+  'tweets',
+])
+
+/** The first archive command in a shell command line, with its words. */
+function firstArchiveCommand(
+  command: string,
+): { name: string; rest: string[] } | null {
+  for (const segment of command.split(/;|&&|\|\||\|/)) {
+    const [name, ...rest] = commandWords(segment.trim())
+    if (name && ARCHIVE_COMMANDS.has(name)) return { name, rest }
+  }
+  return null
+}
+
+/** What a shell command did, for its icon: its first archive command. */
+export function commandKind(command: string): StepKind {
+  return (firstArchiveCommand(command)?.name as StepKind | undefined) ?? 'files'
+}
+
 /**
  * What a running shell command is doing, in words: the first archive command
  * in it, or looking through files already found. Members never see the shell.
  */
 export function describeCommand(command: string): string {
-  const segments = command.split(/;|&&|\|\||\|/)
-  for (const segment of segments) {
-    const [name, ...rest] = commandWords(segment.trim())
+  const found = firstArchiveCommand(command)
+  if (found) {
+    const { name, rest } = found
     const text = rest.join(' ').trim()
     switch (name) {
       case 'search':
@@ -550,6 +593,17 @@ export function describeCommand(command: string): string {
     }
   }
   return 'Looking through the results'
+}
+
+const TOOL_KINDS: Record<string, StepKind> = {
+  find_people: 'people',
+  search_tweets: 'search',
+  semantic_search: 'semantic',
+  collect_and_score: 'score',
+  score_tweets: 'score',
+  get_thread: 'thread',
+  get_quote_posts: 'quotes',
+  get_tweets: 'tweets',
 }
 
 const SEARCH_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -761,7 +815,12 @@ export function progressLine(call: ToolCallView): ProgressLine {
       finished = asString(out.summary) ?? firstLine ?? `Ran ${command}`
       failure = `Could not finish: ${doing.charAt(0).toLowerCase()}${doing.slice(1)}`
       if (done && (asNumber(out.exitCode) ?? 0) !== 0) {
-        return { id: call.id, text: failure, status: 'error' }
+        return {
+          id: call.id,
+          text: failure,
+          status: 'error',
+          kind: commandKind(asString(input.command) ?? ''),
+        }
       }
       searchHref = bashSearchHref(asString(input.command) ?? '')
       break
@@ -776,6 +835,10 @@ export function progressLine(call: ToolCallView): ProgressLine {
     id: call.id,
     text: failed ? failure : done ? finished : running,
     status: failed ? 'error' : done ? 'done' : 'running',
+    kind:
+      call.name === 'bash'
+        ? commandKind(asString(input.command) ?? '')
+        : (TOOL_KINDS[call.name] ?? 'other'),
     ...(searchHref ? { searchHref } : {}),
   }
 }

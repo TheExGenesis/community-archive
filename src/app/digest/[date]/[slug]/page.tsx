@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { DigestStoryView } from '@/components/digest/DigestStoryView'
 import { getPublishedDigest } from '@/lib/digest/data'
-import { markdownToPlainText } from '@/lib/digest/markdown'
+import { getDigestStoryMetadata } from '@/lib/digest/metadata'
 import { loadDigestQuotePosts } from '@/lib/digest/quotePosts'
 
 export const revalidate = 300
@@ -13,18 +13,15 @@ export async function generateMetadata({
 }: {
   params: { date: string; slug: string }
 }): Promise<Metadata> {
+  const pathname = `/digest/${params.date}/${params.slug}`
   if (!DATE_PATTERN.test(params.date))
-    return { title: 'What Happened Yesterday · Community Archive' }
+    return getDigestStoryMetadata(null, undefined, pathname)
   const edition = await getPublishedDigest(params.date)
-  const story = edition?.content.stories.find(
-    (item) => item.slug === params.slug,
+  return getDigestStoryMetadata(
+    edition,
+    edition?.content.stories.find((item) => item.slug === params.slug),
+    pathname,
   )
-  return story
-    ? {
-        title: `${markdownToPlainText(story.title)} · Community Archive`,
-        description: markdownToPlainText(story.subtitle),
-      }
-    : { title: 'What Happened Yesterday · Community Archive' }
 }
 
 export default async function DigestStoryPage({

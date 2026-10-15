@@ -26,6 +26,14 @@ available in the calendar.
   stages versions, and publishes one version per day. Its calendar covers the
   previous 12 completed months.
 
+Shared links unfurl with a generated 1200×630 card instead of the site logo.
+An edition link leads with the day's main headline, the first executive-summary
+line, with the second and third story titles in small type; a story link shows
+that story's headline and standfirst. `/digest` reuses the latest edition's
+dated image so a cached preview never shows an earlier day's headlines. The
+cards are rendered by `src/lib/digest/socialCard.tsx` from the published
+edition only.
+
 The global navigation and homepage digest card expose only published editions.
 Drafts, raw responses, prompts, and failures never cross the public RLS policy.
 
@@ -232,9 +240,10 @@ digest tweet cards label community-authored posts as `Community author`.
 
 ## Nightly schedule and recovery
 
-`community-archive-nightly-digest.timer` runs on `prod-firehose` at `06:15 UTC`
-every day. That is 10:15 PM PST or 11:15 PM PDT, fifteen minutes after the
-Community Archive editorial day closes. The oneshot Bun process ingests the
+`community-archive-nightly-digest.timer` runs on `prod-firehose` at `07:30 UTC`
+every day. That is 11:30 PM PST or 12:30 AM PDT, ninety minutes after the
+Community Archive editorial day closes, so that the 03:00 UTC Autorefresh run
+has normally finished inserting first. The oneshot Bun process ingests the
 candidate snapshot, sends one Opus 5.5 request, performs one repair request only
 when deterministic validation rejects the first response, and stages and
 publishes the validated edition through Supabase.

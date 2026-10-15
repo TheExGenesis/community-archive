@@ -47,7 +47,7 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) return { title: 'User not found' }
-  const { accountId, profile } = resolved
+  const { accountId, isMember, profile } = resolved
   const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
   const normalizedBio = profile.bio?.replace(/\s+/g, ' ').trim()
   const description = normalizedBio
@@ -60,6 +60,8 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: canonicalPath },
+    // Only people who joined the archive are offered to search engines.
+    ...(isMember ? {} : { robots: { index: false } }),
     openGraph: {
       type: 'website',
       url: canonicalPath,

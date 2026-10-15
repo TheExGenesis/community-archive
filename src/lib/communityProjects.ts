@@ -360,6 +360,26 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     featured: false,
     publishedAt: '2026-08-22',
   },
+  {
+    slug: 'common-tongue',
+    name: 'Common Tongue',
+    creator: 'Loopy',
+    creatorHandle: 'strangestloop',
+    summary:
+      'Find who tweets any word, phrase, or website most across the archive.',
+    description:
+      'Search a word, phrase, or website and see which Community Archive accounts use it most, comparing matching posts, active days, and adjusted frequency.',
+    archiveUse:
+      'Counts how often each archived account uses a term, normalized by how much they post, to rank who says it most.',
+    category: 'Tools',
+    tags: ['Language', 'Word frequency', 'Search'],
+    projectUrl: 'https://strangestloop.io/common-tongue',
+    sourceTweetId: '2110430860549800058',
+    image: '/images/community/common-tongue-preview.webp',
+    coverClass: 'from-[#223fe3] via-[#4f63ea] to-[#d6f27a]',
+    featured: false,
+    publishedAt: '2026-10-14',
+  },
 ]
 
 /**
@@ -378,6 +398,10 @@ export const SUBMITTED_PROJECT_OVERRIDES: Record<
   },
   'loore-79f33a88': {
     image: '/images/community/loore-preview.webp',
+  },
+  'twesties-8a710e65': {
+    image: '/images/community/twesties-preview.webp',
+    summary: 'See who an account is closest to, drawn ten shareable ways.',
   },
   'finding-your-digital-twin-in-latent-space': {
     image: '/images/community/finding-your-digital-twin-card.webp',

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import TweetCard from './TweetCard'
 import type { PortalTweet } from '@/lib/portal/types'
 
@@ -17,10 +17,12 @@ jest.mock('@/components/ImageLightbox', () => ({
     src,
     alt,
     className,
+    badge,
   }: {
     src: string
     alt: string
     className?: string
+    badge?: React.ReactNode
   }) => (
     <button
       type="button"
@@ -28,7 +30,9 @@ jest.mock('@/components/ImageLightbox', () => ({
       data-src={src}
       aria-label={`Enlarge ${alt.toLowerCase()}`}
       className={className}
-    />
+    >
+      {badge}
+    </button>
   ),
 }))
 
@@ -125,6 +129,69 @@ describe('TweetCard', () => {
       'data-src',
       'https://example.com/video-thumbnail.jpg',
     )
+    expect(screen.getByTestId('tweet-image')).toHaveTextContent('Video')
+  })
+
+  test('plays an archived animated GIF as a silent looping video', async () => {
+    const originalFetch = global.fetch
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['gif'], { type: 'video/mp4' }),
+    })
+    global.fetch = fetchMock as unknown as typeof fetch
+    URL.createObjectURL = jest.fn(() => 'blob:gif')
+    URL.revokeObjectURL = jest.fn()
+
+    const { container } = render(
+      <TweetCard
+        tweet={{
+          ...tweet,
+          media: [
+            {
+              url: 'https://pbs.twimg.com/tweet_video_thumb/HUJCSBJWkAAEWF5.jpg',
+              type: 'animated_gif',
+            },
+          ],
+          quotedTweet: undefined,
+        }}
+      />,
+    )
+
+    const video = container.querySelector('video')
+    expect(video).toHaveAttribute(
+      'poster',
+      'https://pbs.twimg.com/tweet_video_thumb/HUJCSBJWkAAEWF5.jpg',
+    )
+    expect(video).toHaveAttribute('loop')
+    expect(video?.muted).toBe(true)
+    expect(screen.queryByTestId('tweet-image')).not.toBeInTheDocument()
+    expect(screen.getByText('GIF')).toBeInTheDocument()
+
+    // Twitter's video CDN rejects requests carrying a third-party Referer.
+    await waitFor(() => expect(video).toHaveAttribute('src', 'blob:gif'))
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://video.twimg.com/tweet_video/HUJCSBJWkAAEWF5.mp4',
+      expect.objectContaining({ referrerPolicy: 'no-referrer' }),
+    )
+    global.fetch = originalFetch
+  })
+
+  test('falls back to the still image for an animated GIF without a video key', () => {
+    render(
+      <TweetCard
+        tweet={{
+          ...tweet,
+          media: [{ url: 'https://example.com/gif.jpg', type: 'animated_gif' }],
+          quotedTweet: undefined,
+        }}
+      />,
+    )
+
+    expect(screen.getByTestId('tweet-image')).toHaveAttribute(
+      'data-src',
+      'https://example.com/gif.jpg',
+    )
+    expect(screen.getByTestId('tweet-image')).toHaveTextContent('GIF')
   })
 
   test.each([1, 2, 3, 4])(

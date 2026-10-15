@@ -1,6 +1,7 @@
 const resolvePublicProfileIdentityMock = jest.fn()
 const getCachedProfileHeaderMock = jest.fn()
 const getClickHouseUserProfileMock = jest.fn()
+const isPolicyBlockedAccountMock = jest.fn()
 
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
@@ -12,6 +13,8 @@ jest.mock('@/lib/metaTwitter/data', () => ({
     resolvePublicProfileIdentityMock(...args),
   getCachedProfileHeader: (...args: unknown[]) =>
     getCachedProfileHeaderMock(...args),
+  isPolicyBlockedAccount: (...args: unknown[]) =>
+    isPolicyBlockedAccountMock(...args),
 }))
 
 jest.mock('@/lib/clickhouseUserProfile', () => ({
@@ -53,6 +56,7 @@ test('prefers the authoritative archived profile', async () => {
 
   await expect(resolveProfile('alice')).resolves.toEqual({
     accountId: '42',
+    isMember: true,
     profile: archivedProfile,
   })
   expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
@@ -79,6 +83,7 @@ test('maps the analytical fallback to the shared profile shape', async () => {
 
   await expect(resolveProfile('bob')).resolves.toMatchObject({
     accountId: '77',
+    isMember: true,
     profile: {
       account_id: '77',
       username: 'bob',
@@ -89,12 +94,78 @@ test('maps the analytical fallback to the shared profile shape', async () => {
   })
 })
 
-test('does not load profile sources when the public policy identity is hidden', async () => {
+const outsideProfile = {
+  user: {
+    ...archivedProfile,
+    account_id: '77',
+    username: 'Bob',
+    account_display_name: 'Bob',
+    has_archive: false,
+    is_opted_in: false,
+  },
+  topTweets: [],
+}
+
+test('serves an account outside the directory from the analytical corpus', async () => {
   resolvePublicProfileIdentityMock.mockResolvedValue(null)
+  getClickHouseUserProfileMock.mockResolvedValue(outsideProfile)
+  isPolicyBlockedAccountMock.mockResolvedValue(false)
+
+  await expect(resolveProfileCore('BOB')).resolves.toMatchObject({
+    accountId: '77',
+    isMember: false,
+    profile: { username: 'Bob', has_archive: false, is_opted_in: false },
+  })
+  expect(getCachedProfileHeaderMock).not.toHaveBeenCalled()
+  expect(getClickHouseUserProfileMock.mock.calls).toEqual([['bob']])
+  expect(isPolicyBlockedAccountMock.mock.calls).toEqual([['77', 'Bob']])
+})
+
+test('hides an opted-out account outside the directory', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue(null)
+  getClickHouseUserProfileMock.mockResolvedValue(outsideProfile)
+  isPolicyBlockedAccountMock.mockResolvedValue(true)
+
+  await expect(resolveProfileCore('77')).resolves.toBeNull()
+  expect(isPolicyBlockedAccountMock).toHaveBeenCalledWith('77', 'Bob')
+})
+
+test('treats a member found only by stable ID as a member', async () => {
+  resolvePublicProfileIdentityMock.mockImplementation(async (param: string) =>
+    param === '77' ? { accountId: '77', username: 'oldbob' } : null,
+  )
+  getClickHouseUserProfileMock.mockResolvedValue(outsideProfile)
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    account_id: '77',
+    username: 'oldbob',
+  })
+
+  await expect(resolveProfileCore('bob')).resolves.toMatchObject({
+    accountId: '77',
+    isMember: true,
+    profile: { username: 'oldbob', has_archive: true },
+  })
+  expect(isPolicyBlockedAccountMock).not.toHaveBeenCalled()
+})
+
+test('does not render an account outside the directory when the policy read fails', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue(null)
+  getClickHouseUserProfileMock.mockResolvedValue(outsideProfile)
+  isPolicyBlockedAccountMock.mockRejectedValue(new Error('policy unavailable'))
+
+  await expect(resolveProfileCore('bob')).rejects.toThrow('policy unavailable')
+})
+
+test('returns nothing for an unknown account or a malformed identifier', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue(null)
+  getClickHouseUserProfileMock.mockResolvedValue(null)
 
   await expect(resolveProfile('missing')).resolves.toBeNull()
-  expect(getCachedProfileHeaderMock).not.toHaveBeenCalled()
-  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
+  await expect(resolveProfile('archive%3Aalice')).resolves.toBeNull()
+  await expect(resolveProfile('%E0%A4%A')).resolves.toBeNull()
+  expect(getClickHouseUserProfileMock.mock.calls).toEqual([['missing']])
+  expect(isPolicyBlockedAccountMock).not.toHaveBeenCalled()
 })
 
 test('backfills a missing archive avatar from the analytical profile', async () => {

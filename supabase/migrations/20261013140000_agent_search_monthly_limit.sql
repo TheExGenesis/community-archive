@@ -3,11 +3,11 @@
 -- month, an own-key question against all of their questions this month,
 -- under the higher limit the caller passes for it.
 --
--- The nine-argument function from 20261013120000 was never deployed without
--- this migration, so it is replaced rather than kept. The eight-argument one
--- stays for code deployed before both (it admits house runs with no monthly
--- check); drop it in a later migration.
+-- Ask the archive ships with this migration, so no deployed code calls the
+-- eight-argument function from 20261009130000 or the nine-argument one from
+-- 20261013120000; both are dropped rather than kept as overloads.
 
+DROP FUNCTION IF EXISTS public.agent_search_admit(text, text, text, text, text, integer, numeric, integer);
 DROP FUNCTION IF EXISTS public.agent_search_admit(text, text, text, text, text, integer, numeric, integer, text);
 
 CREATE OR REPLACE FUNCTION public.agent_search_admit(

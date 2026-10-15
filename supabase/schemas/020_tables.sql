@@ -588,7 +588,13 @@ CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
     -- fetched again through the gateway when a past answer is opened.
     "parts" jsonb,
     -- The Workflow run executing it; null until the workflow has started.
-    "workflow_run_id" text
+    "workflow_run_id" text,
+    -- Who paid for the planner: the house key or the member's own key. The
+    -- key itself is never stored.
+    "key_source" text NOT NULL DEFAULT 'house' CONSTRAINT "agent_search_runs_key_source_check" CHECK ("key_source" IN ('house', 'own')),
+    -- Set when the member deletes the run: its content is cleared and its
+    -- accounting stays, so deleting never gives back questions or budget.
+    "deleted_at" timestamptz
 );
 ALTER TABLE "public"."agent_search_runs" OWNER TO "postgres";
 

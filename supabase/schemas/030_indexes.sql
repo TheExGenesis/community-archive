@@ -166,6 +166,9 @@ CREATE INDEX IF NOT EXISTS "agent_search_runs_started_idx"
   ON "public"."agent_search_runs" ("started_at");
 CREATE INDEX IF NOT EXISTS "agent_search_runs_conversation_idx"
   ON "public"."agent_search_runs" ("conversation_id", "started_at");
+CREATE INDEX IF NOT EXISTS "agent_search_runs_account_live_idx"
+  ON "public"."agent_search_runs" ("account_id", "started_at" DESC)
+  WHERE "deleted_at" IS NULL;
 
 CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
   ON "public"."digest_edition_comments" ("edition_id", "created_at");

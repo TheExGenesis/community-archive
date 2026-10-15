@@ -14,7 +14,7 @@
  * Append-only by default: a year that already has sections is left alone so
  * published titles and deep links stay stable across runs (the model is not
  * deterministic); years recorded empty are retried. --force regenerates every
- * year of the selected accounts.
+ * year of the selected accounts, or only the --years given.
  * Accounts that explicitly opted out of the directory are skipped.
  *
  * Needs in .env: CLICKHOUSE_ANALYTICS_API_URL, CLICKHOUSE_ANALYTICS_API_TOKEN,
@@ -342,7 +342,13 @@ async function main() {
         years: {},
       }
       entry.username = account.username
-      if (FORCE) entry.years = {}
+      // --years narrows a forced run, so the account's other years survive it.
+      if (FORCE)
+        entry.years = Object.fromEntries(
+          Object.entries(entry.years).filter(
+            ([year]) => YEARS.length > 0 && !YEARS.includes(Number(year)),
+          ),
+        )
       output.accounts[account.account_id] = entry
       const years = new Set([
         ...byYear.keys(),
@@ -444,7 +450,7 @@ async function main() {
         await writes
       }
       log(
-        `[${++done}/${jobs.length}] @${account.username} ${year}: ${result.source} ${result.sections.map((section) => `"${section.title}" (${section.tweetIds.length})`).join(', ')}`,
+        `[${++done}/${jobs.length}] @${account.username} ${year}: ${result.source} ${result.sections.map((section) => `${section.label}: "${section.title}" (${section.tweetIds.length})`).join(', ')}`,
       )
     } catch (error) {
       audit.push({
@@ -506,7 +512,7 @@ async function main() {
       for (const [year, data] of Object.entries(entry.years)) {
         lines.push(
           data.sections.length
-            ? `- **${year}** (${data.bangers} bangers): ${data.sections.map((s) => `"${s.title}" (${s.tweetIds.length})`).join(' · ')} · other`
+            ? `- **${year}** (${data.bangers} bangers): ${data.sections.map((s) => `${s.label ? `${s.label}: ` : ''}"${s.title}" (${s.tweetIds.length})`).join(' · ')} · other`
             : `- **${year}** (${data.bangers} bangers): _no sections_`,
         )
       }

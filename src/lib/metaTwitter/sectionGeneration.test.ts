@@ -1,5 +1,7 @@
 import { OTHER_SECTION_SLUG } from '@/lib/metaTwitter/chapterSections'
 import {
+  PROMPT_EXAMPLE,
+  cleanSectionLabel,
   parseYearSections,
   topBangersByYear,
   yearSectionPrompt,
@@ -35,13 +37,26 @@ test('prompt names the year and carries every tweet id', () => {
   const prompt = yearSectionPrompt(2025, YEAR)
   expect(prompt).toContain('from 2025')
   for (const { tweet_id } of YEAR) expect(prompt).toContain(`id ${tweet_id}:`)
+  // The example asks for a label beside each quoted title.
+  expect(prompt).toContain(
+    JSON.stringify({ sections: PROMPT_EXAMPLE.sections }),
+  )
+  expect(prompt).toContain('"label":"sinkholes"')
 })
 
 test('accepts a clean grouping without a catch-all', () => {
   const sections = parseYearSections(
     [
-      { title: 'full of sinkholes', tweet_ids: ['1', '2', '3'] },
-      { title: '"soup thoughts"', tweet_ids: ['4', '5', '6'] },
+      {
+        label: 'sinkhole lore',
+        title: 'full of sinkholes',
+        tweet_ids: ['1', '2', '3'],
+      },
+      {
+        label: 'soup discourse',
+        title: '"soup thoughts"',
+        tweet_ids: ['4', '5', '6'],
+      },
     ],
     YEAR,
   )
@@ -50,6 +65,10 @@ test('accepts a clean grouping without a catch-all', () => {
     'soup-thoughts',
   ])
   expect(sections[1].title).toBe('soup thoughts')
+  expect(sections.map((s) => s.label)).toEqual([
+    'sinkhole lore',
+    'soup discourse',
+  ])
   expect(sections.some((s) => s.slug === OTHER_SECTION_SLUG)).toBe(false)
 })
 
@@ -57,9 +76,17 @@ test('drops fabricated ids, double claims, non-verbatim titles, and thin years',
   expect(
     parseYearSections(
       [
-        { title: 'full of sinkholes', tweet_ids: ['1', '2', '3', '999'] },
+        {
+          label: 'sinkhole lore',
+          title: 'full of sinkholes',
+          tweet_ids: ['1', '2', '3', '999'],
+        },
         // '1' is already claimed, leaving only two real posts.
-        { title: 'soup thoughts', tweet_ids: ['1', '4', '5'] },
+        {
+          label: 'soup discourse',
+          title: 'soup thoughts',
+          tweet_ids: ['1', '4', '5'],
+        },
       ],
       YEAR,
     ),
@@ -67,8 +94,16 @@ test('drops fabricated ids, double claims, non-verbatim titles, and thin years',
   expect(
     parseYearSections(
       [
-        { title: 'Generic Label', tweet_ids: ['1', '2', '3'] },
-        { title: 'soup thoughts', tweet_ids: ['4', '5', '6'] },
+        {
+          label: 'sinkhole lore',
+          title: 'Generic Label',
+          tweet_ids: ['1', '2', '3'],
+        },
+        {
+          label: 'soup discourse',
+          title: 'soup thoughts',
+          tweet_ids: ['4', '5', '6'],
+        },
       ],
       YEAR,
     ),
@@ -76,7 +111,11 @@ test('drops fabricated ids, double claims, non-verbatim titles, and thin years',
 })
 
 test('rejects titles carrying links, handles, or the catch-all slug', () => {
-  const base = { title: 'soup thoughts', tweet_ids: ['4', '5', '6'] }
+  const base = {
+    label: 'soup discourse',
+    title: 'soup thoughts',
+    tweet_ids: ['4', '5', '6'],
+  }
   for (const title of [
     'https://t.co/abc',
     'the finale, with @friend',
@@ -85,7 +124,11 @@ test('rejects titles carrying links, handles, or the catch-all slug', () => {
     expect(
       parseYearSections(
         [
-          { title: 'full of sinkholes', tweet_ids: ['1', '2', '3'] },
+          {
+            label: 'sinkhole lore',
+            title: 'full of sinkholes',
+            tweet_ids: ['1', '2', '3'],
+          },
           { ...base, title },
         ],
         YEAR,
@@ -94,11 +137,74 @@ test('rejects titles carrying links, handles, or the catch-all slug', () => {
   }
 })
 
+test('cleans a short specific label and rejects vague, long, linked or parroted ones', () => {
+  expect(cleanSectionLabel('  "speech  coaching." ')).toBe('speech coaching')
+  expect(cleanSectionLabel('FractalU')).toBe('FractalU')
+  // Vague words are fine beside a real subject.
+  expect(cleanSectionLabel('thoughts on soup')).toBe('thoughts on soup')
+  for (const label of [
+    undefined,
+    42,
+    '',
+    '  ',
+    'other',
+    'Other',
+    'random thoughts',
+    'life updates',
+    'my musings and reflections',
+    'one two three four five',
+    'x'.repeat(33),
+    'with @friend',
+    'https://t.co/abc',
+    // Copied from the prompt's example.
+    'soup',
+    'Sinkholes',
+  ])
+    expect(cleanSectionLabel(label)).toBeNull()
+})
+
+test('drops a section whose label is missing, invalid or repeated', () => {
+  const sinkholes = {
+    label: 'sinkhole lore',
+    title: 'full of sinkholes',
+    tweet_ids: ['1', '2', '3'],
+  }
+  const soup = { title: 'soup thoughts', tweet_ids: ['4', '5', '6'] }
+  for (const label of [
+    undefined,
+    'misc',
+    'sinkhole lore',
+    'too many words here now',
+  ])
+    expect(
+      parseYearSections([sinkholes, { ...soup, label } as never], YEAR),
+    ).toEqual([])
+  expect(
+    parseYearSections([sinkholes, { ...soup, label: 'soup discourse' }], YEAR),
+  ).toHaveLength(2)
+})
+
+test('drops the prompt example when the model parrots it back', () => {
+  const posts = PROMPT_EXAMPLE.posts.map(([tweet_id, full_text]) => ({
+    tweet_id,
+    full_text,
+  }))
+  const parroted = PROMPT_EXAMPLE.sections.map((section) => ({
+    ...section,
+    tweet_ids: [...section.tweet_ids],
+  }))
+  expect(parseYearSections(parroted, posts)).toEqual([])
+})
+
 test('tolerates malformed model output', () => {
   expect(
     parseYearSections(
       [
-        { title: 'full of sinkholes', tweet_ids: ['1', '2', '3'] },
+        {
+          label: 'sinkhole lore',
+          title: 'full of sinkholes',
+          tweet_ids: ['1', '2', '3'],
+        },
         { title: 'soup thoughts' } as never,
         null as never,
       ],
@@ -113,8 +219,12 @@ test('only the fallback path accepts two-post sections', async () => {
     ['1', '2', '4', '5'].includes(tweet.tweet_id),
   ).map((tweet) => ({ ...tweet, favorite_count: 10 }))
   const raw = [
-    { title: 'full of sinkholes', tweet_ids: ['1', '2'] },
-    { title: 'soup thoughts', tweet_ids: ['4', '5'] },
+    {
+      label: 'sinkhole lore',
+      title: 'full of sinkholes',
+      tweet_ids: ['1', '2'],
+    },
+    { label: 'soup discourse', title: 'soup thoughts', tweet_ids: ['4', '5'] },
   ]
   expect(parseYearSections(raw, small)).toEqual([])
   const request = jest.fn().mockResolvedValue(raw)
@@ -136,8 +246,16 @@ test('prefers successful bangers and never fetches fallback unnecessarily', asyn
     .fn()
     .mockRejectedValueOnce(new Error('provider down'))
     .mockResolvedValue([
-      { title: 'full of sinkholes', tweet_ids: ['1', '2', '3'] },
-      { title: 'soup thoughts', tweet_ids: ['4', '5', '6'] },
+      {
+        label: 'sinkhole lore',
+        title: 'full of sinkholes',
+        tweet_ids: ['1', '2', '3'],
+      },
+      {
+        label: 'soup discourse',
+        title: 'soup thoughts',
+        tweet_ids: ['4', '5', '6'],
+      },
     ])
   const result = await generateYearSections(2025, YEAR, fallback, request)
   expect(result.source).toBe('bangers')
@@ -211,6 +329,7 @@ test('rejects overfragmented model output instead of publishing more than five s
     tweet(String(i), 2025, `theme ${Math.floor(i / 3)}`),
   )
   const raw = Array.from({ length: 6 }, (_, i) => ({
+    label: `theme ${i}`,
     title: `theme ${i}`,
     tweet_ids: [0, 1, 2].map((j) => String(i * 3 + j)),
   }))

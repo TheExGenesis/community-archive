@@ -1,6 +1,8 @@
 import {
   OTHER_SECTION_SLUG,
   chapterSectionTweets,
+  sectionHeading,
+  sectionQuote,
   withCatchAll,
   type ChapterSection,
 } from '@/lib/metaTwitter/chapterSections'
@@ -59,4 +61,24 @@ test('leads a section with the tweet its title quotes', () => {
       (t) => t.tweet_id,
     ),
   ).toEqual(['2'])
+})
+
+test('heads a labelled section with its label and keeps the quote beneath', () => {
+  const labelled: ChapterSection = {
+    slug: 'sinkholes',
+    label: 'sinkholes',
+    title: 'full of sinkholes',
+    tweetIds: ['1', '2', '3'],
+  }
+  expect(sectionHeading(labelled)).toBe('sinkholes')
+  expect(sectionQuote(labelled)).toBe('full of sinkholes')
+
+  // Sections written before labels, and the catch-all, read as before.
+  for (const section of SECTIONS) {
+    expect(sectionHeading(section)).toBe(section.title)
+    expect(sectionQuote(section)).toBeNull()
+  }
+  // A blank label, or one that repeats the quote, adds no second line.
+  expect(sectionHeading({ ...labelled, label: ' ' })).toBe('full of sinkholes')
+  expect(sectionQuote({ ...labelled, label: 'Full of sinkholes' })).toBeNull()
 })

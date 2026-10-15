@@ -1,5 +1,6 @@
 import {
   FaFire,
+  FaComments,
   FaHistory,
   FaPoll,
   FaProjectDiagram,
@@ -37,6 +38,13 @@ export const PORTAL_TOOLS: PortalTool[] = [
     link: 'https://bangers.community-archive.org',
     icon: <FaFire />,
     image: '/images/featured/bangers.png',
+  },
+  {
+    slug: 'common-tongue',
+    name: 'Common Tongue',
+    description: 'Who tweets a word or phrase the most',
+    link: 'https://strangestloop.io/common-tongue',
+    icon: <FaComments />,
   },
   {
     slug: 'archive-trends',

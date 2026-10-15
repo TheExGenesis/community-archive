@@ -1,4 +1,8 @@
-import { OTHER_SECTION_SLUG, type ChapterSection } from './chapterSections'
+import {
+  OTHER_SECTION_SLUG,
+  normalizeSectionText as normalize,
+  type ChapterSection,
+} from './chapterSections'
 
 /**
  * Turning an account's bangers into chapter sections, one model call per
@@ -81,14 +85,6 @@ Respond with JSON only, in exactly that shape.
 
 ${posts}`
 }
-
-const normalize = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim()
 
 export const slugify = (title: string) =>
   normalize(title)

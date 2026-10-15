@@ -147,7 +147,7 @@ async function bashStep(
 }
 bashStep.maxRetries = 0
 
-// Semantic search is slow (about 14 s), so a failed call is not retried.
+// Semantic searches are limited per question, so a failed call is not retried.
 async function semanticSearchStep(
   input: SemanticSearchInput,
   deadlineAt: number,
@@ -276,7 +276,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   const toolMode = input.toolMode ?? 'typed'
   // The workspace as of the last finished command, carried between steps.
   let workspace: WorkspaceManifest = {}
-  // A question may run only a few semantic searches (each about 14 s).
+  // A question may run only a few semantic searches.
   let semanticUsed = 0
   // Tweets already sent to the page in this run (streamedBashOutput).
   const sentTweetIds = new Set<string>()

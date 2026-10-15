@@ -17,6 +17,7 @@ import {
   type SemanticSearchInput,
 } from './semantic'
 import type { AgentTweet, ScoredTweet } from './types'
+import { isPolicyBlockedAccount } from './policy'
 
 // Plain implementations of the agent's tools. The workflow wraps each one in a
 // 'use step' function; scripts call them directly. The second argument carries
@@ -56,10 +57,27 @@ export async function findPeopleImpl(
   const [members, user] = await Promise.all([
     findMembers(handle, 10, limits),
     /^[A-Za-z0-9_]{1,15}$/.test(handle)
-      ? getUser(handle, limits)
+      ? getUser(handle, limits).then(withheldUnlessAllowed)
       : Promise.resolve(null),
   ])
   return { query, members, user }
+}
+
+/**
+ * The gateway's user lookup also serves accounts outside the member directory,
+ * including opted-out and scrape-blocked ones; the directory hides those, so
+ * only the policy check keeps their bio and top tweets from the agent. A
+ * failed check withholds the account too.
+ */
+async function withheldUnlessAllowed<
+  T extends { accountId: string; username: string },
+>(user: T | null): Promise<T | null> {
+  if (!user) return null
+  const blocked = await isPolicyBlockedAccount(
+    user.accountId,
+    user.username,
+  ).catch(() => true)
+  return blocked ? null : user
 }
 
 export interface SearchTweetsToolInput {

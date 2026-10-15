@@ -1,4 +1,7 @@
 jest.mock('./gateway', () => ({
+  findMembers: jest.fn(async () => [
+    { accountId: '9', username: 'Alice', displayName: 'Alice' },
+  ]),
   getTweetsByIds: jest.fn(async (ids: string[]) =>
     // '2' is opted out: the gateway does not return it.
     ids
@@ -58,7 +61,7 @@ describe('semantic search', () => {
       k: 1000,
       threshold: 1,
       with_payload: false,
-      filter: { must: [{ key: 'username', match: { value: 'alice' } }] },
+      filter: { must: [{ key: 'username', match: { value: 'Alice' } }] },
     })
     expect(getTweetsByIds).toHaveBeenCalledWith(['3', '2', '1'], {})
     // The API's order and distance; the gateway's text; opted-out ids gone.

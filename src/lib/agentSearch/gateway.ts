@@ -240,6 +240,7 @@ export async function getTweetsByIds(
       username: string
       display_name?: string
       avatar_url?: string | null
+      is_tombstone?: boolean
     }>
   }>(
     ['bulletin-sources'],
@@ -249,20 +250,24 @@ export async function getTweetsByIds(
   if (!Array.isArray(response.data)) {
     throw new Error('Gateway bulletin-sources returned an invalid payload')
   }
-  return response.data.map((row) =>
-    toAgentTweet({
-      tweetId: row.tweet_id,
-      accountId: row.account_id,
-      createdAt: row.created_at,
-      fullText: row.full_text,
-      replyToTweetId: row.reply_to_tweet_id,
-      favoriteCount: 0,
-      retweetCount: null,
-      username: row.username,
-      accountDisplayName: row.display_name ?? row.username,
-      avatarMediaUrl: row.avatar_url ?? null,
-    }),
-  )
+  // A deleted tweet's latest version is a tombstone; the Bulletin worker drops
+  // these rows from the same endpoint.
+  return response.data
+    .filter((row) => !row.is_tombstone)
+    .map((row) =>
+      toAgentTweet({
+        tweetId: row.tweet_id,
+        accountId: row.account_id,
+        createdAt: row.created_at,
+        fullText: row.full_text,
+        replyToTweetId: row.reply_to_tweet_id,
+        favoriteCount: 0,
+        retweetCount: null,
+        username: row.username,
+        accountDisplayName: row.display_name ?? row.username,
+        avatarMediaUrl: row.avatar_url ?? null,
+      }),
+    )
 }
 
 export interface AgentUser {

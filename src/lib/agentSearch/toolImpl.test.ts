@@ -5,6 +5,9 @@ jest.mock('./classifier', () => ({
     costUsd: 0,
   })),
 }))
+jest.mock('./policy', () => ({
+  isPolicyBlockedAccount: jest.fn(async () => false),
+}))
 jest.mock('./gateway', () => ({
   searchTweets: jest.fn(),
   getTweetsByIds: jest.fn(async () => []),
@@ -15,8 +18,13 @@ jest.mock('./gateway', () => ({
   getUser: jest.fn(),
 }))
 
-import { searchTweets } from './gateway'
-import { collectAndScoreImpl, searchTweetsImpl } from './toolImpl'
+import { isPolicyBlockedAccount } from './policy'
+import { findMembers, getUser, searchTweets } from './gateway'
+import {
+  collectAndScoreImpl,
+  findPeopleImpl,
+  searchTweetsImpl,
+} from './toolImpl'
 
 const tweet = (id: string) => ({
   id,
@@ -100,4 +108,37 @@ test('collect is not capped when every term is exhausted', async () => {
   })
   expect(result.collected).toBe(3)
   expect(result.capped).toBe(false)
+})
+
+describe('findPeopleImpl', () => {
+  const user = {
+    accountId: '42',
+    username: 'notamember',
+    displayName: 'Not a member',
+    bio: 'bio',
+    followers: 1,
+    tweets: 1,
+    topTweets: [],
+  }
+
+  beforeEach(() => {
+    ;(findMembers as jest.Mock).mockResolvedValue([])
+    ;(getUser as jest.Mock).mockResolvedValue(user)
+  })
+
+  test('returns an account outside the directory that policy allows', async () => {
+    ;(isPolicyBlockedAccount as jest.Mock).mockResolvedValueOnce(false)
+    const result = await findPeopleImpl({ query: '@notamember' })
+    expect(result.user).toEqual(user)
+    expect(isPolicyBlockedAccount).toHaveBeenCalledWith('42', 'notamember')
+  })
+
+  test('withholds an opted-out or blocked account, and one whose check fails', async () => {
+    ;(isPolicyBlockedAccount as jest.Mock).mockResolvedValueOnce(true)
+    expect((await findPeopleImpl({ query: 'notamember' })).user).toBeNull()
+    ;(isPolicyBlockedAccount as jest.Mock).mockRejectedValueOnce(
+      new Error('policy read failed'),
+    )
+    expect((await findPeopleImpl({ query: 'notamember' })).user).toBeNull()
+  })
 })

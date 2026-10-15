@@ -119,13 +119,17 @@ turns' changes in order, and its question lists those files.
 
 `semantic` (and the typed `semantic_search`) calls the Tweetstack embeddings
 API (`POST https://embed.tweetstack.app/embeddings/search`, Qwen3-Embedding-4B
-over the archive; `semantic.ts`). It takes about 13–14 seconds, so it is
-limited to 2 calls per run; a third returns an error telling the agent to use
-keyword search. Its timeout is bounded by the run's deadline. The API returns
-tweet ids with a distance; the metadata text it also returns is never used.
-The ids are fetched again through the gateway, keeping the API's order and
-distance, so opt-outs and deletions apply. A failed semantic call does not
-count as the archive being down.
+over the archive; `semantic.ts`). It takes about 1 s, or 2–9 s with a
+username filter on a prolific member (measured 2026-10-15), and a run gets 6
+calls; the seventh returns an error telling the agent to use keyword search.
+Its timeout (20 s) is bounded by the run's deadline. Ask sends
+`with_payload: false`, so the API returns only tweet ids with a distance. The
+API drops opted-out members' and deleted tweets when it reads results, but
+their vectors stay in its index; the ids are fetched again through the
+gateway anyway, keeping the API's order and distance. A username filter
+searches all of that member's tweets, but the API compares the handle
+case-sensitively, so `semantic.ts` sends the member directory's spelling. A
+failed semantic call does not count as the archive being down.
 
 The prompt steers semantic search to paraphrased ideas, surveys and
 investigative questions, and keyword search to names, handles, exact phrases
@@ -315,7 +319,8 @@ plain words; keep the two in step.
   the run on Vercel Pro. Deleting a conversation does not reach it; the delete
   confirmation says so.
 - **A member's own OpenRouter key** stays in their browser and reaches the
-  workflow only sealed (see above); it is never stored.
+  workflow only sealed (see above). Our database never stores it; the sealed
+  copy is in Workflow's run data until that retention ends.
 
 ## Run storage
 

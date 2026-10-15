@@ -1,13 +1,13 @@
 import { callTimeoutMs, type RunLimits } from './deadline'
-import { getTweetsByIds } from './gateway'
+import { findMembers, getTweetsByIds } from './gateway'
 import type { AgentTweet } from './types'
 
 // Semantic search over the archive through the project's own embeddings API
 // (Qwen3-Embedding-4B over tweet text). It finds tweets that say something in
-// other words, which keyword search cannot. Its opt-out handling and index
-// freshness are not confirmed, so its returned text is never used: only the
-// ids, re-fetched through the gateway, which applies opt-outs. The API's
-// order and distance (higher is closer) are kept.
+// other words, which keyword search cannot. The API drops opted-out members'
+// and deleted tweets as it reads results, and Ask asks it for ids and
+// distances only: the tweets are re-fetched through the gateway, which applies
+// opt-outs too. The API's order and distance (higher is closer) are kept.
 
 export const DEFAULT_SEMANTIC_SEARCH_URL =
   'https://embed.tweetstack.app/embeddings/search'
@@ -54,6 +54,26 @@ function either(a: AbortSignal, b: AbortSignal): AbortSignal {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max)
 
+/**
+ * The member's handle as the directory spells it. The API matches a username
+ * filter case-sensitively and returns nothing for any other casing
+ * (`VisakanV` finds none of visakanv's tweets), and it only returns members'
+ * tweets, so the directory's spelling is the one it knows. A handle the
+ * directory doesn't have, or a failed lookup, is sent as given.
+ */
+async function memberHandle(handle: string, limits: RunLimits) {
+  const lower = handle.toLowerCase()
+  try {
+    const members = await findMembers(handle, 10, limits)
+    return (
+      members.find((member) => member.username.toLowerCase() === lower)
+        ?.username ?? handle
+    )
+  } catch {
+    return handle
+  }
+}
+
 export async function semanticSearch(
   input: SemanticSearchInput,
   limits: RunLimits = {},
@@ -61,7 +81,8 @@ export async function semanticSearch(
 ): Promise<{ query: string; tweets: SemanticTweet[]; matched: number }> {
   const query = input.query.trim()
   if (!query) throw new Error('Semantic search needs a query')
-  const handle = input.fromUser?.trim().replace(/^@/, '')
+  const given = input.fromUser?.trim().replace(/^@/, '')
+  const handle = given ? await memberHandle(given, limits) : undefined
   const body = {
     searchTerm: query,
     k: clamp(Math.round(input.k ?? SEMANTIC_DEFAULT_K), 1, MAX_K),

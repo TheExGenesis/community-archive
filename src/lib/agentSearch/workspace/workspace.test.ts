@@ -18,6 +18,9 @@ jest.mock('../classifier', () => {
     ),
   }
 })
+jest.mock('../policy', () => ({
+  isPolicyBlockedAccount: jest.fn(async () => false),
+}))
 jest.mock('../gateway', () => ({
   searchTweets: jest.fn(),
   getTweetsByIds: jest.fn(),

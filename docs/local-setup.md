@@ -119,9 +119,9 @@ a literal token would be committed to this public repository.
    environment. Restart the agent after setting the variable.
 
 3. Claude Code expands `${SUPABASE_ACCESS_TOKEN}` in `.mcp.json`. If the
-   variable is unset, only the Supabase server fails to start. Other MCP clients
-   that do not expand variables should be configured in their user-level
-   settings, not in this file.
+   variable is unset, the Supabase tools will not work; nothing else is
+   affected. Other MCP clients that do not expand variables should be
+   configured in their user-level settings, not in this file.
 
 The token carries your full account permissions; `--read-only` only limits what
 the MCP server itself will do. The same variable is used by `pnpm gen-types`.

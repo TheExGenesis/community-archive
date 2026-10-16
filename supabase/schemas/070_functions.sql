@@ -413,7 +413,10 @@ $$;
 
 ALTER FUNCTION "private"."update_conversation_ids_since"("since_timestamp" timestamp with time zone) OWNER TO "postgres";
 
-COMMENT ON FUNCTION "private"."update_conversation_ids_since"("since_timestamp" timestamp with time zone) IS 'Optimized version of update_conversation_ids that can process only tweets updated since a given timestamp. \nWhen since_timestamp is NULL, processes all tweets (same as original function).\nWhen since_timestamp is provided, only processes tweets with updated_at >= since_timestamp.\nThis allows for efficient incremental updates instead of reprocessing all tweets.';
+COMMENT ON FUNCTION "private"."update_conversation_ids_since"("since_timestamp" timestamp with time zone) IS 'Optimized version of update_conversation_ids that can process only tweets updated since a given timestamp. 
+When since_timestamp is NULL, processes all tweets (same as original function).
+When since_timestamp is provided, only processes tweets with updated_at >= since_timestamp.
+This allows for efficient incremental updates instead of reprocessing all tweets.';
 
 
 CREATE OR REPLACE FUNCTION "private"."update_conversation_ids_since_v2"("since_timestamp" timestamp with time zone DEFAULT NULL::timestamp with time zone, "batch_size" integer DEFAULT 10000) RETURNS "json"
@@ -3304,6 +3307,10 @@ REVOKE ALL ON FUNCTION public.admin_enqueue_delete_with_export(text, text, text,
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid)
   TO service_role;
+COMMENT ON FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid) IS
+  'Vercel-side entry point for queuing an admin delete-with-export job. '
+  'Inserts a row into private.admin_jobs (which is not PostgREST-exposed), '
+  'so the Hetzner admin-delete-worker can claim it. Returns the job key.';
 
 -- admin_list_recent_delete_jobs: service-role-only read bridge for the
 -- dashboard. private.admin_jobs remains outside PostgREST's exposed schemas.
@@ -3344,6 +3351,9 @@ REVOKE ALL ON FUNCTION public.admin_list_recent_delete_jobs(integer)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_list_recent_delete_jobs(integer)
   TO service_role;
+COMMENT ON FUNCTION public.admin_list_recent_delete_jobs(integer) IS
+  'Returns recent admin archive-delete jobs for the service-role-gated admin dashboard.';
+
 CREATE OR REPLACE FUNCTION "public"."publish_digest_edition"("p_edition_id" uuid)
 RETURNS "public"."digest_editions"
 LANGUAGE plpgsql

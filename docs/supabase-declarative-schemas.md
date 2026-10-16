@@ -50,7 +50,8 @@ Local Verification Loop
 - Verify a no‑op diff (ensures ordering/duplicates are correct):
   - `supabase db diff` seeds the declarative files into a shadow database and compares them with the migration history (add `-f verify_noop` only if you want the output written as a migration)
   - Expect: “No schema changes found”. If not, align the declarative files to the migration history, or fix duplicates or order.
-  - The diff does not compare function EXECUTE or sequence grants, `readclient` grants, comments, column order, or the `storage` schema. After privilege changes, compare those catalogs against the migration-built database separately.
+  - Use Supabase CLI v2 (for example the globally installed `supabase`). The `supabase` 1.x devDependency behind `pnpm supabase` ignores `schema_paths` and reports “No schema changes found” whatever the declarative files say.
+  - The diff reports base-table grants but has missed function EXECUTE, sequence, view, and schema privilege differences. It also ignores comments, column order, the `dev` and `storage` schemas, and pg_cron jobs. After privilege changes, compare those catalogs against the migration-built database separately.
 - Update generated TS types if schema changed:
   - Remote types: `pnpm gen-types`
   - Local types: `pnpm dev:gen-types`

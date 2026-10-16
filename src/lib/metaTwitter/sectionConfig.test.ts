@@ -7,6 +7,7 @@ import {
 import {
   MAX_LABEL_LENGTH,
   MAX_LABEL_WORDS,
+  MIN_PRUNED_SECTION_TWEETS,
 } from '@/lib/metaTwitter/sectionGeneration'
 
 const CURATED_ACCOUNT_ID = '826134955549790208'
@@ -24,7 +25,11 @@ const chapters = () => [
         [
           `generated @${account.username} ${id} ${year}`,
           entry.sections,
-          entry.generationSource === 'fallback' ? 2 : 3,
+          // Fallback years may group pairs, and pruning misfits may leave
+          // a section with its floor.
+          entry.generationSource === 'fallback' || entry.misfitsPrunedAt
+            ? MIN_PRUNED_SECTION_TWEETS
+            : 3,
         ] as const,
     ),
   ),

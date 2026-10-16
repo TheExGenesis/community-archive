@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import {
   ProfileHeader,
@@ -26,13 +27,16 @@ import {
 } from '@/lib/metaTwitter/profilePagination'
 import { getCachedArchivedAt } from '@/lib/metaTwitter/data'
 import {
+  resolveMemberProfileCore,
   resolveProfileCore,
   withBackfilledMedia,
 } from '@/lib/metaTwitter/profile'
+import { isCrawlerAgent } from '@/lib/crawlers'
 import { getCachedProfileLinks } from '@/lib/profileLinks'
 import { measureServerRead } from '@/lib/performance/server'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 import Image from 'next/image'
+import { isTwitterImage } from '@/lib/remoteImages'
 import { SectionReady } from '@/components/PagePerformance'
 import type { SectionsByYear } from '@/lib/metaTwitter/chapterSections'
 import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
@@ -42,10 +46,17 @@ interface PageProps {
   searchParams: { chapter?: string; section?: string; username?: string }
 }
 
+// Crawlers only reach member profiles; people and link previews see everyone.
+function resolveProfileForRequest(param: string) {
+  return isCrawlerAgent(headers().get('user-agent'))
+    ? resolveMemberProfileCore(param)
+    : resolveProfileCore(param)
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const resolved = await resolveProfileCore(params.account_id)
+  const resolved = await resolveProfileForRequest(params.account_id)
   if (!resolved) return { title: 'User not found' }
   const { accountId, isMember, profile } = resolved
   const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
@@ -142,7 +153,7 @@ async function ProfileArchivedAt({ accountId }: { accountId: string }) {
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
-  const resolved = await resolveProfileCore(params.account_id)
+  const resolved = await resolveProfileForRequest(params.account_id)
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
@@ -264,6 +275,7 @@ async function OptionalProfileBanner({
       src={`${url.replace(/\/$/, '')}/1500x500`}
       alt=""
       fill
+      unoptimized={isTwitterImage(url)}
       sizes="(max-width: 1220px) 100vw, 1220px"
       className="object-cover"
     />

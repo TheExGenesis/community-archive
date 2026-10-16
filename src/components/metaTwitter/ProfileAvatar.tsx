@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { isTwitterImage } from '@/lib/remoteImages'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 
@@ -70,6 +71,7 @@ function ResolvedProfileAvatar({
     return (
       <Image
         src={resolvedAvatarUrl}
+        unoptimized={isTwitterImage(resolvedAvatarUrl)}
         alt={`${displayName}'s avatar`}
         width={132}
         height={132}

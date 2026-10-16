@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent, type RefObject } from 'react'
 import Image from 'next/image'
+import { isTwitterImage } from '@/lib/remoteImages'
 import Link from 'next/link'
 import {
   ArrowDown,
@@ -426,6 +427,7 @@ export function Workspace({
                   >
                     <Image
                       src={item.media_url}
+                      unoptimized={isTwitterImage(item.media_url)}
                       alt=""
                       fill
                       sizes="94px"
@@ -489,6 +491,7 @@ export function Workspace({
                     {avatarUrl ? (
                       <Image
                         src={avatarUrl}
+                        unoptimized={isTwitterImage(avatarUrl)}
                         alt=""
                         width={36}
                         height={36}

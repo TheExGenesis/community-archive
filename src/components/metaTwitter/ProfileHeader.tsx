@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { isTwitterImage } from '@/lib/remoteImages'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { PiInfo } from 'react-icons/pi'
@@ -88,6 +89,7 @@ export function ProfileHeader({
         {headerUrl ? (
           <Image
             src={headerUrl}
+            unoptimized={isTwitterImage(headerUrl)}
             alt=""
             fill
             priority

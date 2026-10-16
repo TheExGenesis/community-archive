@@ -161,6 +161,20 @@ export const resolveProfileCore = cache(
   },
 )
 
+/**
+ * Member-only resolution for crawlers. Non-member pages are noindex, and each
+ * one costs a gateway read plus a policy check, so crawlers get the same 404
+ * they saw before those pages existed.
+ */
+export const resolveMemberProfileCore = cache(
+  async (param: string): Promise<ResolvedProfile | null> => {
+    const publicIdentity = await measureServerRead('profile.eligibility', () =>
+      resolvePublicProfileIdentity(param),
+    )
+    return publicIdentity ? memberProfile(publicIdentity) : null
+  },
+)
+
 /** Full media remains available for social cards; navigation uses the core. */
 export const resolveProfile = cache(
   async (param: string): Promise<ResolvedProfile | null> => {

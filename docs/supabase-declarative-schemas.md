@@ -1,10 +1,12 @@
 Declarative Schemas: Setup and Workflow
 
 Overview
+
 - Declarative schemas declare the desired DB state under `supabase/schemas/**`. The Supabase CLI computes diffs and generates versioned migrations in `supabase/migrations/`.
 - `supabase/schemas/prod.sql` is a legacy dump retained short‑term for compatibility, shrinking as we move definitions into ordered files.
 
 Apply Order and File Layout
+
 - The order is controlled by `db.migrations.schema_paths` in `supabase/config.toml`. Our canonical files, in order:
   - `000_extensions.sql` — extensions only
   - `000_roles.sql` — roles and role grants
@@ -16,35 +18,45 @@ Apply Order and File Layout
   - `032_views_prereq.sql` — helper objects needed by views
   - `035_matviews.sql` — materialized views
   - `036_matview_indexes.sql` — matview indexes
-  - `040_auth_helpers.sql` — minimal auth helpers (only `auth.jwt()`, `auth.uid()`)
   - `040_views.sql` — views
   - `050_constraints.sql` — FKs, uniques, checks not set inline
   - `060_grants.sql` — table/view grants and default privileges
   - `060_policies.sql` — RLS policies
   - `070_functions.sql` — functions and procedures
+  - `075_policy_enforcement.sql` — consent/opt-out enforcement functions
   - `080_triggers.sql` — CREATE TRIGGER wiring
   - `prod.sql` — legacy file; do not add new logic. Keep only grants/stragglers until fully migrated.
+  - `090_policy_grants.sql` — privilege narrowing that must run after `prod.sql`'s legacy grants
+  - `095_policy_legacy_triggers.sql` — comment-only: database-wide JSON scans stay off insert/update triggers
 
 Authoring Guidelines
+
 - Make changes in the canonical files above. Do not introduce new CREATEs in `prod.sql`.
-- Exclude service‑managed internals; include only minimal auth helpers in `040_auth_helpers.sql`.
+- Exclude service‑managed internals. `auth.jwt()` and `auth.uid()` are owned by
+  Supabase Auth in every environment (hosted, local, and the diff shadow
+  database), so do not redeclare them; the `postgres` role cannot replace them.
 - Maintain ordering: definitions before references (functions before triggers, types before tables, etc.).
 - RLS belongs in `060_policies.sql`. Follow the existing policy helpers.
 - Grants:
   - Prefer grants in `060_grants.sql` (tables/views). Some function GRANTs may still live in `prod.sql`; we will migrate them over time.
-- When moving an object out of `prod.sql`, remove the duplicate from `prod.sql` (comment it with “moved to …”).
+  - Put a function's REVOKE/GRANT right after its definition. A grant in `060_grants.sql` runs before `070_functions.sql` and fails.
+  - Narrow anything that `prod.sql` grants broadly in `090_policy_grants.sql`, which runs after it.
+- When moving an object out of `prod.sql`, remove the duplicate from `prod.sql` (comment it with “moved to …”). When a migration dropped the object, remove it and comment it with “dropped by <migration file>”.
 
 Local Verification Loop
-- Recreate local DB from declarative files:
+
+- Rebuild the local DB from migrations (this does not apply the declarative files):
   - `supabase db reset`
 - Verify a no‑op diff (ensures ordering/duplicates are correct):
-  - `supabase db diff -f verify_noop`
-  - Expect: “No changes”. If not, fix duplicates or order.
+  - `supabase db diff` seeds the declarative files into a shadow database and compares them with the migration history (add `-f verify_noop` only if you want the output written as a migration)
+  - Expect: “No schema changes found”. If not, align the declarative files to the migration history, or fix duplicates or order.
+  - The diff does not compare function EXECUTE or sequence grants, `readclient` grants, comments, column order, or the `storage` schema. After privilege changes, compare those catalogs against the migration-built database separately.
 - Update generated TS types if schema changed:
   - Remote types: `pnpm gen-types`
   - Local types: `pnpm dev:gen-types`
 
 Creating and Applying Migrations
+
 - One‑time:
   - `supabase login`
   - `supabase link --project-ref <PROJECT_REF>`
@@ -90,6 +102,7 @@ Production Ahead of the Current Branch
   repository with the remote ledger before changing production.
 
 Common Patterns
+
 - New table: `020_tables.sql` (+ indexes in `030_indexes.sql`, constraints in `050_constraints.sql`)
 - New view: `040_views.sql`
 - New function: `070_functions.sql`
@@ -98,11 +111,13 @@ Common Patterns
 - New enum/type: `010_types.sql`
 
 Do Not
+
 - Don’t define the same object in multiple files (no duplicates).
 - Don’t track service‑managed schemas (auth/storage internals).
 - Don’t add new logic to `prod.sql`.
 
 Troubleshooting
+
 - Diff isn’t a no‑op:
   - Ensure objects aren’t duplicated between `prod.sql` and canonical files.
   - Check order dependencies (e.g., function depends on a type defined later).
@@ -112,6 +127,7 @@ Troubleshooting
   - Inspect the error line; adjust order or add prerequisites in `031_*` / `032_*` files.
 
 Baselining Remote Ledger (empty or wiped)
+
 - Symptom: `supabase migration list --linked` shows no applied migrations on the remote, but the database already contains your schema. `supabase db push` then fails on non‑idempotent CREATEs in baseline snapshot files (e.g., indexes, triggers).
 - Fix: mark the baseline/no‑op migrations as applied on the remote without executing them.
   - Ensure you’re linked to the correct project: `supabase link --project-ref <PROJECT_REF>`

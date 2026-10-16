@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION "public"."get_top_accounts_with_followers"("limit_cou
     AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         a.account_id,
         a.created_via,
         a.username,
@@ -19,21 +19,21 @@ BEGIN
         p.header_media_url,
         a.num_followers,
         a.num_tweets
-    FROM 
+    FROM
         public.account a
-    LEFT JOIN 
+    LEFT JOIN
         public.profile p ON a.account_id = p.account_id
-    WHERE 
+    WHERE
         p.archive_upload_id = (
             SELECT MAX(p2.archive_upload_id)
             FROM public.profile p2
             WHERE p2.account_id = a.account_id
         )
-    ORDER BY 
-        a.num_followers DESC
-    LIMIT 
+    ORDER BY
+        a.num_followers DESC NULLS LAST
+    LIMIT
         limit_count;
-END; 
+END;
 $$;
 ALTER FUNCTION "public"."get_top_accounts_with_followers"("limit_count" integer) OWNER TO "postgres";
 
@@ -72,6 +72,10 @@ BEGIN
 END;
 $$;
 ALTER FUNCTION "public"."get_top_mentioned_users"("limit_" integer) OWNER TO "postgres";
+
+-- Bootstrap copies of the policy helpers that views and policies reference
+-- before 075_policy_enforcement.sql runs. 075 redefines them and wins, so keep
+-- these bodies byte-identical to 075.
 CREATE OR REPLACE FUNCTION public.policy_account_is_blocked(
   p_account_id text DEFAULT NULL,
   p_username text DEFAULT NULL
@@ -105,6 +109,9 @@ AS $$
         )
       )
   ) OR EXISTS (
+    -- Close the short interval where consent is known by username but the
+    -- derived stable-ID block has not yet been written. The account PK and the
+    -- partial consent-name index make this a bounded metadata lookup.
     SELECT 1
     FROM public.all_account AS account
     JOIN public.optin AS consent

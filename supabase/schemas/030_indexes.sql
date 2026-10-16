@@ -57,7 +57,6 @@ CREATE INDEX "idx_tweet_urls_tweet_id" ON "public"."tweet_urls" USING "btree" ("
 
 -- public.profile_curation / public.tweet_link_previews
 CREATE INDEX "profile_curation_scope_idx" ON "public"."profile_curation" USING "btree" ("account_id", "section", "position");
-CREATE UNIQUE INDEX "tweet_link_previews_normalized_url_key" ON "public"."tweet_link_previews" USING "btree" ("normalized_url");
 CREATE INDEX "tweet_link_previews_expires_at_idx" ON "public"."tweet_link_previews" USING "btree" ("expires_at");
 
 -- public.tweets
@@ -119,11 +118,30 @@ CREATE INDEX IF NOT EXISTS "idx_all_account_display_name_trgm"
 -- private.tweet_user: every get_streaming_stats_* function filters on created_at.
 CREATE INDEX IF NOT EXISTS "idx_tweet_user_created_at"
   ON "private"."tweet_user" USING "btree" ("created_at");
+
+-- private.admin_jobs: the worker claims the oldest QUEUED row per job_name;
+-- PROCESSING rows stay in the partial index for stuck-job checks.
+CREATE INDEX IF NOT EXISTS "idx_admin_jobs_claim"
+  ON "private"."admin_jobs" USING "btree" ("job_name", "created_at")
+  WHERE ("status" = ANY (ARRAY['QUEUED'::"text", 'PROCESSING'::"text"]));
+CREATE INDEX IF NOT EXISTS "idx_admin_jobs_job_name_status"
+  ON "private"."admin_jobs" USING "btree" ("job_name", "status");
 CREATE INDEX IF NOT EXISTS "digest_runs_date_created_idx"
   ON "public"."digest_runs" ("digest_date" DESC, "created_at" DESC);
 
 CREATE INDEX IF NOT EXISTS "digest_runs_prompt_version_idx"
   ON "public"."digest_runs" ("prompt_version_id");
+
+CREATE UNIQUE INDEX IF NOT EXISTS "digest_runs_workflow_run_id_key"
+  ON "public"."digest_runs" ("workflow_run_id")
+  WHERE "workflow_run_id" IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "digest_runs_parent_run_idx"
+  ON "public"."digest_runs" ("parent_run_id", "created_at" DESC)
+  WHERE "parent_run_id" IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS "digest_editions_source_run_idx"
+  ON "public"."digest_editions" ("source_run_id", "version" DESC);
 
 -- One subscription per address, case-insensitively.
 CREATE UNIQUE INDEX IF NOT EXISTS "digest_email_subscriptions_email_key"

@@ -44,6 +44,8 @@ ALTER FUNCTION private.policy_authority_fingerprint() OWNER TO postgres;
 REVOKE ALL ON FUNCTION private.policy_authority_fingerprint()
   FROM PUBLIC, anon, authenticated, readclient, service_role;
 
+-- 031_functions_prereq.sql carries bootstrap copies of the policy helpers below;
+-- keep both copies byte-identical.
 CREATE OR REPLACE FUNCTION public.policy_account_is_blocked(
   p_account_id text DEFAULT NULL,
   p_username text DEFAULT NULL
@@ -77,6 +79,9 @@ AS $$
         )
       )
   ) OR EXISTS (
+    -- Close the short interval where consent is known by username but the
+    -- derived stable-ID block has not yet been written. The account PK and the
+    -- partial consent-name index make this a bounded metadata lookup.
     SELECT 1
     FROM public.all_account AS account
     JOIN public.optin AS consent
@@ -459,6 +464,8 @@ BEGIN
     RAISE EXCEPTION 'p_batch_size must be between 1 and 10000';
   END IF;
 
+  -- Serialize checkpoint advancement. Individual author locks below also
+  -- close the race with an opt-out arriving during a batch.
   PERFORM pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(
       'community-archive-policy-backfill:' || v_job_name,
@@ -493,6 +500,8 @@ BEGIN
   v_batch_rows := COALESCE(pg_catalog.cardinality(v_tweet_ids), 0);
 
   IF v_batch_rows > 0 THEN
+    -- Acquire account locks in a stable order. If a policy change owns one of
+    -- these locks, this batch waits and re-checks the committed block state.
     PERFORM public.lock_policy_account(author.account_id)
     FROM (
       SELECT DISTINCT tweet.account_id
@@ -707,8 +716,9 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  -- Avoid recursively applying the same block while tombstone_policy_account
-  -- updates policy-owned rows.
+  -- A nested block write from enforce_policy_account_tombstone only records
+  -- the stable-id association. The outer account trigger already scrubs that
+  -- row, so avoid recursively upserting the same account.
   IF pg_trigger_depth() > 1 THEN
     RETURN NEW;
   END IF;
@@ -890,8 +900,9 @@ BEGIN
       is_tombstone = true
   WHERE account_id = p_account_id;
 
-  -- Never fall back to a full corpus scan inside an opt-out transaction. The
-  -- release operator builds these exact-expression indexes concurrently.
+  -- These expression indexes are built CONCURRENTLY by the release operator.
+  -- Until then, the temporary RLS overlay hides copied identity immediately;
+  -- never fall back to a full tweets scan inside an opt-out transaction.
   IF v_username ~ '^[A-Za-z0-9_]{1,15}$'
      AND EXISTS (
        SELECT 1
@@ -911,6 +922,7 @@ BEGIN
       )) = lower(v_username);
   END IF;
 
+  -- The stable relationship ID is indexed and can be scrubbed synchronously.
   UPDATE public.tweets
   SET reply_to_username = NULL
   WHERE account_id <> p_account_id
@@ -987,9 +999,10 @@ BEGIN
       AND lower(screen_name) = lower(v_username);
   END IF;
 
-  -- Never sequential-scan the legacy liked-tweet table from an opt-out
-  -- transaction. The release operator creates this index concurrently and
-  -- reruns the blocked-account sweep before writers resume.
+  -- The universal migration intentionally defers this index to a concurrent
+  -- post-DDL step. Never sequential-scan the legacy liked-tweet table from an
+  -- opt-out transaction; the RLS boundary hides unattributed legacy rows until
+  -- the index exists and the operator reruns every blocked-account sweep.
   IF EXISTS (
     SELECT 1
     FROM pg_catalog.pg_index AS candidate
@@ -1005,6 +1018,8 @@ BEGIN
       AND author_account_id = p_account_id;
   END IF;
 
+  -- Storage object names are case-sensitive. Enqueue every exact archive path
+  -- identity before metadata deletion, plus the best policy/account fallback.
   FOREACH v_archive_username IN ARRAY v_archive_usernames LOOP
     PERFORM public.enqueue_policy_archive_cleanup(
       p_account_id,

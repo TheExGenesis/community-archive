@@ -51,12 +51,41 @@ describe('authenticated write policy contract', () => {
     expect(migration).toContain(
       'REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE',
     )
-    expect(migration).toContain('public.profile_curation\nFROM anon, authenticated;')
+    expect(migration).toContain(
+      'public.profile_curation\nFROM anon, authenticated;',
+    )
     expect(grants).not.toContain(
       'GRANT INSERT, UPDATE ON TABLE "public"."profile_settings"',
     )
     expect(grants).not.toContain(
       'GRANT INSERT, UPDATE, DELETE ON TABLE "public"."profile_curation"',
+    )
+  })
+
+  test('declarative table write revokes run after prod.sql legacy grants', () => {
+    const policyGrants = read('supabase/schemas/090_policy_grants.sql')
+    const config = read('supabase/config.toml')
+    const revoked = policyGrants.match(
+      /REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE\n([\s\S]*?)\nFROM "anon", "authenticated";/,
+    )?.[1]
+
+    for (const table of [
+      'all_profile',
+      'followers',
+      'following',
+      'likes',
+      'tweets',
+      'tweet_media',
+      'tweet_urls',
+      'user_mentions',
+      'optin',
+    ]) {
+      expect(revoked).toContain(`"public"."${table}"`)
+    }
+    // prod.sql re-grants ALL to anon/authenticated, so the revoke must follow it.
+    expect(config.indexOf('"./schemas/prod.sql"')).toBeGreaterThan(-1)
+    expect(config.indexOf('"./schemas/090_policy_grants.sql"')).toBeGreaterThan(
+      config.indexOf('"./schemas/prod.sql"'),
     )
   })
 })

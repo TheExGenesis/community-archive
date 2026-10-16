@@ -341,6 +341,8 @@ export const topLikedTweets = (tweets: SectionCandidateTweet[], year: number) =>
  * One year's sections: up to three grouping attempts (0, 0.7, 0.7) on the
  * bangers, or one when the banger pool is below SMALL_BANGER_POOL, then the
  * top-liked fallback pool with three posts per section and, failing that, two.
+ * When no fallback pool exists (the account has no archive), the bangers are
+ * regrouped once more with two posts per section before giving up.
  */
 export async function generateYearSections(
   year: number,
@@ -389,7 +391,24 @@ export async function generateYearSections(
         failures,
       }
   }
-  const tweets = topLikedTweets(await fallback(), year)
+  let pool: SectionCandidateTweet[]
+  try {
+    pool = await fallback()
+  } catch (error) {
+    // No top-liked pool can exist for an account without an uploaded
+    // archive, so a small banger year is its only material: accept pairs.
+    if (bangers.length < MIN_BANGERS) throw error
+    const sections = await attempt(bangers, 'bangers', 2, [0, 0.7])
+    if (!sections.length) throw error
+    return {
+      sections,
+      source: 'bangers',
+      candidates: bangers.length,
+      responses,
+      failures,
+    }
+  }
+  const tweets = topLikedTweets(pool, year)
   for (const minimum of [3, 2] as const) {
     if (tweets.length < minimum * MIN_YEAR_SECTIONS) continue
     const sections = await attempt(tweets, 'fallback', minimum, [0, 0.7, 0.7])

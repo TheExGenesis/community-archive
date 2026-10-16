@@ -146,7 +146,24 @@ test('treats a member found only by stable ID as a member', async () => {
     isMember: true,
     profile: { username: 'oldbob', has_archive: true },
   })
-  expect(isPolicyBlockedAccountMock).not.toHaveBeenCalled()
+})
+
+test('ignores a failed policy read for a member found by stable ID', async () => {
+  resolvePublicProfileIdentityMock.mockImplementation(async (param: string) =>
+    param === '77' ? { accountId: '77', username: 'oldbob' } : null,
+  )
+  getClickHouseUserProfileMock.mockResolvedValue(outsideProfile)
+  isPolicyBlockedAccountMock.mockRejectedValue(new Error('policy unavailable'))
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    account_id: '77',
+    username: 'oldbob',
+  })
+
+  await expect(resolveProfileCore('bob')).resolves.toMatchObject({
+    accountId: '77',
+    isMember: true,
+  })
 })
 
 test('does not render an account outside the directory when the policy read fails', async () => {

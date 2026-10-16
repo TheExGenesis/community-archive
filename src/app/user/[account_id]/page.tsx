@@ -37,6 +37,10 @@ import { SectionReady } from '@/components/PagePerformance'
 import type { SectionsByYear } from '@/lib/metaTwitter/chapterSections'
 import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
+// A cold profile waits on several gateway reads; Vercel's 15s default cut
+// streamed renders off mid-way (504).
+export const maxDuration = 60
+
 interface PageProps {
   params: { account_id: string }
   searchParams: { chapter?: string; section?: string; username?: string }
@@ -91,10 +95,12 @@ async function ProfileArchiveContent({
   candidateSection: string | null
   displayName: string
 }) {
-  const candidatePage = await getCuratedProfileBangersPage(accountId, {
-    limit: PROFILE_BANGERS_INITIAL_LIMIT,
-    year: candidateYear ?? undefined,
-  })
+  const candidatePage = await measureServerRead('profile.archive-page', () =>
+    getCuratedProfileBangersPage(accountId, {
+      limit: PROFILE_BANGERS_INITIAL_LIMIT,
+      year: candidateYear ?? undefined,
+    }),
+  )
 
   const year = resolveProfileChapterYear(candidateYear, candidatePage)
   const initialPage =
@@ -127,7 +133,9 @@ async function ProfileArchiveContent({
 }
 
 async function ProfileArchivedAt({ accountId }: { accountId: string }) {
-  const archivedAt = await getCachedArchivedAt(accountId)
+  const archivedAt = await measureServerRead('profile.archived-at', () =>
+    getCachedArchivedAt(accountId),
+  )
   if (!archivedAt) return null
   return (
     <span>

@@ -58,7 +58,9 @@ async function analyticalProfile(
   identifier: string,
   isMember: boolean,
 ): Promise<ResolvedProfile | null> {
-  const clickHouseProfile = await getClickHouseUserProfile(identifier)
+  const clickHouseProfile = await measureServerRead('profile.analytical', () =>
+    getClickHouseUserProfile(identifier),
+  )
   const accountId = clickHouseProfile?.user.account_id
   if (!clickHouseProfile || !accountId) return null
   const user = clickHouseProfile.user
@@ -131,19 +133,24 @@ async function resolveNonMemberProfile(
   )
   if (!resolved) return null
 
+  // Both reads are live and need only the resolved ID, so they run together;
+  // the policy answer is ignored when the ID turns out to be a member.
+  const blocked = measureServerRead('profile.policy', () =>
+    isPolicyBlockedAccount(resolved.accountId, resolved.profile.username),
+  )
   // The directory can still hold a member under a handle they have since
   // changed; the stable ID finds them.
   if (!isAccountId) {
-    const member = await measureServerRead('profile.eligibility', () =>
+    // Keep a policy failure from surfacing as an unhandled rejection when the
+    // member path below never awaits it.
+    blocked.catch(() => undefined)
+    const member = await measureServerRead('profile.eligibility-by-id', () =>
       resolvePublicProfileIdentity(resolved.accountId),
     )
     if (member) return memberProfile(member)
   }
 
-  const blocked = await measureServerRead('profile.policy', () =>
-    isPolicyBlockedAccount(resolved.accountId, resolved.profile.username),
-  )
-  return blocked ? null : resolved
+  return (await blocked) ? null : resolved
 }
 
 /**

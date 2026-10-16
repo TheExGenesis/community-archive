@@ -286,6 +286,25 @@ test('prefers successful bangers and never fetches fallback unnecessarily', asyn
   expect(fallback).not.toHaveBeenCalled()
 })
 
+test('regroups a small banger year into pairs when no top-liked pool exists', async () => {
+  const pairs = [
+    { label: 'sinkhole lore', title: 'full of sinkholes', tweet_ids: ['1', '2'] },
+    { label: 'soup discourse', title: 'soup thoughts', tweet_ids: ['4', '5'] },
+  ]
+  const request = jest.fn().mockResolvedValueOnce([]).mockResolvedValue(pairs)
+  const noPool = async () => {
+    throw new Error('no pool')
+  }
+  const result = await generateYearSections(2025, YEAR, noPool, request)
+  expect(result.source).toBe('bangers')
+  expect(result.sections).toHaveLength(2)
+  expect(request.mock.calls[0][0]).toContain('at least 3 posts')
+  expect(request.mock.calls[1][0]).toContain('at least 2 posts')
+  await expect(
+    generateYearSections(2025, YEAR.slice(0, 4), noPool, request),
+  ).rejects.toThrow('no pool')
+})
+
 test('fallback tries three-post themes before permitting pairs and distinguishes provider errors', async () => {
   const candidates = YEAR.map((tweet) => ({ ...tweet, favorite_count: 10 }))
   const request = jest.fn().mockResolvedValue([])

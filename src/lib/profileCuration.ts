@@ -1,6 +1,9 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
-import { supplementalSectionIds } from './metaTwitter/sectionConfig'
+import {
+  curatedSectionIds,
+  supplementalSectionIds,
+} from './metaTwitter/sectionConfig'
 
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { devLog } from '@/lib/devLog'
@@ -179,9 +182,30 @@ async function getSectionedProfilePage(
   accountId: string,
   options: ProfileBangersPageOptions,
 ) {
-  const page = await getProfileBangersPage(accountId, options)
   const supplemental = supplementalSectionIds(accountId)
-  if (!page.available || !Object.keys(supplemental).length) return page
+  const curated = curatedSectionIds(accountId)
+  // Curated IDs aren't counted until their year is hydrated: most are
+  // bangers already, so adding them below would inflate the chapter counts.
+  const wanted = new Set(
+    options.year === undefined
+      ? []
+      : [
+          ...(supplemental[options.year] ?? []),
+          ...(curated[options.year] ?? []),
+        ],
+  )
+  // A combined chapter pages itself below. Its later offsets run past the
+  // banger pool, which the gateway reports as an invalid page, so only the
+  // first page is asked for its counts.
+  const page = await getProfileBangersPage(
+    accountId,
+    wanted.size ? { ...options, offset: 0 } : options,
+  )
+  if (
+    !page.available ||
+    (!Object.keys(supplemental).length && !Object.keys(curated).length)
+  )
+    return page
   const counts = new Map(page.yearCounts.map((row) => [row.year, row.count]))
   for (const [year, ids] of Object.entries(supplemental))
     counts.set(Number(year), (counts.get(Number(year)) ?? 0) + ids.length)
@@ -189,13 +213,12 @@ async function getSectionedProfilePage(
     year,
     count,
   })).sort((a, b) => b.year - a.year)
-  if (options.year === undefined || !supplemental[options.year]?.length)
-    return { ...page, yearCounts }
+  if (options.year === undefined || !wanted.size) return { ...page, yearCounts }
   const collection = await getProfileBangers(accountId)
   if (!collection.available) return { ...page, available: false }
   const known = new Set(collection.tweets.map((tweet) => tweet.tweet_id))
   try {
-    const ids = supplemental[options.year].filter((id) => !known.has(id))
+    const ids = Array.from(wanted).filter((id) => !known.has(id))
     const extra = await getSectionTweets(accountId, options.year, ids)
     const tweets = [
       ...collection.tweets.filter(

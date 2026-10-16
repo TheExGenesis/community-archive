@@ -1,4 +1,7 @@
-import { supplementalSectionIds } from './metaTwitter/sectionConfig'
+import {
+  curatedSectionIds,
+  supplementalSectionIds,
+} from './metaTwitter/sectionConfig'
 import { getCuratedProfileBangersPage } from './profileCuration'
 import { getProfileBangers, getProfileBangersPage } from './metaTwitter/bangers'
 import { fetchClickHouseTweetPageData } from './clickhouseTweetPage'
@@ -7,12 +10,17 @@ import type { BangerTweet } from './metaTwitter/types'
 jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
 jest.mock('./metaTwitter/sectionConfig', () => ({
   supplementalSectionIds: jest.fn(() => ({})),
+  curatedSectionIds: jest.fn(() => ({})),
 }))
 const mockSupplemental = supplementalSectionIds as jest.MockedFunction<
   typeof supplementalSectionIds
 >
+const mockCurated = curatedSectionIds as jest.MockedFunction<
+  typeof curatedSectionIds
+>
 beforeEach(() => {
   mockSupplemental.mockReturnValue({})
+  mockCurated.mockReturnValue({})
   jest.clearAllMocks()
 })
 const mockFinalEq = jest.fn()
@@ -203,6 +211,12 @@ test('hydrates and paginates fallback representatives, deduplicating posts that 
   expect(second.nextOffset).toBeNull()
   expect(second.total).toBe(2)
   expect(mockFetchTweet).not.toHaveBeenCalledWith('1')
+  // Past the banger pool the gateway rejects the raw offset, so later pages
+  // of a combined chapter never forward it.
+  expect(mockGetProfileBangersPage).toHaveBeenLastCalledWith(
+    '42',
+    expect.objectContaining({ year: 2025, offset: 0 }),
+  )
 })
 
 test('adds zero-banger chapter links without hydrating every year on the all-time page', async () => {
@@ -242,4 +256,47 @@ test('fails visibly on a supplemental gateway failure instead of serving a succe
     limit: 20,
   })
   expect(page.available).toBe(false)
+})
+
+test('hydrates curated section tweets outside the banger pool only for their year', async () => {
+  mockCurated.mockReturnValue({ 2025: ['1', '2'] })
+  const bangers = [banger('1', 10)]
+  mockGetProfileBangersPage.mockResolvedValue({
+    tweets: bangers,
+    yearCounts: [{ year: 2025, count: 1 }],
+    total: 1,
+    nextOffset: null,
+    available: true,
+  })
+  mockGetProfileBangers.mockResolvedValue({
+    tweets: bangers,
+    yearCounts: [{ year: 2025, count: 1 }],
+    total: 1,
+    available: true,
+  })
+  mockFinalEq.mockResolvedValue({ data: [], error: null })
+  mockFetchTweet.mockImplementation(async (id) => ({
+    ...banger(id, 0),
+    reply_to_tweet_id: null,
+    reply_to_username: undefined,
+    retweeted_tweet_id: null,
+    urls: [],
+    quoted_tweet: undefined,
+    quote_tweet_id: null,
+    media: [],
+  }))
+
+  // Curated IDs may already be bangers, so the all-time page doesn't count them.
+  const allTime = await getCuratedProfileBangersPage('42', { limit: 20 })
+  expect(allTime.yearCounts).toEqual([{ year: 2025, count: 1 }])
+  expect(mockFetchTweet).not.toHaveBeenCalled()
+
+  const year = await getCuratedProfileBangersPage('42', {
+    year: 2025,
+    limit: 20,
+  })
+  expect(mockFetchTweet).toHaveBeenCalledTimes(1)
+  expect(mockFetchTweet).toHaveBeenCalledWith('2')
+  expect(year.tweets.map((tweet) => tweet.tweet_id)).toEqual(['1', '2'])
+  expect(year.yearCounts).toEqual([{ year: 2025, count: 2 }])
 })

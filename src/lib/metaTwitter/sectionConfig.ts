@@ -83,3 +83,20 @@ export const supplementalSectionIds = (
       )
       .map(([year, entry]) => [year, entry.supplementalTweetIds!]),
   )
+
+/**
+ * Every tweet a curated chapter names. Curation is not limited to bangers, so
+ * the year feed hydrates whichever of these the banger pool lacks; unlike the
+ * generated supplements, some are usually bangers already.
+ */
+export const curatedSectionIds = (
+  accountId: string,
+): Record<number, string[]> =>
+  Object.fromEntries(
+    Object.entries(CURATED_SECTIONS[accountId] ?? {}).map(
+      ([year, sections]) => [
+        year,
+        sections.flatMap((section) => section.tweetIds),
+      ],
+    ),
+  )

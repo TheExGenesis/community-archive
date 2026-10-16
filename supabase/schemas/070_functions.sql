@@ -3521,6 +3521,65 @@ REVOKE ALL ON FUNCTION "public"."search_user_suggestions"(text, integer)
 GRANT EXECUTE ON FUNCTION "public"."search_user_suggestions"(text, integer)
   TO "anon", "authenticated", "readclient", "service_role";
 
+-- Resolve one profile identifier against public.user_directory, skipping the
+-- view when neither all_account nor an opted-in optin row has a candidate.
+-- SECURITY INVOKER keeps the caller's RLS on the prefilter and the view.
+CREATE OR REPLACE FUNCTION public.resolve_directory_identity(identifier text)
+RETURNS TABLE (account_id text, username text)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  -- All-digit identifiers are account IDs; anything else is a handle. A
+  -- numeric handle never matches a username, mirroring the application.
+  IF identifier ~ '^[0-9]+$' THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.all_account a WHERE a.account_id = identifier
+    ) AND NOT EXISTS (
+      SELECT 1
+      FROM public.optin o
+      WHERE o.opted_in = true
+        AND o.twitter_user_id = identifier
+    ) THEN
+      RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT d.account_id, d.username
+    FROM public.user_directory d
+    WHERE d.account_id = identifier
+    LIMIT 1;
+  ELSE
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.all_account a
+      WHERE lower(a.username) = lower(identifier)
+    ) AND NOT EXISTS (
+      SELECT 1
+      FROM public.optin o
+      WHERE o.opted_in = true
+        AND lower(o.username) = lower(identifier)
+    ) THEN
+      RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT d.account_id, d.username
+    FROM public.user_directory d
+    WHERE lower(d.username) = lower(identifier)
+    LIMIT 1;
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.resolve_directory_identity(text) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.resolve_directory_identity(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.resolve_directory_identity(text)
+  TO anon, authenticated, service_role;
+
 -- Private, aggregate-only monitoring bridges for the least-privilege
 -- archive_metrics_exporter role. The functions intentionally expose no user,
 -- account, archive, or free-form metadata labels.

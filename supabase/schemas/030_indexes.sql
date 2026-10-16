@@ -44,6 +44,9 @@ CREATE INDEX "idx_optin_opted_in" ON "public"."optin" USING "btree" ("opted_in")
 CREATE INDEX "idx_optin_explicit_optout" ON "public"."optin" USING "btree" ("explicit_optout") WHERE ("explicit_optout" = true);
 CREATE INDEX "optin_explicit_optout_twitter_user_id_idx" ON "public"."optin" USING "btree" ("twitter_user_id") WHERE (("explicit_optout" IS TRUE) AND ("twitter_user_id" IS NOT NULL));
 CREATE INDEX "optin_explicit_optout_username_lower_idx" ON "public"."optin" USING "btree" (lower("username")) WHERE ("explicit_optout" IS TRUE);
+-- Prefilter probes for public.resolve_directory_identity.
+CREATE INDEX "optin_opted_in_twitter_user_id_idx" ON "public"."optin" USING "btree" ("twitter_user_id") WHERE ("opted_in" = true);
+CREATE INDEX "optin_opted_in_username_lower_idx" ON "public"."optin" USING "btree" (lower("username")) WHERE ("opted_in" = true);
 
 CREATE INDEX "blocked_scraping_users_username_idx" ON "tes"."blocked_scraping_users" USING "btree" (lower("username")) WHERE ("username" IS NOT NULL);
 

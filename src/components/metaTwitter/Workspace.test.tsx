@@ -1,8 +1,8 @@
-import { createRef } from 'react'
-import { render, screen } from '@testing-library/react'
+import { createRef, type ReactNode } from 'react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BANGER_SCORE_EXPLANATION, Workspace } from './Workspace'
-import type { BangerTweet } from '@/lib/metaTwitter/types'
+import type { ArchiveMediaItem, BangerTweet } from '@/lib/metaTwitter/types'
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -13,8 +13,30 @@ jest.mock('@/components/TweetAvatarImage', () => ({
 }))
 jest.mock('@/components/ImageLightbox', () => ({
   __esModule: true,
-  default: ({ src, alt }: { src: string; alt: string }) => (
-    <span data-testid="tweet-image" data-src={src} aria-label={alt} />
+  default: ({
+    src,
+    alt,
+    label,
+    gallery,
+    index,
+    badge,
+  }: {
+    src: string
+    alt: string
+    label?: string
+    gallery?: { href?: string }[]
+    index?: number
+    badge?: ReactNode
+  }) => (
+    <span
+      data-testid="tweet-image"
+      data-src={src}
+      aria-label={label ?? alt}
+      data-index={index}
+      data-gallery={gallery?.map((image) => image.href).join(' ')}
+    >
+      {badge}
+    </span>
   ),
 }))
 
@@ -166,4 +188,63 @@ test('shows the initial canonical banger cards with media and profile return lin
   await user.click(screen.getByRole('button', { name: 'Load more bangers' }))
 
   expect(onLoadMore).toHaveBeenCalledTimes(1)
+})
+
+test('opens chapter media in a gallery over every loaded item instead of navigating', () => {
+  const media: ArchiveMediaItem[] = Array.from({ length: 8 }, (_, index) => ({
+    media_url: `https://example.com/media-${index}.jpg`,
+    media_type: 'photo',
+    width: 800,
+    height: 600,
+    tweet_id: String(200 + index),
+    created_at: '2025-02-01T00:00:00.000Z',
+    favorite_count: 0,
+  }))
+  render(
+    <Workspace
+      avatarUrl={null}
+      contextTitle="Best of Alice"
+      tweets={[]}
+      bangersAvailable
+      bangersLoading={false}
+      media={media}
+      mediaCount={24}
+      people={[]}
+      peopleTitle="Top people"
+      mediaLoading={false}
+      mediaFailed={false}
+      onRetryMedia={jest.fn()}
+      peopleLoading={false}
+      peopleFailed={false}
+      onRetryPeople={jest.fn()}
+      sort="quotes"
+      onSortChange={jest.fn()}
+      hasMore={false}
+      loadMoreFailed={false}
+      onLoadMore={jest.fn()}
+      loadMoreRef={createRef<HTMLDivElement>()}
+      returnTo="/user/alice?chapter=2025"
+    />,
+  )
+
+  const panel = screen.getByRole('region', { name: 'Media' })
+  expect(within(panel).queryByRole('link')).not.toBeInTheDocument()
+  const tiles = within(panel).getAllByLabelText(/^Open media \d of 8/)
+  expect(tiles).toHaveLength(6)
+  const galleryHrefs = media
+    .map(
+      (item) =>
+        `/tweets/${item.tweet_id}?from=profile&returnTo=%2Fuser%2Falice%3Fchapter%3D2025`,
+    )
+    .join(' ')
+  tiles.forEach((tile, index) => {
+    expect(tile).toHaveAttribute('data-index', String(index))
+    expect(tile).toHaveAttribute('data-gallery', galleryHrefs)
+  })
+  expect(tiles[5]).toHaveAttribute(
+    'aria-label',
+    'Open media 6 of 8, 18 more in this chapter',
+  )
+  expect(tiles[5]).toHaveTextContent('+18')
+  expect(tiles[4]).toBeEmptyDOMElement()
 })

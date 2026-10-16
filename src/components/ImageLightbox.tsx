@@ -44,6 +44,17 @@ const isEditable = (target: EventTarget) =>
   (target.isContentEditable ||
     ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
+/** Previews render larger than the media's own size, within the viewport. */
+const PREVIEW_SCALE = 1.25
+
+const previewWidth = (image: LightboxImage, hasFooter: boolean) => {
+  const width = image.width ?? 1200
+  const aspect = width / (image.height ?? 800)
+  const maxHeight = hasFooter ? '(92vh - 2.5rem)' : '92vh'
+  // Width alone sets the size, so the height cap is expressed as a width too.
+  return `min(${Math.round(width * PREVIEW_SCALE)}px, 96vw, 1500px, calc(${maxHeight} * ${aspect.toFixed(4)}))`
+}
+
 const navButtonClass =
   'absolute top-1/2 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white'
 
@@ -125,12 +136,13 @@ export default function ImageLightbox({
           ref={contentRef}
           onKeyDown={handleKeyDown}
           // Focus the dialog itself so the first arrow press doesn't light up
-          // whichever nav button Radix would otherwise focus.
+          // whichever nav button Radix would otherwise focus. w-max: centred
+          // at left-1/2, an auto width would shrink-wrap to half the viewport.
           onOpenAutoFocus={(event) => {
             event.preventDefault()
             contentRef.current?.focus()
           }}
-          className="w-auto max-w-[96vw] gap-2 border-0 bg-transparent p-0 shadow-none focus:outline-none [&>button:hover]:bg-black/90 [&>button]:right-2 [&>button]:top-2 [&>button]:rounded-full [&>button]:bg-black/70 [&>button]:p-2 [&>button]:text-white [&>button]:opacity-100"
+          className="w-max max-w-[96vw] gap-2 border-0 bg-transparent p-0 shadow-none focus:outline-none [&>button:hover]:bg-black/90 [&>button]:right-2 [&>button]:top-2 [&>button]:rounded-full [&>button]:bg-black/70 [&>button]:p-2 [&>button]:text-white [&>button]:opacity-100"
         >
           <DialogTitle className="sr-only">{image.alt}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -147,10 +159,8 @@ export default function ImageLightbox({
               width={image.width ?? 1200}
               height={image.height ?? 800}
               sizes="96vw"
-              className={cn(
-                'h-auto w-auto max-w-[min(96vw,1200px)] rounded-md object-contain',
-                hasFooter ? 'max-h-[calc(92vh-2.5rem)]' : 'max-h-[92vh]',
-              )}
+              style={{ width: previewWidth(image, hasFooter) }}
+              className="h-auto rounded-md object-contain"
             />
             {hasPrevious && (
               <button

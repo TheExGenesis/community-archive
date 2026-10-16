@@ -2,7 +2,10 @@ import 'server-only'
 
 import type { TweetData, TweetMedia } from '@/lib/tweets/types'
 import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
-import { isClickHouseReadsEnabled } from '@/lib/clickhouseGateway'
+import {
+  isClickHouseReadsEnabled,
+  type AnalyticsGatewayFetcher,
+} from '@/lib/clickhouseGateway'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 
@@ -111,6 +114,19 @@ async function getSupabaseQuotingTweetsPage(
   }
 }
 
+export async function getClickHouseQuotingTweetsPage(
+  tweetId: string,
+  offset: number,
+  limit: number,
+  fetcher?: AnalyticsGatewayFetcher,
+): Promise<QuotingTweetsPage> {
+  const page = await fetchClickHouseQuotePosts(tweetId, limit, offset, fetcher)
+  return {
+    ...page,
+    nextOffset: nextOffset(offset, page.tweets.length, page.totalCount),
+  }
+}
+
 export async function getQuotingTweetsPage(
   tweetId: string,
   offset = 0,
@@ -119,11 +135,7 @@ export async function getQuotingTweetsPage(
   const safeOffset = Math.max(0, Math.min(5_000, Math.trunc(offset)))
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
   if (isClickHouseReadsEnabled()) {
-    const page = await fetchClickHouseQuotePosts(tweetId, safeLimit, safeOffset)
-    return {
-      ...page,
-      nextOffset: nextOffset(safeOffset, page.tweets.length, page.totalCount),
-    }
+    return getClickHouseQuotingTweetsPage(tweetId, safeOffset, safeLimit)
   }
   return getSupabaseQuotingTweetsPage(tweetId, safeOffset, safeLimit)
 }

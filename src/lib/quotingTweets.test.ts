@@ -63,6 +63,6 @@ describe('getQuotingTweetsPage', () => {
         },
       ],
     })
-    expect(fetchQuotePostsMock).toHaveBeenCalledWith('101', 12, 12)
+    expect(fetchQuotePostsMock).toHaveBeenCalledWith('101', 12, 12, undefined)
   })
 })

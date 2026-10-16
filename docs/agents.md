@@ -7,6 +7,9 @@ Guide for AI agents working with the Community Archive database.
 
 ## Choose an access method
 
+- **MCP clients:** use the [MCP server](./mcp.md) at
+  `https://www.community-archive.org/api/mcp` for tweet search, threads, quote
+  posts, profiles, Bangers, and digests. Public tools do not require sign-in.
 - **Bulk or corpus-wide analysis:** follow the consent-safe package from the
   [latest GitHub Release](https://github.com/TheExGenesis/community-archive/releases/latest)
   or its `latest.json` pointer; see [api-doc.md](./api-doc.md).
@@ -228,6 +231,7 @@ WHERE um.mentioned_user_id = '1680757426889342977';
 
 ## Related Documentation
 
+- [MCP Guide](./mcp.md) - Connect an MCP client and use the public archive tools
 - [API Documentation](./api-doc.md) - How to query the database via Supabase API
 - [Website Docs](https://www.community-archive.org/docs) - Agent, API, and bulk-data quickstart
 - [Archive Data Structure](./archive_data.md) - Structure of raw archive JSON files

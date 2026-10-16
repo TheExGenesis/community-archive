@@ -55,6 +55,7 @@
     "docker:run:process-archive": "docker compose -f services/process_archive/docker-compose.yml run --rm process-archive"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
     "@next/bundle-analyzer": "^14.2.23",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-avatar": "^1.1.2",
@@ -122,7 +123,8 @@
     "tsx": "^4.19.2",
     "undici": "^5.28.5",
     "winston": "^3.17.0",
-    "workflow": "4.8.2"
+    "workflow": "4.8.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@swc/core": "^1.10.12",

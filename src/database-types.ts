@@ -2679,6 +2679,15 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_directory_identity: {
+        Args: {
+          identifier: string
+        }
+        Returns: {
+          account_id: string
+          username: string
+        }[]
+      }
       save_bulletin_prompt: {
         Args: {
           expected_id: number

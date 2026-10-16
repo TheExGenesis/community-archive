@@ -20,28 +20,30 @@ The old API stays up until the retirement date in the announcement.
 
 ## Call by call
 
-| Old PostgREST call                                                                                                          | New call                                                                                                                                          |
-| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /rest/v1/tweets?tweet_id=eq.X`                                                                                         | `GET /v1/tweets/X`                                                                                                                                |
-| `GET /rest/v1/tweets?tweet_id=in.(A,B,C)`                                                                                   | `GET /v1/tweets?ids=A,B,C` (up to 100)                                                                                                            |
-| `GET /rest/v1/tweets?account_id=eq.X&order=created_at.desc&limit=1000&offset=N`                                             | `GET /v1/accounts/X/tweets?order=desc&limit=200&cursor=…`                                                                                         |
-| same, `order=created_at.asc`                                                                                                | `GET /v1/accounts/X/tweets?order=asc`                                                                                                             |
-| `...&full_text=not.like.RT*` (skip retweets)                                                                                | add `exclude_retweets=true` (also `exclude_replies=true`)                                                                                         |
-| `GET /rest/v1/enriched_tweets?created_at=gte.A&created_at=lt.B`                                                             | `GET /v1/tweets?since=A&until=B` (window up to 31 days)                                                                                           |
-| `GET /rest/v1/enriched_tweets?tweet_id=in.(…)`                                                                              | `GET /v1/tweets?ids=…`                                                                                                                            |
-| `POST /rest/v1/rpc/search_tweets` (`search_query`, `from_user`, `to_user`, `since_date`, `until_date`, `limit_`, `offset_`) | `GET /v1/tweets/search?q=…&from_user=…&reply_to_user=…&since=…&until=…&limit=…&offset=…`                                                          |
-| `GET /rest/v1/all_account?username=ilike.X` or `account?username=eq.X`                                                      | `GET /v1/accounts/X`, or `GET /v1/accounts?usernames=X,Y`                                                                                         |
-| `GET /rest/v1/all_account?account_id=eq.X` and `profile?account_id=eq.X`                                                    | `GET /v1/accounts/X` (one object with profile fields)                                                                                             |
-| `GET /rest/v1/all_account?account_id=in.(…)`                                                                                | `GET /v1/accounts?ids=…` (up to 100)                                                                                                              |
-| `GET /rest/v1/tweet_media?tweet_id=…`                                                                                       | `media` on every tweet                                                                                                                            |
-| `GET /rest/v1/tweet_urls?tweet_id=…`                                                                                        | `urls` on every tweet                                                                                                                             |
-| `GET /rest/v1/quote_tweets?tweet_id=…`                                                                                      | `quoted_tweet_id` on the tweet                                                                                                                    |
-| `GET /rest/v1/retweets?tweet_id=…`                                                                                          | `retweeted_tweet_id` on the tweet                                                                                                                 |
-| `GET /rest/v1/conversations?tweet_id=…`                                                                                     | `conversation_id` on the tweet                                                                                                                    |
-| `GET /rest/v1/user_mentions?tweet_id=…`                                                                                     | `mentioned_account_ids` on the tweet                                                                                                              |
-| `GET /rest/v1/user_directory` (members)                                                                                     | `GET /v1/members`                                                                                                                                 |
-| `likes`, `liked_tweets`, `followers`, `following`                                                                           | Coming as `/v1/accounts/X/likes`, `/followers`, `/following`. They return `404 not_available_yet` today; use the public dataset export meanwhile. |
-| Other RPCs and views (`word_occurrences`, `get_monthly_tweet_counts`, `global_activity_summary`, …)                         | Not in v1. Open an issue describing what you need.                                                                                                |
+| Old PostgREST call                                                                                                          | New call                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /rest/v1/tweets?tweet_id=eq.X`                                                                                         | `GET /v1/tweets/X`                                                                       |
+| `GET /rest/v1/tweets?tweet_id=in.(A,B,C)`                                                                                   | `GET /v1/tweets?ids=A,B,C` (up to 100)                                                   |
+| `GET /rest/v1/tweets?account_id=eq.X&order=created_at.desc&limit=1000&offset=N`                                             | `GET /v1/accounts/X/tweets?order=desc&limit=200&cursor=…`                                |
+| same, `order=created_at.asc`                                                                                                | `GET /v1/accounts/X/tweets?order=asc`                                                    |
+| `...&full_text=not.like.RT*` (skip retweets)                                                                                | add `exclude_retweets=true` (also `exclude_replies=true`)                                |
+| `GET /rest/v1/enriched_tweets?created_at=gte.A&created_at=lt.B`                                                             | `GET /v1/tweets?since=A&until=B` (window up to 31 days)                                  |
+| `GET /rest/v1/enriched_tweets?tweet_id=in.(…)`                                                                              | `GET /v1/tweets?ids=…`                                                                   |
+| `POST /rest/v1/rpc/search_tweets` (`search_query`, `from_user`, `to_user`, `since_date`, `until_date`, `limit_`, `offset_`) | `GET /v1/tweets/search?q=…&from_user=…&reply_to_user=…&since=…&until=…&limit=…&offset=…` |
+| `GET /rest/v1/all_account?username=ilike.X` or `account?username=eq.X`                                                      | `GET /v1/accounts/X`, or `GET /v1/accounts?usernames=X,Y`                                |
+| `GET /rest/v1/all_account?account_id=eq.X` and `profile?account_id=eq.X`                                                    | `GET /v1/accounts/X` (one object with profile fields)                                    |
+| `GET /rest/v1/all_account?account_id=in.(…)`                                                                                | `GET /v1/accounts?ids=…` (up to 100)                                                     |
+| `GET /rest/v1/tweet_media?tweet_id=…`                                                                                       | `media` on every tweet                                                                   |
+| `GET /rest/v1/tweet_urls?tweet_id=…`                                                                                        | `urls` on every tweet                                                                    |
+| `GET /rest/v1/quote_tweets?tweet_id=…`                                                                                      | `quoted_tweet_id` on the tweet                                                           |
+| `GET /rest/v1/retweets?tweet_id=…`                                                                                          | `retweeted_tweet_id` on the tweet                                                        |
+| `GET /rest/v1/conversations?tweet_id=…`                                                                                     | `conversation_id` on the tweet                                                           |
+| `GET /rest/v1/user_mentions?tweet_id=…`                                                                                     | `mentioned_account_ids` on the tweet                                                     |
+| `GET /rest/v1/user_directory` (members)                                                                                     | `GET /v1/members`                                                                        |
+| `GET /rest/v1/likes?account_id=eq.X` (+ `liked_tweets`)                                                                     | `GET /v1/accounts/X/likes` (`liked_tweet_id`, `full_text`, `author_account_id`)          |
+| `GET /rest/v1/followers?account_id=eq.X`                                                                                    | `GET /v1/accounts/X/followers`                                                           |
+| `GET /rest/v1/following?account_id=eq.X`                                                                                    | `GET /v1/accounts/X/following`                                                           |
+| Other RPCs and views (`word_occurrences`, `get_monthly_tweet_counts`, `global_activity_summary`, …)                         | Not in v1. Open an issue describing what you need.                                       |
 
 `X` in an account path is a numeric account ID or a username. A numeric
 username needs an `@` prefix (`/v1/accounts/@1234`).
@@ -65,7 +67,7 @@ username needs an `@` prefix (`/v1/accounts/@1234`).
 ## Paging
 
 Offsets and `Range` headers are replaced by a cursor. Ask for up to 200 tweets
-(1,000 members), then pass `next_cursor` back as `cursor` until it is `null`.
+(500 likes or follows, 1,000 members), then pass `next_cursor` back as `cursor` until it is `null`.
 Don't stop on a short or empty page; stop on `next_cursor: null`. Search
 pages with `offset` (up to 5,000) and returns `next_offset`.
 

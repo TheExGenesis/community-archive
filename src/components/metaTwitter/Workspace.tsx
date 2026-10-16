@@ -12,6 +12,7 @@ import {
   Star,
   X,
 } from 'lucide-react'
+import ImageLightbox, { type LightboxImage } from '@/components/ImageLightbox'
 import TweetCard from '@/components/TweetCard'
 import { getSmallAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
@@ -118,6 +119,14 @@ export function Workspace({
 }) {
   const mediaTiles = media.slice(0, 6)
   const mediaOverflow = Math.max(mediaCount - 6, 0)
+  // Tiles open a lightbox over every loaded item, not just the visible six.
+  const mediaGallery: LightboxImage[] = media.map((item, index) => ({
+    src: item.media_url,
+    alt: `Media ${index + 1} from this chapter`,
+    width: item.width || 1200,
+    height: item.height || 800,
+    href: tweetPermalinkHref(item.tweet_id, 'profile', returnTo),
+  }))
   const [tweetReference, setTweetReference] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
 
@@ -414,30 +423,35 @@ export function Workspace({
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-1">
-                {mediaTiles.map((item, index) => (
-                  <Link
-                    key={item.media_url}
-                    href={tweetPermalinkHref(
-                      item.tweet_id,
-                      'profile',
-                      returnTo,
-                    )}
-                    className="relative block aspect-square overflow-hidden rounded-md bg-muted"
-                  >
-                    <Image
+                {mediaTiles.map((item, index) => {
+                  const overflow = index === 5 && mediaOverflow > 0
+                  return (
+                    <ImageLightbox
+                      key={item.media_url}
                       src={item.media_url}
-                      alt=""
-                      fill
+                      alt={mediaGallery[index].alt}
+                      width={item.width || 1200}
+                      height={item.height || 800}
                       sizes="94px"
-                      className="object-cover"
+                      label={`Open media ${index + 1} of ${mediaGallery.length}${
+                        overflow
+                          ? `, ${formatNumber(mediaOverflow)} more in this chapter`
+                          : ''
+                      }`}
+                      gallery={mediaGallery}
+                      index={index}
+                      className="aspect-square rounded-md bg-muted"
+                      imageClassName="h-full w-full object-cover"
+                      badge={
+                        overflow ? (
+                          <span className="absolute inset-0 grid place-items-center bg-black/50 text-xs font-semibold text-white">
+                            +{formatNumber(mediaOverflow)}
+                          </span>
+                        ) : undefined
+                      }
                     />
-                    {index === 5 && mediaOverflow > 0 && (
-                      <span className="absolute inset-0 grid place-items-center bg-black/50 text-xs font-semibold text-white">
-                        +{formatNumber(mediaOverflow)}
-                      </span>
-                    )}
-                  </Link>
-                ))}
+                  )
+                })}
               </div>
             )}
           </section>

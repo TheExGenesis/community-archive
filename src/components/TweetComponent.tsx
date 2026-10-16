@@ -21,11 +21,11 @@ import { formatNumber } from '@/lib/formatNumber'
 import { HighlightedText } from '@/components/HighlightedText'
 import { decodeTweetText } from '@/lib/tweetText'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
-import ImageLightbox from '@/components/ImageLightbox'
+import ImageLightbox, { type LightboxImage } from '@/components/ImageLightbox'
 import TweetLikeButton from '@/components/TweetLikeButton'
 import TweetLikers from '@/components/TweetLikers'
 
-import type { TweetData } from '@/lib/tweets/types'
+import type { TweetData, TweetMedia } from '@/lib/tweets/types'
 
 interface TweetComponentProps {
   tweet: TweetData
@@ -37,6 +37,20 @@ interface TweetComponentProps {
   highlightQuery?: string
   isPermalinkPage?: boolean
 }
+
+// Video entries carry a poster still, so they render like photos here.
+const isRenderableMedia = (item: TweetMedia) =>
+  item.media_type === 'photo' ||
+  item.media_type.startsWith('image/') ||
+  item.media_type === 'video'
+
+const toGallery = (media: TweetMedia[], label: string): LightboxImage[] =>
+  media.map((item, index) => ({
+    src: item.media_url,
+    alt: `${label} ${index + 1}`,
+    width: item.width || 1200,
+    height: item.height || 800,
+  }))
 
 export const compactTweetGridClass =
   'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-3 py-3 sm:px-4 md:grid-cols-[minmax(190px,0.95fr)_minmax(300px,2.6fr)_6.5rem_6rem_6rem] md:gap-x-4'
@@ -177,13 +191,10 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     const mediaArray = tweet.media
     if (!mediaArray || mediaArray.length === 0) return null
 
-    const renderableMedia = mediaArray.filter(
-      (mediaItem) =>
-        mediaItem.media_type === 'photo' ||
-        mediaItem.media_type.startsWith('image/') ||
-        mediaItem.media_type === 'video',
-    )
+    const renderableMedia = mediaArray.filter(isRenderableMedia)
     if (renderableMedia.length === 0) return null
+    // Every thumbnail opens the same gallery, so ←/→ walks the whole tweet.
+    const gallery = toGallery(renderableMedia, 'Tweet image')
 
     if (compact) {
       return (
@@ -195,6 +206,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               alt={`Tweet image ${index + 1}`}
               width={mediaItem.width || 1200}
               height={mediaItem.height || 800}
+              gallery={gallery}
+              index={index}
               sizes="(max-width: 640px) 7rem, 9rem"
               className="h-20 w-28 flex-none rounded-md border border-border bg-muted sm:h-24 sm:w-36"
               imageClassName="h-full w-full object-cover transition-transform hover:scale-[1.02]"
@@ -220,6 +233,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             alt={`Tweet image ${index + 1}`}
             width={mediaItem.width || 1200}
             height={mediaItem.height || 800}
+            gallery={gallery}
+            index={index}
             sizes={
               renderableMedia.length > 1
                 ? '(max-width: 640px) 50vw, 360px'
@@ -248,6 +263,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       )
     }
     const quotedProfilePic = quotedTweet.avatar_media_url
+    const quotedMedia = (quotedTweet.media ?? []).filter(isRenderableMedia)
+    const quotedGallery = toGallery(quotedMedia, 'Quoted tweet image')
     const quotedProfileHref = userProfileHref(
       quotedTweet.username,
       quotedTweet.account_id,
@@ -326,13 +343,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                     : 'mt-2 flex flex-col space-y-1'
                 }
               >
-                {quotedTweet.media
-                  .filter(
-                    (m) =>
-                      m.media_type === 'photo' ||
-                      m.media_type.startsWith('image/') ||
-                      m.media_type === 'video',
-                  )
+                {quotedMedia
                   .slice(0, compact ? 3 : undefined)
                   .map((mediaItem, index) => (
                     <ImageLightbox
@@ -341,6 +352,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                       alt={`Quoted tweet image ${index + 1}`}
                       width={mediaItem.width || 1200}
                       height={mediaItem.height || 800}
+                      gallery={quotedGallery}
+                      index={index}
                       sizes={
                         compact ? '6rem' : '(max-width: 640px) 100vw, 640px'
                       }

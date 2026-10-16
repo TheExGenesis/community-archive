@@ -15,9 +15,7 @@ export const CURATED_SECTIONS: Record<
         tweetIds: [
           '1502765137714835456', // thankful to those who are unabashedly weird
           '1551996871584796672', // I made a guide to tpot!
-          '1605591960810446848', // Try my fake twitter, I made it
           '1528053626442162176', // can we have designated tpot hubs all
-          '1591536191459196928', // today I am reading about full fractal
           '1500134291774136320', // I want to hear everything about vibe
         ],
       },
@@ -28,7 +26,6 @@ export const CURATED_SECTIONS: Record<
         tweetIds: [
           '1569948503685890048', // Ways to play with your identity, life
           '1569948792384012291', // 4. Be more agreeable, less agreeable. Be
-          '1567309182248034305', // Want to meet the faces behind the
           '1561507307065774086', // after some experimentation I have decided that
           '1594597266685583360', // what is the best way to see
         ],

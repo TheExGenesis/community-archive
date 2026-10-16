@@ -124,6 +124,10 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" FROM "anon", "aut
 GRANT ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" TO "service_role";
 GRANT SELECT ON TABLE "public"."tweet_page_summaries" TO "anon", "authenticated";
 
+-- Agentic search runs are private to the asker and read only by server code.
+REVOKE ALL PRIVILEGES ON TABLE "public"."agent_search_runs" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."agent_search_runs" TO "service_role";
+
 REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";

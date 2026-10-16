@@ -8,6 +8,7 @@ export const analyticsRoutes = {
   '/stream': ['live_stream', 'product'],
   '/research': ['research', 'product'],
   '/search': ['search', 'product'],
+  '/search/ask': ['ask_archive', 'product'],
   '/settings': ['settings', 'product'],
   '/profile': ['settings', 'product'],
   '/trends': ['trends', 'product'],

@@ -6,12 +6,31 @@ import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import UserSearchInput from '@/components/UserSearchInput'
 import { buildSearchHref, parseSearchExpression } from '@/lib/searchParams'
+import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { AskShortcutChip } from '@/components/AskShortcutChip'
+import {
+  AskSignInPopover,
+  useAskFromSearch,
+} from '@/components/AskSignInPopover'
 
 export default function HeaderSearch() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const searchHref = buildSearchHref(query)
+
+  const goAsk = () => {
+    if (!query.trim()) return
+    capturePostHogEvent('search_interface_action', {
+      action: 'ask_from_search',
+      has_query: true,
+      active_filter_count: Object.keys(parseSearchExpression(query).options)
+        .length,
+    })
+    router.push(buildAskHref(query))
+  }
+  // Signed out, asking explains and offers sign-in instead.
+  const { ask, explaining, setExplaining, available } = useAskFromSearch(goAsk)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,10 +62,28 @@ export default function HeaderSearch() {
             placeholder="Search tweets..."
             value={query}
             onValueChange={setQuery}
-            className="h-9 w-40 border-border bg-muted py-1.5 pl-8 pr-3 text-sm focus:ring-brand lg:w-56"
+            className={`h-9 w-40 border-border bg-muted py-1.5 pl-8 text-sm focus:ring-brand lg:w-56 ${available && query.trim() ? 'pr-16' : 'pr-3'}`}
             aria-label="Search Community Archive"
+            aria-keyshortcuts="Control+Enter Meta+Enter"
+            title="Enter to search · Ctrl or ⌘ + Enter to ask the archive"
             autoComplete="off"
+            onKeyDownCapture={(event) => {
+              if (!available || !isAskShortcut(event) || !query.trim()) return
+              event.preventDefault()
+              ask()
+            }}
           />
+          {available && query.trim() && (
+            <AskSignInPopover
+              open={explaining}
+              onOpenChange={setExplaining}
+              question={query}
+            >
+              <span className="absolute right-1.5 top-1/2 -translate-y-1/2">
+                <AskShortcutChip onAsk={ask} />
+              </span>
+            </AskSignInPopover>
+          )}
         </div>
       </form>
     </>

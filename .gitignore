@@ -69,3 +69,6 @@ scratchpad/
 
 # Left behind when `gen-types` fails before it can mv the file into place.
 src/database-types.ts.tmp
+
+# agentic search run records in local development
+.agent-search-runs/

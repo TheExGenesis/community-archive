@@ -7,6 +7,12 @@ import { Button } from '@/components/ui/button'
 import UserSearchInput from '@/components/UserSearchInput'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { buildSearchParams, parseSearchExpression } from '@/lib/searchParams'
+import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
+import { AskShortcutChip } from '@/components/AskShortcutChip'
+import {
+  AskSignInPopover,
+  useAskFromSearch,
+} from '@/components/AskSignInPopover'
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
 
@@ -28,6 +34,21 @@ export default function HomepageSearch() {
     router.push(`/search?${params.toString()}`)
   }
 
+  // ⌘/Ctrl+Enter, or the chip, hands the text to Ask the archive instead.
+  const goAsk = () => {
+    const trimmed = query.trim()
+    if (!trimmed) return
+    capturePostHogEvent('search_interface_action', {
+      action: 'ask_from_search',
+      has_query: true,
+      active_filter_count: Object.keys(parseSearchExpression(trimmed).options)
+        .length,
+    })
+    router.push(buildAskHref(trimmed))
+  }
+  // Signed out, asking explains and offers sign-in instead.
+  const { ask, explaining, setExplaining, available } = useAskFromSearch(goAsk)
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     search(query)
@@ -44,9 +65,26 @@ export default function HomepageSearch() {
           onValueChange={setQuery}
           placeholder="Search tweets, people, ideas"
           aria-label="Search Community Archive"
-          className="h-14 rounded-[50px] border-0 bg-transparent pl-3 pr-16 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg"
+          className={`h-14 rounded-[50px] border-0 bg-transparent pl-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg ${available && query.trim() ? 'pr-32' : 'pr-16'}`}
           autoComplete="off"
+          aria-keyshortcuts="Control+Enter Meta+Enter"
+          onKeyDownCapture={(event) => {
+            if (!available || !isAskShortcut(event) || !query.trim()) return
+            event.preventDefault()
+            ask()
+          }}
         />
+        {available && query.trim() && (
+          <AskSignInPopover
+            open={explaining}
+            onOpenChange={setExplaining}
+            question={query}
+          >
+            <span className="absolute right-16 top-1/2 -translate-y-1/2 sm:right-[4.25rem]">
+              <AskShortcutChip onAsk={ask} />
+            </span>
+          </AskSignInPopover>
+        )}
         <Button
           type="submit"
           size="icon"

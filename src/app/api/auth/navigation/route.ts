@@ -1,3 +1,4 @@
+import { agentSearchEnabled } from '@/lib/agentSearch/enabled'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { NextResponse } from 'next/server'
 import { isAdminUser } from '@/app/admin/data'
@@ -12,6 +13,8 @@ export async function GET() {
   return NextResponse.json(
     {
       isMember: isMember || localPreview === 'admin',
+      // Ask the archive's entry points hide while it is paused.
+      askEnabled: agentSearchEnabled(),
       localPreview,
       isAdmin: user ? isAdminUser(user) : false,
     },

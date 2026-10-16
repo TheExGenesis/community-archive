@@ -196,7 +196,7 @@ function ArchiveMetric({
 }: {
   value: string
   label: string
-  note: string
+  note?: string
   noteClass?: string
   live?: boolean
   divider?: boolean
@@ -221,7 +221,9 @@ function ArchiveMetric({
       >
         {label}
       </span>
-      <span className={`text-[12px] ${noteClass ?? MUTED}`}>{note}</span>
+      {note && (
+        <span className={`text-[12px] ${noteClass ?? MUTED}`}>{note}</span>
+      )}
     </span>
   )
 }
@@ -262,7 +264,9 @@ export function ArchiveOverview({
           note={
             failures.liveAnalytics
               ? 'Tweet totals are temporarily unavailable.'
-              : `+${stats.streamedLast24Hours.toLocaleString('en-US')} in the last 24h`
+              : stats.addedLast24Hours === null
+                ? undefined
+                : `+${stats.addedLast24Hours.toLocaleString('en-US')} in the last 24h`
           }
           noteClass={
             failures.liveAnalytics

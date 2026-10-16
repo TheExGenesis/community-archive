@@ -31,6 +31,7 @@ test('renders ready panels while trends and the digest remain pending', async ()
       data: {
         totalTweets: 14_000_000,
         memberCount: 700,
+        addedLast24Hours: 12_000,
         generatedAt: '2026-09-06T00:00:00Z',
       },
       failed: false,

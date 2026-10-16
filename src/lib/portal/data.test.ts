@@ -5,7 +5,6 @@ jest.mock('next/cache', () => ({
 jest.mock('./analytics', () => ({
   fetchPortalBangersPage: jest.fn(),
   fetchPortalHistoricalBangers: jest.fn(),
-  fetchPortalLiveAnalytics: jest.fn(),
   fetchPortalRecentBangers: jest.fn(),
   fetchPortalTrends: jest.fn(),
   fetchPortalWeeklyTrends: jest.fn(),
@@ -36,7 +35,6 @@ import {
 import {
   fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
-  fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
   fetchPortalWeeklyTrends,
@@ -50,10 +48,6 @@ const fetchPortalHistoricalBangersMock =
   >
 const fetchPortalBangersPageMock =
   fetchPortalBangersPage as jest.MockedFunction<typeof fetchPortalBangersPage>
-const fetchPortalLiveAnalyticsMock =
-  fetchPortalLiveAnalytics as jest.MockedFunction<
-    typeof fetchPortalLiveAnalytics
-  >
 const fetchPortalRecentBangersMock =
   fetchPortalRecentBangers as jest.MockedFunction<
     typeof fetchPortalRecentBangers
@@ -168,10 +162,6 @@ describe('portal page resilience', () => {
       weekly: [],
       computedAt: '2026-08-07T20:00:00.000Z',
     })
-    fetchPortalLiveAnalyticsMock.mockResolvedValue({
-      streamedLast24Hours: 25,
-      latestObservedAt: '2026-08-07T20:00:00.000Z',
-    })
     fetchPortalRecentBangersMock.mockResolvedValue([])
     fetchPortalHistoricalBangersMock.mockResolvedValue([])
     getResearchPostsMock.mockResolvedValue([])
@@ -187,6 +177,7 @@ describe('portal page resilience', () => {
               sourceUpdatedAt: '2026-08-13 18:34:09.903',
               collectedAt: '2026-08-13 18:34:20.907',
               membershipSnapshotAt: '2026-08-13 18:34:00.000',
+              addedLast24Hours: '399270',
               source:
                 'clickhouse.community_membership_current+corpus_count_current',
               countMode: 'live_membership+cached_unique_tweets_exact',
@@ -298,24 +289,17 @@ describe('portal page resilience', () => {
     })
   })
 
-  test('preserves the shared ClickHouse counts when live analytics fails', async () => {
-    fetchPortalLiveAnalyticsMock.mockRejectedValueOnce(
-      new Error('live analytics unavailable'),
-    )
-
+  test('reports 24h growth from the shared corpus total', async () => {
     await expect(getPortalData()).resolves.toMatchObject({
-      stats: {
-        totalTweets: 15_334_092,
-        accountCount: 42,
-        firstYear: 2007,
-        currentYear: 2026,
-      },
-      failures: {
-        liveAnalytics: true,
-        memberCount: false,
-        corpusRange: false,
-      },
+      stats: { totalTweets: 15_334_092, addedLast24Hours: 399_270 },
+      failures: { liveAnalytics: false },
     })
+    const requested = (global.fetch as jest.Mock).mock.calls.map(([input]) =>
+      new URL(String(input)).pathname,
+    )
+    expect(requested.some((path) => path.endsWith('/stream-stats'))).toBe(
+      false,
+    )
   })
 })
 
@@ -433,6 +417,7 @@ describe('portal reads', () => {
             sourceUpdatedAt: '2026-08-13 18:34:09.903',
             collectedAt: '2026-08-13 18:34:20.907',
             membershipSnapshotAt: '2026-08-13 18:34:00.000',
+            addedLast24Hours: '399270',
             source:
               'clickhouse.community_membership_current+corpus_count_current',
             countMode: 'live_membership+cached_unique_tweets_exact',
@@ -445,6 +430,7 @@ describe('portal reads', () => {
     await expect(fetchPortalGlobalStats()).resolves.toEqual({
       totalTweets: 15_334_092,
       memberCount: 658,
+      addedLast24Hours: 399_270,
       generatedAt: '2026-08-13T18:34:20.907Z',
     })
     expect(fetchMock).toHaveBeenCalledWith(
@@ -455,6 +441,27 @@ describe('portal reads', () => {
         }),
       }),
     )
+  })
+
+  test('omits 24h growth when the summary has no baseline', async () => {
+    for (const addedLast24Hours of [null, undefined]) {
+      jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              totalTweets: '15334092',
+              memberAccounts: '658',
+              collectedAt: '2026-08-13 18:34:20.907',
+              ...(addedLast24Hours === null ? { addedLast24Hours } : {}),
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      await expect(fetchPortalGlobalStats()).resolves.toMatchObject({
+        addedLast24Hours: null,
+      })
+    }
   })
 
   test('does not fall back to Supabase when the shared summary fails', async () => {

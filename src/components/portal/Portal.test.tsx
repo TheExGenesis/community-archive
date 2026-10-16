@@ -51,7 +51,7 @@ const data: PortalData = {
   stats: {
     totalTweets: 14_000_000,
     accountCount: 600,
-    streamedLast24Hours: 2_400,
+    addedLast24Hours: 2_400,
     joinedThisWeek: 3,
     firstYear: 2006,
     currentYear: 2026,
@@ -266,6 +266,21 @@ describe('portal component failures', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Community Builds')).toBeInTheDocument()
     expect(screen.queryByText('Explore the archive')).not.toBeInTheDocument()
+  })
+
+  test('shows the corpus total without a 24h note when growth is unknown', async () => {
+    render(
+      <Portal
+        data={{ ...data, stats: { ...data.stats, addedLast24Hours: null } }}
+        view="home"
+      />,
+    )
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('14,000,000')).toBeInTheDocument()
+    expect(screen.queryByText(/in the last 24h/)).not.toBeInTheDocument()
   })
 })
 

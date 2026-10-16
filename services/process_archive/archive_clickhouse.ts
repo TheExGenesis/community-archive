@@ -1102,6 +1102,9 @@ export class ArchiveClickHouseSink {
   ): Promise<string> {
     const endpoint = new URL(this.url)
     endpoint.searchParams.set('database', this.database)
+    // The writer's profile defaults to a 15-second limit; a synchronous
+    // mutation legitimately waits longer.
+    endpoint.searchParams.set('max_execution_time', String(Math.ceil(timeoutMs / 1000)))
     for (const [key, value] of Object.entries(params)) {
       endpoint.searchParams.set(`param_${key}`, value)
     }

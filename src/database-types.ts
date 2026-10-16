@@ -2038,6 +2038,16 @@ export type Database = {
           unique_scrapers: number
         }[]
       }
+      create_public_api_key: {
+        Args: {
+          owner_user_id: string
+          owner_account_id: string
+          new_key_id: string
+          new_key_sha256: string
+          key_label: string
+        }
+        Returns: Json
+      }
       delete_non_allowlist_streamed_tweet_batch: {
         Args: {
           p_limit?: number
@@ -2615,6 +2625,12 @@ export type Database = {
         }
         Returns: unknown
       }
+      list_public_api_keys: {
+        Args: {
+          owner_user_id: string
+        }
+        Returns: Json
+      }
       lock_policy_account: {
         Args: {
           p_account_id: string
@@ -2678,6 +2694,13 @@ export type Database = {
           actor_id: string
         }
         Returns: string
+      }
+      revoke_public_api_key: {
+        Args: {
+          owner_user_id: string
+          target_key_id: string
+        }
+        Returns: boolean
       }
       save_bulletin_prompt: {
         Args: {
@@ -2807,6 +2830,13 @@ export type Database = {
           schema_name: string
         }
         Returns: undefined
+      }
+      verify_public_api_key: {
+        Args: {
+          target_key_id: string
+          presented_key_sha256: string
+        }
+        Returns: Json
       }
       word_occurrences: {
         Args: {

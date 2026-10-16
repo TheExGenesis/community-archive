@@ -204,4 +204,22 @@ describe('API middleware rate limits', () => {
       status: 200,
     })
   })
+
+  it('lets the gateway reach the key verifier with a server user agent and its own budget', async () => {
+    const ip = '203.0.113.90'
+    const gatewayRequest = (pathname: string) =>
+      middleware(
+        new NextRequest(`https://www.community-archive.org${pathname}`, {
+          method: 'POST',
+          headers: { 'user-agent': 'Bun/1.3.11', 'x-forwarded-for': ip },
+        }),
+      )
+    for (let index = 0; index < 100; index++) {
+      expect(
+        (await gatewayRequest('/api/internal/public-api/keys/verify')).status,
+      ).toBe(200)
+    }
+    // Other API routes keep the browser user-agent requirement.
+    expect((await gatewayRequest('/api/settings/api-keys')).status).toBe(403)
+  })
 })

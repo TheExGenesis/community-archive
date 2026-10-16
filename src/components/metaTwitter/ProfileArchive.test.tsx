@@ -8,6 +8,7 @@ import { ProfileArchive } from './ProfileArchive'
 import { ProfileEditButton } from './ProfileEditButton'
 import { ProfileEditingProvider } from './ProfileEditingContext'
 import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
+import { sectionHeading, withCatchAll } from '@/lib/metaTwitter/chapterSections'
 import type { BangerTweet } from '@/lib/metaTwitter/types'
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 
@@ -841,7 +842,7 @@ test('does not start a stale chapter preload over an in-flight active feed', asy
 const CURATED_ACCOUNT_ID = '826134955549790208'
 const curatedSections = configuredSectionsByYear(CURATED_ACCOUNT_ID)!
 
-test('opens a chapter subsection and titles the workspace with its quote', async () => {
+test('opens a chapter subsection and titles the workspace with its heading', async () => {
   const user = userEvent.setup()
   jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
   const [section] = curatedSections[2025]
@@ -869,28 +870,32 @@ test('opens a chapter subsection and titles the workspace with its quote', async
 
   // Every chapter lists its sections, open or not.
   expect(
-    screen.getByRole('link', { name: `${otherSection.title}, 2024` }),
+    screen.getByRole('link', { name: `${sectionHeading(otherSection)}, 2024` }),
   ).toBeVisible()
 
-  await user.click(screen.getByRole('link', { name: `${section.title}, 2025` }))
+  await user.click(
+    screen.getByRole('link', { name: `${sectionHeading(section)}, 2025` }),
+  )
 
   expect(window.location.pathname + window.location.search).toBe(
     `/user/alice?chapter=2025&section=${section.slug}`,
   )
-  expect(screen.getByRole('heading', { name: section.title })).toBeVisible()
+  expect(
+    screen.getByRole('heading', { name: sectionHeading(section) }),
+  ).toBeVisible()
   // One per breakpoint: the compact nav marks the year, the wide nav the
   // section it lists under that year.
   expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(2)
 
   // A section from another chapter switches chapters with it.
   await user.click(
-    screen.getByRole('link', { name: `${otherSection.title}, 2024` }),
+    screen.getByRole('link', { name: `${sectionHeading(otherSection)}, 2024` }),
   )
   expect(window.location.pathname + window.location.search).toBe(
     `/user/alice?chapter=2024&section=${otherSection.slug}`,
   )
   expect(
-    screen.getByRole('heading', { name: otherSection.title }),
+    screen.getByRole('heading', { name: sectionHeading(otherSection) }),
   ).toBeVisible()
 
   // Leaving the chapter drops the section from the URL.
@@ -932,7 +937,9 @@ test('restores a subsection from an initial URL and from browser history', async
     />,
   )
 
-  expect(screen.getByRole('heading', { name: section.title })).toBeVisible()
+  expect(
+    screen.getByRole('heading', { name: sectionHeading(section) }),
+  ).toBeVisible()
 
   await user.click(screen.getByRole('link', { name: '2025 4' }))
   expect(screen.getByRole('heading', { name: 'Best of 2025' })).toBeVisible()
@@ -943,7 +950,9 @@ test('restores a subsection from an initial URL and from browser history', async
   })
 
   await waitFor(() =>
-    expect(screen.getByRole('heading', { name: section.title })).toBeVisible(),
+    expect(
+      screen.getByRole('heading', { name: sectionHeading(section) }),
+    ).toBeVisible(),
   )
 })
 
@@ -982,15 +991,77 @@ test('filters a chapter down to the selected section, catch-all included', async
   expect(screen.getByText('curated')).toBeVisible()
   expect(screen.getByText('uncurated')).toBeVisible()
 
-  await user.click(screen.getByRole('link', { name: `${curated.title}, 2025` }))
+  await user.click(
+    screen.getByRole('link', { name: `${sectionHeading(curated)}, 2025` }),
+  )
   expect(screen.getByText('curated')).toBeVisible()
   expect(screen.queryByText('uncurated')).not.toBeInTheDocument()
 
   await user.click(
-    screen.getByRole('link', { name: `${everythingElse.title}, 2025` }),
+    screen.getByRole('link', {
+      name: `${sectionHeading(everythingElse)}, 2025`,
+    }),
   )
   expect(screen.getByText('uncurated')).toBeVisible()
   expect(screen.queryByText('curated')).not.toBeInTheDocument()
+})
+
+test('heads a labelled section with its theme and quotes its lead tweet beneath', async () => {
+  const user = userEvent.setup()
+  jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
+  const sectionsByYear = {
+    2025: withCatchAll([
+      {
+        slug: 'full-of-sinkholes',
+        label: 'sinkholes',
+        title: 'full of sinkholes',
+        tweetIds: ['1', '2'],
+      },
+      { slug: 'soup-thoughts', title: 'soup thoughts', tweetIds: ['3'] },
+    ]),
+  }
+
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      sectionsByYear={sectionsByYear}
+      initialYear={2025}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2025), banger(3, 2025)],
+        yearCounts: chapters,
+        total: 3,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  // The nav names the theme, not the quote.
+  const labelled = screen.getByRole('link', { name: 'sinkholes, 2025' })
+  expect(labelled).toHaveTextContent(/^sinkholes$/)
+  expect(
+    screen.queryByRole('link', { name: 'full of sinkholes, 2025' }),
+  ).not.toBeInTheDocument()
+
+  await user.click(labelled)
+  expect(screen.getByRole('heading', { name: 'sinkholes' })).toBeVisible()
+  expect(screen.getByText('“full of sinkholes”')).toBeVisible()
+  expect(
+    screen.getByRole('region', { name: 'sinkholes' }),
+  ).toHaveAccessibleDescription('“full of sinkholes”')
+
+  // Without a label, the quote is the heading and there is no second line.
+  await user.click(screen.getByRole('link', { name: 'soup thoughts, 2025' }))
+  expect(screen.getByRole('heading', { name: 'soup thoughts' })).toBeVisible()
+  expect(screen.queryByText(/“/)).not.toBeInTheDocument()
+  expect(
+    screen.getByRole('region', { name: 'soup thoughts' }),
+  ).not.toHaveAttribute('aria-describedby')
 })
 
 test('shows no sections when none are provided', () => {

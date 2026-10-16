@@ -4,6 +4,10 @@ import {
   GENERATED_SECTIONS,
   configuredSectionsByYear,
 } from '@/lib/metaTwitter/sectionConfig'
+import {
+  MAX_LABEL_LENGTH,
+  MAX_LABEL_WORDS,
+} from '@/lib/metaTwitter/sectionGeneration'
 
 const CURATED_ACCOUNT_ID = '826134955549790208'
 
@@ -59,6 +63,16 @@ test('keeps every section addressable, titled, and worth opening', () => {
       expect(section.title.trim()).toBe(section.title)
       expect(section.title).not.toHaveLength(0)
       expect(section.title).not.toMatch(/https?:\/\/|@\w/)
+      // Labels are optional; older sections head with their title.
+      if (section.label !== undefined) {
+        expect(section.label.trim()).toBe(section.label)
+        expect(section.label).not.toHaveLength(0)
+        expect(section.label.length).toBeLessThanOrEqual(MAX_LABEL_LENGTH)
+        expect(section.label.split(/\s+/).length).toBeLessThanOrEqual(
+          MAX_LABEL_WORDS,
+        )
+        expect(section.label).not.toMatch(/https?:\/\/|@\w/)
+      }
       // Below three tweets a section is a footnote, not a chapter.
       expect(section.tweetIds.length).toBeGreaterThanOrEqual(minimum)
       for (const id of section.tweetIds) expect(id).toMatch(/^\d{1,20}$/)

@@ -45,6 +45,7 @@ const sharesFeaturedGroup = (
 export function Workspace({
   avatarUrl,
   contextTitle,
+  contextQuote = null,
   tweets,
   bangersAvailable,
   bangersLoading,
@@ -78,6 +79,8 @@ export function Workspace({
 }: {
   avatarUrl: string | null
   contextTitle: string
+  /** A section's own words, shown under its theme heading. */
+  contextQuote?: string | null
   tweets: BangerTweet[]
   bangersAvailable: boolean
   bangersLoading: boolean
@@ -129,31 +132,47 @@ export function Workspace({
     if (await onAddTweet?.(tweetId)) setTweetReference('')
   }
 
+  const heading = (
+    <div className="flex min-w-0 items-center gap-2">
+      <h2 id="profile-bangers-heading" className="text-xl font-extrabold">
+        {contextTitle}
+      </h2>
+      <span className="group relative flex-none">
+        <button
+          type="button"
+          aria-label="How banger score works"
+          aria-describedby="profile-banger-score-description"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Info className="h-3 w-3" aria-hidden="true" />
+        </button>
+        <span
+          id="profile-banger-score-description"
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+        >
+          {BANGER_SCORE_EXPLANATION}
+        </span>
+      </span>
+    </div>
+  )
+
   return (
     <main className="flex min-w-0 flex-col gap-4 px-4 py-4 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 id="profile-bangers-heading" className="text-xl font-extrabold">
-            {contextTitle}
-          </h2>
-          <span className="group relative flex-none">
-            <button
-              type="button"
-              aria-label="How banger score works"
-              aria-describedby="profile-banger-score-description"
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        {contextQuote ? (
+          <div className="min-w-0">
+            {heading}
+            <p
+              id="profile-bangers-quote"
+              className="mt-0.5 text-[13px] italic leading-snug text-muted-foreground"
             >
-              <Info className="h-3 w-3" aria-hidden="true" />
-            </button>
-            <span
-              id="profile-banger-score-description"
-              role="tooltip"
-              className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
-            >
-              {BANGER_SCORE_EXPLANATION}
-            </span>
-          </span>
-        </div>
+              “{contextQuote}”
+            </p>
+          </div>
+        ) : (
+          heading
+        )}
         <div className="flex flex-wrap items-center justify-end gap-2">
           {editing && (
             <button
@@ -251,6 +270,7 @@ export function Workspace({
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_280px]">
         <section
           aria-labelledby="profile-bangers-heading"
+          aria-describedby={contextQuote ? 'profile-bangers-quote' : undefined}
           className="flex flex-col gap-3"
         >
           {!bangersAvailable && (
@@ -319,7 +339,7 @@ export function Workspace({
                       index === 0 ||
                       !sharesFeaturedGroup(tweet, tweets[index - 1])
                     }
-                    className="disabled:opacity-35 rounded-full p-1.5 hover:bg-muted"
+                    className="rounded-full p-1.5 hover:bg-muted disabled:opacity-35"
                   >
                     <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
@@ -332,7 +352,7 @@ export function Workspace({
                       index === tweets.length - 1 ||
                       !sharesFeaturedGroup(tweet, tweets[index + 1])
                     }
-                    className="disabled:opacity-35 rounded-full p-1.5 hover:bg-muted"
+                    className="rounded-full p-1.5 hover:bg-muted disabled:opacity-35"
                   >
                     <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
@@ -552,7 +572,7 @@ export function Workspace({
                             index === 0 ||
                             !sharesFeaturedGroup(person, people[index - 1])
                           }
-                          className="disabled:opacity-35 rounded-full p-1 hover:bg-muted"
+                          className="rounded-full p-1 hover:bg-muted disabled:opacity-35"
                         >
                           <ArrowUp className="h-3 w-3" aria-hidden="true" />
                         </button>
@@ -565,7 +585,7 @@ export function Workspace({
                             index === people.length - 1 ||
                             !sharesFeaturedGroup(person, people[index + 1])
                           }
-                          className="disabled:opacity-35 rounded-full p-1 hover:bg-muted"
+                          className="rounded-full p-1 hover:bg-muted disabled:opacity-35"
                         >
                           <ArrowDown className="h-3 w-3" aria-hidden="true" />
                         </button>

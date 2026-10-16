@@ -1347,6 +1347,34 @@ GRANT EXECUTE ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) T
 
 COMMENT ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) IS 'Deletes up to 100 tweets only when every ID belongs to the authenticated Twitter account in app_metadata.provider_id.';
 
+-- Daily pg_cron refresh of the legacy global activity snapshot. Backfilled
+-- from production by 20260404173000_schedule_daily_global_activity_summary_refresh.sql.
+-- 20261016203822_restrict_refresh_global_activity_summary_execute.sql revoked
+-- the default EXECUTE grants; the pg_cron job runs as the owner (postgres).
+CREATE OR REPLACE FUNCTION "public"."refresh_global_activity_summary"() RETURNS void
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "statement_timeout" TO '20min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
+    AS $$
+BEGIN
+    BEGIN
+        REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
+    EXCEPTION
+        WHEN OTHERS THEN
+            IF SQLERRM LIKE '%not populated%' THEN
+                REFRESH MATERIALIZED VIEW public.global_activity_summary;
+            ELSE
+                RAISE;
+            END IF;
+    END;
+END;
+$$;
+ALTER FUNCTION "public"."refresh_global_activity_summary"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."refresh_global_activity_summary"() TO "service_role";
+
 
 CREATE OR REPLACE FUNCTION "public"."delete_user_archive"("p_account_id" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER

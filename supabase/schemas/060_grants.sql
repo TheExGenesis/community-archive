@@ -154,6 +154,8 @@ REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
   FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_activity_day(integer)
   FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_graph_purge()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 DO $$
 BEGIN
@@ -168,6 +170,9 @@ BEGIN
       TO archive_metrics_exporter;
     GRANT EXECUTE
       ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_graph_purge()
       TO archive_metrics_exporter;
   END IF;
 END;

@@ -17,9 +17,11 @@ import {
   ArchiveClickHouseError,
   ArchiveClickHouseSink,
   type ArchiveClickHouseDelivery,
+  type ArchiveGraphPurgeRequest,
   type ArchivePolicyCandidate,
   type ArchivePolicyDecisions,
   attemptArchiveClickHouseDelivery,
+  attemptArchiveGraphPurge,
   buildArchiveClickHouseBatch,
   buildArchiveTombstoneBatch,
   collectArchivePolicyCandidates,
@@ -54,6 +56,18 @@ const CONFIG = {
     Math.min(
       50,
       parseInt(process.env.ARCHIVE_CLICKHOUSE_RETRY_BATCH || '5', 10),
+    ),
+  ),
+  // Likes/follows delivery and deletion purges. Enable only after the
+  // ClickHouse likes/follows tables are deployed; see
+  // ops/clickhouse-likes-follows in the control-panel repository.
+  ARCHIVE_CLICKHOUSE_GRAPH_ENABLED:
+    process.env.ARCHIVE_CLICKHOUSE_GRAPH_ENABLED === 'true',
+  ARCHIVE_CLICKHOUSE_GRAPH_PURGE_BATCH: Math.max(
+    1,
+    Math.min(
+      100,
+      parseInt(process.env.ARCHIVE_CLICKHOUSE_GRAPH_PURGE_BATCH || '20', 10),
     ),
   ),
   CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
@@ -1208,8 +1222,20 @@ async function attemptClickHouseDelivery(
             ${delivery.username ?? null}
           ) AS blocked
         `
+        // Read under the same lock the deletion purge takes, so a deleted
+        // upload's likes/follows are never re-written after its purge.
+        const [upload] = CONFIG.ARCHIVE_CLICKHOUSE_GRAPH_ENABLED
+          ? await trx`
+              SELECT 1 AS present
+              FROM public.archive_upload
+              WHERE id = ${delivery.archive_upload_id}
+                AND account_id = ${delivery.account_id}
+                AND upload_phase = 'completed'
+            `
+          : []
         await operation({
           ownerBlocked: policy?.blocked === true,
+          graphEligible: Boolean(upload),
           resolvePolicies: (candidates) =>
             resolveArchivePolicyDecisions(trx, candidates),
           markDelivered: async () => {
@@ -1254,6 +1280,123 @@ async function attemptClickHouseDelivery(
   } else {
     logger.warn(
       `ClickHouse delivery remains pending (archive_upload_id=${delivery.archive_upload_id}, code=${result.errorCode})`,
+    )
+  }
+}
+
+async function attemptClickHouseGraphPurge(
+  sql: Sql,
+  sink: ArchiveClickHouseSink,
+  request: ArchiveGraphPurgeRequest,
+): Promise<void> {
+  const result = await attemptArchiveGraphPurge({
+    request,
+    sink,
+    readStateUnderPolicyLock: async (accountId) =>
+      sql.begin(async (transaction) => {
+        const trx = transaction as unknown as Sql
+        // Waits for any delivery writing this account's rows, so the state
+        // below already includes them. Released before ClickHouse work.
+        await trx`SELECT public.lock_policy_account(${accountId})`
+        const [self] = await trx`
+          SELECT purge_state
+          FROM private.archive_clickhouse_graph_purge
+          WHERE id = ${request.id}
+        `
+        // Duplicates first: each committed before the upload read below, so
+        // that read reflects every deletion this run is about to cover.
+        const covered = await trx`
+          SELECT id::text AS id
+          FROM private.archive_clickhouse_graph_purge
+          WHERE purge_state = 'pending'
+            AND id <> ${request.id}
+            AND purge_scope = ${request.purge_scope}
+            AND account_id = ${request.account_id}
+            AND archive_upload_id IS NOT DISTINCT FROM ${request.archive_upload_id}
+            AND reason = ${request.reason}
+        `
+        const uploads = await trx`
+          SELECT id::text AS id
+          FROM public.archive_upload
+          WHERE account_id = ${accountId}
+        `
+        // The identity sequence's high-water mark, not just MAX(id): the
+        // deletion being purged may have removed the highest uploads, and
+        // uploads created later always exceed it.
+        const [bounds] = await trx`
+          SELECT
+            GREATEST(
+              COALESCE(
+                pg_catalog.pg_sequence_last_value(
+                  pg_catalog.pg_get_serial_sequence('public.archive_upload', 'id')::regclass
+                ),
+                0
+              ),
+              (SELECT COALESCE(MAX(id), 0) FROM public.archive_upload)
+            )::text AS max_upload_id,
+            public.policy_account_is_blocked(${accountId}, NULL) AS blocked
+        `
+        return {
+          requestPending: self?.purge_state === 'pending',
+          existingUploadIds: uploads.map((row) => String(row.id)),
+          ownerBlocked: bounds?.blocked === true,
+          maxUploadId: String(bounds?.max_upload_id ?? '0'),
+          coveredRequestIds: covered.map((row) => String(row.id)),
+        }
+      }),
+    markCompleted: async (requestIds) => {
+      await sql`
+        UPDATE private.archive_clickhouse_graph_purge
+        SET
+          purge_state = 'completed',
+          attempt_count = attempt_count + CASE WHEN id = ${request.id} THEN 1 ELSE 0 END,
+          last_error_code = NULL,
+          completed_at = now()
+        WHERE id = ANY(${requestIds}::bigint[])
+          AND purge_state = 'pending'
+      `
+    },
+    markPending: async (errorCode) => {
+      await sql`
+        UPDATE private.archive_clickhouse_graph_purge
+        SET
+          attempt_count = attempt_count + 1,
+          last_error_code = ${errorCode},
+          next_attempt_at = now() + interval '5 minutes'
+        WHERE id = ${request.id}
+          AND purge_state = 'pending'
+      `
+    },
+  })
+
+  if (result.status === 'completed') {
+    logger.info(
+      `ClickHouse likes/follows purge completed (purge_id=${request.id}, reason=${request.reason})`,
+    )
+  } else {
+    logger.warn(
+      `ClickHouse likes/follows purge remains pending (purge_id=${request.id}, code=${result.errorCode})`,
+    )
+  }
+}
+
+async function retryPendingClickHouseGraphPurges(
+  sql: Sql,
+  sink: ArchiveClickHouseSink,
+): Promise<void> {
+  const pending = await sql`
+    SELECT id, purge_scope, account_id, archive_upload_id, reason
+    FROM private.archive_clickhouse_graph_purge
+    WHERE purge_state = 'pending'
+      AND next_attempt_at <= now()
+    ORDER BY next_attempt_at, id
+    LIMIT ${CONFIG.ARCHIVE_CLICKHOUSE_GRAPH_PURGE_BATCH}
+  `
+  for (const request of pending) {
+    await attemptClickHouseGraphPurge(
+      sql,
+      sink,
+      request as unknown as ArchiveGraphPurgeRequest,
     )
   }
 }
@@ -1324,7 +1467,15 @@ async function main() {
       try {
         clickHouseSink = createArchiveClickHouseSink()
         await clickHouseSink.healthCheck()
+        if (CONFIG.ARCHIVE_CLICKHOUSE_GRAPH_ENABLED) {
+          // Fail closed: a delivery marked complete without its likes and
+          // follows would never receive them later.
+          await clickHouseSink.graphHealthCheck()
+        }
         await retryPendingClickHouseDeliveries(sql, clickHouseSink)
+        if (CONFIG.ARCHIVE_CLICKHOUSE_GRAPH_ENABLED) {
+          await retryPendingClickHouseGraphPurges(sql, clickHouseSink)
+        }
       } catch (error) {
         const code =
           error instanceof ArchiveClickHouseError

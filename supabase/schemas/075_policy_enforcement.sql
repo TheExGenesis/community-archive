@@ -700,6 +700,51 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION private.enqueue_archive_clickhouse_graph_purge(
+  p_purge_scope text,
+  p_account_id text,
+  p_archive_upload_id bigint,
+  p_reason text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  -- ClickHouse stores UInt64 account IDs only. Legacy placeholders such as
+  -- policy_unknown:* cannot own likes or follows there, and must never make
+  -- a deletion or opt-out transaction fail.
+  IF p_account_id IS NULL
+     OR p_account_id !~ '^(0|[1-9][0-9]{0,19})$'
+     OR p_account_id::numeric > 18446744073709551615 THEN
+    RETURN;
+  END IF;
+
+  -- Every deletion gets its own request; requests are idempotent and the
+  -- processor reads current state under the account policy lock when it runs
+  -- one. Never wait for that lock here: API callers run with an 8-second
+  -- lock_timeout, and a deletion must not fail because an upload is being
+  -- processed.
+  INSERT INTO private.archive_clickhouse_graph_purge (
+    purge_scope,
+    account_id,
+    archive_upload_id,
+    reason
+  ) VALUES (
+    p_purge_scope,
+    p_account_id,
+    p_archive_upload_id,
+    p_reason
+  );
+END;
+$$;
+
+ALTER FUNCTION private.enqueue_archive_clickhouse_graph_purge(text, text, bigint, text)
+  OWNER TO postgres;
+REVOKE ALL ON FUNCTION private.enqueue_archive_clickhouse_graph_purge(text, text, bigint, text)
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+
 CREATE OR REPLACE FUNCTION public.apply_policy_block_tombstone()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -824,6 +869,12 @@ BEGIN
   DELETE FROM public.following
   WHERE account_id = p_account_id
      OR archive_upload_id = ANY(v_archive_upload_ids);
+
+  -- Remove the account's ClickHouse likes and follows, and tombstone liked
+  -- tweet text it authored, once the archive processor drains this request.
+  PERFORM private.enqueue_archive_clickhouse_graph_purge(
+    'account', p_account_id, NULL, 'policy_tombstone'
+  );
   DELETE FROM public.all_profile WHERE account_id = p_account_id;
   DELETE FROM public.profile_settings WHERE account_id = p_account_id;
   DELETE FROM public.profile_curation WHERE account_id = p_account_id;

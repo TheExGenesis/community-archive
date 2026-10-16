@@ -116,17 +116,17 @@ export function ArchiveNav({
               } ${
                 active
                   ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  : 'text-foreground hover:bg-muted'
               }`}
             >
-              <span>{chapter.year}</span>
+              <span className="font-bold">{chapter.year}</span>
               <span className="ml-2 text-xs text-muted-foreground">
                 {formatNumber(chapter.count)}
               </span>
             </Link>
             {sections.length > 0 && (
-              <div className="hidden whitespace-nowrap px-3 py-2 text-sm font-semibold text-muted-foreground lg:mt-1 lg:flex lg:justify-between">
-                <span>{chapter.year}</span>
+              <div className="hidden whitespace-nowrap px-3 py-2 text-sm font-semibold text-foreground lg:mt-1 lg:flex lg:justify-between">
+                <span className="font-bold">{chapter.year}</span>
                 <span className="ml-2 text-xs text-muted-foreground">
                   {formatNumber(chapter.count)}
                 </span>

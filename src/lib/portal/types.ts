@@ -70,7 +70,8 @@ export interface PortalBangersPage {
 export interface PortalStats {
   totalTweets: number
   accountCount: number
-  streamedLast24Hours: number
+  /** Growth of the cached corpus total over 24h; null without a baseline. */
+  addedLast24Hours: number | null
   joinedThisWeek: number
   firstYear: number
   currentYear: number

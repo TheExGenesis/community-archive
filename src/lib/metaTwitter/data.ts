@@ -237,6 +237,9 @@ export interface PublicProfileIdentity {
   username: string
 }
 
+const isMissingFunctionError = (error: { code?: string }) =>
+  error.code === 'PGRST202' || error.code === '42883'
+
 /**
  * Resolve only identities that are currently eligible for public serving.
  * This policy lookup is deliberately uncached so an explicit opt-out hides a
@@ -263,15 +266,31 @@ export const resolvePublicProfileIdentity = async (
   }
 
   const supabase = getMetaClient({ noStore: true })
-  const baseQuery = supabase
-    .from('user_directory')
-    .select('account_id, username')
+  const viewLookup = () => {
+    const baseQuery = supabase
+      .from('user_directory')
+      .select('account_id, username')
+    return isDirectoryIdentifier
+      ? baseQuery.eq('directory_id', decoded).limit(1).maybeSingle()
+      : isAccountIdentifier
+        ? baseQuery.eq('account_id', decoded).limit(1).maybeSingle()
+        : baseQuery.ilike('username', decoded).limit(1).maybeSingle()
+  }
+
+  // The RPC skips the directory view entirely when neither base table could
+  // contain the identifier, so a miss costs index probes, not a view scan.
+  const rpcLookup = async () => {
+    const rpc = await supabase.rpc('resolve_directory_identity', {
+      identifier: decoded,
+    })
+    // Migration not applied yet: keep serving through the view.
+    if (rpc.error && isMissingFunctionError(rpc.error)) return viewLookup()
+    return { data: rpc.data?.[0] ?? null, error: rpc.error }
+  }
 
   const { data, error } = isDirectoryIdentifier
-    ? await baseQuery.eq('directory_id', decoded).limit(1).maybeSingle()
-    : isAccountIdentifier
-      ? await baseQuery.eq('account_id', decoded).limit(1).maybeSingle()
-      : await baseQuery.ilike('username', decoded).limit(1).maybeSingle()
+    ? await viewLookup()
+    : await rpcLookup()
 
   if (error) throw error
   if (!data?.username) return null

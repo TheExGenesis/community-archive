@@ -1,8 +1,16 @@
 import { OTHER_SECTION_SLUG } from '@/lib/metaTwitter/chapterSections'
 import {
   MAX_TITLE_WORDS,
+  MIN_PRUNED_SECTION_TWEETS,
+  MISFIT_TEXT_LENGTH,
   TITLE_WORDS,
   fitTitle,
+  misfitPrompt,
+  misfitReviewPrompt,
+  parseMisfitReview,
+  parseMisfits,
+  pruneSection,
+  sectionTitleTweetId,
   PROMPT_EXAMPLE,
   SMALL_BANGER_POOL,
   cleanSectionLabel,
@@ -278,6 +286,25 @@ test('prefers successful bangers and never fetches fallback unnecessarily', asyn
   expect(fallback).not.toHaveBeenCalled()
 })
 
+test('regroups a small banger year into pairs when no top-liked pool exists', async () => {
+  const pairs = [
+    { label: 'sinkhole lore', title: 'full of sinkholes', tweet_ids: ['1', '2'] },
+    { label: 'soup discourse', title: 'soup thoughts', tweet_ids: ['4', '5'] },
+  ]
+  const request = jest.fn().mockResolvedValueOnce([]).mockResolvedValue(pairs)
+  const noPool = async () => {
+    throw new Error('no pool')
+  }
+  const result = await generateYearSections(2025, YEAR, noPool, request)
+  expect(result.source).toBe('bangers')
+  expect(result.sections).toHaveLength(2)
+  expect(request.mock.calls[0][0]).toContain('at least 3 posts')
+  expect(request.mock.calls[1][0]).toContain('at least 2 posts')
+  await expect(
+    generateYearSections(2025, YEAR.slice(0, 4), noPool, request),
+  ).rejects.toThrow('no pool')
+})
+
 test('fallback tries three-post themes before permitting pairs and distinguishes provider errors', async () => {
   const candidates = YEAR.map((tweet) => ({ ...tweet, favorite_count: 10 }))
   const request = jest.fn().mockResolvedValue([])
@@ -470,4 +497,157 @@ test('a small banger pool gets one attempt before the fallback', async () => {
   expect(big.mock.calls.map(([, temperature]) => temperature)).toEqual([
     0, 0.7, 0.7,
   ])
+})
+
+/** YEAR as written sections: '1' leads sinkholes, '5' leads soup. */
+const MISFIT_SECTIONS = [
+  {
+    label: 'sinkhole lore',
+    titleTweetId: '1',
+    tweets: YEAR.slice(0, 3),
+  },
+  {
+    label: 'soup discourse',
+    titleTweetId: '5',
+    tweets: YEAR.slice(3),
+  },
+]
+
+test('finds the tweet a title quotes, as the page does', () => {
+  const texts = new Map(YEAR.map((t) => [t.tweet_id, t.full_text]))
+  const section = { title: 'Soup Thoughts', tweetIds: ['4', '5', '6'] }
+  expect(sectionTitleTweetId(section, texts)).toBe('5')
+  // The first quoting tweet in list order wins.
+  expect(
+    sectionTitleTweetId({ title: 'soup', tweetIds: ['6', '4'] }, texts),
+  ).toBe('6')
+  expect(
+    sectionTitleTweetId({ title: 'no such phrase', tweetIds: ['4'] }, texts),
+  ).toBeNull()
+  expect(sectionTitleTweetId(section, new Map())).toBeNull()
+})
+
+test('misfit prompt shows labels and every tweet, lead first, never the title', () => {
+  const long = 'soup '.repeat(MISFIT_TEXT_LENGTH)
+  const prompt = misfitPrompt(2025, [
+    MISFIT_SECTIONS[0]!,
+    {
+      ...MISFIT_SECTIONS[1]!,
+      tweets: [...YEAR.slice(3), tweet('7', 2025, long)],
+    },
+  ])
+  expect(prompt).toContain("account's 2025 posts")
+  expect(prompt).toContain('Section 1, label "sinkhole lore":\n- id 1 (lead):')
+  expect(prompt).toContain('Section 2, label "soup discourse":\n- id 5 (lead):')
+  for (const { tweet_id } of YEAR) expect(prompt).toContain(`- id ${tweet_id}`)
+  expect(prompt).not.toContain('title')
+  expect(prompt).toContain(
+    `- id 7: ${long.trim().slice(0, MISFIT_TEXT_LENGTH)}…`,
+  )
+  expect(prompt).not.toContain(long.trim())
+})
+
+test('parses misfit verdicts, dropping unknown, title and repeated ids', () => {
+  const { bySection, rejected, judged } = parseMisfits(
+    {
+      posts: [
+        { id: '1', about: 'sinkholes', fits: false },
+        { id: '2', about: 'sinkholes', fits: true },
+        { id: ' 3 ', about: '  a  new haircut ', fits: false },
+        { id: '4', about: 'soup', fits: false },
+        { id: '4', about: 'soup again', fits: false },
+        { id: '999', about: 'invented', fits: false },
+        { id: 6, about: 'numeric id', fits: false },
+        { id: '6', about: 'soup', fits: 'no' },
+        null,
+      ],
+    },
+    MISFIT_SECTIONS,
+  )
+  expect(bySection).toEqual([
+    [{ id: '3', reason: 'a new haircut' }],
+    [{ id: '4', reason: 'soup' }],
+  ])
+  expect(rejected.map((entry) => entry.reason)).toEqual([
+    'title tweet',
+    'repeated',
+    'not a post in any section',
+    'not a post in any section',
+  ])
+  expect(judged).toBe(5)
+  for (const raw of [null, {}, { posts: 'none' }, { misfits: [{ id: '3' }] }])
+    expect(parseMisfits(raw, MISFIT_SECTIONS)).toEqual({
+      bySection: [[], []],
+      rejected: [],
+      judged: 0,
+    })
+})
+
+test('prunes misfits unless that empties most of a section or drops it below the floor', () => {
+  const misfit = (id: string) => ({ id, reason: 'off-label' })
+  expect(pruneSection(['1', '2', '3', '4'], [])).toEqual({
+    kind: 'unchanged',
+    tweetIds: ['1', '2', '3', '4'],
+  })
+  // Misfits outside the section are ignored.
+  expect(pruneSection(['1', '2', '3'], [misfit('9')]).kind).toBe('unchanged')
+  expect(
+    pruneSection(['1', '2', '3', '4'], [misfit('4'), misfit('2')]),
+  ).toEqual({
+    kind: 'pruned',
+    tweetIds: ['1', '3'],
+    removed: [misfit('4'), misfit('2')],
+  })
+  expect(pruneSection(['1', '2', '3'], [misfit('2'), misfit('3')])).toEqual({
+    kind: 'flagged',
+    tweetIds: ['1', '2', '3'],
+    removed: [misfit('2'), misfit('3')],
+    why: 'would remove 2 of 3',
+  })
+  expect(MIN_PRUNED_SECTION_TWEETS).toBe(2)
+  expect(pruneSection(['1', '2', '3'], [misfit('3')]).kind).toBe('pruned')
+  expect(pruneSection(['1', '2', '3'], [misfit('3')], 3)).toMatchObject({
+    kind: 'flagged',
+    why: 'would leave 2, below 3',
+  })
+})
+
+test('the second look shows only proposed misfits, beside their lead tweet', () => {
+  const prompt = misfitReviewPrompt(2025, MISFIT_SECTIONS, [
+    [],
+    [{ id: '6', reason: 'a party' }],
+  ])
+  expect(prompt).toContain("account's 2025 posts")
+  expect(prompt).not.toContain('sinkhole lore')
+  expect(prompt).toContain(
+    'Label "soup discourse". Its lead post, for context: soup thoughts, continued\nProposed misfits:\n- id 6: soup: the finale, with @friend',
+  )
+  expect(prompt).not.toContain('- id 4')
+  // The first pass's reason isn't shown, so it can't anchor the second.
+  expect(prompt).not.toContain('a party')
+})
+
+test('the second look confirms only explicit moves and keeps everything else', () => {
+  const misfit = (id: string) => ({ id, reason: 'off-label' })
+  const { bySection, rescued } = parseMisfitReview(
+    {
+      posts: [
+        { id: '2', tie: 'none', keep: false },
+        { id: ' 3 ', tie: 'a sinkhole pun', keep: true },
+        { id: '6', tie: 'none', keep: 'false' },
+        { id: '2', tie: 'changed its mind', keep: true },
+      ],
+    },
+    [
+      [misfit('2'), misfit('3')],
+      [misfit('5'), misfit('6')],
+    ],
+  )
+  expect(bySection).toEqual([[misfit('2')], []])
+  expect(rescued).toEqual([
+    { ...misfit('3'), tie: 'a sinkhole pun' },
+    { ...misfit('5'), tie: 'no verdict' },
+    { ...misfit('6'), tie: 'none' },
+  ])
+  expect(parseMisfitReview(null, [[misfit('2')]]).bySection).toEqual([[]])
 })

@@ -33,6 +33,12 @@ export interface GeneratedSectionsFile {
           bangers: number
           generationSource?: string
           supplementalTweetIds?: string[]
+          /**
+           * When scripts/prune-section-misfits.ts last moved this year's
+           * off-label tweets to the catch-all. Removed supplements stay in
+           * supplementalTweetIds so the page still hydrates them.
+           */
+          misfitsPrunedAt?: string
           sections: ChapterSection[]
         }
       >

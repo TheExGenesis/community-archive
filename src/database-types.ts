@@ -2695,6 +2695,15 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_directory_identity: {
+        Args: {
+          identifier: string
+        }
+        Returns: {
+          account_id: string
+          username: string
+        }[]
+      }
       revoke_public_api_key: {
         Args: {
           owner_user_id: string

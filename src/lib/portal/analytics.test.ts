@@ -3,7 +3,6 @@ import {
   fetchPortalDailyInteractions,
   fetchPortalTrendEvidence,
   fetchPortalTrendSeries,
-  fetchPortalLiveAnalytics,
   fetchPortalHistoricalBangers,
   fetchPortalRecentBangers,
   fetchPortalTrends,
@@ -13,32 +12,6 @@ import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 
 describe('ClickHouse-backed portal analytics', () => {
-  test('maps the rolling 24-hour stream stats', async () => {
-    const fetcher = jest.fn(async () => {
-      return {
-        summary: {
-          totalTweets: '1234',
-          latestObservedAt: '2026-08-07 11:59:00.000',
-          scope: 'firehose',
-          countMode: 'unique_tweets_observed',
-        },
-      }
-    }) as unknown as AnalyticsFetcher
-
-    await expect(
-      fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
-    ).resolves.toEqual({
-      streamedLast24Hours: 1234,
-      latestObservedAt: '2026-08-07T11:59:00.000Z',
-    })
-
-    expect(fetcher).toHaveBeenCalledTimes(1)
-    const streamCall = (fetcher as jest.Mock).mock.calls[0]
-    expect(streamCall?.[1].toString()).toBe(
-      'start=2026-08-06T12%3A00%3A00.000Z&end=2026-08-07T12%3A00%3A00.000Z&granularity=hour&scope=firehose',
-    )
-  })
-
   test('builds one bounded trend snapshot and distinguishes new from inactive', async () => {
     const fetcher = jest.fn(
       async (_path: string[], params: URLSearchParams) => {
@@ -312,21 +285,6 @@ describe('ClickHouse-backed portal analytics', () => {
         },
       ],
     })
-  })
-
-  test('rejects invalid ClickHouse stream counts instead of rendering false zeros', async () => {
-    const fetcher = jest.fn(async () => ({
-      summary: {
-        totalTweets: 'not-a-count',
-        latestObservedAt: null,
-        scope: 'firehose',
-        countMode: 'unique_tweets_observed',
-      },
-    })) as unknown as AnalyticsFetcher
-
-    await expect(
-      fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
-    ).rejects.toThrow('invalid last-24-hours streamed count')
   })
 
   test('maps recent member bangers and requests the 30-minute cache window', async () => {

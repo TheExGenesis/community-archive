@@ -40,15 +40,6 @@ type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 // Keep corpus-scan fan-out aligned with the two-query production capacity.
 const DEFAULT_ANALYTICS_CONCURRENCY = 2
 
-interface ClickHouseStreamStatsResponse {
-  summary: {
-    totalTweets: string | number
-    latestObservedAt: string | null
-    scope: 'firehose' | 'all'
-    countMode: 'unique_tweets_observed'
-  }
-}
-
 interface ClickHouseTrendRow {
   bucket: string
   tweets: string | number
@@ -142,11 +133,6 @@ interface ClickHouseTopQuotesResponse {
     yearCounts: Array<{ year: number; count: number }>
     candidateRankingTruncated: boolean
   }
-}
-
-export interface PortalLiveAnalytics {
-  streamedLast24Hours: number
-  latestObservedAt: string | null
 }
 
 function safeCount(value: string | number, field: string): number {
@@ -493,42 +479,6 @@ export async function fetchPortalTrendEvidence(
       safeOffset + tweets.length <= 5_000
         ? safeOffset + tweets.length
         : null,
-  }
-}
-
-export async function fetchPortalLiveAnalytics(
-  now = new Date(),
-  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
-): Promise<PortalLiveAnalytics> {
-  const start = daysBefore(now, 1)
-  const streamParams = new URLSearchParams({
-    start: start.toISOString(),
-    end: now.toISOString(),
-    granularity: 'hour',
-    scope: 'firehose',
-  })
-
-  const stream = await fetcher<ClickHouseStreamStatsResponse>(
-    ['stream-stats'],
-    streamParams,
-    { timeoutMs: 25_000 },
-  )
-
-  if (
-    stream.summary?.scope !== 'firehose' ||
-    stream.summary?.countMode !== 'unique_tweets_observed'
-  ) {
-    throw new Error('ClickHouse stream-stats returned an invalid response')
-  }
-
-  return {
-    streamedLast24Hours: safeCount(
-      stream.summary.totalTweets,
-      'last-24-hours streamed count',
-    ),
-    latestObservedAt: stream.summary.latestObservedAt
-      ? safeTimestamp(stream.summary.latestObservedAt, 'observation timestamp')
-      : null,
   }
 }
 

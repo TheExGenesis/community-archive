@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { isTwitterImage } from '@/lib/remoteImages'
 import type { ReactNode } from 'react'
 import {
   Dialog,
@@ -47,6 +48,7 @@ export default function ImageLightbox({
           >
             <Image
               src={src}
+              unoptimized={isTwitterImage(src)}
               alt={alt}
               width={width}
               height={height}
@@ -63,6 +65,7 @@ export default function ImageLightbox({
           </DialogDescription>
           <Image
             src={src}
+            unoptimized={isTwitterImage(src)}
             alt={alt}
             width={width}
             height={height}

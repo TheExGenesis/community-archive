@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
+import { isTwitterImage } from '@/lib/remoteImages'
 import Link from 'next/link'
 import {
   Archive,
@@ -116,6 +117,7 @@ function AccountIdentity({ account }: { account: MissingAccount }) {
             alt=""
             fill
             sizes="40px"
+            unoptimized={isTwitterImage(avatarUrl)}
             className="object-cover"
           />
         ) : (

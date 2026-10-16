@@ -22,7 +22,11 @@ jest.mock('@/lib/clickhouseUserProfile', () => ({
     getClickHouseUserProfileMock(...args),
 }))
 
-import { resolveProfile, resolveProfileCore } from './profile'
+import {
+  resolveMemberProfileCore,
+  resolveProfile,
+  resolveProfileCore,
+} from './profile'
 
 const archivedProfile = {
   account_id: '42',
@@ -262,4 +266,26 @@ test('renders the core profile while optional media never settles', async () => 
     profile: { account_display_name: 'Alice', header_media_url: null },
   })
   expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
+})
+
+test('member-only resolution never reaches the analytical corpus', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue(null)
+
+  await expect(resolveMemberProfileCore('bob')).resolves.toBeNull()
+  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
+  expect(isPolicyBlockedAccountMock).not.toHaveBeenCalled()
+})
+
+test('member-only resolution still serves members', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
+  getCachedProfileHeaderMock.mockResolvedValue(archivedProfile)
+
+  await expect(resolveMemberProfileCore('alice')).resolves.toEqual({
+    accountId: '42',
+    isMember: true,
+    profile: archivedProfile,
+  })
 })

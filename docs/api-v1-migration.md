@@ -11,8 +11,10 @@ personal key:
   Keep it on your server or in your script, never in browser code.
 - **Reference:** [`/v1/openapi.json`](https://analytics.community-archive.org/v1/openapi.json)
   (OpenAPI 3.1; load it in any OpenAPI viewer or client generator).
-- **Limits:** 60 requests a minute and 20,000 a day per key. On `429` or
-  `503`, wait for `Retry-After` seconds and retry.
+- **Limits:** 60 requests a minute and 20,000 a day per key, and two
+  requests running at once per account. On `429` or `503`, wait for
+  `Retry-After` seconds and retry. A `422` means the request was too broad
+  for its query budget; narrow it (for example, add a date range).
 
 The old API stays up until the retirement date in the announcement.
 

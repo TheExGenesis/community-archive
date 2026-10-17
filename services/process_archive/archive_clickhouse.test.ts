@@ -5,12 +5,19 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
   type ArchiveClickHouseBatch,
+  type ArchiveClickHouseGraphBatch,
+  type ArchiveGraphPurgePlan,
+  type ArchiveGraphPurgeRequest,
   type ArchivePolicyDecisions,
+  ArchiveClickHouseSink,
   attemptArchiveClickHouseDelivery,
+  attemptArchiveGraphPurge,
   buildArchiveClickHouseBatch,
+  buildArchiveGraphBatch,
   buildArchiveTombstoneBatch,
   collectArchivePolicyCandidates,
   createArchiveClickHouseManifest,
+  planArchiveGraphPurge,
 } from './archive_clickhouse'
 
 const archive = {
@@ -388,3 +395,354 @@ test('preserves all four extended attachments in the ClickHouse and canonical ar
   const batch = buildArchiveClickHouseBatch(source, createArchiveClickHouseManifest(source, '9'), new Map(), '2026-09-06T00:00:00Z')
   assert.deepEqual(batch.tweet_media_versions.map((row) => row.media_id), ['701', '702', '703', '704'])
 })
+
+const graphArchive = {
+  ...archive,
+  like: [
+    { like: { tweetId: '500', fullText: 'liked third-party text SENTINEL' } },
+    { like: { tweetId: '500', fullText: 'duplicate like' } },
+    { like: { tweetId: 'not-a-number' } },
+    { like: { tweetId: '501' } },
+  ],
+  follower: [
+    { follower: { accountId: '600' } },
+    { follower: { accountId: '-1' } },
+  ],
+  following: [
+    { following: { accountId: '700' } },
+    { following: { accountId: '600' } },
+  ],
+}
+
+test('likes and follow edges keep per-upload provenance and never carry liked text', () => {
+  const manifest = createArchiveClickHouseManifest(graphArchive, '9')
+  const batch = buildArchiveGraphBatch(
+    graphArchive,
+    manifest,
+    '2026-10-16T12:00:00.000Z',
+  )
+
+  assert.deepEqual(
+    batch.account_likes.map((row) => [
+      row.account_id,
+      row.liked_tweet_id,
+      row.archive_upload_id,
+      row.is_tombstone,
+    ]),
+    [
+      ['111', '500', '9', 0],
+      ['111', '501', '9', 0],
+    ],
+  )
+  assert.deepEqual(
+    batch.liked_tweet_versions.map((row) => [
+      row.tweet_id,
+      row.author_account_id,
+      row.full_text,
+      row.is_tombstone,
+    ]),
+    [
+      ['500', null, '', 1],
+      ['501', null, '', 1],
+    ],
+  )
+  assert.deepEqual(
+    batch.account_follows.map((row) => [
+      row.direction,
+      row.related_account_id,
+      row.archive_upload_id,
+    ]),
+    [
+      ['follower', '600'],
+      ['following', '700'],
+      ['following', '600'],
+    ].map(([direction, id]) => [direction, id, '9']),
+  )
+  assert.equal(new Set(batch.account_likes.map((row) => row.event_id)).size, 2)
+  assert.equal(JSON.stringify(batch).includes('SENTINEL'), false)
+})
+
+test('likes and follows are written only for an eligible, unblocked upload', async () => {
+  const manifest = createArchiveClickHouseManifest(graphArchive, '9')
+  const delivery = {
+    archive_upload_id: manifest.archiveUploadId,
+    account_id: manifest.accountId,
+    tweet_ids: manifest.tweetIds,
+    username: 'allowed_owner',
+  }
+  const attempt = async (ownerBlocked: boolean, graphEligible: boolean) => {
+    const graphWrites: ArchiveClickHouseGraphBatch[] = []
+    const result = await attemptArchiveClickHouseDelivery({
+      delivery,
+      archive: graphArchive,
+      withOwnerPolicyLock: async (_accountId, operation) =>
+        operation({
+          ownerBlocked,
+          graphEligible,
+          resolvePolicies: async () => new Map(),
+          markDelivered: async () => undefined,
+        }),
+      sink: {
+        writeBatch: async () => undefined,
+        writeGraphBatch: async (batch) => {
+          graphWrites.push(batch)
+        },
+      },
+      markPending: async () => assert.fail('must not remain pending'),
+    })
+    assert.deepEqual(result, { status: 'delivered' })
+    return graphWrites
+  }
+
+  assert.equal((await attempt(false, true))[0]?.account_likes.length, 2)
+  // A deleted upload (or a disabled feature flag) must not be re-written.
+  assert.equal((await attempt(false, false)).length, 0)
+  // An opted-out owner contributes no edges, whatever the flag says.
+  assert.equal((await attempt(true, true)).length, 0)
+})
+
+test('a failed likes/follows write leaves the whole delivery pending', async () => {
+  const manifest = createArchiveClickHouseManifest(graphArchive, '9')
+  let delivered = false
+  let pendingCode = ''
+  const result = await attemptArchiveClickHouseDelivery({
+    delivery: {
+      archive_upload_id: manifest.archiveUploadId,
+      account_id: manifest.accountId,
+      tweet_ids: manifest.tweetIds,
+      username: 'allowed_owner',
+    },
+    archive: graphArchive,
+    withOwnerPolicyLock: async (_accountId, operation) =>
+      operation({
+        ownerBlocked: false,
+        graphEligible: true,
+        resolvePolicies: async () => new Map(),
+        markDelivered: async () => {
+          delivered = true
+        },
+      }),
+    sink: {
+      writeBatch: async () => undefined,
+      writeGraphBatch: async () => {
+        throw new Error('raw ClickHouse response with SENTINEL')
+      },
+    },
+    markPending: async (code) => {
+      pendingCode = code
+    },
+  })
+  assert.equal(result.status, 'pending')
+  assert.equal(delivered, false)
+  assert.equal(pendingCode, 'archive_clickhouse_delivery_failed')
+})
+
+test('purge plans match each PostgreSQL deletion path', () => {
+  const request = (
+    reason: ArchiveGraphPurgeRequest['reason'],
+    archiveUploadId: string | null = null,
+  ): ArchiveGraphPurgeRequest => ({
+    id: '42',
+    purge_scope: archiveUploadId ? 'archive_upload' : 'account',
+    account_id: '111',
+    archive_upload_id: archiveUploadId,
+    reason,
+  })
+  const state = (existingUploadIds: string[], ownerBlocked = false) => ({
+    existingUploadIds,
+    ownerBlocked,
+    maxUploadId: '20',
+  })
+
+  assert.deepEqual(planArchiveGraphPurge(request('delete_single_archive', '9'), state(['9', '10'])), {
+    accountId: '111',
+    archiveUploadId: '9',
+    keepUploadIds: [],
+    maxUploadId: '20',
+    purgeLikedTweetAuthor: false,
+    requestId: '42',
+  })
+  // A re-upload created after "delete all my archives" survives the purge.
+  assert.deepEqual(planArchiveGraphPurge(request('delete_user_archive'), state(['12'])).keepUploadIds, ['12'])
+  // An opt-out keeps nothing and also tombstones liked text the account wrote.
+  const optOut = planArchiveGraphPurge(request('policy_tombstone'), state(['12'], true))
+  assert.deepEqual(optOut.keepUploadIds, [])
+  assert.equal(optOut.purgeLikedTweetAuthor, true)
+  // Replayed after the account opted back in and re-uploaded: keep the new upload.
+  assert.deepEqual(planArchiveGraphPurge(request('policy_tombstone'), state(['12'])).keepUploadIds, ['12'])
+  assert.throws(
+    () => planArchiveGraphPurge({ ...request('policy_tombstone'), account_id: 'policy_unknown:1' }, state([])),
+    /invalid_graph_purge_request/,
+  )
+  assert.throws(
+    () => planArchiveGraphPurge(request('delete_single_archive'), state([])),
+    /invalid_graph_purge_request/,
+  )
+})
+
+test('a purge completes its duplicates and runs no ClickHouse work under the lock', async () => {
+  const request: ArchiveGraphPurgeRequest = {
+    id: '42',
+    purge_scope: 'account',
+    account_id: '111',
+    archive_upload_id: null,
+    reason: 'delete_user_archive',
+  }
+  const events: string[] = []
+  let plan: ArchiveGraphPurgePlan | undefined
+  let completedIds: string[] = []
+  const ok = await attemptArchiveGraphPurge({
+    request,
+    readStateUnderPolicyLock: async () => {
+      events.push('state')
+      return {
+        requestPending: true,
+        existingUploadIds: ['12'],
+        ownerBlocked: false,
+        maxUploadId: '12',
+        coveredRequestIds: ['43', '44'],
+      }
+    },
+    sink: {
+      purgeGraph: async (value) => {
+        events.push('purge')
+        plan = value
+      },
+    },
+    markCompleted: async (ids) => {
+      events.push('complete')
+      completedIds = ids
+    },
+    markPending: async () => assert.fail('must not remain pending'),
+  })
+  assert.deepEqual(ok, { status: 'completed' })
+  assert.deepEqual(events, ['state', 'purge', 'complete'])
+  assert.deepEqual(plan?.keepUploadIds, ['12'])
+  assert.equal(plan?.maxUploadId, '12')
+  assert.deepEqual(completedIds, ['42', '43', '44'])
+
+  // Already completed by an earlier duplicate: nothing to do.
+  const skipped = await attemptArchiveGraphPurge({
+    request,
+    readStateUnderPolicyLock: async () => ({
+      requestPending: false,
+      existingUploadIds: [],
+      ownerBlocked: false,
+      maxUploadId: '12',
+      coveredRequestIds: [],
+    }),
+    sink: { purgeGraph: async () => assert.fail('must not purge') },
+    markCompleted: async () => assert.fail('must not complete again'),
+    markPending: async () => assert.fail('must not remain pending'),
+  })
+  assert.deepEqual(skipped, { status: 'completed' })
+
+  let pendingCode = ''
+  const failed = await attemptArchiveGraphPurge({
+    request,
+    readStateUnderPolicyLock: async () => ({
+      requestPending: true,
+      existingUploadIds: [],
+      ownerBlocked: false,
+      maxUploadId: '12',
+      coveredRequestIds: ['43'],
+    }),
+    sink: {
+      purgeGraph: async () => {
+        throw new Error('ClickHouse said SENTINEL')
+      },
+    },
+    markCompleted: async () => assert.fail('must not complete'),
+    markPending: async (code) => {
+      pendingCode = code
+    },
+  })
+  assert.equal(failed.status, 'pending')
+  assert.equal(pendingCode, 'archive_clickhouse_graph_purge_failed')
+})
+
+// Opt-in: CLICKHOUSE_TEST_URL=http://127.0.0.1:8123 CLICKHOUSE_TEST_USER=...
+// CLICKHOUSE_TEST_PASSWORD=... against a scratch server with
+// ops/clickhouse-likes-follows/schema.sql applied. Never point it at production.
+const integrationUrl = process.env.CLICKHOUSE_TEST_URL
+test(
+  'ClickHouse purge removes exactly the targeted likes and follows',
+  { skip: !integrationUrl && 'CLICKHOUSE_TEST_URL is not set' },
+  async () => {
+    const sink = new ArchiveClickHouseSink(
+      integrationUrl!,
+      process.env.CLICKHOUSE_TEST_DATABASE || 'community_archive',
+      process.env.CLICKHOUSE_TEST_USER || 'default',
+      process.env.CLICKHOUSE_TEST_PASSWORD || '',
+    )
+    await sink.graphHealthCheck()
+    const owner = '98765432100000001'
+    const ownerArchive = (upload: string, likes: string[], follows: string[]) => ({
+      ...graphArchive,
+      account: [{ account: { ...archive.account[0].account, accountId: owner } }],
+      like: likes.map((tweetId) => ({ like: { tweetId } })),
+      follower: follows.map((accountId) => ({ follower: { accountId } })),
+      following: [],
+      upload,
+    })
+    const write = async (upload: string, likes: string[], follows: string[]) => {
+      const source = ownerArchive(upload, likes, follows)
+      await sink.writeGraphBatch(
+        buildArchiveGraphBatch(source, createArchiveClickHouseManifest(source, upload)),
+      )
+    }
+    const execute = async (sql: string) => {
+      const response = await fetch(integrationUrl!, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${process.env.CLICKHOUSE_TEST_USER || 'default'}:${process.env.CLICKHOUSE_TEST_PASSWORD || ''}`).toString('base64')}`,
+        },
+        body: sql,
+      })
+      assert.equal(response.ok, true, await response.clone().text())
+      return (await response.text()).trim()
+    }
+    const rows = (sql: string) => execute(`${sql} FORMAT TSV`)
+    const liveLikes = () => rows(`
+      SELECT arrayStringConcat(arraySort(groupUniqArray(toString(liked_tweet_id))), ',')
+      FROM community_archive.account_likes FINAL
+      WHERE account_id = ${owner} AND is_tombstone = 0`)
+
+    // Start clean even after an interrupted earlier run.
+    for (const table of ['account_likes', 'account_follows']) {
+      await execute(`ALTER TABLE community_archive.${table} DELETE WHERE account_id = ${owner} SETTINGS mutations_sync = 2`)
+    }
+    await execute(`ALTER TABLE community_archive.liked_tweet_versions DELETE WHERE tweet_id = 77 SETTINGS mutations_sync = 2`)
+
+    // Upload 9001 and 9002 overlap on tweet 2.
+    await write('9001', ['1', '2'], ['11'])
+    await write('9002', ['2', '3'], ['12'])
+    await execute(`INSERT INTO community_archive.liked_tweet_versions
+      (tweet_id, author_account_id, full_text, is_tombstone, source, event_id, observed_at)
+      VALUES (77, ${owner}, 'attributed liked text', 0, 'supabase_graph_backfill', 'pg:liked_tweets:77', now64(3) - 60)`)
+    assert.equal(await liveLikes(), '1,2,3')
+
+    // Deleting one upload keeps edges another retained upload contributes.
+    await sink.purgeGraph({ accountId: owner, archiveUploadId: '9001', keepUploadIds: [], maxUploadId: '9002', purgeLikedTweetAuthor: false, requestId: '1' })
+    assert.equal(await liveLikes(), '2,3')
+
+    // "Delete all" keeps an upload created after the deletion, and one
+    // delivered while the purge runs (above the upload-ID bound).
+    await write('9003', ['4'], [])
+    await write('9004', ['5'], [])
+    await sink.purgeGraph({ accountId: owner, archiveUploadId: null, keepUploadIds: ['9003'], maxUploadId: '9003', purgeLikedTweetAuthor: false, requestId: '2' })
+    assert.equal(await liveLikes(), '4,5')
+
+    // An opt-out removes every row and the liked text the account authored.
+    await sink.purgeGraph({ accountId: owner, archiveUploadId: null, keepUploadIds: [], maxUploadId: '9004', purgeLikedTweetAuthor: true, requestId: '3' })
+    assert.equal(await rows(`SELECT count() FROM community_archive.account_likes WHERE account_id = ${owner}`), '0')
+    assert.equal(await rows(`SELECT count() FROM community_archive.account_follows WHERE account_id = ${owner}`), '0')
+    assert.equal(await rows(`
+      SELECT concat(toString(argMax(is_tombstone, observed_at)), ':', argMax(full_text, observed_at))
+      FROM community_archive.liked_tweet_versions WHERE tweet_id = 77`), '1:')
+    assert.equal(await rows(`SELECT count() FROM community_archive.liked_tweet_versions WHERE tweet_id = 77 AND full_text != ''`), '0')
+
+    // Purges are idempotent once nothing remains.
+    await sink.purgeGraph({ accountId: owner, archiveUploadId: null, keepUploadIds: [], maxUploadId: '9004', purgeLikedTweetAuthor: true, requestId: '3' })
+  },
+)

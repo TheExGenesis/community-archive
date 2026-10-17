@@ -760,16 +760,30 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  v_outer_account_id text := current_setting(
+    'community_archive.policy_tombstone_account_id', true
+  );
 BEGIN
-  -- A nested block write from enforce_policy_account_tombstone only records
-  -- the stable-id association. The outer account trigger already scrubs that
-  -- row, so avoid recursively upserting the same account.
-  IF pg_trigger_depth() > 1 THEN
+  -- tombstone_policy_account backfills this table's username, which re-fires
+  -- this trigger for the account it is already scrubbing. Skip only that
+  -- self-recursion. A block written by another trigger, such as an explicit
+  -- opt-out propagated from public.optin, must still tombstone synchronously,
+  -- so this must not be a pg_trigger_depth() guard.
+  IF v_outer_account_id = NEW.account_id THEN
     RETURN NEW;
   END IF;
 
+  PERFORM set_config(
+    'community_archive.policy_tombstone_account_id', NEW.account_id, true
+  );
   PERFORM public.lock_policy_account(NEW.account_id);
   PERFORM public.tombstone_policy_account(NEW.account_id);
+  PERFORM set_config(
+    'community_archive.policy_tombstone_account_id',
+    COALESCE(v_outer_account_id, ''),
+    true
+  );
   RETURN NEW;
 END;
 $$;

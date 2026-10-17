@@ -30,7 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDistanceToNow } from 'date-fns'
 import { deleteArchive, deleteSingleArchive } from '@/lib/db_insert'
-import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+import { getAccountIdentity } from '@/lib/twitterIdentity'
 import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { updateOptIn } from '@/lib/optInApi'
@@ -60,7 +60,6 @@ export default function ProfileContent({
   initialTweets,
 }: ProfileContentProps) {
   const router = useRouter()
-  const { userMetadata } = useAuthAndArchive()
   const preferenceMutationInFlight = useRef(false)
   const [isPreferenceSaving, setIsPreferenceSaving] = useState(false)
   const [optInStatus, setOptInStatus] = useState(
@@ -102,12 +101,10 @@ export default function ProfileContent({
   const [optOutReason, setOptOutReason] = useState('')
   const supabase = createBrowserClient()
 
-  const twitterUsername =
-    userMetadata?.user_name ||
-    user.user_metadata?.user_name ||
-    user.user_metadata?.preferred_username ||
-    user.user_metadata?.username ||
-    user.app_metadata?.user_name
+  // From the server-verified user's Twitter/X identity or app_metadata, never
+  // the client-writable user_metadata. Lowercase, like the storage folders.
+  const { providerId: ownAccountId, username: twitterUsername } =
+    getAccountIdentity(user)
 
   const beginPreferenceMutation = () => {
     if (preferenceMutationInFlight.current) return false
@@ -136,7 +133,7 @@ export default function ProfileContent({
       }
 
       await updateOptIn({
-        username: twitterUsername.toLowerCase(),
+        username: twitterUsername,
         optedIn: checked,
         termsVersion: 'v1.0',
       })
@@ -194,7 +191,7 @@ export default function ProfileContent({
       const { error: logError } = await supabase
         .from('user_action_log')
         .insert({
-          account_id: userMetadata?.provider_id ?? null,
+          account_id: ownAccountId,
           user_id: user.id,
           action_type,
           // Cast through unknown — Record<string, unknown> is structurally compatible
@@ -217,7 +214,7 @@ export default function ProfileContent({
     }
 
     await updateOptIn({
-      username: twitterUsername.toLowerCase(),
+      username: twitterUsername,
       optedIn: false,
       termsVersion: 'v1.0',
       explicitOptOut: checked,
@@ -284,7 +281,7 @@ export default function ProfileContent({
   // Confirmed from the opt-out modal: persist the hard opt-out before deletion
   // so a partial deletion failure can never leave scraping enabled.
   const confirmOptOutAndDelete = async () => {
-    if (!userMetadata?.provider_id) {
+    if (!ownAccountId) {
       setError('Unable to identify user account')
       return
     }
@@ -302,8 +299,7 @@ export default function ProfileContent({
 
       // persistOptOut() is serviced by the privileged API; the database policy
       // trigger has already synchronously replaced authored rows with tombstones.
-      if (twitterUsername)
-        await deleteStorageFiles(twitterUsername.toLowerCase())
+      if (twitterUsername) await deleteStorageFiles(twitterUsername)
 
       setShowOptOutDialog(false)
       setSuccess('Data deleted and added to explicit opt-out list')
@@ -351,7 +347,7 @@ export default function ProfileContent({
       return
     }
 
-    if (!userMetadata?.provider_id) {
+    if (!ownAccountId) {
       setError('Unable to identify user account')
       return
     }
@@ -361,7 +357,7 @@ export default function ProfileContent({
     setSuccess(null)
 
     try {
-      await deleteSingleArchive(supabase, userMetadata.provider_id, archiveId)
+      await deleteSingleArchive(supabase, ownAccountId, archiveId)
 
       setSuccess('Archive deleted successfully')
       capturePostHogEvent('archive_deleted')
@@ -375,7 +371,7 @@ export default function ProfileContent({
   }
 
   const handleDeleteAllArchives = async () => {
-    if (!userMetadata?.provider_id) {
+    if (!ownAccountId) {
       setError('Unable to identify user account')
       return
     }
@@ -385,8 +381,9 @@ export default function ProfileContent({
     setSuccess(null)
 
     try {
-      await deleteArchive(supabase, userMetadata.provider_id)
-      await deleteStorageFiles(userMetadata.provider_id)
+      await deleteArchive(supabase, ownAccountId)
+      // Archives are stored under the username folder, not the account id.
+      if (twitterUsername) await deleteStorageFiles(twitterUsername)
 
       setShowDeleteAllDialog(false)
       setSuccess('All data deleted successfully')

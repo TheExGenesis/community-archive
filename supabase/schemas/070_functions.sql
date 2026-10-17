@@ -1536,9 +1536,15 @@ BEGIN
     -- Get provider_id from JWT
     SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
     
-    -- Verify the JWT provider_id matches the account_id being deleted, unless postgres/service_role
-    IF (current_role NOT IN ('postgres', 'service_role')) AND 
-       (v_provider_id IS NULL OR v_provider_id != p_account_id) THEN
+    -- Verify the JWT provider_id matches the account_id being deleted, unless
+    -- the caller is service_role or a direct postgres session. current_role is
+    -- always the owner inside SECURITY DEFINER, so identify the caller from the
+    -- request JWT that PostgREST sets on every request instead.
+    IF NOT (
+           COALESCE(auth.jwt()->>'role', '') = 'service_role'
+           OR (COALESCE(auth.jwt(), '{}'::jsonb) = '{}'::jsonb AND session_user = 'postgres')
+       ) AND
+       (v_provider_id IS NULL OR v_provider_id IS DISTINCT FROM p_account_id) THEN
         RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_account_id;
     END IF;
 
@@ -1630,9 +1636,15 @@ BEGIN
     -- Get provider_id from JWT
     SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
 
-    -- Verify the JWT provider_id matches the account_id being deleted, unless postgres/service_role
-    IF (current_role NOT IN ('postgres', 'service_role')) AND
-       (v_provider_id IS NULL OR v_provider_id != p_account_id) THEN
+    -- Verify the JWT provider_id matches the account_id being deleted, unless
+    -- the caller is service_role or a direct postgres session. current_role is
+    -- always the owner inside SECURITY DEFINER, so identify the caller from the
+    -- request JWT that PostgREST sets on every request instead.
+    IF NOT (
+           COALESCE(auth.jwt()->>'role', '') = 'service_role'
+           OR (COALESCE(auth.jwt(), '{}'::jsonb) = '{}'::jsonb AND session_user = 'postgres')
+       ) AND
+       (v_provider_id IS NULL OR v_provider_id IS DISTINCT FROM p_account_id) THEN
         RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_account_id;
     END IF;
 

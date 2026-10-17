@@ -34,6 +34,7 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { updateOptIn } from '@/lib/optInApi'
+import { deleteOwnArchiveFiles } from '@/lib/archiveStorageApi'
 import { updateDownloadArchiveVisibility } from '@/app/user/[account_id]/actions'
 
 interface ProfileContentProps {
@@ -302,8 +303,7 @@ export default function ProfileContent({
 
       // persistOptOut() is serviced by the privileged API; the database policy
       // trigger has already synchronously replaced authored rows with tombstones.
-      if (twitterUsername)
-        await deleteStorageFiles(twitterUsername.toLowerCase())
+      await deleteOwnArchiveFiles()
 
       setShowOptOutDialog(false)
       setSuccess('Data deleted and added to explicit opt-out list')
@@ -320,25 +320,6 @@ export default function ProfileContent({
       )
     } finally {
       setDeletingArchive(null)
-    }
-  }
-
-  const deleteStorageFiles = async (username: string) => {
-    const { data: fileList, error: listError } = await supabase.storage
-      .from('archives')
-      .list(username)
-
-    if (listError) throw listError
-
-    if (fileList && fileList.length > 0) {
-      const filesToDelete = fileList.map(
-        (file: { name: string }) => `${username}/${file.name}`,
-      )
-      const { error: deleteError } = await supabase.storage
-        .from('archives')
-        .remove(filesToDelete)
-
-      if (deleteError) throw deleteError
     }
   }
 
@@ -386,7 +367,7 @@ export default function ProfileContent({
 
     try {
       await deleteArchive(supabase, userMetadata.provider_id)
-      await deleteStorageFiles(userMetadata.provider_id)
+      await deleteOwnArchiveFiles()
 
       setShowDeleteAllDialog(false)
       setSuccess('All data deleted successfully')

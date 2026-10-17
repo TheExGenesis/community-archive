@@ -13,9 +13,10 @@ const originalFetch = global.fetch
 const mockLogInsert = jest.fn().mockResolvedValue({ error: null })
 const mockRpc = jest.fn()
 const mockUpdateDownloadArchiveVisibility = jest.fn()
+const mockRefresh = jest.fn()
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: jest.fn() }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }))
 
 jest.mock('@/hooks/useAuthAndArchive', () => ({
@@ -34,7 +35,6 @@ jest.mock('@/utils/supabase', () => ({
 
 jest.mock('@/lib/db_insert', () => ({
   deleteArchive: jest.fn(),
-  deleteSingleArchive: jest.fn(),
 }))
 
 jest.mock('@/lib/posthog', () => ({
@@ -238,6 +238,51 @@ describe('ProfileContent opt-in preference', () => {
     expect(await screen.findByText('Tweet deleted permanently')).toBeVisible()
     expect(screen.queryByText('A tweet I can remove')).not.toBeInTheDocument()
   })
+
+  it.each([
+    [200, { deleted: true, file: 'removed' }, 'Archive deleted successfully'],
+    [
+      500,
+      {
+        error: 'Archive deleted, but its raw archive file could not be removed',
+        archiveDeleted: true,
+      },
+      'Archive deleted, but its raw archive file could not be removed',
+    ],
+  ])(
+    'deletes one archive and its raw file through the server (HTTP %i)',
+    async (status, body, message) => {
+      const interaction = userEvent.setup()
+      jest.spyOn(window, 'confirm').mockReturnValue(true)
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(body), { status }),
+      )
+
+      render(
+        <ProfileContent
+          user={user}
+          initialOptInData={null}
+          archives={[
+            {
+              id: 42,
+              created_at: '2026-10-01T00:00:00.000Z',
+              accounts: { username: 'ExampleUser', num_tweets: 3 },
+            },
+          ]}
+        />,
+      )
+
+      await interaction.click(screen.getByRole('tab', { name: 'My Archives' }))
+      await interaction.click(screen.getByRole('button', { name: 'Delete' }))
+
+      expect(await screen.findByText(message)).toBeVisible()
+      expect(mockFetch).toHaveBeenCalledWith('/api/archive-uploads/42', {
+        method: 'DELETE',
+      })
+      expect(mockRpc).not.toHaveBeenCalled()
+      expect(mockRefresh).toHaveBeenCalled()
+    },
+  )
 })
 
 test('loads tweets only when the tab is opened, with retry instead of an empty result on failure', async () => {

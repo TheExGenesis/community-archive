@@ -29,7 +29,11 @@ import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDistanceToNow } from 'date-fns'
-import { deleteArchive, deleteSingleArchive } from '@/lib/db_insert'
+import { deleteArchive } from '@/lib/db_insert'
+import {
+  ArchiveUploadDeleteError,
+  deleteArchiveUpload,
+} from '@/lib/archiveUploadApi'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
 import { capturePostHogEvent } from '@/lib/posthog'
@@ -351,17 +355,14 @@ export default function ProfileContent({
       return
     }
 
-    if (!userMetadata?.provider_id) {
-      setError('Unable to identify user account')
-      return
-    }
-
     setDeletingArchive(String(archiveId))
     setError(null)
     setSuccess(null)
 
     try {
-      await deleteSingleArchive(supabase, userMetadata.provider_id, archiveId)
+      // The server derives the owner from the session and also removes the
+      // upload's raw archive file.
+      await deleteArchiveUpload(archiveId)
 
       setSuccess('Archive deleted successfully')
       capturePostHogEvent('archive_deleted')
@@ -369,6 +370,9 @@ export default function ProfileContent({
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to delete archive')
+      if (err instanceof ArchiveUploadDeleteError && err.archiveDeleted) {
+        router.refresh()
+      }
     } finally {
       setDeletingArchive(null)
     }

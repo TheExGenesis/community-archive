@@ -700,21 +700,81 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION private.enqueue_archive_clickhouse_graph_purge(
+  p_purge_scope text,
+  p_account_id text,
+  p_archive_upload_id bigint,
+  p_reason text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  -- ClickHouse stores UInt64 account IDs only. Legacy placeholders such as
+  -- policy_unknown:* cannot own likes or follows there, and must never make
+  -- a deletion or opt-out transaction fail.
+  IF p_account_id IS NULL
+     OR p_account_id !~ '^(0|[1-9][0-9]{0,19})$'
+     OR p_account_id::numeric > 18446744073709551615 THEN
+    RETURN;
+  END IF;
+
+  -- Every deletion gets its own request; requests are idempotent and the
+  -- processor reads current state under the account policy lock when it runs
+  -- one. Never wait for that lock here: API callers run with an 8-second
+  -- lock_timeout, and a deletion must not fail because an upload is being
+  -- processed.
+  INSERT INTO private.archive_clickhouse_graph_purge (
+    purge_scope,
+    account_id,
+    archive_upload_id,
+    reason
+  ) VALUES (
+    p_purge_scope,
+    p_account_id,
+    p_archive_upload_id,
+    p_reason
+  );
+END;
+$$;
+
+ALTER FUNCTION private.enqueue_archive_clickhouse_graph_purge(text, text, bigint, text)
+  OWNER TO postgres;
+REVOKE ALL ON FUNCTION private.enqueue_archive_clickhouse_graph_purge(text, text, bigint, text)
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+
 CREATE OR REPLACE FUNCTION public.apply_policy_block_tombstone()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  v_outer_account_id text := current_setting(
+    'community_archive.policy_tombstone_account_id', true
+  );
 BEGIN
-  -- Avoid recursively applying the same block while tombstone_policy_account
-  -- updates policy-owned rows.
-  IF pg_trigger_depth() > 1 THEN
+  -- tombstone_policy_account backfills this table's username, which re-fires
+  -- this trigger for the account it is already scrubbing. Skip only that
+  -- self-recursion. A block written by another trigger, such as an explicit
+  -- opt-out propagated from public.optin, must still tombstone synchronously,
+  -- so this must not be a pg_trigger_depth() guard.
+  IF v_outer_account_id = NEW.account_id THEN
     RETURN NEW;
   END IF;
 
+  PERFORM set_config(
+    'community_archive.policy_tombstone_account_id', NEW.account_id, true
+  );
   PERFORM public.lock_policy_account(NEW.account_id);
   PERFORM public.tombstone_policy_account(NEW.account_id);
+  PERFORM set_config(
+    'community_archive.policy_tombstone_account_id',
+    COALESCE(v_outer_account_id, ''),
+    true
+  );
   RETURN NEW;
 END;
 $$;
@@ -824,6 +884,12 @@ BEGIN
   DELETE FROM public.following
   WHERE account_id = p_account_id
      OR archive_upload_id = ANY(v_archive_upload_ids);
+
+  -- Remove the account's ClickHouse likes and follows, and tombstone liked
+  -- tweet text it authored, once the archive processor drains this request.
+  PERFORM private.enqueue_archive_clickhouse_graph_purge(
+    'account', p_account_id, NULL, 'policy_tombstone'
+  );
   DELETE FROM public.all_profile WHERE account_id = p_account_id;
   DELETE FROM public.profile_settings WHERE account_id = p_account_id;
   DELETE FROM public.profile_curation WHERE account_id = p_account_id;

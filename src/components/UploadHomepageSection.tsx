@@ -66,8 +66,8 @@ export default function UploadHomepageSection() {
 
   useEffect(() => {
     const fetchArchive = async () => {
-      if (!userMetadata) return
-      const archiveUpload = await fetchArchiveUpload(userMetadata)
+      if (!userMetadata?.provider_id) return
+      const archiveUpload = await fetchArchiveUpload(userMetadata.provider_id)
       console.log({ archiveUpload, userMetadata })
       setState((prev) => ({ ...prev, archiveUpload: archiveUpload || null }))
     }
@@ -106,6 +106,11 @@ export default function UploadHomepageSection() {
   }
 
   const onDeleteArchive = async () => {
+    const accountId = userMetadata?.provider_id
+    if (!accountId) {
+      alert('Unable to identify your account. Please sign in again.')
+      return
+    }
     if (
       window.confirm(
         'Are you sure you want to delete your archive? This action cannot be undone.',
@@ -113,7 +118,7 @@ export default function UploadHomepageSection() {
     ) {
       setState((prev) => ({ ...prev, isDeleting: true }))
       try {
-        await deleteArchive(supabase, userMetadata.provider_id)
+        await deleteArchive(supabase, accountId)
         await deleteOwnArchiveFiles()
         setState((prev) => ({ ...prev, archiveUpload: null }))
         alert('Archive deleted successfully from database and storage')

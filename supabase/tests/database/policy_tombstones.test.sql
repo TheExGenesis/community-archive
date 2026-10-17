@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(16);
+SELECT plan(18);
 
 INSERT INTO public.all_account (
   account_id, created_via, username, created_at, account_display_name
@@ -105,6 +105,43 @@ SELECT is(
    WHERE account_id = '990000000000000003'),
   true,
   'an explicit opt-out synchronously tombstones existing account content'
+);
+
+-- Self-service opt-out updates an existing consent row. Re-blocking an account
+-- already tombstoned earlier in the transaction must not be suppressed.
+UPDATE public.optin
+SET opted_in = true, explicit_optout = false
+WHERE twitter_user_id = '990000000000000003';
+
+UPDATE public.all_account
+SET created_via = 'test', username = '__pgtap_explicit_optout',
+    created_at = now(), account_display_name = 'Opt out test',
+    is_tombstone = false
+WHERE account_id = '990000000000000003';
+
+INSERT INTO public.tweets (
+  tweet_id, account_id, created_at, full_text, favorite_count, retweet_count
+) VALUES (
+  '990000000000000004', '990000000000000003', now(),
+  'content before a later opt-out', 1, 1
+);
+
+UPDATE public.optin
+SET opted_in = false, explicit_optout = true
+WHERE twitter_user_id = '990000000000000003';
+
+SELECT is(
+  (SELECT is_tombstone FROM public.all_account
+   WHERE account_id = '990000000000000003'),
+  true,
+  'an opt-out on an existing consent row synchronously tombstones the account'
+);
+
+SELECT is(
+  (SELECT is_tombstone FROM public.tweets
+   WHERE tweet_id = '990000000000000004'),
+  true,
+  'an opt-out on an existing consent row synchronously tombstones its tweets'
 );
 
 SELECT is(

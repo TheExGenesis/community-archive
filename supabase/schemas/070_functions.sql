@@ -1347,6 +1347,34 @@ GRANT EXECUTE ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) T
 
 COMMENT ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) IS 'Deletes up to 100 tweets only when every ID belongs to the authenticated Twitter account in app_metadata.provider_id.';
 
+-- Daily pg_cron refresh of the legacy global activity snapshot. Backfilled
+-- from production by 20260404173000_schedule_daily_global_activity_summary_refresh.sql.
+-- 20261016203822_restrict_refresh_global_activity_summary_execute.sql revoked
+-- the default EXECUTE grants; the pg_cron job runs as the owner (postgres).
+CREATE OR REPLACE FUNCTION "public"."refresh_global_activity_summary"() RETURNS void
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "statement_timeout" TO '20min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
+    AS $$
+BEGIN
+    BEGIN
+        REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
+    EXCEPTION
+        WHEN OTHERS THEN
+            IF SQLERRM LIKE '%not populated%' THEN
+                REFRESH MATERIALIZED VIEW public.global_activity_summary;
+            ELSE
+                RAISE;
+            END IF;
+    END;
+END;
+$$;
+ALTER FUNCTION "public"."refresh_global_activity_summary"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."refresh_global_activity_summary"() TO "service_role";
+
 
 CREATE OR REPLACE FUNCTION "public"."delete_user_archive"("p_account_id" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1422,6 +1450,13 @@ BEGIN
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,
         v_schema_name, v_schema_name)
         USING v_archive_upload_ids, p_account_id;
+
+        -- ClickHouse keeps archive likes and follows; the archive processor
+        -- removes them once this request is drained (see
+        -- private.archive_clickhouse_graph_purge).
+        PERFORM private.enqueue_archive_clickhouse_graph_purge(
+            'account', p_account_id, NULL, 'delete_user_archive'
+        );
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error deleting archives for account %: %', p_account_id, SQLERRM;
         RAISE;
@@ -1627,6 +1662,14 @@ BEGIN
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,
         v_schema_name)
         USING p_archive_upload_id, p_account_id;
+
+        -- Remove only this upload's ClickHouse likes and follows; edges that a
+        -- retained upload also contains stay (see
+        -- private.archive_clickhouse_graph_purge).
+        PERFORM private.enqueue_archive_clickhouse_graph_purge(
+            'archive_upload', p_account_id, p_archive_upload_id,
+            'delete_single_archive'
+        );
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error deleting archive % for account %: %', p_archive_upload_id, p_account_id, SQLERRM;
         RAISE;
@@ -1635,6 +1678,65 @@ END;
 $_$;
 
 ALTER FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) OWNER TO "postgres";
+
+
+-- =========================
+-- Auth identity claims
+-- =========================
+
+-- Runs as sync_user_meta_data on auth.users (080_triggers.sql). Account
+-- identity comes from the Twitter/X identity, never raw_user_meta_data.
+CREATE OR REPLACE FUNCTION "public"."sync_meta_data"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_app jsonb := COALESCE(NEW.raw_app_meta_data, '{}'::jsonb);
+    v_provider_id text;
+    v_user_name text;
+BEGIN
+    -- GoTrue writes auth.identities from the OAuth provider's response, and
+    -- users cannot edit it.
+    SELECT i.provider_id,
+           COALESCE(NULLIF(i.identity_data->>'user_name', ''),
+                    NULLIF(i.identity_data->>'preferred_username', ''))
+    INTO v_provider_id, v_user_name
+    FROM auth.identities i
+    WHERE i.user_id = NEW.id
+      AND i.provider IN ('twitter', 'x')
+    ORDER BY i.created_at, i.id
+    LIMIT 1;
+
+    IF v_provider_id IS NOT NULL THEN
+        v_app := v_app || jsonb_build_object('provider_id', v_provider_id);
+        IF v_user_name IS NOT NULL THEN
+            v_app := v_app || jsonb_build_object('user_name', v_user_name);
+        END IF;
+    ELSIF TG_OP = 'INSERT' THEN
+        -- GoTrue's OAuth sign-up inserts the user before its identity, with
+        -- raw_user_meta_data set to the provider's claims. app_metadata.provider
+        -- is set by GoTrue, so a client sign-up (provider 'email', 'phone' or
+        -- anonymous) never reaches this branch.
+        IF v_app->>'provider' IN ('twitter', 'x') THEN
+            v_app := v_app || jsonb_strip_nulls(jsonb_build_object(
+                'provider_id', NULLIF(NEW.raw_user_meta_data->>'provider_id', ''),
+                'user_name', NULLIF(NEW.raw_user_meta_data->>'user_name', '')
+            ));
+        END IF;
+    ELSE
+        -- Without a Twitter identity, keep the values the row was created with.
+        v_app := (v_app - 'provider_id' - 'user_name') || jsonb_strip_nulls(jsonb_build_object(
+            'provider_id', OLD.raw_app_meta_data->'provider_id',
+            'user_name', OLD.raw_app_meta_data->'user_name'
+        ));
+    END IF;
+
+    NEW.raw_app_meta_data := v_app;
+    RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."sync_meta_data"() OWNER TO "postgres";
 
 
 -- =========================
@@ -1649,9 +1751,12 @@ DECLARE
     v_account_id TEXT;
 BEGIN
     SELECT a.account_id INTO v_account_id
-    FROM auth.users u
-    JOIN public.account a ON a.account_id = u.raw_user_meta_data->>'provider_id'
-    WHERE u.id = auth.uid();
+    FROM auth.identities i
+    JOIN public.account a ON a.account_id = i.provider_id
+    WHERE i.user_id = auth.uid()
+      AND i.provider IN ('twitter', 'x')
+    ORDER BY i.created_at, i.id
+    LIMIT 1;
 
     RETURN v_account_id;
 END;
@@ -3456,6 +3561,39 @@ GRANT EXECUTE ON FUNCTION "public"."search_user_suggestions"(text, integer)
 -- Private, aggregate-only monitoring bridges for the least-privilege
 -- archive_metrics_exporter role. The functions intentionally expose no user,
 -- account, archive, or free-form metadata labels.
+
+-- Exporter view of the purge backlog. RLS hides the outbox itself, so the
+-- restricted monitoring role reads three aggregates through this function.
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_graph_purge()
+RETURNS TABLE (
+  pending_requests double precision,
+  oldest_pending_age_seconds double precision,
+  max_attempts double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF session_user <> 'archive_metrics_exporter' THEN
+    RAISE EXCEPTION 'monitoring function is restricted'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- queued_at restarts when a backfill replays a request, so a replay does
+  -- not look like an hour-old stall; failed attempts keep their age.
+  RETURN QUERY
+  SELECT
+    COUNT(*)::double precision,
+    COALESCE(EXTRACT(EPOCH FROM (now() - MIN(purge.queued_at))), 0)::double precision,
+    COALESCE(MAX(purge.attempt_count), 0)::double precision
+  FROM private.archive_clickhouse_graph_purge AS purge
+  WHERE purge.purge_state = 'pending';
+END;
+$$;
+
+ALTER FUNCTION private.community_archive_monitoring_graph_purge() OWNER TO postgres;
 
 CREATE OR REPLACE FUNCTION private.community_archive_monitoring_membership()
 RETURNS TABLE (currently_opted_in double precision)

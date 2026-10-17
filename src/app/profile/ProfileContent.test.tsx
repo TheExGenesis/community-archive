@@ -19,17 +19,13 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: jest.fn() }),
 }))
 
-jest.mock('@/hooks/useAuthAndArchive', () => ({
-  useAuthAndArchive: () => ({
-    userMetadata: { user_name: 'ExampleUser', provider_id: 'twitter-123' },
-  }),
-}))
+const mockStorageFrom = jest.fn()
 
 jest.mock('@/utils/supabase', () => ({
   createBrowserClient: () => ({
     from: () => ({ insert: mockLogInsert }),
     rpc: mockRpc,
-    storage: { from: jest.fn() },
+    storage: { from: mockStorageFrom },
   }),
 }))
 
@@ -47,13 +43,22 @@ jest.mock('@/app/user/[account_id]/actions', () => ({
     mockUpdateDownloadArchiveVisibility(...args),
 }))
 
+// user_metadata is client-writable; the component must act on the Twitter
+// identity instead.
 const user = {
   id: 'auth-user-123',
   user_metadata: {
-    user_name: 'ExampleUser',
-    provider_id: 'twitter-123',
+    user_name: 'victim',
+    provider_id: '999',
   },
   app_metadata: {},
+  identities: [
+    {
+      id: '123',
+      provider: 'twitter',
+      identity_data: { provider_id: '123', user_name: 'ExampleUser' },
+    },
+  ],
 } as any
 
 describe('ProfileContent opt-in preference', () => {
@@ -86,6 +91,7 @@ describe('ProfileContent opt-in preference', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Opt out only' }))
       await screen.findByText('Added to explicit opt-out list')
       expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toMatchObject({
+        username: 'exampleuser',
         optedIn: false,
         explicitOptOut: true,
         optOutReason: expected,
@@ -200,6 +206,32 @@ describe('ProfileContent opt-in preference', () => {
     ).toBeVisible()
   })
 
+  it('deletes all data for the Twitter identity account, not user_metadata', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('{"removed":1}', { status: 200 }),
+    )
+    render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
+
+    const interaction = userEvent.setup()
+    await interaction.click(screen.getByRole('tab', { name: 'My Archives' }))
+    await interaction.click(
+      screen.getByRole('button', { name: /delete all your data/i }),
+    )
+    await interaction.click(
+      screen.getByRole('button', { name: 'Delete Everything' }),
+    )
+
+    await screen.findByText('All data deleted successfully')
+    expect(deleteArchive).toHaveBeenCalledWith(expect.anything(), '123')
+    // The server derives the storage folder from the session; the browser
+    // neither names it nor touches Storage.
+    expect(mockFetch).toHaveBeenCalledWith('/api/archive', { method: 'DELETE' })
+    expect(mockStorageFrom).not.toHaveBeenCalled()
+    expect(mockLogInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ account_id: '123' }),
+    )
+  })
+
   it('lets the owner permanently delete one of their tweets', async () => {
     const interaction = userEvent.setup()
     jest.spyOn(window, 'confirm').mockReturnValue(true)
@@ -211,7 +243,7 @@ describe('ProfileContent opt-in preference', () => {
     render(
       <ProfileContent
         user={user}
-        accountId="twitter-123"
+        accountId="123"
         initialOptInData={null}
         archives={[]}
         initialTweets={[
@@ -304,7 +336,7 @@ describe('ProfileContent data deletion', () => {
     expect(
       await screen.findByText('All data deleted successfully'),
     ).toBeVisible()
-    expect(deleteArchive).toHaveBeenCalledWith(expect.anything(), 'twitter-123')
+    expect(deleteArchive).toHaveBeenCalledWith(expect.anything(), '123')
     expect(mockFetch.mock.calls).toEqual([archiveDelete])
     expect(jest.mocked(deleteArchive).mock.invocationCallOrder[0]).toBeLessThan(
       mockFetch.mock.invocationCallOrder[0],

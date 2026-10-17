@@ -12,13 +12,14 @@
     "start:stream": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process_stream.ts",
     "start:copy": "npm run start",
     "smoke:runtime": "node --expose-gc runtime_smoke_test.cjs",
-    "test:archive-clickhouse": "node --import tsx --test archive_clickhouse.test.ts canonical_archive.test.ts",
+    "test:archive-clickhouse": "node --import tsx --test archive_clickhouse.test.ts canonical_archive.test.ts verify_archive_graph.test.ts",
     "run": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process.ts",
     "docker:build": "cd ../../ && docker build -f services/process_archive/Dockerfile -t process-archive .",
     "docker:run": "docker compose run --rm process-archive",
     "docker:run-direct": "docker run --rm --env-file=.env -v $(pwd)/logs:/app/logs -v $(pwd)/data:/app/data process-archive",
     "docker:logs": "tail -f logs/process_archive.log",
-    "docker:exec-logs": "tail -f logs/execution.log"
+    "docker:exec-logs": "tail -f logs/execution.log",
+    "verify:archive-graph": "node --import tsx verify_archive_graph.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.2",

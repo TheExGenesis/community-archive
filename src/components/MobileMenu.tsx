@@ -24,11 +24,7 @@ export default function MobileMenu() {
     userMetadata?.user_name,
     userMetadata?.provider_id,
   )
-  const avatarUrl =
-    userMetadata?.avatar_url ??
-    userMetadata?.picture ??
-    userMetadata?.profile_image_url_https ??
-    userMetadata?.profile_image_url
+  const avatarUrl = userMetadata?.avatar_url
 
   const handleSignOut = async () => {
     capturePostHogEvent('navigation_item_clicked', {

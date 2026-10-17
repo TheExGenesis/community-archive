@@ -3831,6 +3831,44 @@ BEGIN
 END;
 $$;
 
+-- Trusted callers are the service_role JWT and direct database logins, which
+-- have no request JWT and are not PostgREST's authenticator. current_role is
+-- not used: inside a SECURITY DEFINER caller it is the function owner.
+CREATE OR REPLACE FUNCTION private.enforce_archive_upload_owner()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+  v_user_name text := auth.jwt()->'app_metadata'->>'user_name';
+BEGIN
+  IF v_role = 'service_role'
+     OR (v_role IS NULL AND session_user <> 'authenticator') THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND NEW.username IS NOT DISTINCT FROM OLD.username
+     AND NEW.storage_path IS NOT DISTINCT FROM OLD.storage_path THEN
+    RETURN NEW;
+  END IF;
+
+  IF NULLIF(BTRIM(v_user_name), '') IS NULL
+     OR lower(NEW.username) IS DISTINCT FROM lower(v_user_name) THEN
+    RAISE EXCEPTION 'archive upload username does not match the authenticated account'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF NEW.storage_path IS NOT NULL
+     AND split_part(NEW.storage_path, '/', 1) IS DISTINCT FROM lower(NEW.username) THEN
+    RAISE EXCEPTION 'archive storage path is outside the authenticated account folder'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.enforce_archive_upload_owner() OWNER TO postgres;
+
 -- Private dashboard read. No consent or archive data is changed by this function.
 CREATE OR REPLACE FUNCTION public.admin_activity_page(
   p_before_at timestamptz DEFAULT NULL,

@@ -17,11 +17,18 @@
  *   node --import tsx verify_archive_graph.ts --sample 5
  *   node --import tsx verify_archive_graph.ts --account-ids 123,456
  * Exit status: 0 all match, 3 only missing_only accounts, 2 mismatch, 1 error.
+ * Accounts whose upload rows name a different owner than the account's
+ * trusted handle are reported as `skipped_owner_mismatch` and never read.
  */
 import * as dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
-import { archiveStoragePath } from './archive_storage_reference'
+import { lookupTrustedArchiveOwner } from './archive_owner'
+import {
+  ArchiveOwnerError,
+  type ArchiveUploadOwnerRow,
+  trustedArchiveStoragePath,
+} from './archive_storage_reference'
 import { parseArchiveInput } from './archive_storage_input'
 
 dotenv.config({ path: '.env' })
@@ -191,6 +198,34 @@ export function compareAccountGraph(
   return report
 }
 
+/**
+ * Storage paths for an account's uploads, with every folder taken from the
+ * account's trusted handle. Rows whose client-written username names anyone
+ * else are returned instead, and none of the account's objects are read.
+ */
+export function resolveAccountArchivePaths(
+  uploads: readonly (ArchiveUploadOwnerRow & { id: string })[],
+  trustedOwner: string | null,
+):
+  | { status: 'ok'; paths: Map<string, string> }
+  | { status: 'owner_mismatch'; uploadIds: string[]; codes: string[] } {
+  const paths = new Map<string, string>()
+  const rejected: string[] = []
+  const codes = new Set<string>()
+  for (const upload of uploads) {
+    try {
+      paths.set(upload.id, trustedArchiveStoragePath(upload, trustedOwner))
+    } catch (error) {
+      if (!(error instanceof ArchiveOwnerError)) throw error
+      rejected.push(upload.id)
+      codes.add(error.code)
+    }
+  }
+  return rejected.length
+    ? { status: 'owner_mismatch', uploadIds: rejected, codes: [...codes].sort() }
+    : { status: 'ok', paths }
+}
+
 async function main() {
   const options = parseOptions(process.argv.slice(2))
   if (!process.env.POSTGRES_CONNECTION_STRING) throw new Error('POSTGRES_CONNECTION_STRING is required')
@@ -198,6 +233,7 @@ async function main() {
   const storage = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE!).storage
   let mismatches = 0
   let missingOnly = 0
+  let ownerMismatches = 0
   try {
     const accounts = options.accountIds.length
       ? options.accountIds
@@ -217,10 +253,24 @@ async function main() {
         WHERE account_id = ${accountId} AND upload_phase = 'completed'
         ORDER BY id
       `
+      const resolved = resolveAccountArchivePaths(
+        uploads as unknown as (ArchiveUploadOwnerRow & { id: string })[],
+        await lookupTrustedArchiveOwner(sql, accountId),
+      )
+      if (resolved.status !== 'ok') {
+        ownerMismatches += 1
+        console.log(JSON.stringify({
+          account_id: accountId,
+          status: 'skipped_owner_mismatch',
+          codes: resolved.codes,
+          upload_ids: resolved.uploadIds,
+        }))
+        continue
+      }
       const perUpload = new Map<string, EdgeSets>()
       const uploadsByPath = new Map<string, string[]>()
       for (const upload of uploads) {
-        const path = archiveStoragePath(String(upload.username), upload)
+        const path = resolved.paths.get(String(upload.id))!
         uploadsByPath.set(path, [...(uploadsByPath.get(path) ?? []), String(upload.id)])
       }
       // Older uploads that share a legacy path were overwritten by the newest.
@@ -230,7 +280,7 @@ async function main() {
       let skipped = false
       for (const upload of uploads) {
         if (overwritten.has(String(upload.id))) continue
-        const path = archiveStoragePath(String(upload.username), upload)
+        const path = resolved.paths.get(String(upload.id))!
         const { data, error } = await storage.from('archives').download(path)
         if (error) throw new Error(`Archive download failed for upload ${upload.id}`)
         if (data.size > options.maxArchiveMb * 1024 * 1024) {
@@ -258,7 +308,11 @@ async function main() {
   } finally {
     await sql.end()
   }
-  console.log(JSON.stringify({ mismatching_accounts: mismatches, missing_only_accounts: missingOnly }))
+  console.log(JSON.stringify({
+    mismatching_accounts: mismatches,
+    missing_only_accounts: missingOnly,
+    owner_mismatch_accounts: ownerMismatches,
+  }))
   process.exitCode = mismatches ? 2 : missingOnly ? 3 : 0
 }
 

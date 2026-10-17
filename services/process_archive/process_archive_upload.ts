@@ -1,7 +1,12 @@
 import * as dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
-import { archiveStoragePath } from './archive_storage_reference'
+import {
+  ArchiveOwnerError,
+  type ArchiveUploadOwnerRow,
+  trustedArchiveStoragePath,
+} from './archive_storage_reference'
+import { lookupTrustedArchiveOwner } from './archive_owner'
 import { parseArchiveInput } from './archive_storage_input'
 import winston from 'winston'
 import type { Logform } from 'winston'
@@ -855,24 +860,45 @@ export class ArchiveUploadProcessor {
   }
 }
 
-// Twitter handle rules: 1-15 chars, alphanumerics and underscore only.
-// Used as a chokepoint validator before any path/URL construction to prevent
-// path traversal (e.g. `../foo`) or other injection via the archive_upload.username
-// column. Applied to both the dev filesystem branch and the Supabase Storage
-// branch (defense in depth — do not rely on Storage's rejection of `..`).
-const TWITTER_USERNAME_REGEX = /^[A-Za-z0-9_]{1,15}$/
-
-function assertValidUsername(username: string): void {
-  if (typeof username !== 'string' || !TWITTER_USERNAME_REGEX.test(username)) {
-    throw new Error(
-      `Invalid username for archive path construction: ${JSON.stringify(username)} (must match ${TWITTER_USERNAME_REGEX})`
-    )
+// archive_upload.username and storage_path are written by the uploading
+// client. The Storage folder is read with the service role, so it must come
+// from the account's trusted handle (archive_owner.ts); the row's username is
+// only accepted when it names that same handle. trustedArchiveStoragePath also
+// validates the handle before any path/URL construction (no `../`), for both
+// the dev filesystem branch and the Supabase Storage branch.
+async function resolveArchiveObject(
+  sql: Sql,
+  upload: ArchiveUploadOwnerRow,
+  archiveUploadId: string | number | null | undefined,
+): Promise<{ owner: string; objectPath: string }> {
+  try {
+    const accountId = upload.account_id == null ? '' : String(upload.account_id)
+    const trustedOwner = accountId
+      ? await lookupTrustedArchiveOwner(sql, accountId)
+      : null
+    const objectPath = trustedArchiveStoragePath(upload, trustedOwner)
+    return { owner: objectPath.split('/')[0], objectPath }
+  } catch (error) {
+    if (error instanceof ArchiveOwnerError) {
+      logger.error(
+        `Archive owner check failed (archive_upload_id=${archiveUploadId ?? 'unknown'}, code=${error.code}): ${error.message}`,
+      )
+    }
+    throw error
   }
 }
 
-async function loadArchiveData(username: string, reference?: Partial<ArchiveClickHouseDelivery>): Promise<any> {
-  assertValidUsername(username)
-  const objectPath = archiveStoragePath(username, reference)
+async function loadArchiveData(
+  sql: Sql,
+  upload: ArchiveUploadOwnerRow,
+  archiveUploadId: string | number | null | undefined,
+): Promise<any> {
+  const reference = upload as Partial<ArchiveClickHouseDelivery>
+  const { owner: username, objectPath } = await resolveArchiveObject(
+    sql,
+    upload,
+    archiveUploadId,
+  )
   if (CONFIG.DEV_ARCHIVE_PATH) {
     const archivePath = path.join(CONFIG.DEV_ARCHIVE_PATH, objectPath)
     logger.debug(`Reading archive from filesystem: ${archivePath}`)
@@ -1070,7 +1096,9 @@ async function buildPolicySafeCanonicalArchiveBatch(
       const source =
         archive ??
         (delivery.username
-          ? patchArchive(await loadArchiveData(delivery.username, delivery))
+          ? patchArchive(
+              await loadArchiveData(trx, delivery, delivery.archive_upload_id),
+            )
           : null)
       if (!source) {
         throw new ArchiveClickHouseError('archive_source_unavailable')
@@ -1211,7 +1239,20 @@ async function attemptClickHouseDelivery(
   const result = await attemptArchiveClickHouseDelivery({
     delivery,
     archive,
-    loadArchive: async (username) => patchArchive(await loadArchiveData(username, delivery)),
+    // The callback's username argument is the row's client-written value;
+    // the object is resolved from the account's trusted handle instead.
+    loadArchive: async () => {
+      try {
+        return patchArchive(
+          await loadArchiveData(sql, delivery, delivery.archive_upload_id),
+        )
+      } catch (error) {
+        if (error instanceof ArchiveOwnerError) {
+          throw new ArchiveClickHouseError(error.code)
+        }
+        throw error
+      }
+    },
     sink,
     withOwnerPolicyLock: async (accountId, operation) => {
       await sql.begin(async (trx: Sql) => {
@@ -1528,7 +1569,18 @@ async function main() {
           continue
         }
 
-        const archive = await loadArchiveData(username, row)
+        const archive = await loadArchiveData(sql, row, archiveUploadId)
+        // The archive file is client-written too: it may only write the
+        // account that owns the upload row (RLS binds account_id to the JWT).
+        if (
+          String(archive?.account?.[0]?.account?.accountId ?? '') !==
+          String(account_id)
+        ) {
+          logger.error(
+            `Archive owner check failed (archive_upload_id=${archiveUploadId}, code=archive_account_mismatch): the archive's account id does not match the upload row`,
+          )
+          throw new Error('Archive account id does not match the upload row')
+        }
         const archiveManifest = createArchiveClickHouseManifest(
           archive,
           archiveUploadId,

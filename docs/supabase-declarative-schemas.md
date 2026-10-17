@@ -51,7 +51,12 @@ Local Verification Loop
   - `supabase db diff` seeds the declarative files into a shadow database and compares them with the migration history (add `-f verify_noop` only if you want the output written as a migration)
   - Expect: “No schema changes found”. If not, align the declarative files to the migration history, or fix duplicates or order.
   - Use Supabase CLI v2 (for example the globally installed `supabase`). The `supabase` 1.x devDependency behind `pnpm supabase` ignores `schema_paths` and reports “No schema changes found” whatever the declarative files say.
-  - The diff reports base-table grants but has missed function EXECUTE, sequence, view, and schema privilege differences. It also ignores comments, column order, the `dev` and `storage` schemas, and pg_cron jobs. After privilege changes, compare those catalogs against the migration-built database separately.
+  - The diff reports base-table grants but has missed function EXECUTE, view, materialized view, sequence, and schema USAGE differences (CLI 2.39.2), so a no‑op diff does not prove privileges match. It also ignores comments, column order, the `dev` and `storage` schemas, and pg_cron jobs.
+- Verify privilege changes (GRANT/REVOKE, default privileges) by comparing ACLs:
+  - Start a bare `public.ecr.aws/supabase/postgres:<tag>` container, using the local stack's image tag.
+  - As `supabase_admin`, replace its `auth` and `storage` schemas with a `pg_dump --schema-only -n auth -n storage` of the migration-built local DB, with `CREATE POLICY` lines removed.
+  - As `postgres`, run each `schema_paths` file in order with `psql`, and check the output for errors.
+  - Compare `pg_proc.proacl`, `pg_class.relacl`, and `pg_namespace.nspacl` for the app schemas (`public`, `private`, `tes`, `ca_website`, `ca_autorefresh`, `temp`, `bulletin`) between that container and the migration-built DB. Sort each ACL's entries before comparing. Any difference is privilege drift.
 - Update generated TS types if schema changed:
   - Remote types: `pnpm gen-types`
   - Local types: `pnpm dev:gen-types`

@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(21);
+SELECT plan(23);
 
 -- Users:
 --   ...401 Alice    Twitter account 990000000000000401
@@ -132,30 +132,32 @@ SELECT ok(
   'a user without a Twitter identity cannot claim an account by updating user_metadata'
 );
 
-UPDATE auth.users
-SET raw_app_meta_data = raw_app_meta_data
-  || '{"provider_id":"990000000000000401","user_name":"alicetw"}'::jsonb
-WHERE id = '00000000-0000-4000-8000-000000000402';
-
-SELECT ok(
-  (SELECT NOT (raw_app_meta_data ?| ARRAY['provider_id', 'user_name'])
-   FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000402'),
-  'the callback''s app_metadata copy cannot claim an account without a Twitter identity'
-);
-
--- dev-login: auth.admin.createUser({ app_metadata: { provider_id, user_name } })
+-- dev-login: auth.admin.createUser({ user_metadata, app_metadata }). GoTrue
+-- inserts the user with its own app_metadata, then applies the requested
+-- app_metadata with an UPDATE.
 INSERT INTO auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 VALUES (
   '00000000-0000-4000-8000-000000000403', 'authenticated', 'authenticated', 'alice_dev@example.test',
-  '{"provider":"email","providers":["email"],"provider_id":"mock_alice","user_name":"alice_dev"}',
+  '{"provider":"email","providers":["email"]}',
   '{"provider_id":"mock_alice","user_name":"alice_dev"}',
   now(), now()
 );
 
+SELECT ok(
+  (SELECT NOT (raw_app_meta_data ?| ARRAY['provider_id', 'user_name'])
+   FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000403'),
+  'a service-role-created user gets no account from user_metadata on INSERT'
+);
+
+UPDATE auth.users
+SET raw_app_meta_data = raw_app_meta_data
+  || '{"provider":"staging","provider_id":"mock_alice","user_name":"alice_dev"}'::jsonb
+WHERE id = '00000000-0000-4000-8000-000000000403';
+
 SELECT is(
-  (SELECT raw_app_meta_data->>'provider_id' FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000403'),
-  'mock_alice',
-  'a service-role-created user keeps the provider_id it was created with'
+  (SELECT raw_app_meta_data FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000403'),
+  '{"provider":"staging","providers":["email"],"provider_id":"mock_alice","user_name":"alice_dev"}'::jsonb,
+  'an admin app_metadata update on a user without a Twitter identity is kept'
 );
 
 UPDATE auth.users
@@ -168,13 +170,37 @@ WHERE id = '00000000-0000-4000-8000-000000000403';
 SELECT is(
   (SELECT raw_app_meta_data->>'provider_id' FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000403'),
   'mock_alice',
-  'later updates cannot move a service-role-created user to another account'
+  'rewriting user_metadata.provider_id does not move a service-role-created user to another account'
 );
 
 SELECT is(
   (SELECT raw_app_meta_data->>'birdseye_share' FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000403'),
   'public',
   'unrelated app_metadata writes still apply'
+);
+
+-- auth.admin.updateUserById(id, { app_metadata: { provider_id, user_name } })
+UPDATE auth.users
+SET raw_app_meta_data = raw_app_meta_data
+  || '{"provider_id":"mock_bob","user_name":"bob_dev"}'::jsonb
+WHERE id = '00000000-0000-4000-8000-000000000403';
+
+SELECT is(
+  (SELECT raw_app_meta_data->>'provider_id' FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000403'),
+  'mock_bob',
+  'an admin can reassign app_metadata.provider_id on a user without a Twitter identity'
+);
+
+-- supabase.auth.updateUser({ data }) writes raw_user_meta_data only.
+UPDATE auth.users
+SET raw_user_meta_data = raw_user_meta_data
+  || '{"provider_id":"990000000000000401","user_name":"AliceTw"}'::jsonb
+WHERE id = '00000000-0000-4000-8000-000000000403';
+
+SELECT is(
+  (SELECT raw_app_meta_data->>'user_name' FROM auth.users WHERE id = '00000000-0000-4000-8000-000000000403'),
+  'bob_dev',
+  'rewriting user_metadata after an admin write does not change app_metadata'
 );
 
 -- The previous trigger returned NULL app_metadata when a claim was missing.

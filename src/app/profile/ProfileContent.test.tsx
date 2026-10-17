@@ -19,16 +19,13 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: jest.fn() }),
 }))
 
-const mockStorageList = jest.fn()
-const mockStorageRemove = jest.fn()
+const mockStorageFrom = jest.fn()
 
 jest.mock('@/utils/supabase', () => ({
   createBrowserClient: () => ({
     from: () => ({ insert: mockLogInsert }),
     rpc: mockRpc,
-    storage: {
-      from: () => ({ list: mockStorageList, remove: mockStorageRemove }),
-    },
+    storage: { from: mockStorageFrom },
   }),
 }))
 
@@ -210,11 +207,9 @@ describe('ProfileContent opt-in preference', () => {
   })
 
   it('deletes all data for the Twitter identity account, not user_metadata', async () => {
-    mockStorageList.mockResolvedValue({
-      data: [{ name: 'archive.json' }],
-      error: null,
-    })
-    mockStorageRemove.mockResolvedValue({ error: null })
+    mockFetch.mockResolvedValueOnce(
+      new Response('{"removed":1}', { status: 200 }),
+    )
     render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
 
     const interaction = userEvent.setup()
@@ -228,8 +223,10 @@ describe('ProfileContent opt-in preference', () => {
 
     await screen.findByText('All data deleted successfully')
     expect(deleteArchive).toHaveBeenCalledWith(expect.anything(), '123')
-    expect(mockStorageList).toHaveBeenCalledWith('exampleuser')
-    expect(mockStorageRemove).toHaveBeenCalledWith(['exampleuser/archive.json'])
+    // The server derives the storage folder from the session; the browser
+    // neither names it nor touches Storage.
+    expect(mockFetch).toHaveBeenCalledWith('/api/archive', { method: 'DELETE' })
+    expect(mockStorageFrom).not.toHaveBeenCalled()
     expect(mockLogInsert).toHaveBeenCalledWith(
       expect.objectContaining({ account_id: '123' }),
     )
@@ -304,4 +301,107 @@ test('loads tweets only when the tab is opened, with retry instead of an empty r
   await userEvent.click(screen.getByRole('tab', { name: 'Privacy Settings' }))
   await userEvent.click(screen.getByRole('tab', { name: 'My Tweets' }))
   expect(mockGetOwnLatestTweets).toHaveBeenCalledTimes(2)
+})
+
+describe('ProfileContent data deletion', () => {
+  const archiveDelete = ['/api/archive', { method: 'DELETE' }]
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    global.fetch = mockFetch
+  })
+
+  afterAll(() => {
+    global.fetch = originalFetch
+  })
+
+  const deleteAllYourData = async () => {
+    render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
+    await userEvent.click(screen.getByRole('tab', { name: 'My Archives' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete All Your Data' }),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete Everything' }),
+    )
+  }
+
+  it('Delete All Your Data deletes the rows, then every archive file', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('{"removed":3}', { status: 200 }),
+    )
+
+    await deleteAllYourData()
+
+    expect(
+      await screen.findByText('All data deleted successfully'),
+    ).toBeVisible()
+    expect(deleteArchive).toHaveBeenCalledWith(expect.anything(), '123')
+    expect(mockFetch.mock.calls).toEqual([archiveDelete])
+    expect(jest.mocked(deleteArchive).mock.invocationCallOrder[0]).toBeLessThan(
+      mockFetch.mock.invocationCallOrder[0],
+    )
+  })
+
+  it('Delete All Your Data reports archive files that were not deleted', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('{"error":"Failed to delete archive files"}', {
+        status: 500,
+      }),
+    )
+
+    await deleteAllYourData()
+
+    expect(
+      await screen.findByText('Failed to delete archive files'),
+    ).toBeVisible()
+    expect(
+      screen.queryByText('All data deleted successfully'),
+    ).not.toBeInTheDocument()
+  })
+
+  const optOutAndDelete = async () => {
+    render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
+    fireEvent.click(screen.getByRole('switch', { name: /explicit opt-out/i }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Opt out and delete everything' }),
+    )
+  }
+
+  it('opt out and delete saves the opt-out before deleting archive files', async () => {
+    mockFetch
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(new Response('{"removed":2}', { status: 200 }))
+
+    await optOutAndDelete()
+
+    expect(
+      await screen.findByText(
+        'Data deleted and added to explicit opt-out list',
+      ),
+    ).toBeVisible()
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/opt-in')
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toMatchObject({
+      explicitOptOut: true,
+    })
+    expect(mockFetch.mock.calls[1]).toEqual(archiveDelete)
+  })
+
+  it('opt out and delete reports archive files that were not deleted', async () => {
+    mockFetch
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response('{"error":"Failed to delete archive files"}', {
+          status: 500,
+        }),
+      )
+
+    await optOutAndDelete()
+
+    expect(
+      await screen.findByText(
+        'Opt-out saved and scraping blocked, but data deletion failed: Failed to delete archive files',
+      ),
+    ).toBeVisible()
+  })
 })

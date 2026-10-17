@@ -1594,6 +1594,13 @@ BEGIN
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,
         v_schema_name, v_schema_name)
         USING v_archive_upload_ids, p_account_id;
+
+        -- ClickHouse keeps archive likes and follows; the archive processor
+        -- removes them once this request is drained (see
+        -- private.archive_clickhouse_graph_purge).
+        PERFORM private.enqueue_archive_clickhouse_graph_purge(
+            'account', p_account_id, NULL, 'delete_user_archive'
+        );
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error deleting archives for account %: %', p_account_id, SQLERRM;
         RAISE;
@@ -1689,6 +1696,14 @@ BEGIN
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,
         v_schema_name)
         USING p_archive_upload_id, p_account_id;
+
+        -- Remove only this upload's ClickHouse likes and follows; edges that a
+        -- retained upload also contains stay (see
+        -- private.archive_clickhouse_graph_purge).
+        PERFORM private.enqueue_archive_clickhouse_graph_purge(
+            'archive_upload', p_account_id, p_archive_upload_id,
+            'delete_single_archive'
+        );
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error deleting archive % for account %: %', p_archive_upload_id, p_account_id, SQLERRM;
         RAISE;
@@ -3594,6 +3609,39 @@ GRANT EXECUTE ON FUNCTION public.resolve_directory_identity(text)
 -- archive_metrics_exporter role. The functions intentionally expose no user,
 -- account, archive, or free-form metadata labels.
 
+-- Exporter view of the purge backlog. RLS hides the outbox itself, so the
+-- restricted monitoring role reads three aggregates through this function.
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_graph_purge()
+RETURNS TABLE (
+  pending_requests double precision,
+  oldest_pending_age_seconds double precision,
+  max_attempts double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF session_user <> 'archive_metrics_exporter' THEN
+    RAISE EXCEPTION 'monitoring function is restricted'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- queued_at restarts when a backfill replays a request, so a replay does
+  -- not look like an hour-old stall; failed attempts keep their age.
+  RETURN QUERY
+  SELECT
+    COUNT(*)::double precision,
+    COALESCE(EXTRACT(EPOCH FROM (now() - MIN(purge.queued_at))), 0)::double precision,
+    COALESCE(MAX(purge.attempt_count), 0)::double precision
+  FROM private.archive_clickhouse_graph_purge AS purge
+  WHERE purge.purge_state = 'pending';
+END;
+$$;
+
+ALTER FUNCTION private.community_archive_monitoring_graph_purge() OWNER TO postgres;
+
 CREATE OR REPLACE FUNCTION private.community_archive_monitoring_membership()
 RETURNS TABLE (currently_opted_in double precision)
 LANGUAGE plpgsql
@@ -3678,6 +3726,8 @@ REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
   FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_activity_day(integer)
   FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_graph_purge()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 DO $$
 BEGIN
@@ -3692,6 +3742,9 @@ BEGIN
       TO archive_metrics_exporter;
     GRANT EXECUTE
       ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_graph_purge()
       TO archive_metrics_exporter;
   END IF;
 END;

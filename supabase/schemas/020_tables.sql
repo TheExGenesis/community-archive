@@ -128,6 +128,32 @@ ALTER TABLE "private"."archive_clickhouse_delivery" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE "private"."archive_clickhouse_delivery" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
 COMMENT ON TABLE "private"."archive_clickhouse_delivery" IS 'Content-free stable-ID retry control for independent new archive ClickHouse delivery; never a source for content reconstruction or historical backfill.';
 
+CREATE TABLE IF NOT EXISTS "private"."archive_clickhouse_graph_purge" (
+    "id" bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+    "purge_scope" "text" NOT NULL,
+    "account_id" "text" NOT NULL,
+    "archive_upload_id" bigint,
+    "reason" "text" NOT NULL,
+    "purge_state" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "attempt_count" integer DEFAULT 0 NOT NULL,
+    "last_error_code" "text",
+    "next_attempt_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "completed_at" timestamp with time zone,
+    "queued_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "archive_clickhouse_graph_purge_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "archive_clickhouse_graph_purge_account_id_check" CHECK (("account_id" ~ '^(0|[1-9][0-9]*)$'::"text")),
+    CONSTRAINT "archive_clickhouse_graph_purge_scope_check" CHECK (((("purge_scope" = 'account'::"text") AND ("archive_upload_id" IS NULL) AND ("reason" = ANY (ARRAY['delete_user_archive'::"text", 'policy_tombstone'::"text"]))) OR (("purge_scope" = 'archive_upload'::"text") AND ("archive_upload_id" IS NOT NULL) AND ("reason" = 'delete_single_archive'::"text")))),
+    CONSTRAINT "archive_clickhouse_graph_purge_state_check" CHECK (("purge_state" = ANY (ARRAY['pending'::"text", 'completed'::"text"]))),
+    CONSTRAINT "archive_clickhouse_graph_purge_attempt_count_check" CHECK (("attempt_count" >= 0)),
+    CONSTRAINT "archive_clickhouse_graph_purge_error_code_check" CHECK ((("last_error_code" IS NULL) OR ("last_error_code" ~ '^[a-z0-9_]{1,80}$'::"text")))
+);
+ALTER TABLE "private"."archive_clickhouse_graph_purge" OWNER TO "postgres";
+ALTER TABLE "private"."archive_clickhouse_graph_purge" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "private"."archive_clickhouse_graph_purge" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+COMMENT ON TABLE "private"."archive_clickhouse_graph_purge" IS 'Content-free outbox of archive likes/follows deletions for the ClickHouse projection; drained by the archive processor under the account policy lock.';
+
 -- Content-free commit receipts and entity ordering guards for the independent
 -- canonical PostgreSQL queue consumer. These tables are intentionally private
 -- and unavailable to every Data API role, including service_role.

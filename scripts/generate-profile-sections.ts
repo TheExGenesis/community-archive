@@ -101,10 +101,12 @@ async function selectAccounts(
     : await supabase<Account[]>(
         `account?${select}&order=num_followers.desc.nullslast&limit=${TOP}`,
       )
+  // Includes come from the directory so opted-in accounts without an
+  // uploaded archive (absent from `account`) can be sectioned too.
   const included =
     !BACKFILL && INCLUDE.length
       ? await supabase<Account[]>(
-          `account?${select}&username=in.(${INCLUDE.join(',')})`,
+          `user_directory?${select}&username=in.(${INCLUDE.join(',')})`,
         )
       : []
   const current: Account[] = []

@@ -22730,6 +22730,130 @@
         }
       }
     },
+    "1549539284285374469": {
+      "username": "maebichka",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-10-16T19:47:48.372Z",
+          "bangers": 9,
+          "generationSource": "bangers",
+          "misfitsPrunedAt": "2026-10-16T19:51:04.975Z",
+          "sections": [
+            {
+              "slug": "finding-my-people-based-on-vibes",
+              "label": "vibecamp",
+              "title": "Finding My People Based On Vibes",
+              "tweetIds": [
+                "1634768068177010689",
+                "1668089785607495680",
+                "1670539950763245573"
+              ]
+            },
+            {
+              "slug": "tickets-for-vibehole-are-now-live",
+              "label": "vibehole tickets",
+              "title": "tickets for vibehole are now LIVE",
+              "tweetIds": [
+                "1707425152357564584",
+                "1712980765904892127"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-10-16T19:45:16.742Z",
+          "bangers": 13,
+          "generationSource": "bangers",
+          "misfitsPrunedAt": "2026-10-16T19:51:04.384Z",
+          "sections": [
+            {
+              "slug": "come-to-dancehole",
+              "label": "dancing",
+              "title": "come to Dancehole",
+              "tweetIds": [
+                "1771524651547517186",
+                "1798467456563904795",
+                "1813524752016810255"
+              ]
+            },
+            {
+              "slug": "magical-things-it-is-actually-possible-t",
+              "label": "self-improvement",
+              "title": "magical things it is actually possible to teach yourself",
+              "tweetIds": [
+                "1857656850537214119",
+                "1855030818676392018",
+                "1871030472119287915"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-10-16T19:47:48.466Z",
+          "bangers": 8,
+          "generationSource": "bangers",
+          "misfitsPrunedAt": "2026-10-16T19:51:04.244Z",
+          "sections": [
+            {
+              "slug": "twitter-is-split-between-poasters",
+              "label": "online behavior",
+              "title": "twitter is split between poasters",
+              "tweetIds": [
+                "1911014658883920245",
+                "1890462393039462807"
+              ]
+            },
+            {
+              "slug": "excesses-and-dangers-of-agencymaxxing",
+              "label": "agency and yang",
+              "title": "excesses and dangers of agencymaxxing",
+              "tweetIds": [
+                "1891427323015999752",
+                "1920481944090845489"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-10-16T19:45:18.907Z",
+          "bangers": 18,
+          "generationSource": "bangers",
+          "misfitsPrunedAt": "2026-10-16T19:51:04.933Z",
+          "sections": [
+            {
+              "slug": "art-is-like-pooping",
+              "label": "art and creativity",
+              "title": "ART IS LIKE POOPING",
+              "tweetIds": [
+                "2033695936543703360",
+                "2037595776520495491",
+                "2102104603643064576"
+              ]
+            },
+            {
+              "slug": "tell-me-what-a-life-with-you-will-look-l",
+              "label": "relationships and desire",
+              "title": "tell me what a life with you will look like",
+              "tweetIds": [
+                "2078508512192196917",
+                "2078607859550466214",
+                "2090584300458565813"
+              ]
+            },
+            {
+              "slug": "aliveness-is-about-tension-and-release",
+              "label": "self-improvement and embodiment",
+              "title": "Aliveness is about tension and release",
+              "tweetIds": [
+                "2038607555652448362",
+                "2076722669685239851",
+                "2037910721946587598"
+              ]
+            }
+          ]
+        }
+      }
+    },
     "1159211693546885120": {
       "username": "mechanical_monk",
       "years": {

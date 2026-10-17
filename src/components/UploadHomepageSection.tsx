@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { deleteArchive } from '../lib/db_insert'
+import { deleteOwnArchiveFiles } from '@/lib/archiveStorageApi'
 import { createBrowserClient } from '@/utils/supabase'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { FileUploadDialog } from './file-upload-dialog'
@@ -10,8 +11,6 @@ import { devLog } from '@/lib/devLog'
 import { fetchArchiveUpload } from '@/lib/queries/fetchArchiveUpload'
 import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
 import { handleFileUpload } from '@/lib/upload-archive/handleFileUpload'
-import { SupabaseClient } from '@supabase/supabase-js'
-import { Database } from '@/database-types'
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -67,8 +66,8 @@ export default function UploadHomepageSection() {
 
   useEffect(() => {
     const fetchArchive = async () => {
-      if (!userMetadata) return
-      const archiveUpload = await fetchArchiveUpload(userMetadata)
+      if (!userMetadata?.provider_id) return
+      const archiveUpload = await fetchArchiveUpload(userMetadata.provider_id)
       console.log({ archiveUpload, userMetadata })
       setState((prev) => ({ ...prev, archiveUpload: archiveUpload || null }))
     }
@@ -107,6 +106,11 @@ export default function UploadHomepageSection() {
   }
 
   const onDeleteArchive = async () => {
+    const accountId = userMetadata?.provider_id
+    if (!accountId) {
+      alert('Unable to identify your account. Please sign in again.')
+      return
+    }
     if (
       window.confirm(
         'Are you sure you want to delete your archive? This action cannot be undone.',
@@ -114,8 +118,8 @@ export default function UploadHomepageSection() {
     ) {
       setState((prev) => ({ ...prev, isDeleting: true }))
       try {
-        await deleteArchive(supabase, userMetadata.provider_id)
-        await deleteStorageFiles(supabase, userMetadata.provider_id)
+        await deleteArchive(supabase, accountId)
+        await deleteOwnArchiveFiles()
         setState((prev) => ({ ...prev, archiveUpload: null }))
         alert('Archive deleted successfully from database and storage')
         window.location.reload()
@@ -231,26 +235,4 @@ export default function UploadHomepageSection() {
       </div>
     )
   )
-}
-
-const deleteStorageFiles = async (
-  supabase: SupabaseClient<Database>,
-  username: string,
-) => {
-  const { data: fileList, error: listError } = await supabase.storage
-    .from('archives')
-    .list(username)
-
-  if (listError) throw listError
-
-  if (fileList && fileList.length > 0) {
-    const filesToDelete = fileList.map(
-      (file: { name: string }) => `${username}/${file.name}`,
-    )
-    const { error: deleteError } = await supabase.storage
-      .from('archives')
-      .remove(filesToDelete)
-
-    if (deleteError) throw deleteError
-  }
 }

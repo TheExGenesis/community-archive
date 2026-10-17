@@ -18,6 +18,10 @@ CREATE OR REPLACE TRIGGER "update_digest_email_subscriptions_updated_at" BEFORE 
 
 CREATE OR REPLACE TRIGGER "update_optin_timestamp" BEFORE INSERT OR UPDATE ON "public"."optin" FOR EACH ROW EXECUTE FUNCTION "public"."update_optin_updated_at"();
 
+-- Production created this trigger outside migrations; see
+-- 20261016192016_trust_twitter_identity_for_account_claims.sql.
+CREATE OR REPLACE TRIGGER "sync_user_meta_data" BEFORE INSERT OR UPDATE ON "auth"."users" FOR EACH ROW EXECUTE FUNCTION "public"."sync_meta_data"();
+
 CREATE OR REPLACE TRIGGER "propagate_explicit_optout_scrape_block" AFTER INSERT OR UPDATE OF "explicit_optout", "twitter_user_id", "username" ON "public"."optin" FOR EACH ROW EXECUTE FUNCTION "public"."propagate_explicit_optout_scrape_block"();
 
 CREATE OR REPLACE TRIGGER "update_tweet_media_updated_at" BEFORE UPDATE ON "public"."tweet_media" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
@@ -32,6 +36,7 @@ CREATE OR REPLACE TRIGGER "update_tweets_updated_at" BEFORE UPDATE ON "public"."
 CREATE OR REPLACE TRIGGER "update_user_mentions_updated_at" BEFORE UPDATE ON "public"."user_mentions" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 CREATE OR REPLACE TRIGGER "update_archive_clickhouse_delivery_updated_at" BEFORE UPDATE ON "private"."archive_clickhouse_delivery" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+CREATE OR REPLACE TRIGGER "update_archive_clickhouse_graph_purge_updated_at" BEFORE UPDATE ON "private"."archive_clickhouse_graph_purge" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 CREATE OR REPLACE TRIGGER "update_tes_blocked_scraping_timestamp" BEFORE UPDATE ON "tes"."blocked_scraping_users" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 

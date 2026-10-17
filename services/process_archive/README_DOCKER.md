@@ -54,6 +54,17 @@ Existing rows with both reference fields null retain the legacy
 mutable inputs. The existing admin deletion worker already recursively removes
 the owner's archive folder, including immutable upload objects.
 
+`archive_upload.username` and `storage_path` are written by the uploading
+client, so the worker never takes the Storage folder from them. It reads the
+account's handle from its Twitter/X identity in `auth.identities` (or
+`app_metadata` for an auth user without one) and fails the job, logging
+`Archive owner check failed (... code=archive_owner_mismatch)`, when the row's
+username differs from that handle case-insensitively. A row whose account has
+no trusted handle fails with `archive_owner_unverified`. Legacy rows resolve to
+`<trusted-handle>/archive.json`. The archive's own `accountId` must also equal
+the row's `account_id`. Migration `20261017165014_bind_archive_upload_owner`
+adds the matching database check for rows written by signed-in users.
+
 Deploy migration `20260907031822_pin_immutable_archive_inputs` first, then this
 worker, then the upload/download frontend. Validate an isolated staged upload
 and retry before production promotion. Keep a worker that understands pinned

@@ -58,6 +58,11 @@ CREATE OR REPLACE TRIGGER trg_log_archive_upload_event
 CREATE TRIGGER preserve_archive_storage_reference
 BEFORE UPDATE ON public.archive_upload FOR EACH ROW
 EXECUTE FUNCTION private.preserve_archive_storage_reference();
+
+-- Rows a user writes must name the caller's own handle and folder.
+CREATE OR REPLACE TRIGGER enforce_archive_upload_owner
+BEFORE INSERT OR UPDATE OF username, storage_path ON public.archive_upload
+FOR EACH ROW EXECUTE FUNCTION private.enforce_archive_upload_owner();
 CREATE OR REPLACE TRIGGER fill_community_like_slug
 BEFORE INSERT ON public.community_project_likes
 FOR EACH ROW EXECUTE FUNCTION public.fill_community_like_slug();

@@ -1886,20 +1886,7 @@ CREATE TABLE IF NOT EXISTS "ca_website"."scraping_stats" (
 ALTER TABLE "ca_website"."scraping_stats" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "private"."archived_temporary_data" (
-    "type" character varying(255) NOT NULL,
-    "item_id" character varying(255) NOT NULL,
-    "originator_id" character varying(255) NOT NULL,
-    "timestamp" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "data" "jsonb" NOT NULL,
-    "user_id" character varying(255) DEFAULT 'anon'::character varying NOT NULL,
-    "inserted" timestamp with time zone,
-    "stored" boolean DEFAULT false,
-    "id" integer NOT NULL
-);
-
-
-ALTER TABLE "private"."archived_temporary_data" OWNER TO "postgres";
+-- dropped by 20250915205939_remove_old_firehose_processing_functions.sql: private.archived_temporary_data
 
 
 CREATE TABLE IF NOT EXISTS "private"."daily_pg_stat_statements" (
@@ -2012,22 +1999,7 @@ CREATE TABLE IF NOT EXISTS "private"."job_queue" (
 ALTER TABLE "private"."job_queue" OWNER TO "postgres";
 
 
--- Dedicated queue for admin-initiated jobs consumed by the Hetzner
--- admin-delete-worker. Kept separate from private.job_queue because
--- private.process_jobs() (pg_cron-driven) would silently mark unknown
--- job_names DONE. See migration 20260523180000_add_admin_jobs.sql.
-CREATE TABLE IF NOT EXISTS "private"."admin_jobs" (
-    "key" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "job_name" "text" NOT NULL,
-    "status" "text" DEFAULT 'QUEUED'::"text" NOT NULL,
-    "args" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "admin_jobs_status_check" CHECK (("status" = ANY (ARRAY['QUEUED'::"text", 'PROCESSING'::"text", 'DONE'::"text", 'FAILED'::"text"])))
-);
-
-
-ALTER TABLE "private"."admin_jobs" OWNER TO "postgres";
+-- moved to 020_tables.sql: private.admin_jobs
 
 
 -- One row per Hetzner-worker job attempt. Written by
@@ -2411,16 +2383,6 @@ ALTER TABLE ONLY "ca_website"."scraping_stats"
 
 
 
-ALTER TABLE ONLY "private"."archived_temporary_data"
-    ADD CONSTRAINT "archived_temporary_data_id_key" UNIQUE ("id");
-
-
-
-ALTER TABLE ONLY "private"."archived_temporary_data"
-    ADD CONSTRAINT "archived_temporary_data_pkey" PRIMARY KEY ("type", "originator_id", "item_id", "timestamp");
-
-
-
 ALTER TABLE ONLY "private"."daily_pg_stat_statements"
     ADD CONSTRAINT "daily_pg_stat_statements_pkey" PRIMARY KEY ("id");
 
@@ -2436,8 +2398,7 @@ ALTER TABLE ONLY "private"."job_queue"
 
 
 
-ALTER TABLE ONLY "private"."admin_jobs"
-    ADD CONSTRAINT "admin_jobs_pkey" PRIMARY KEY ("key");
+-- moved to 020_tables.sql: private.admin_jobs_pkey
 
 
 
@@ -2564,34 +2525,6 @@ CREATE INDEX "idx_scraping_stats_period_end" ON "ca_website"."scraping_stats" US
 
 
 
-CREATE INDEX "archived_temporary_data_inserted_stored_idx" ON "private"."archived_temporary_data" USING "btree" ("inserted", "stored") WHERE (("inserted" IS NOT NULL) AND ("stored" = false) AND (("type")::"text" ~~ 'api_%'::"text"));
-
-
-
-CREATE INDEX "archived_temporary_data_inserted_stored_type_idx" ON "private"."archived_temporary_data" USING "btree" ("inserted", "stored", "type");
-
-
-
-CREATE INDEX "archived_temporary_data_stored_idx" ON "private"."archived_temporary_data" USING "btree" ("stored");
-
-
-
-CREATE INDEX "archived_temporary_data_timestamp_idx" ON "private"."archived_temporary_data" USING "btree" ("timestamp" DESC);
-
-
-
-CREATE INDEX "archived_temporary_data_type_idx" ON "private"."archived_temporary_data" USING "btree" ("type" "text_pattern_ops");
-
-
-
-CREATE INDEX "archived_temporary_data_type_originator_id_item_id_idx" ON "private"."archived_temporary_data" USING "btree" ("type", "originator_id", "item_id");
-
-
-
-CREATE INDEX "archived_temporary_data_user_id_idx" ON "private"."archived_temporary_data" USING "btree" ("user_id");
-
-
-
 CREATE INDEX "idx_import_errors_type_originator_item" ON "private"."import_errors" USING "btree" ("type", "originator_id", "item_id");
 
 
@@ -2604,11 +2537,11 @@ CREATE INDEX "idx_job_queue_status_timestamp" ON "private"."job_queue" USING "bt
 
 
 
-CREATE INDEX "idx_admin_jobs_claim" ON "private"."admin_jobs" USING "btree" ("job_name", "created_at") WHERE ("status" = ANY (ARRAY['QUEUED'::"text", 'PROCESSING'::"text"]));
+-- moved to 030_indexes.sql: private.idx_admin_jobs_claim
 
 
 
-CREATE INDEX "idx_admin_jobs_job_name_status" ON "private"."admin_jobs" USING "btree" ("job_name", "status");
+-- moved to 030_indexes.sql: private.idx_admin_jobs_job_name_status
 
 
 

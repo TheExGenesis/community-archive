@@ -17,7 +17,8 @@ CREATE TABLE public.all_account (
  num_tweets int, num_following int, num_followers int, num_likes int);
 CREATE TABLE public.archive_upload (
  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, account_id text,
- upload_phase public.upload_phase_enum, created_at timestamptz DEFAULT now(), archive_at timestamptz);
+ upload_phase public.upload_phase_enum, created_at timestamptz DEFAULT now(), archive_at timestamptz,
+ keep_private boolean, upload_likes boolean, start_date date, end_date date, username text);
 CREATE TABLE public.all_profile (
  account_id text, bio text, website text, location text, avatar_media_url text,
  header_media_url text, archive_upload_id bigint);

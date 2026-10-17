@@ -96,7 +96,7 @@ ALTER TABLE ONLY "public"."following"
 ALTER TABLE ONLY "public"."liked_tweets"
     ADD CONSTRAINT "liked_tweets_pkey" PRIMARY KEY ("tweet_id");
 ALTER TABLE ONLY "public"."liked_tweets"
-    ADD CONSTRAINT "liked_tweets_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR ("full_text" = ''::"text")));
+    ADD CONSTRAINT "liked_tweets_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR ("full_text" = ''::"text"))) NOT VALID;
 
 ALTER TABLE ONLY "public"."likes"
     ADD CONSTRAINT "likes_account_id_liked_tweet_id_key" UNIQUE ("account_id", "liked_tweet_id");
@@ -106,7 +106,7 @@ ALTER TABLE ONLY "public"."likes"
 ALTER TABLE ONLY "public"."mentioned_users"
     ADD CONSTRAINT "mentioned_users_pkey" PRIMARY KEY ("user_id");
 ALTER TABLE ONLY "public"."mentioned_users"
-    ADD CONSTRAINT "mentioned_users_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR (("name" = ''::"text") AND ("screen_name" = ''::"text"))));
+    ADD CONSTRAINT "mentioned_users_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR (("name" = ''::"text") AND ("screen_name" = ''::"text")))) NOT VALID;
 
 ALTER TABLE ONLY "public"."tweet_media"
     ADD CONSTRAINT "tweet_media_pkey" PRIMARY KEY ("media_id");
@@ -132,6 +132,8 @@ ALTER TABLE ONLY "public"."profile_curation"
 
 ALTER TABLE ONLY "public"."tweet_link_previews"
     ADD CONSTRAINT "tweet_link_previews_pkey" PRIMARY KEY ("url_hash");
+ALTER TABLE ONLY "public"."tweet_link_previews"
+    ADD CONSTRAINT "tweet_link_previews_normalized_url_key" UNIQUE ("normalized_url");
 ALTER TABLE ONLY "public"."tweet_link_previews"
     ADD CONSTRAINT "tweet_link_previews_url_hash_check" CHECK (("url_hash" ~ '^[0-9a-f]{64}$'::text));
 ALTER TABLE ONLY "public"."tweet_link_previews"
@@ -219,17 +221,10 @@ ALTER TABLE ONLY "public"."optin"
 -- public.quote_tweets foreign keys
 ALTER TABLE ONLY "public"."quote_tweets"
     ADD CONSTRAINT "fk_quote_tweets_tweet_id" FOREIGN KEY ("tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE CASCADE;
-ALTER TABLE ONLY "public"."quote_tweets"
-    ADD CONSTRAINT "fk_quote_tweets_quoted_tweet_id" FOREIGN KEY ("quoted_tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE CASCADE;
+-- No FK on quoted_tweet_id: the quoted tweet is often absent from the archive.
 
 -- public.retweets foreign keys
 ALTER TABLE ONLY "public"."retweets"
     ADD CONSTRAINT "fk_retweets_tweet_id" FOREIGN KEY ("tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE CASCADE;
 ALTER TABLE ONLY "public"."retweets"
     ADD CONSTRAINT "fk_retweets_retweeted_tweet_id" FOREIGN KEY ("retweeted_tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE SET NULL;
-
--- ca_autorefresh.account_refresh_log
-ALTER TABLE ONLY "ca_autorefresh"."account_refresh_log"
-    ADD CONSTRAINT "account_refresh_log_pkey" PRIMARY KEY ("account_id");
-ALTER TABLE ONLY "ca_autorefresh"."account_refresh_log"
-    ADD CONSTRAINT "account_refresh_log_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "public"."all_account"("account_id");

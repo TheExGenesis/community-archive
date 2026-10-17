@@ -44,6 +44,8 @@ ALTER FUNCTION private.policy_authority_fingerprint() OWNER TO postgres;
 REVOKE ALL ON FUNCTION private.policy_authority_fingerprint()
   FROM PUBLIC, anon, authenticated, readclient, service_role;
 
+-- 031_functions_prereq.sql carries bootstrap copies of the policy helpers below;
+-- keep both copies byte-identical.
 CREATE OR REPLACE FUNCTION public.policy_account_is_blocked(
   p_account_id text DEFAULT NULL,
   p_username text DEFAULT NULL
@@ -77,6 +79,9 @@ AS $$
         )
       )
   ) OR EXISTS (
+    -- Close the short interval where consent is known by username but the
+    -- derived stable-ID block has not yet been written. The account PK and the
+    -- partial consent-name index make this a bounded metadata lookup.
     SELECT 1
     FROM public.all_account AS account
     JOIN public.optin AS consent
@@ -459,6 +464,8 @@ BEGIN
     RAISE EXCEPTION 'p_batch_size must be between 1 and 10000';
   END IF;
 
+  -- Serialize checkpoint advancement. Individual author locks below also
+  -- close the race with an opt-out arriving during a batch.
   PERFORM pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(
       'community-archive-policy-backfill:' || v_job_name,
@@ -493,6 +500,8 @@ BEGIN
   v_batch_rows := COALESCE(pg_catalog.cardinality(v_tweet_ids), 0);
 
   IF v_batch_rows > 0 THEN
+    -- Acquire account locks in a stable order. If a policy change owns one of
+    -- these locks, this batch waits and re-checks the committed block state.
     PERFORM public.lock_policy_account(author.account_id)
     FROM (
       SELECT DISTINCT tweet.account_id

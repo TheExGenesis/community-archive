@@ -50,6 +50,25 @@ CREATE TABLE IF NOT EXISTS "private"."user_intercepted_stats" (
 );
 ALTER TABLE "private"."user_intercepted_stats" OWNER TO "postgres";
 
+-- Dedicated queue for admin-initiated jobs consumed by the Hetzner
+-- admin-delete-worker. Kept separate from private.job_queue because
+-- private.process_jobs() (pg_cron-driven) would silently mark unknown
+-- job_names DONE. See migration 20260523180000_add_admin_jobs.sql.
+CREATE TABLE IF NOT EXISTS "private"."admin_jobs" (
+    "key" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "job_name" "text" NOT NULL,
+    "status" "text" DEFAULT 'QUEUED'::"text" NOT NULL,
+    "args" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "admin_jobs_pkey" PRIMARY KEY ("key"),
+    CONSTRAINT "admin_jobs_status_check" CHECK (("status" = ANY (ARRAY['QUEUED'::"text", 'PROCESSING'::"text", 'DONE'::"text", 'FAILED'::"text"])))
+);
+ALTER TABLE "private"."admin_jobs" OWNER TO "postgres";
+COMMENT ON TABLE "private"."admin_jobs" IS 'Admin-initiated jobs consumed by out-of-process workers (e.g. services/admin-delete-worker). Deliberately separate from private.job_queue, which is consumed by private.process_jobs() via pg_cron and would silently mark unknown job_names DONE.';
+REVOKE ALL ON TABLE "private"."admin_jobs" FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE ON TABLE "private"."admin_jobs" TO "service_role";
+
 -- Content-free manifest for policy-safe Firehose Parquet/DLQ objects. Objects
 -- are deleted wholesale when any indexed author becomes policy-blocked.
 CREATE TABLE IF NOT EXISTS "private"."policy_storage_objects" (
@@ -60,11 +79,11 @@ CREATE TABLE IF NOT EXISTS "private"."policy_storage_objects" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "policy_storage_objects_pkey" PRIMARY KEY ("storage_class", "object_path"),
     CONSTRAINT "policy_storage_objects_storage_class_check" CHECK (("storage_class" = ANY (ARRAY['private'::"text", 'public'::"text"]))),
-    CONSTRAINT "policy_storage_objects_path_check" CHECK (("object_path" ~ '^policy_safe_v1/'::"text")),
+    CONSTRAINT "policy_storage_objects_object_path_check" CHECK (("object_path" ~ '^policy_safe_v1/'::"text")),
     CONSTRAINT "policy_storage_objects_account_ids_check" CHECK ((cardinality("account_ids") > 0)),
-    CONSTRAINT "policy_storage_objects_account_ids_nonnull_check" CHECK ((array_position("account_ids", NULL::"text") IS NULL)),
-    CONSTRAINT "policy_storage_objects_username_hashes_nonnull_check" CHECK ((array_position("username_hashes", NULL::"text") IS NULL)),
-    CONSTRAINT "policy_storage_objects_username_hashes_format_check" CHECK (((cardinality("username_hashes") = 0) OR (array_to_string("username_hashes", ','::"text") ~ '^([0-9a-f]{64})(,[0-9a-f]{64})*$'::"text")))
+    CONSTRAINT "policy_storage_objects_account_ids_check1" CHECK ((array_position("account_ids", NULL::"text") IS NULL)),
+    CONSTRAINT "policy_storage_objects_username_hashes_check" CHECK ((array_position("username_hashes", NULL::"text") IS NULL)),
+    CONSTRAINT "policy_storage_objects_username_hashes_check1" CHECK (((cardinality("username_hashes") = 0) OR (array_to_string("username_hashes", ','::"text") ~ '^([0-9a-f]{64})(,[0-9a-f]{64})*$'::"text")))
 );
 ALTER TABLE "private"."policy_storage_objects" OWNER TO "postgres";
 REVOKE ALL ON TABLE "private"."policy_storage_objects" FROM PUBLIC, "anon", "authenticated", "readclient";
@@ -191,7 +210,7 @@ CREATE TABLE IF NOT EXISTS "private"."canonical_ingest_entity_versions" (
     CONSTRAINT "canonical_ingest_entity_versions_key_hash_check" CHECK (("entity_key_hash" ~ '^[0-9a-f]{64}$'::"text")),
     CONSTRAINT "canonical_ingest_entity_versions_version_check" CHECK (("version" >= (0)::numeric)),
     CONSTRAINT "canonical_ingest_entity_versions_event_id_check" CHECK (("event_id" ~ '^[0-9a-f]{64}$'::"text")),
-    CONSTRAINT "canonical_ingest_entity_versions_operation_rank_check" CHECK (("operation_rank" = ANY (ARRAY[(1)::smallint, (2)::smallint])))
+    CONSTRAINT "canonical_ingest_entity_versions_operation_rank_check" CHECK (("operation_rank" = ANY (ARRAY[1, 2])))
 );
 ALTER TABLE "private"."canonical_ingest_entity_versions" OWNER TO "postgres";
 ALTER TABLE "private"."canonical_ingest_entity_versions" ENABLE ROW LEVEL SECURITY;
@@ -214,6 +233,7 @@ CREATE TABLE IF NOT EXISTS "public"."all_account" (
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.05');
 ALTER TABLE "public"."all_account" OWNER TO "postgres";
+COMMENT ON COLUMN "public"."all_account"."is_tombstone" IS 'True for a policy-minimal account placeholder; authorized imports hydrate it in place.';
 
 -- public.archive_upload
 CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
@@ -238,6 +258,7 @@ CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
     )
 );
 ALTER TABLE "public"."archive_upload" OWNER TO "postgres";
+COMMENT ON COLUMN "public"."archive_upload"."username" IS 'Username/handle at the time of archive upload - used to locate archive files in storage';
 
 -- public.likes
 CREATE TABLE IF NOT EXISTS "public"."likes" (
@@ -278,6 +299,7 @@ CREATE TABLE IF NOT EXISTS "public"."tweets" (
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.10', "autovacuum_analyze_scale_factor"='0.05', "fillfactor"='90');
 ALTER TABLE "public"."tweets" OWNER TO "postgres";
+COMMENT ON COLUMN "public"."tweets"."is_tombstone" IS 'True for a policy-minimal tweet placeholder containing stable IDs but no authored content.';
 
 -- public.user_mentions
 CREATE TABLE IF NOT EXISTS "public"."user_mentions" (
@@ -409,6 +431,9 @@ CREATE TABLE IF NOT EXISTS public.quote_tweets (
 );
 
 ALTER TABLE "public"."quote_tweets" OWNER TO "postgres";
+COMMENT ON TABLE "public"."quote_tweets" IS 'Stores relationships between tweets and their quoted tweets';
+COMMENT ON COLUMN "public"."quote_tweets"."tweet_id" IS 'The ID of the tweet that contains the quote';
+COMMENT ON COLUMN "public"."quote_tweets"."quoted_tweet_id" IS 'The ID of the tweet being quoted';
 
 CREATE TABLE IF NOT EXISTS public.retweets (
     tweet_id TEXT NOT NULL PRIMARY KEY,
@@ -416,8 +441,15 @@ CREATE TABLE IF NOT EXISTS public.retweets (
 );
 
 ALTER TABLE "public"."retweets" OWNER TO "postgres";
+COMMENT ON TABLE "public"."retweets" IS 'Stores relationships between tweets and their retweeted tweets';
+COMMENT ON COLUMN "public"."retweets"."tweet_id" IS 'The ID of the retweet';
+COMMENT ON COLUMN "public"."retweets"."retweeted_tweet_id" IS 'The ID of the original tweet being retweeted';
 
 -- ca_autorefresh.account_refresh_log
+-- No PK or FK to all_account is declared: migrations never create them
+-- (20260520020000 creates only the column). Production may still have the
+-- legacy FK noted in 20260318160000; add an idempotent migration before
+-- declaring it here.
 CREATE TABLE IF NOT EXISTS "ca_autorefresh"."account_refresh_log" (
     "account_id" "text" NOT NULL
 );

@@ -44,6 +44,9 @@ CREATE INDEX "idx_optin_opted_in" ON "public"."optin" USING "btree" ("opted_in")
 CREATE INDEX "idx_optin_explicit_optout" ON "public"."optin" USING "btree" ("explicit_optout") WHERE ("explicit_optout" = true);
 CREATE INDEX "optin_explicit_optout_twitter_user_id_idx" ON "public"."optin" USING "btree" ("twitter_user_id") WHERE (("explicit_optout" IS TRUE) AND ("twitter_user_id" IS NOT NULL));
 CREATE INDEX "optin_explicit_optout_username_lower_idx" ON "public"."optin" USING "btree" (lower("username")) WHERE ("explicit_optout" IS TRUE);
+-- Prefilter probes for public.resolve_directory_identity.
+CREATE INDEX "optin_opted_in_twitter_user_id_idx" ON "public"."optin" USING "btree" ("twitter_user_id") WHERE ("opted_in" = true);
+CREATE INDEX "optin_opted_in_username_lower_idx" ON "public"."optin" USING "btree" (lower("username")) WHERE ("opted_in" = true);
 
 CREATE INDEX "blocked_scraping_users_username_idx" ON "tes"."blocked_scraping_users" USING "btree" (lower("username")) WHERE ("username" IS NOT NULL);
 
@@ -57,7 +60,6 @@ CREATE INDEX "idx_tweet_urls_tweet_id" ON "public"."tweet_urls" USING "btree" ("
 
 -- public.profile_curation / public.tweet_link_previews
 CREATE INDEX "profile_curation_scope_idx" ON "public"."profile_curation" USING "btree" ("account_id", "section", "position");
-CREATE UNIQUE INDEX "tweet_link_previews_normalized_url_key" ON "public"."tweet_link_previews" USING "btree" ("normalized_url");
 CREATE INDEX "tweet_link_previews_expires_at_idx" ON "public"."tweet_link_previews" USING "btree" ("expires_at");
 
 -- public.tweets
@@ -119,6 +121,14 @@ CREATE INDEX IF NOT EXISTS "idx_all_account_display_name_trgm"
 -- private.tweet_user: every get_streaming_stats_* function filters on created_at.
 CREATE INDEX IF NOT EXISTS "idx_tweet_user_created_at"
   ON "private"."tweet_user" USING "btree" ("created_at");
+
+-- private.admin_jobs: the worker claims the oldest QUEUED row per job_name;
+-- PROCESSING rows stay in the partial index for stuck-job checks.
+CREATE INDEX IF NOT EXISTS "idx_admin_jobs_claim"
+  ON "private"."admin_jobs" USING "btree" ("job_name", "created_at")
+  WHERE ("status" = ANY (ARRAY['QUEUED'::"text", 'PROCESSING'::"text"]));
+CREATE INDEX IF NOT EXISTS "idx_admin_jobs_job_name_status"
+  ON "private"."admin_jobs" USING "btree" ("job_name", "status");
 CREATE INDEX IF NOT EXISTS "digest_runs_date_created_idx"
   ON "public"."digest_runs" ("digest_date" DESC, "created_at" DESC);
 

@@ -18,6 +18,10 @@ CREATE OR REPLACE TRIGGER "update_digest_email_subscriptions_updated_at" BEFORE 
 
 CREATE OR REPLACE TRIGGER "update_optin_timestamp" BEFORE INSERT OR UPDATE ON "public"."optin" FOR EACH ROW EXECUTE FUNCTION "public"."update_optin_updated_at"();
 
+-- Production created this trigger outside migrations; see
+-- 20261016192016_trust_twitter_identity_for_account_claims.sql.
+CREATE OR REPLACE TRIGGER "sync_user_meta_data" BEFORE INSERT OR UPDATE ON "auth"."users" FOR EACH ROW EXECUTE FUNCTION "public"."sync_meta_data"();
+
 CREATE OR REPLACE TRIGGER "propagate_explicit_optout_scrape_block" AFTER INSERT OR UPDATE OF "explicit_optout", "twitter_user_id", "username" ON "public"."optin" FOR EACH ROW EXECUTE FUNCTION "public"."propagate_explicit_optout_scrape_block"();
 
 CREATE OR REPLACE TRIGGER "update_tweet_media_updated_at" BEFORE UPDATE ON "public"."tweet_media" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();

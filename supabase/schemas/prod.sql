@@ -1538,25 +1538,7 @@ ALTER FUNCTION "public"."process_archive"("archive_data" "jsonb") OWNER TO "post
 -- moved to 070_functions.sql: public.search_tweets(plpgsql variant)
 
 
-CREATE OR REPLACE FUNCTION "public"."sync_meta_data"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-    NEW.raw_app_meta_data = jsonb_set(
-        jsonb_set(
-            COALESCE(NEW.raw_app_meta_data::jsonb, '{}'::jsonb),
-            '{user_name}',
-            NEW.raw_user_meta_data::jsonb->'user_name'
-        ),
-        '{provider_id}',
-        NEW.raw_user_meta_data::jsonb->'provider_id'
-    );
-    RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."sync_meta_data"() OWNER TO "postgres";
+-- moved to 070_functions.sql: public.sync_meta_data
 
 
 -- moved to 070_functions.sql: public.trigger_commit_temp_data

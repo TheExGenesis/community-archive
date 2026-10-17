@@ -1532,9 +1532,9 @@ DECLARE
 BEGIN
     -- Get provider_id from JWT
     SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
-
+    
     -- Verify the JWT provider_id matches the account_id being deleted, unless postgres/service_role
-    IF (current_role NOT IN ('postgres', 'service_role')) AND
+    IF (current_role NOT IN ('postgres', 'service_role')) AND 
        (v_provider_id IS NULL OR v_provider_id != p_account_id) THEN
         RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_account_id;
     END IF;
@@ -1571,7 +1571,7 @@ BEGIN
             -- Now we can safely delete the tweets
             DELETE FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2;
 
-            -- Delete other related data (OR account_id catches orphan rows from scraper/extension)
+            -- Delete other related data
             DELETE FROM %I.likes WHERE archive_upload_id = ANY($1) OR account_id = $2;
             DELETE FROM %I.followers WHERE archive_upload_id = ANY($1) OR account_id = $2;
             DELETE FROM %I.following WHERE archive_upload_id = ANY($1) OR account_id = $2;

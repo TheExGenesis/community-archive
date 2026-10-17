@@ -951,9 +951,8 @@ BEGIN
       is_tombstone = true
   WHERE account_id = p_account_id;
 
-  -- These expression indexes are built CONCURRENTLY by the release operator.
-  -- Until then, the temporary RLS overlay hides copied identity immediately;
-  -- never fall back to a full tweets scan inside an opt-out transaction.
+  -- Never fall back to a full corpus scan inside an opt-out transaction. The
+  -- release operator builds these exact-expression indexes concurrently.
   IF v_username ~ '^[A-Za-z0-9_]{1,15}$'
      AND EXISTS (
        SELECT 1
@@ -973,7 +972,6 @@ BEGIN
       )) = lower(v_username);
   END IF;
 
-  -- The stable relationship ID is indexed and can be scrubbed synchronously.
   UPDATE public.tweets
   SET reply_to_username = NULL
   WHERE account_id <> p_account_id
@@ -1050,10 +1048,9 @@ BEGIN
       AND lower(screen_name) = lower(v_username);
   END IF;
 
-  -- The universal migration intentionally defers this index to a concurrent
-  -- post-DDL step. Never sequential-scan the legacy liked-tweet table from an
-  -- opt-out transaction; the RLS boundary hides unattributed legacy rows until
-  -- the index exists and the operator reruns every blocked-account sweep.
+  -- Never sequential-scan the legacy liked-tweet table from an opt-out
+  -- transaction. The release operator creates this index concurrently and
+  -- reruns the blocked-account sweep before writers resume.
   IF EXISTS (
     SELECT 1
     FROM pg_catalog.pg_index AS candidate
@@ -1069,8 +1066,6 @@ BEGIN
       AND author_account_id = p_account_id;
   END IF;
 
-  -- Storage object names are case-sensitive. Enqueue every exact archive path
-  -- identity before metadata deletion, plus the best policy/account fallback.
   FOREACH v_archive_username IN ARRAY v_archive_usernames LOOP
     PERFORM public.enqueue_policy_archive_cleanup(
       p_account_id,

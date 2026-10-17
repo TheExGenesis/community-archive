@@ -245,3 +245,17 @@ REVOKE ALL ON bulletin.pipeline_state,bulletin.jev_items FROM PUBLIC,anon,authen
 REVOKE INSERT,UPDATE,DELETE ON bulletin.pipeline_state FROM service_role;
 GRANT SELECT ON bulletin.pipeline_state TO service_role;
 GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.jev_items TO service_role;
+
+ALTER TABLE private.public_api_consumers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE private.public_api_keys ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.public_api_consumers, private.public_api_keys
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+GRANT SELECT, INSERT, UPDATE ON private.public_api_consumers, private.public_api_keys TO service_role;
+REVOKE ALL ON FUNCTION public.create_public_api_key(uuid,text,text,text,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.list_public_api_keys(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.revoke_public_api_key(uuid,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.verify_public_api_key(text,text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_public_api_key(uuid,text,text,text,text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.list_public_api_keys(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.revoke_public_api_key(uuid,text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.verify_public_api_key(text,text) TO service_role;

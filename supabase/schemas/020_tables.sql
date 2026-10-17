@@ -1001,3 +1001,36 @@ CREATE INDEX bulletin_jev_ready_idx ON bulletin.jev_items(posted_at DESC)
   WHERE status='ready';
 CREATE INDEX bulletin_jev_resolution_idx ON bulletin.jev_items(context_checked_at NULLS FIRST,tweet_id)
   WHERE status='ready';
+
+-- Self-service keys for the public read API at analytics.community-archive.org/v1.
+-- A consumer is the signed-in owner and keeps a stable ID across key rotation;
+-- each key is a revocable credential. Only the SHA-256 of a key is stored. The
+-- website issues and revokes keys; the gateway resolves them through a
+-- server-to-server website route and never holds database credentials.
+CREATE TABLE private.public_api_consumers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  account_id text CHECK (account_id ~ '^[0-9]{1,20}$'),
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE private.public_api_keys (
+  id text PRIMARY KEY CHECK (id ~ '^[a-z0-9]{16}$'),
+  consumer_id uuid NOT NULL REFERENCES private.public_api_consumers(id) ON DELETE CASCADE,
+  label text CHECK (label IS NULL OR length(label) BETWEEN 1 AND 80),
+  key_sha256 text NOT NULL UNIQUE CHECK (key_sha256 ~ '^[0-9a-f]{64}$'),
+  scopes text[] NOT NULL DEFAULT ARRAY['corpus:read']::text[]
+    CHECK (cardinality(scopes) > 0 AND scopes <@ ARRAY['corpus:read']::text[]),
+  requests_per_minute integer NOT NULL DEFAULT 60 CHECK (requests_per_minute BETWEEN 1 AND 6000),
+  requests_per_day integer NOT NULL DEFAULT 20000 CHECK (requests_per_day BETWEEN 1 AND 5000000),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz,
+  -- Approximate: refreshed when the gateway re-verifies the key (at most every
+  -- two minutes per key), never by a write on each data request.
+  last_used_at timestamptz,
+  revoked_at timestamptz,
+  CHECK (expires_at IS NULL OR expires_at > created_at)
+);
+CREATE INDEX public_api_keys_consumer_idx ON private.public_api_keys(consumer_id, created_at DESC);

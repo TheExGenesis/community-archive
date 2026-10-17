@@ -106,8 +106,9 @@ gcp_jwt_path = "supabase/gcloud.json"
 [db.migrations]
 # Explicit schema file order for declarative schemas. Files are deduplicated and
 # applied in the order listed after glob expansion. Ensure foundational files
-# (extensions, roles, schemas, helpers) run BEFORE prod.sql so objects exist
-# when referenced by definitions retained in prod.sql.
+# (extensions, roles, schemas, prerequisites) run BEFORE prod.sql so objects exist
+# when referenced by definitions retained in prod.sql. 090/095 run AFTER prod.sql
+# to narrow its legacy GRANT ALL statements.
 schema_paths = [
   "./schemas/000_extensions.sql",
   "./schemas/000_roles.sql",
@@ -119,7 +120,6 @@ schema_paths = [
   "./schemas/032_views_prereq.sql",
   "./schemas/035_matviews.sql",
   "./schemas/036_matview_indexes.sql",
-  "./schemas/040_auth_helpers.sql",
   "./schemas/040_views.sql",
   "./schemas/050_constraints.sql",
   "./schemas/060_grants.sql",

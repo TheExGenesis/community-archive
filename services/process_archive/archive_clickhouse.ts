@@ -8,6 +8,15 @@ const EPOCH = '1970-01-01T00:00:00.000Z'
 export const ARCHIVE_CLICKHOUSE_SOURCE = 'archive_upload'
 export const ARCHIVE_CLICKHOUSE_TOMBSTONE_SOURCE =
   'archive_upload_policy_tombstone'
+export const ARCHIVE_CLICKHOUSE_GRAPH_PURGE_SOURCE =
+  'archive_graph_policy_purge'
+export const ARCHIVE_CLICKHOUSE_GRAPH_TABLES = [
+  'account_likes',
+  'liked_tweet_versions',
+  'account_follows',
+] as const
+const GRAPH_INSERT_CHUNK_ROWS = 25_000
+const GRAPH_PURGE_TIMEOUT_MS = 10 * 60_000
 
 export interface ArchiveClickHouseManifest {
   archiveUploadId: string
@@ -50,8 +59,23 @@ export interface ArchiveClickHouseBatch {
   tweet_url_versions: Record<string, unknown>[]
 }
 
+// Likes and follow edges are written beside, not inside, the tweet batch: the
+// canonical queue publisher maps every ArchiveClickHouseBatch table to a
+// queue entity and has no likes/follows entity types.
+export interface ArchiveClickHouseGraphBatch {
+  account_likes: Record<string, unknown>[]
+  liked_tweet_versions: Record<string, unknown>[]
+  account_follows: Record<string, unknown>[]
+}
+
 export interface LockedArchiveDeliveryContext {
   ownerBlocked: boolean
+  /**
+   * True only when likes/follows delivery is enabled and, under the owner's
+   * policy lock, the upload is still a completed upload of this account. A
+   * deleted upload must not be re-written by a delayed retry.
+   */
+  graphEligible?: boolean
   resolvePolicies(
     candidates: ArchivePolicyCandidate[],
   ): Promise<ArchivePolicyDecisions>
@@ -66,13 +90,80 @@ export interface ArchiveDeliveryAttemptOptions {
     accountId: string,
     operation: (context: LockedArchiveDeliveryContext) => Promise<void>,
   ): Promise<void>
-  sink: Pick<ArchiveClickHouseSink, 'writeBatch'>
+  sink: Pick<ArchiveClickHouseSink, 'writeBatch'> &
+    Partial<Pick<ArchiveClickHouseSink, 'writeGraphBatch'>>
   markPending(errorCode: string): Promise<void>
   now?: () => Date
 }
 
+export type ArchiveGraphPurgeReason =
+  | 'delete_user_archive'
+  | 'delete_single_archive'
+  | 'policy_tombstone'
+
+/** A row of private.archive_clickhouse_graph_purge. */
+export interface ArchiveGraphPurgeRequest {
+  id: string | number
+  purge_scope: 'account' | 'archive_upload'
+  account_id: string
+  archive_upload_id: string | number | null
+  reason: ArchiveGraphPurgeReason
+}
+
+/** What one purge removes from ClickHouse, resolved from current state. */
+export interface ArchiveGraphPurgePlan {
+  accountId: string
+  /** Remove only this upload's rows (delete_single_archive). */
+  archiveUploadId: string | null
+  /** Account scope: keep rows from these still-existing uploads. */
+  keepUploadIds: string[]
+  /**
+   * Account scope: never touch uploads created after the state was read.
+   * This is the upload ID sequence's high-water mark (never MAX(id), which
+   * drops when the purged deletion removed the newest uploads), so a
+   * re-upload delivered while the ClickHouse mutation runs stays intact.
+   */
+  maxUploadId: string
+  /** Opt-out: also tombstone liked-tweet text authored by the account. */
+  purgeLikedTweetAuthor: boolean
+  requestId: string
+}
+
+/**
+ * PostgreSQL state for one purge, read in a short transaction holding the
+ * account policy lock and released before any ClickHouse work: holding the
+ * lock across a mutation would make that account's opt-out wait and fail
+ * under the API's lock_timeout. Taking the lock still orders the read after
+ * any delivery that is writing this account's rows.
+ */
+export interface ArchiveGraphPurgeState {
+  /** False when an earlier duplicate already completed this request. */
+  requestPending: boolean
+  existingUploadIds: string[]
+  ownerBlocked: boolean
+  maxUploadId: string
+  /**
+   * Other pending requests with the same scope, account, upload and reason,
+   * read before the upload state, so this run covers every deletion they
+   * stand for. Completing them with this one bounds the queue.
+   */
+  coveredRequestIds: string[]
+}
+
+export interface ArchiveGraphPurgeAttemptOptions {
+  request: ArchiveGraphPurgeRequest
+  readStateUnderPolicyLock(accountId: string): Promise<ArchiveGraphPurgeState>
+  sink: Pick<ArchiveClickHouseSink, 'purgeGraph'>
+  markCompleted(requestIds: string[]): Promise<void>
+  markPending(errorCode: string): Promise<void>
+}
+
 export type ArchiveDeliveryAttemptResult =
   | { status: 'delivered' }
+  | { status: 'pending'; errorCode: string }
+
+export type ArchiveGraphPurgeAttemptResult =
+  | { status: 'completed' }
   | { status: 'pending'; errorCode: string }
 
 export class ArchiveClickHouseError extends Error {
@@ -590,16 +681,172 @@ export function buildArchiveClickHouseBatch(
   return deduplicateBatch(batch)
 }
 
-function deduplicateBatch(
-  batch: ArchiveClickHouseBatch,
-): ArchiveClickHouseBatch {
+function deduplicateBatch<T extends object>(batch: T): T {
   return Object.fromEntries(
     Object.entries(batch).map(([table, rows]) => {
       const byEvent = new Map<string, Record<string, unknown>>()
-      for (const row of rows) byEvent.set(String(row.event_id), row)
+      for (const row of rows as Record<string, unknown>[]) {
+        byEvent.set(String(row.event_id), row)
+      }
       return [table, [...byEvent.values()]]
     }),
-  ) as unknown as ArchiveClickHouseBatch
+  ) as unknown as T
+}
+
+/**
+ * Likes and follow edges from the archive owner's like.js, follower.js and
+ * following.js, mirroring the PostgreSQL processor. Liked tweets are written
+ * as content-free tombstones exactly as the processor upserts
+ * public.liked_tweets, so a new upload never re-publishes third-party text.
+ * Targets keep their stable IDs; the owner policy check happens before this.
+ */
+export function buildArchiveGraphBatch(
+  archive: any,
+  manifest: ArchiveClickHouseManifest,
+  observedAt = new Date().toISOString(),
+): ArchiveClickHouseGraphBatch {
+  if (asUInt64(archive?.account?.[0]?.account?.accountId) !== manifest.accountId) {
+    throw new ArchiveClickHouseError('archive_owner_mismatch')
+  }
+  const prefix = eventPrefix(manifest)
+  const batch: ArchiveClickHouseGraphBatch = {
+    account_likes: [],
+    liked_tweet_versions: [],
+    account_follows: [],
+  }
+
+  for (const record of archive?.like ?? []) {
+    const likedTweetId = asUInt64(record?.like?.tweetId)
+    if (!likedTweetId) continue
+    batch.account_likes.push({
+      account_id: manifest.accountId,
+      liked_tweet_id: likedTweetId,
+      archive_upload_id: manifest.archiveUploadId,
+      is_tombstone: 0,
+      source: ARCHIVE_CLICKHOUSE_SOURCE,
+      event_id: `${prefix}:like:${likedTweetId}`,
+      observed_at: observedAt,
+    })
+    batch.liked_tweet_versions.push({
+      tweet_id: likedTweetId,
+      author_account_id: null,
+      full_text: '',
+      is_tombstone: 1,
+      source: ARCHIVE_CLICKHOUSE_SOURCE,
+      event_id: `${prefix}:liked_tweet:${likedTweetId}`,
+      observed_at: observedAt,
+    })
+  }
+
+  const follows: [direction: 'follower' | 'following', records: any[], key: string][] = [
+    ['follower', archive?.follower ?? [], 'follower'],
+    ['following', archive?.following ?? [], 'following'],
+  ]
+  for (const [direction, records, key] of follows) {
+    for (const record of records) {
+      const relatedAccountId = asUInt64(record?.[key]?.accountId)
+      if (!relatedAccountId) continue
+      batch.account_follows.push({
+        account_id: manifest.accountId,
+        direction,
+        related_account_id: relatedAccountId,
+        archive_upload_id: manifest.archiveUploadId,
+        is_tombstone: 0,
+        source: ARCHIVE_CLICKHOUSE_SOURCE,
+        event_id: `${prefix}:${direction}:${relatedAccountId}`,
+        observed_at: observedAt,
+      })
+    }
+  }
+
+  return deduplicateBatch(batch)
+}
+
+/**
+ * Resolve a queued purge into ClickHouse predicates under the policy lock.
+ * Plans depend only on current PostgreSQL state, so replaying an old request
+ * (for example after a backfill) never removes rows that are still valid.
+ */
+export function planArchiveGraphPurge(
+  request: ArchiveGraphPurgeRequest,
+  state: Pick<ArchiveGraphPurgeState, 'existingUploadIds' | 'ownerBlocked' | 'maxUploadId'>,
+): ArchiveGraphPurgePlan {
+  const accountId = asUInt64(request.account_id)
+  const requestId = asUInt64(request.id)
+  const maxUploadId = asUInt64(state.maxUploadId)
+  if (!accountId || !requestId || !maxUploadId) {
+    throw new ArchiveClickHouseError('invalid_graph_purge_request')
+  }
+  const ownerBlocked = state.ownerBlocked
+  const existing = state.existingUploadIds
+    .map(asUInt64)
+    .filter((value): value is string => Boolean(value))
+  if (request.purge_scope === 'archive_upload') {
+    const archiveUploadId = asUInt64(request.archive_upload_id)
+    if (!archiveUploadId || request.reason !== 'delete_single_archive') {
+      throw new ArchiveClickHouseError('invalid_graph_purge_request')
+    }
+    return {
+      accountId,
+      archiveUploadId,
+      keepUploadIds: [],
+      maxUploadId,
+      purgeLikedTweetAuthor: false,
+      requestId,
+    }
+  }
+  if (request.purge_scope !== 'account') {
+    throw new ArchiveClickHouseError('invalid_graph_purge_request')
+  }
+  if (request.reason === 'policy_tombstone') {
+    // A blocked account keeps nothing. tombstone_policy_account deleted every
+    // upload it had, so after a later opt-in only newer uploads remain.
+    return {
+      accountId,
+      archiveUploadId: null,
+      keepUploadIds: ownerBlocked ? [] : existing,
+      maxUploadId,
+      purgeLikedTweetAuthor: true,
+      requestId,
+    }
+  }
+  if (request.reason !== 'delete_user_archive') {
+    throw new ArchiveClickHouseError('invalid_graph_purge_request')
+  }
+  // Uploads created after the deletion belong to a new upload and stay.
+  return {
+    accountId,
+    archiveUploadId: null,
+    keepUploadIds: existing,
+    maxUploadId,
+    purgeLikedTweetAuthor: false,
+    requestId,
+  }
+}
+
+export async function attemptArchiveGraphPurge(
+  options: ArchiveGraphPurgeAttemptOptions,
+): Promise<ArchiveGraphPurgeAttemptResult> {
+  const accountId = asUInt64(options.request.account_id)
+  if (!accountId) {
+    const errorCode = 'invalid_graph_purge_request'
+    await options.markPending(errorCode)
+    return { status: 'pending', errorCode }
+  }
+  try {
+    const state = await options.readStateUnderPolicyLock(accountId)
+    if (!state.requestPending) return { status: 'completed' }
+    const plan = planArchiveGraphPurge(options.request, state)
+    await options.sink.purgeGraph(plan)
+    await options.markCompleted([plan.requestId, ...state.coveredRequestIds])
+    return { status: 'completed' }
+  } catch (error) {
+    const errorCode = error instanceof ArchiveClickHouseError
+      ? error.code
+      : 'archive_clickhouse_graph_purge_failed'
+    await options.markPending(errorCode)
+    return { status: 'pending', errorCode }
+  }
 }
 
 export function safeArchiveClickHouseErrorCode(error: unknown): string {
@@ -627,7 +874,10 @@ export async function attemptArchiveClickHouseDelivery(
     await options.withOwnerPolicyLock(manifest.accountId, async (context) => {
       const observedAt = (options.now ?? (() => new Date()))().toISOString()
       let batch: ArchiveClickHouseBatch
+      let graphBatch: ArchiveClickHouseGraphBatch | null = null
       if (context.ownerBlocked) {
+        // An opted-out owner contributes no likes or follow edges; the
+        // policy purge removes anything delivered before the opt-out.
         batch = buildArchiveTombstoneBatch(manifest, observedAt)
       } else {
         const archive =
@@ -656,9 +906,18 @@ export async function attemptArchiveClickHouseDelivery(
           decisions,
           observedAt,
         )
+        if (context.graphEligible) {
+          graphBatch = buildArchiveGraphBatch(archive, manifest, observedAt)
+        }
       }
 
       await options.sink.writeBatch(batch)
+      if (graphBatch) {
+        if (!options.sink.writeGraphBatch) {
+          throw new ArchiveClickHouseError('clickhouse_graph_sink_missing')
+        }
+        await options.sink.writeGraphBatch(graphBatch)
+      }
       await context.markDelivered()
     })
     return { status: 'delivered' }
@@ -720,6 +979,27 @@ export class ArchiveClickHouseSink {
     }
   }
 
+  /** Required before likes/follows delivery or purges are enabled. */
+  async graphHealthCheck(): Promise<void> {
+    const readiness = await this.request(`
+      SELECT count()
+      FROM system.columns
+      WHERE database = '${this.database}'
+        AND (table, name) IN (
+          ('account_likes', 'archive_upload_id'),
+          ('account_likes', 'is_tombstone'),
+          ('liked_tweet_versions', 'author_account_id'),
+          ('liked_tweet_versions', 'is_tombstone'),
+          ('account_follows', 'direction'),
+          ('account_follows', 'archive_upload_id'),
+          ('account_follows', 'is_tombstone')
+        )
+    `)
+    if (readiness.trim() !== '7') {
+      throw new ArchiveClickHouseError('clickhouse_graph_schema_missing')
+    }
+  }
+
   async writeBatch(batch: ArchiveClickHouseBatch): Promise<void> {
     for (const [table, rows] of Object.entries(batch)) {
       if (rows.length === 0) continue
@@ -729,6 +1009,118 @@ export class ArchiveClickHouseSink {
         body,
       )
     }
+  }
+
+  /** Archives can hold hundreds of thousands of likes; bound each request. */
+  async writeGraphBatch(batch: ArchiveClickHouseGraphBatch): Promise<void> {
+    for (const table of ARCHIVE_CLICKHOUSE_GRAPH_TABLES) {
+      const rows = batch[table]
+      for (let start = 0; start < rows.length; start += GRAPH_INSERT_CHUNK_ROWS) {
+        const body = rows
+          .slice(start, start + GRAPH_INSERT_CHUNK_ROWS)
+          .map((row) => JSON.stringify(row))
+          .join('\n')
+        await this.request(
+          `INSERT INTO ${this.database}.${table} FORMAT JSONEachRow`,
+          body,
+        )
+      }
+    }
+  }
+
+  /**
+   * Physically remove the purged likes and follow edges, then verify none
+   * remain. A tombstone row would still name (account, target), so edge
+   * purges never leave one. Opt-outs also tombstone liked-tweet text written
+   * by the account, matching tombstone_policy_account in PostgreSQL. Every
+   * step is idempotent; a timed-out mutation is re-verified on retry.
+   */
+  async purgeGraph(plan: ArchiveGraphPurgePlan): Promise<void> {
+    const params: Record<string, string> = {
+      account_id: plan.accountId,
+      upload_id: plan.archiveUploadId ?? '0',
+      keep_upload_ids: `[${plan.keepUploadIds.join(',')}]`,
+      max_upload_id: plan.maxUploadId,
+      source: ARCHIVE_CLICKHOUSE_GRAPH_PURGE_SOURCE,
+      event_prefix: `graph_purge:${plan.requestId}:liked_tweet:`,
+    }
+    const edgePredicate = plan.archiveUploadId
+      ? 'account_id = {account_id:UInt64} AND archive_upload_id = {upload_id:UInt64}'
+      : 'account_id = {account_id:UInt64} AND archive_upload_id <= {max_upload_id:UInt64} AND NOT has({keep_upload_ids:Array(UInt64)}, archive_upload_id)'
+
+    for (const table of ['account_likes', 'account_follows']) {
+      await this.deleteUntilAbsent(table, edgePredicate, params)
+    }
+
+    if (plan.purgeLikedTweetAuthor) {
+      await this.command(
+        `INSERT INTO ${this.database}.liked_tweet_versions
+          (tweet_id, author_account_id, full_text, is_tombstone, source, event_id, observed_at)
+         SELECT tweet_id, author_account_id, '', 1, {source:String},
+                concat({event_prefix:String}, toString(tweet_id)), now64(3)
+         FROM ${this.database}.liked_tweet_versions
+         WHERE author_account_id = {account_id:UInt64}
+           AND is_tombstone = 0
+         GROUP BY tweet_id, author_account_id`,
+        params,
+      )
+      await this.deleteUntilAbsent(
+        'liked_tweet_versions',
+        'author_account_id = {account_id:UInt64} AND is_tombstone = 0',
+        params,
+      )
+    }
+  }
+
+  private async deleteUntilAbsent(
+    table: string,
+    predicate: string,
+    params: Record<string, string>,
+  ): Promise<void> {
+    const remaining = () =>
+      this.command(
+        `SELECT count() FROM ${this.database}.${table} WHERE ${predicate}`,
+        params,
+      ).then((value) => value.trim())
+    if ((await remaining()) === '0') return
+    await this.command(
+      `ALTER TABLE ${this.database}.${table} DELETE WHERE ${predicate}
+       SETTINGS mutations_sync = 2`,
+      params,
+      GRAPH_PURGE_TIMEOUT_MS,
+    )
+    if ((await remaining()) !== '0') {
+      throw new ArchiveClickHouseError('clickhouse_graph_purge_incomplete')
+    }
+  }
+
+  /** POST a statement with typed query parameters instead of interpolation. */
+  private async command(
+    query: string,
+    params: Record<string, string>,
+    timeoutMs = 30_000,
+  ): Promise<string> {
+    const endpoint = new URL(this.url)
+    endpoint.searchParams.set('database', this.database)
+    // The writer's profile defaults to a 15-second limit; a synchronous
+    // mutation legitimately waits longer.
+    endpoint.searchParams.set('max_execution_time', String(Math.ceil(timeoutMs / 1000)))
+    for (const [key, value] of Object.entries(params)) {
+      endpoint.searchParams.set(`param_${key}`, value)
+    }
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${this.user}:${this.password}`).toString('base64')}`,
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
+      body: query,
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!response.ok) {
+      throw new ArchiveClickHouseError(`clickhouse_http_${response.status}`)
+    }
+    return response.text()
   }
 
   private async request(query: string, body?: string): Promise<string> {

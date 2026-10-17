@@ -98,6 +98,34 @@ You can manually run the pre-commit checks anytime:
 pnpm pre-commit
 ```
 
+### Supabase MCP server (AI agents)
+
+`.mcp.json` registers the Supabase MCP server for Claude Code in read-only mode
+against the production project (`fabxmporizzqflnftavs`). It reads your personal
+access token from the `SUPABASE_ACCESS_TOKEN` environment variable. Never paste
+a token into `.mcp.json`: git tracks the file despite its `.gitignore` entry, so
+a literal token would be committed to this public repository.
+
+1. Create a personal access token in the Supabase dashboard under
+   **Account → Access Tokens**. Name it so you can find and revoke it later.
+2. Export it in the environment that launches your agent, for example from your
+   shell profile or a password manager:
+
+   ```bash
+   export SUPABASE_ACCESS_TOKEN="<your token>"
+   ```
+
+   The app's `.env` file is not enough; the agent only sees its own process
+   environment. Restart the agent after setting the variable.
+
+3. Claude Code expands `${SUPABASE_ACCESS_TOKEN}` in `.mcp.json`. If the
+   variable is unset, the Supabase tools will not work; nothing else is
+   affected. Other MCP clients that do not expand variables should be
+   configured in their user-level settings, not in this file.
+
+The token carries your full account permissions; `--read-only` only limits what
+the MCP server itself will do. The same variable is used by `pnpm gen-types`.
+
 ### Supabase local instance setup
 
 Echoing [Supabase's Local Development instructions](https://supabase.com/docs/guides/cli/local-development?queryGroups=access-method&access-method=postgres#access-your-projects-services):

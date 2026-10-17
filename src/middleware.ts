@@ -89,6 +89,7 @@ const NOINDEX_PATH_PREFIXES = [
   '/profile',
   '/login',
   '/settings',
+  '/shelf',
   '/admin',
   '/auth',
 ]
@@ -107,6 +108,8 @@ const IN_MEMORY_MAX_SEARCH_CRAWLER = 120
 // DoS target (no HTML rendering cost shifts the attacker's effort lower).
 const IN_MEMORY_MAX_API_DEFAULT = 20
 const IN_MEMORY_MAX_API_SG = 5
+const IN_MEMORY_MAX_SHELF_COVER = 150
+const IN_MEMORY_MAX_SHELF_CURATION = 60
 // Critical signed-in flows have their own buckets so unrelated read traffic
 // cannot consume the request that completes OAuth or persists consent.
 const IN_MEMORY_MAX_OPT_IN_DEFAULT = 10
@@ -174,6 +177,21 @@ function getApiRateLimitPolicy(
     return {
       bucket: `api:${pathname.slice('/api/'.length)}`,
       maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
+
+  // A shelf page loads one cover per work, and curation is a burst of small
+  // owner writes; neither should consume the shared API quota.
+  if (method === 'GET' && pathname === '/api/shelf/cover') {
+    return {
+      bucket: 'api:shelf-cover',
+      maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_SHELF_COVER,
+    }
+  }
+  if (method === 'POST' && pathname === '/api/shelf/curation') {
+    return {
+      bucket: 'api:shelf-curation',
+      maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_SHELF_CURATION,
     }
   }
 

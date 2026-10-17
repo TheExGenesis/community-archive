@@ -37,6 +37,9 @@ const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   return config
 }
 
+/** The Supabase URL server clients in this process connect to. */
+export const getServerSupabaseUrl = () => getSupabaseConfig().url
+
 const createCookieHandler = (cookieStore: ReturnType<typeof cookies>) => ({
   get: (name: string) => cookieStore.get(name)?.value,
   set: (name: string, value: string, options: CookieOptions) => {

@@ -63,6 +63,7 @@ export function ProfileHeader({
   bannerSlot,
   bioSlot,
   ownerActionsSlot,
+  shelfLinkSlot,
 }: {
   profile: ProfileHeaderData
   archivedAt: string | null
@@ -73,6 +74,7 @@ export function ProfileHeader({
   bannerSlot?: ReactNode
   bioSlot?: ReactNode
   ownerActionsSlot?: ReactNode
+  shelfLinkSlot?: ReactNode
 }) {
   const archiveUrl =
     profile.has_archive && isOwner
@@ -200,12 +202,15 @@ export function ProfileHeader({
               <Stat value={profile.num_following} label="Following" />
               <Stat value={profile.num_likes} label="Likes" />
             </div>
-            <Link
-              href={`/search?${new URLSearchParams({ fromUser: profile.username, sort: 'newest' })}`}
-              className="self-start text-sm font-medium text-brand underline-offset-4 hover:underline lg:self-end"
-            >
-              Latest tweets →
-            </Link>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 self-start lg:self-end">
+              {shelfLinkSlot}
+              <Link
+                href={`/search?${new URLSearchParams({ fromUser: profile.username, sort: 'newest' })}`}
+                className="text-sm font-medium text-brand underline-offset-4 hover:underline"
+              >
+                Latest tweets →
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -932,3 +932,127 @@ CREATE INDEX bulletin_jev_ready_idx ON bulletin.jev_items(posted_at DESC)
   WHERE status='ready';
 CREATE INDEX bulletin_jev_resolution_idx ON bulletin.jev_items(context_checked_at NULLS FIRST,tweet_id)
   WHERE status='ready';
+
+-- Shelf: facts about the works and tools a member engaged with, derived from their own
+-- tweets by services/shelf. mentions and answers are append-only facts; items is the
+-- derived shelf the worker rebuilds per account; curation holds the owner's decisions,
+-- which survive rebuilds because they key on work_key.
+CREATE TABLE shelf.runs (
+  id bigserial PRIMARY KEY,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  finished_at timestamptz,
+  accounts text[] NOT NULL CHECK (cardinality(accounts) BETWEEN 1 AND 10),
+  status text NOT NULL DEFAULT 'running' CHECK (status IN ('running','done','failed','budget')),
+  counts jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE shelf.calls (
+  id bigserial PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  run_id bigint REFERENCES shelf.runs(id),
+  provider text NOT NULL CHECK (provider IN ('typesafe','openai','openrouter')),
+  model text NOT NULL,
+  stage text NOT NULL CHECK (stage IN ('gate','name','stance')),
+  reserved_usd numeric(12,8) NOT NULL CHECK (reserved_usd >= 0),
+  actual_usd numeric(12,8) CHECK (actual_usd >= 0),
+  status text NOT NULL DEFAULT 'reserved'
+);
+CREATE INDEX shelf_calls_created_idx ON shelf.calls(created_at);
+
+CREATE TABLE shelf.mentions (
+  id text PRIMARY KEY CHECK (id ~ '^mention:[0-9a-f]{12}$'),
+  account_id text NOT NULL CHECK (account_id ~ '^[0-9]{1,20}$'),
+  tweet_id text NOT NULL CHECK (tweet_id ~ '^[0-9]{1,20}$'),
+  surface text NOT NULL,
+  identity text NOT NULL CHECK (identity IN ('named','url','unnamed')),
+  name text NOT NULL,
+  creator text,
+  kind text NOT NULL,
+  namer text NOT NULL,
+  verbatim boolean NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX shelf_mentions_account_idx ON shelf.mentions(account_id);
+
+-- One row per tweet the namer processed, so tweets with no mentions are not re-sent.
+CREATE TABLE shelf.named_tweets (
+  tweet_id text NOT NULL CHECK (tweet_id ~ '^[0-9]{1,20}$'),
+  namer text NOT NULL,
+  account_id text NOT NULL CHECK (account_id ~ '^[0-9]{1,20}$'),
+  mention_count integer NOT NULL CHECK (mention_count >= 0),
+  cost_usd numeric(12,10),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tweet_id, namer)
+);
+
+-- Classifier answers. Questions are versioned (gate@1, warm@1); a reworded question is a
+-- new version, so answers are never updated.
+CREATE TABLE shelf.answers (
+  subject text NOT NULL CHECK (subject ~ '^(tweet:[0-9]{1,20}|mention:[0-9a-f]{12})$'),
+  question text NOT NULL CHECK (question ~ '^[a-z_]+@[0-9]+$'),
+  model text NOT NULL,
+  account_id text NOT NULL CHECK (account_id ~ '^[0-9]{1,20}$'),
+  p real CHECK (p BETWEEN 0 AND 1),
+  probs jsonb,
+  refusal boolean NOT NULL DEFAULT false,
+  cost_usd numeric(12,10),
+  latency_ms integer,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (subject, question, model),
+  CHECK (refusal OR p IS NOT NULL OR probs IS NOT NULL)
+);
+CREATE INDEX shelf_answers_account_idx ON shelf.answers(account_id);
+
+CREATE TABLE shelf.items (
+  account_id text NOT NULL CHECK (account_id ~ '^[0-9]{1,20}$'),
+  work_key text NOT NULL CHECK (length(work_key) BETWEEN 3 AND 300),
+  shelf_row text NOT NULL CHECK (shelf_row IN
+    ('books','reading','watching','listening','playing','tools','other','made','links','mentioned')),
+  medium text NOT NULL,
+  label text NOT NULL,
+  needs_title boolean NOT NULL,
+  creator text,
+  url text,
+  marks text[] NOT NULL DEFAULT '{}' CHECK (marks <@ ARRAY['loved','recommended','disliked']),
+  evidence_tweet_ids text[] NOT NULL CHECK (cardinality(evidence_tweet_ids) >= 1),
+  first_at timestamptz NOT NULL,
+  last_at timestamptz NOT NULL,
+  image_url text,
+  image_source text,
+  -- Fingerprint of what the public sees (row, label, creator, url, marks). An approval is
+  -- tied to it, so an approved item that changes goes back to the owner for review.
+  content_hash text NOT NULL CHECK (content_hash ~ '^[0-9a-f]{64}$'),
+  computed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, work_key)
+);
+
+-- Resolved titles and images, shared across accounts so a work is looked up once.
+-- key is a medium-scoped identity such as youtube:<id>, book:<title>|<creator> or url:<canonical>.
+CREATE TABLE shelf.resolutions (
+  key text PRIMARY KEY CHECK (length(key) BETWEEN 3 AND 400),
+  title text,
+  image_url text CHECK (image_url IS NULL OR image_url ~ '^https://'),
+  source text NOT NULL,
+  found boolean NOT NULL,
+  resolved_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- t.co short links seen in tweet text whose expanded URL the archive did not record.
+-- status is the HTTP status t.co returned; target is its Location header (a redirect).
+CREATE TABLE shelf.short_links (
+  code text PRIMARY KEY CHECK (code ~ '^[A-Za-z0-9]{4,20}$'),
+  target text CHECK (target IS NULL OR length(target) <= 4000),
+  status integer NOT NULL,
+  resolved_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Owner decisions. Nothing on a shelf is public until its owner approves it.
+CREATE TABLE shelf.curation (
+  account_id text NOT NULL CHECK (account_id ~ '^[0-9]{1,20}$'),
+  work_key text NOT NULL CHECK (length(work_key) BETWEEN 3 AND 300),
+  status text CHECK (status IN ('approved','hidden')),
+  title text CHECK (title IS NULL OR length(title) BETWEEN 1 AND 200),
+  approved_hash text CHECK (approved_hash IS NULL OR approved_hash ~ '^[0-9a-f]{64}$'),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, work_key)
+);

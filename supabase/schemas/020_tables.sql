@@ -458,6 +458,7 @@ CREATE TABLE IF NOT EXISTS "public"."digest_prompt_versions" (
     CONSTRAINT "digest_prompt_versions_parameters_object" CHECK (jsonb_typeof(parameters) = 'object')
 );
 ALTER TABLE "public"."digest_prompt_versions" OWNER TO "postgres";
+COMMENT ON TABLE "public"."digest_prompt_versions" IS 'Immutable prompt and model configurations for reproducible Daily Digest experiments.';
 
 CREATE TABLE IF NOT EXISTS "public"."digest_runs" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -483,6 +484,9 @@ CREATE TABLE IF NOT EXISTS "public"."digest_runs" (
     "started_at" timestamptz,
     "completed_at" timestamptz,
     "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "workflow_run_id" text,
+    "parent_run_id" uuid REFERENCES "public"."digest_runs"("id"),
+    "revision_instruction" text,
     CONSTRAINT "digest_runs_status_check" CHECK (status IN ('candidates_ready', 'running', 'completed', 'failed')),
     CONSTRAINT "digest_runs_window_check" CHECK (window_end > window_start),
     CONSTRAINT "digest_runs_candidates_array" CHECK (jsonb_typeof(candidates) = 'array'),
@@ -491,9 +495,15 @@ CREATE TABLE IF NOT EXISTS "public"."digest_runs" (
     CONSTRAINT "digest_runs_raw_response_object" CHECK (raw_response IS NULL OR jsonb_typeof(raw_response) = 'object'),
     CONSTRAINT "digest_runs_parsed_output_object" CHECK (parsed_output IS NULL OR jsonb_typeof(parsed_output) = 'object'),
     CONSTRAINT "digest_runs_token_counts_nonnegative" CHECK (coalesce(input_tokens, 0) >= 0 AND coalesce(output_tokens, 0) >= 0 AND coalesce(total_tokens, 0) >= 0),
-    CONSTRAINT "digest_runs_duration_nonnegative" CHECK (duration_ms IS NULL OR duration_ms >= 0)
+    CONSTRAINT "digest_runs_duration_nonnegative" CHECK (duration_ms IS NULL OR duration_ms >= 0),
+    CONSTRAINT "digest_runs_revision_instruction_length" CHECK (revision_instruction IS NULL OR char_length(revision_instruction) BETWEEN 1 AND 2000),
+    CONSTRAINT "digest_runs_revision_parent_check" CHECK ((revision_instruction IS NULL AND parent_run_id IS NULL) OR (revision_instruction IS NOT NULL AND parent_run_id IS NOT NULL))
 );
 ALTER TABLE "public"."digest_runs" OWNER TO "postgres";
+COMMENT ON TABLE "public"."digest_runs" IS 'Observable Daily Digest runs with exact candidates, model request/response, parsed output, usage, and event trace.';
+COMMENT ON COLUMN "public"."digest_runs"."workflow_run_id" IS 'Vercel Workflow run that durably executes this generation after the initiating request returns.';
+COMMENT ON COLUMN "public"."digest_runs"."parent_run_id" IS 'Completed digest run whose output an editorial revision builds on.';
+COMMENT ON COLUMN "public"."digest_runs"."revision_instruction" IS 'Editor request applied by this immutable revision generation run.';
 
 CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -506,8 +516,8 @@ CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
     "created_by" uuid,
     "created_at" timestamptz NOT NULL DEFAULT now(),
     "published_at" timestamptz,
-    "view_count" bigint NOT NULL DEFAULT 0,
     "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "view_count" bigint NOT NULL DEFAULT 0,
     CONSTRAINT "digest_editions_date_version_key" UNIQUE ("digest_date", "version"),
     CONSTRAINT "digest_editions_version_positive" CHECK (version > 0),
     CONSTRAINT "digest_editions_view_count_nonnegative" CHECK (view_count >= 0),
@@ -516,6 +526,7 @@ CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
     CONSTRAINT "digest_editions_publication_time_check" CHECK ((status = 'published' AND published_at IS NOT NULL) OR status <> 'published')
 );
 ALTER TABLE "public"."digest_editions" OWNER TO "postgres";
+COMMENT ON TABLE "public"."digest_editions" IS 'Versioned static Daily Digest artifacts. Only rows with status=published are publicly readable.';
 
 -- Daily Digest email subscriptions. Single opt-in: a row exists only after
 -- someone submits their address, confirmed_at is stamped at that moment,

@@ -10,6 +10,7 @@ Source repository: https://github.com/TheExGenesis/community-archive
 - [Docs and access guide](https://www.community-archive.org/docs): Human-readable overview of the bulk dump, API, and raw archives.
 - [Agent and schema guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/agents.md): Tables, relationships, fields, and common query patterns.
 - [API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples, filters, and pagination.
+- [MCP server guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/mcp.md): Connect to /api/mcp for public archive search, tweets, threads, quotes, profiles, Bangers, and digests.
 - [Interactive API reference](https://www.community-archive.org/api/reference): Browse the PostgREST API.
 - [OpenAPI specification](https://www.community-archive.org/openapi.json): Machine-readable API schema.
 - [Examples](https://github.com/TheExGenesis/community-archive/tree/main/docs/examples): Python examples and a canonical notebook.

@@ -22,6 +22,23 @@ const request = (
   )
 
 describe('API middleware rate limits', () => {
+  it('allows agent requests to MCP and keeps a separate bounded quota', async () => {
+    const ip = '203.0.113.90'
+    const mcpRequest = (pathname = '/api/mcp') =>
+      middleware(
+        new NextRequest(`https://www.community-archive.org${pathname}`, {
+          method: 'POST',
+          headers: { 'user-agent': 'codex', 'x-forwarded-for': ip },
+        }),
+      )
+    for (let index = 0; index < 20; index++) {
+      expect((await request('/api/portal/stream', ip)).status).toBe(200)
+      expect((await mcpRequest()).status).toBe(200)
+    }
+    expect((await mcpRequest()).status).toBe(429)
+    expect((await mcpRequest('/api/mcp/other')).status).toBe(403)
+    expect((await request('/api/tweet-search?q=archive', ip)).status).toBe(200)
+  })
   it('gives companion reads one bounded budget separate from website background traffic', async () => {
     const ip = '203.0.113.80'
     for (let index = 0; index < 20; index++) {

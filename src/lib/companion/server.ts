@@ -2,15 +2,13 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@/utils/supabase'
 import { getCurrentUser } from '@/lib/portal/auth'
-import { getPortalBangersPage, enrichPortalTweets } from '@/lib/portal/data'
+import { enrichPortalTweets } from '@/lib/portal/data'
 import {
   fetchPortalWeeklyTrends,
   fetchPortalTrendSeries,
   fetchPortalTrendEvidence,
 } from '@/lib/portal/analytics'
-import { getCuratedProfileBangersPage } from '@/lib/profileCuration'
-import { resolveProfileCore } from '@/lib/metaTwitter/profile'
-import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
+import { getPublicBangersPage } from '@/lib/publicBangers'
 import { getPublishedDigest } from '@/lib/digest/data'
 import {
   fetchAnalyticsGatewayJson,
@@ -18,6 +16,7 @@ import {
   isClickHouseReadsEnabled,
 } from '@/lib/clickhouseGateway'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
+import { buildClickHouseSearchParams } from '@/lib/clickhouseSearch'
 import { compactDigest, compactGraph } from './projections'
 import {
   archiveHref,
@@ -70,45 +69,22 @@ export async function readCompanion(
   const { feature, q = '', username = '', offset = 0 } = input
   switch (feature) {
     case 'bangers': {
-      if (username) {
-        const profile = await resolveProfileCore(username)
-        if (!profile)
-          return {
-            ...base,
-            feature,
-            data: { tweets: [], nextOffset: null },
-            explanation: `No public archive profile found for @${username}.`,
-          }
-        const page = await getCuratedProfileBangersPage(profile.accountId, {
-          limit: 6,
-          offset,
-          sort: 'quotes',
-        })
-        if (!page.available) throw new Error('Profile bangers unavailable')
-        return {
-          ...base,
-          feature,
-          data: {
-            tweets: page.tweets.map((t) => bangerPortalTweet(t)),
-            nextOffset: page.nextOffset,
-          },
-          explanation: `@${username}’s profile bangers, with the same ranking and curation as CA.`,
-        }
-      }
-      const page = await getPortalBangersPage({
+      const page = await getPublicBangersPage({
+        username,
         limit: 6,
         offset,
-        scope: 'all',
-        sort: 'quotes',
         query: q,
-        period: input.period === 'all' ? undefined : input.period || 'week',
+        period: input.period,
       })
       return {
         ...base,
         feature,
-        data: { tweets: page.tweets, nextOffset: page.pagination.nextOffset },
-        explanation:
-          'Ranked by quotes from archive members, using CA’s bangers service.',
+        data: { tweets: page.tweets, nextOffset: page.nextOffset },
+        explanation: username
+          ? page.accountId
+            ? `@${username}'s profile bangers use the same ranking and curation as CA.`
+            : `No public archive profile found for @${username}.`
+          : 'Ranked by quotes from archive members, using CA’s bangers service.',
       }
     }
     case 'digest': {
@@ -203,14 +179,12 @@ export async function readCompanion(
     case 'search': {
       if (!isClickHouseReadsEnabled())
         throw new Error('Archive search unavailable')
-      const params = new URLSearchParams({
-        q,
-        mode: q.split(/\s+/).length > 1 ? 'phrase' : 'all',
-        limit: '6',
-        offset: String(offset),
-        exclude_retweets: 'true',
-      })
-      if (username) params.set('from_user', username)
+      const params = buildClickHouseSearchParams(
+        { rawSearchQuery: q, fromUsername: username },
+        6,
+        offset,
+        { excludeRetweets: true },
+      )
       const page = await fetchAnalyticsGatewayJson<SearchResponse>(
         ['search'],
         params,

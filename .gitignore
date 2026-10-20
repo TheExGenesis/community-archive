@@ -69,3 +69,10 @@ scratchpad/
 
 # Left behind when `gen-types` fails before it can mv the file into place.
 src/database-types.ts.tmp
+
+# design-sync (claude.ai/design) build state; the durable set under .design-sync/ is committed
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

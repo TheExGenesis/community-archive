@@ -140,9 +140,9 @@ export default function DocsPage() {
               <p className="text-sm leading-6 text-foreground">
                 The keyed Community Archive API at{' '}
                 <code className="break-all">{V1_API_URL}</code> replaces the
-                public Supabase REST API, which is being retired. The old API
-                stays up until a retirement date is announced; new projects
-                should start on v1.
+                public Supabase REST API, which is retired on{' '}
+                <strong>19 November 2026</strong>. Move existing integrations
+                before then; new projects should start on v1.
               </p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <ResourceLink href={API_KEYS_URL}>
@@ -384,9 +384,9 @@ export default function DocsPage() {
               Legacy Supabase REST API
             </h2>
             <p className="mt-2 leading-7 text-muted-foreground">
-              The PostgREST API served by Supabase is being retired in favour of
-              v1 above. It stays up until a retirement date is announced, so
-              existing integrations keep working for now; follow the{' '}
+              The PostgREST API served by Supabase is retired on{' '}
+              <strong>19 November 2026</strong> in favour of v1 above. It keeps
+              working until then; follow the{' '}
               <Link
                 href={V1_MIGRATION_GUIDE_URL}
                 className="font-medium text-brand"

@@ -466,19 +466,21 @@ export function TweetRow({
       is_featured: isFeatured,
     })
   }
-  const rowClassName = isEditorial
-    ? isFeatured
-      ? `relative flex min-w-0 gap-[18px] ${animate ? 'portal-slide-in' : ''}`
-      : `flex gap-[18px] border-t border-zinc-200 py-6 dark:border-[#26262a] ${
-          animate ? 'portal-slide-in' : ''
-        }`
-    : isFeatured
-      ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
-          animate ? 'portal-slide-in' : ''
-        }`
-      : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
-          animate ? 'portal-slide-in' : ''
-        }`
+  const rowClassName = isMap
+    ? 'flex min-w-0 gap-1.5 px-2 py-2.5 transition-colors hover:bg-zinc-50 dark:hover:bg-[#1f1f23]'
+    : isEditorial
+      ? isFeatured
+        ? `relative flex min-w-0 gap-[18px] ${animate ? 'portal-slide-in' : ''}`
+        : `flex gap-[18px] border-t border-zinc-200 py-6 dark:border-[#26262a] ${
+            animate ? 'portal-slide-in' : ''
+          }`
+      : isFeatured
+        ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
+            animate ? 'portal-slide-in' : ''
+          }`
+        : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
+            animate ? 'portal-slide-in' : ''
+          }`
 
   const activateCard = () => {
     captureAction('open')

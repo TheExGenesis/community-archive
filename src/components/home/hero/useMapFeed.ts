@@ -10,6 +10,7 @@ import {
 import { mapUrl } from '@/lib/hexMap/version'
 import { selectStories } from '@/lib/hexMap/selectStories'
 import type { StoryPage } from '@/lib/hexMap/stories'
+import type { BestPeriod } from '@/lib/hexMap/periods'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 
 type Page = { nextOffset: number | null }
@@ -31,7 +32,7 @@ function pageOptions<T extends Page>(path: string, offset: number) {
     retry: false,
   })
 }
-async function loadPage<T extends Page>(
+export async function loadPage<T extends Page>(
   client: QueryClient,
   path: string,
   offset: number,
@@ -82,7 +83,7 @@ export function prefetchMapFeed(
 export function selectionFeedPath(
   tab: string,
   cells: string,
-  period: 'week' | 'all' = 'week',
+  period: BestPeriod = 'week',
 ) {
   return tab === 'Stories' || tab === 'Strands'
     ? `stories?kind=${tab === 'Stories' ? 'digest' : 'strand'}&cells=${cells}`

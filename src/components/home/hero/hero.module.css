@@ -230,8 +230,8 @@
   gap: 14px;
   overflow-x: auto;
   border-bottom: 1px solid hsl(var(--border));
-  padding: 0 0 8px;
-  margin-bottom: 14px;
+  padding: 0 0 3px;
+  margin-bottom: 8px;
 }
 .tabs button {
   font-size: 12px;
@@ -267,10 +267,9 @@
   display: block;
   text-align: left;
   width: 100%;
-  padding: 13px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  margin: 10px 0;
+  padding: 10px 8px;
+  border-bottom: 1px solid hsl(var(--border));
+  margin: 0;
   background: hsl(var(--background));
   transition: border-color 0.12s;
 }
@@ -302,7 +301,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-top: 12px;
+  margin-top: 7px;
   font-size: 10px;
   color: hsl(var(--muted-foreground));
   overflow: hidden;
@@ -335,7 +334,7 @@
   margin: 16px 0 22px;
 }
 .message {
-  padding: 24px 10px;
+  padding: 14px 8px;
   font-size: 12px;
   line-height: 1.8;
   color: hsl(var(--muted-foreground));
@@ -400,9 +399,8 @@
   color: hsl(var(--brand-deep));
 }
 .tweet {
-  border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  margin-bottom: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  margin: 0;
   overflow: hidden;
 }
 .tweet:hover {
@@ -511,14 +509,14 @@
   white-space: nowrap;
 }
 .sectionTitle {
-  padding: 16px 20px 8px;
+  padding: 10px 8px 6px;
   font-size: 12px;
   font-weight: 600;
   color: hsl(var(--muted-foreground));
 }
 
 .communityLabel {
-  margin: 16px 0 6px;
+  margin: 10px 8px 2px;
   font-size: 12px;
   font-weight: 600;
   color: hsl(var(--muted-foreground));
@@ -603,7 +601,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0 0 6px;
 }
 .feedControls select {
   border: 1px solid hsl(var(--border));
@@ -679,4 +677,12 @@
 }
 .helpTips dd {
   color: hsl(var(--muted-foreground));
+}
+
+.feedHeading {
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
 }

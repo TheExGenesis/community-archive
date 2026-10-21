@@ -1,3 +1,4 @@
+import { BEST_PERIODS, type BestPeriod } from '@/lib/hexMap/periods'
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import { NextRequest, NextResponse } from 'next/server'
 import { mapGateway, portalPost, type MapPost } from '@/lib/hexMap/gateway'
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     !/^\d+(,\d+)*$/.test(cells) ||
     cells.length > 8000 ||
     !['likes', 'time', 'quotes'].includes(sort) ||
-    !['week', 'all'].includes(period) ||
+    !BEST_PERIODS.includes(period as BestPeriod) ||
     !/^\d{1,4}$/.test(offset) ||
     Number(offset) > 2000
   )
@@ -31,10 +32,16 @@ export async function GET(request: NextRequest) {
   try {
     const result = await mapGateway<{
       period?: string
+      timeRangeVersion?: number
       data: MapPost[]
       nextOffset: number | null
     }>('hex-posts', { cells, sort, offset, period })
-    if (sort === 'quotes' && period === 'week' && result.period !== 'week')
+    if (
+      period !== 'all' &&
+      (result.period !== period ||
+        ((sort !== 'quotes' || period !== 'week') &&
+          result.timeRangeVersion !== 2))
+    )
       throw new Error('Map backend does not support this time range yet')
     const allowed = await memberTweets(result.data.map(portalPost)),
       byId = new Map(result.data.map((t) => [t.tweetId, t]))

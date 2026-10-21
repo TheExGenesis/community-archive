@@ -8,7 +8,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { useBestFeed, bestFeedRows } from './useBestFeed'
+import {
+  BEST_PERIODS,
+  PERIOD_LABELS,
+  type BestPeriod,
+} from '@/lib/hexMap/periods'
 import { useMapFeed, selectionFeedPath } from './useMapFeed'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapStory, StoryPage, MapPostPage } from '@/lib/hexMap/stories'
@@ -149,12 +155,22 @@ export default function SelectionFeed({
   onHover: (s: MapStory | null) => void
   onTweetHover: (cell?: number, username?: string) => void
 }) {
-  const [period, setPeriod] = useState<'week' | 'all'>('week')
+  const [period, setPeriod] = useState<BestPeriod>('week')
   const ids = [...cells].sort((a, b) => a - b).join(',')
-  const q = useMapFeed<MapPostPage>(
+  const posts = useMapFeed<MapPostPage>(
     selectionFeedPath(tab, ids, period),
-    tab !== 'Stories' && tab !== 'Strands',
+    tab !== 'Stories' && tab !== 'Strands' && tab !== 'Bangers',
   )
+  const best = useBestFeed(ids, period, tab === 'Bangers')
+  const q = tab === 'Bangers' ? best : posts
+  const rows =
+    tab === 'Bangers'
+      ? bestFeedRows(best.data?.pages ?? [])
+      : tab === 'Stories' || tab === 'Strands'
+        ? []
+        : (posts.data?.pages.flatMap((p) =>
+            p.tweets.map((row) => ({ ...row, heading: undefined })),
+          ) ?? [])
   return (
     <div role="tabpanel">
       {tab === 'Bangers' && (
@@ -162,10 +178,13 @@ export default function SelectionFeed({
           <select
             aria-label="Best time range"
             value={period}
-            onChange={(e) => setPeriod(e.target.value as 'week' | 'all')}
+            onChange={(e) => setPeriod(e.target.value as BestPeriod)}
           >
-            <option value="week">Last 7 days</option>
-            <option value="all">All time</option>
+            {BEST_PERIODS.map((value) => (
+              <option key={value} value={value}>
+                {PERIOD_LABELS[value]}
+              </option>
+            ))}
           </select>
           <TooltipProvider>
             <Tooltip>
@@ -176,7 +195,10 @@ export default function SelectionFeed({
               </TooltipTrigger>
               <TooltipContent className="max-w-64">
                 Ranked by quote tweets from Community Archive users. The time
-                range applies to when the original post was published.
+                range applies to when the original post was published. If the
+                week has no ranked posts, we show its most-liked posts.
+                Scrolling widens to 30 days, 90 days, 365 days, then all time
+                without repeating posts.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -202,11 +224,10 @@ export default function SelectionFeed({
               <button onClick={() => q.refetch()}>Retry</button>
             </p>
           ) : (
-            q.data?.pages
-              .flatMap((p) => p.tweets)
-              .map(({ tweet, cell }) => (
+            rows.map(({ tweet, cell, heading }) => (
+              <Fragment key={tweet.id}>
+                {heading && <h3 className={styles.feedHeading}>{heading}</h3>}
                 <div
-                  key={tweet.id}
                   className={styles.tweet}
                   onMouseEnter={() => onTweetHover(cell, tweet.username)}
                   onFocusCapture={() => onTweetHover(cell, tweet.username)}
@@ -229,9 +250,10 @@ export default function SelectionFeed({
                     constrainMedia
                   />
                 </div>
-              ))
+              </Fragment>
+            ))
           )}
-          {q.data && !q.data.pages.some((p) => p.tweets.length) && (
+          {q.data && !rows.length && !q.hasNextPage && (
             <p className={styles.message}>
               No member posts are available in these cells.
             </p>

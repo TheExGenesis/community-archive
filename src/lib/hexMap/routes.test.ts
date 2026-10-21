@@ -50,3 +50,43 @@ it('does not publish partially checked data when policy lookup fails', async () 
     error: 'Map posts are temporarily unavailable',
   })
 })
+
+it('requires the extended backend contract before showing bounded likes or wider Best ranges', async () => {
+  jest.mocked(memberTweets).mockResolvedValue([])
+  for (const [sort, period] of [
+    ['likes', 'week'],
+    ['quotes', 'month'],
+    ['quotes', 'quarter'],
+    ['quotes', 'year'],
+  ]) {
+    jest
+      .mocked(mapGateway)
+      .mockResolvedValue({ period, data: [], nextOffset: null })
+    expect(
+      (
+        await GET(
+          request(
+            `version=${MAP_VERSION}&cells=4&sort=${sort}&period=${period}`,
+          ),
+        )
+      ).status,
+    ).toBe(503)
+    jest
+      .mocked(mapGateway)
+      .mockResolvedValue({
+        period,
+        timeRangeVersion: 2,
+        data: [],
+        nextOffset: null,
+      })
+    expect(
+      (
+        await GET(
+          request(
+            `version=${MAP_VERSION}&cells=4&sort=${sort}&period=${period}`,
+          ),
+        )
+      ).status,
+    ).toBe(200)
+  }
+})

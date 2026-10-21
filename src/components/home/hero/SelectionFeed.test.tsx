@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import SelectionFeed from './SelectionFeed'
 import StoryPanel from './StoryPanel'
+import { useBestFeed } from './useBestFeed'
 import { useMapFeed } from './useMapFeed'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 
@@ -20,6 +21,10 @@ jest.mock('./useMapFeed', () => ({
   ...jest.requireActual('./useMapFeed'),
   useMapFeed: jest.fn(),
   prefetchMapFeed: jest.fn(),
+}))
+jest.mock('./useBestFeed', () => ({
+  ...jest.requireActual('./useBestFeed'),
+  useBestFeed: jest.fn(),
 }))
 const empty = {
   stories: [],
@@ -44,6 +49,13 @@ const noop = () => {}
 beforeEach(() => {
   jest.clearAllMocks()
   result = { ...base, data: { pages: [empty] } }
+  jest
+    .mocked(useBestFeed)
+    .mockReturnValue({
+      ...base,
+      hasNextPage: false,
+      data: { pages: [] },
+    } as unknown as ReturnType<typeof useBestFeed>)
   jest.mocked(useMapFeed).mockImplementation(
     (path) =>
       (path.startsWith('stories?')

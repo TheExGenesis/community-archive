@@ -12,6 +12,8 @@ import {
   plainTweetText,
   type TweetPageSubject,
 } from '@/lib/tweetSummary/subject'
+import type { TweetData } from '@/lib/tweets/types'
+import type { ClickHouseQuotePostsData } from '@/lib/clickhouseQuotePosts'
 import type { GeneratedSummary } from '@/lib/tweetSummary/generation'
 import { loadTweetPage } from '@/lib/tweetSummary/loadTweetPage'
 import { getTweetPageSummary } from '@/lib/tweetSummary/store'
@@ -60,6 +62,7 @@ export default async function TweetPage(props: PageProps) {
     threadTree,
     quotingTweets,
     quotingTweetCount,
+    quotePosts,
     subject,
     summary,
     summaryPending,
@@ -88,7 +91,9 @@ export default async function TweetPage(props: PageProps) {
             {eyebrowLabel(subject.kind)}
           </div>
           {summaryPending ? (
-            <Suspense fallback={<SummaryHeadingSkeleton />}>
+            <Suspense
+              fallback={<SummaryHeading subject={subject} summary={null} />}
+            >
               <GeneratedSummaryHeading subject={subject} />
             </Suspense>
           ) : (
@@ -131,11 +136,18 @@ export default async function TweetPage(props: PageProps) {
             </div>
           </div>
 
-          <QuotingTweetsSidebar
-            tweets={quotingTweets}
-            totalCount={quotingTweetCount}
-            targetTweet={tweet}
-          />
+          {quotePosts ? (
+            <Suspense fallback={<QuotePostsLoading />}>
+              <IncomingQuotes quotePosts={quotePosts} targetTweet={tweet} />
+            </Suspense>
+          ) : (
+            <QuotingTweetsSidebar
+              key={tweet.tweet_id}
+              tweets={quotingTweets}
+              totalCount={quotingTweetCount}
+              targetTweet={tweet}
+            />
+          )}
         </div>
       </section>
     </main>
@@ -180,27 +192,36 @@ async function GeneratedSummaryHeading({
   return <SummaryHeading subject={subject} summary={summary} />
 }
 
-// A wireframe of the heading with a brand-tinted sweep, sized like a
-// one-line title and a three-line description. Holds still for reduced motion.
-const shimmerBar =
-  'rounded-md bg-muted bg-shimmer bg-[length:200%_100%] bg-no-repeat animate-shimmer motion-reduce:animate-none'
-
-function SummaryHeadingSkeleton() {
+async function IncomingQuotes({
+  quotePosts,
+  targetTweet,
+}: {
+  quotePosts: Promise<ClickHouseQuotePostsData>
+  targetTweet: TweetData
+}) {
+  const { tweets, totalCount } = await quotePosts
   return (
-    <div aria-busy="true">
-      <div className={`${shimmerBar} h-10 w-full max-w-2xl sm:h-12`} />
-      <div className="mt-5 max-w-2xl space-y-3">
-        <div className={`${shimmerBar} h-4 w-full`} />
-        <div className={`${shimmerBar} h-4 w-11/12`} />
-        <div className={`${shimmerBar} h-4 w-3/5`} />
-      </div>
-      <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground/80">
-        <Sparkles
-          className="h-3.5 w-3.5 animate-pulse text-brand motion-reduce:animate-none"
-          aria-hidden
-        />
-        Writing an AI summary…
+    <QuotingTweetsSidebar
+      key={targetTweet.tweet_id}
+      tweets={tweets}
+      totalCount={totalCount}
+      targetTweet={targetTweet}
+    />
+  )
+}
+
+function QuotePostsLoading() {
+  return (
+    <aside aria-label="Quote tweets" aria-busy="true">
+      <h2 className="mb-5 text-xl font-semibold text-foreground">
+        Conversation
+      </h2>
+      <p
+        role="status"
+        className="rounded-lg border border-border bg-card px-5 py-8 text-sm text-muted-foreground"
+      >
+        Loading archived quotes…
       </p>
-    </div>
+    </aside>
   )
 }

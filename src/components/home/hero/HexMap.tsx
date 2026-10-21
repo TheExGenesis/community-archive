@@ -47,6 +47,8 @@ export default memo(function HexMap({
   onRetryHeat,
   scrubber,
   coverageLive,
+  finder,
+  selfLocation,
 }: {
   snapshot: HexSnapshot
   selected: number[]
@@ -63,6 +65,8 @@ export default memo(function HexMap({
   onRetryHeat: () => void
   scrubber: ReactNode
   coverageLive: boolean
+  finder?: ReactNode
+  selfLocation?: { username: string; cell: number } | null
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ width: 800, height: 650 })
@@ -74,6 +78,14 @@ export default memo(function HexMap({
   const dark = resolvedTheme === 'dark'
   const geo = useMemo(() => geometry(snapshot), [snapshot])
   const camera = useMapCamera(geo.bounds, size.width, size.height)
+  const lastSelfLocation = useRef(selfLocation)
+  useEffect(() => {
+    if (selfLocation && lastSelfLocation.current !== selfLocation) {
+      const cell = snapshot.cells[selfLocation.cell]
+      if (cell) camera.focus(cell.x, -cell.y)
+    }
+    lastSelfLocation.current = selfLocation
+  }, [selfLocation, snapshot, camera])
   const lastAnchor = useRef('')
   useEffect(() => {
     const pin = pins.find(
@@ -427,6 +439,7 @@ export default memo(function HexMap({
   const region = cell && snapshot.regions.find((r) => r.id === cell.region)
   return (
     <div className={styles.mapShell}>
+      {finder}
       <div
         ref={camera.ref}
         className={styles.mapViewport}

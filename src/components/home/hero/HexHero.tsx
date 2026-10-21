@@ -10,6 +10,7 @@ import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapLookup, MapHeat } from '@/lib/hexMap/gateway'
 import type { MapStory } from '@/lib/hexMap/stories'
 import StoryPanel from './StoryPanel'
+import WhereAmI, { type SelfLocation } from './WhereAmI'
 import { useSelectionPreview } from './useSelectionPreview'
 import styles from './hero.module.css'
 const HexMap = dynamic(() => import('./HexMap'), {
@@ -32,6 +33,7 @@ export default function HexHero({
   useEffect(() => {
     void import('./HexMap')
   }, [])
+  const [selfLocation, setSelfLocation] = useState<SelfLocation | null>(null)
   const [selectionTab, setSelectionTab] = useState('Stories')
   const [selected, setSelected] = useState<number[]>([])
   const [hover, setHover] = useState<MapStory | null>(null)
@@ -131,8 +133,10 @@ export default function HexHero({
               ? []
               : [{ username: p.username, cell: p.cell }],
           )
-        : (pins.data?.people ?? []),
-    [active, pins.data],
+        : selfLocation
+          ? [selfLocation]
+          : (pins.data?.people ?? []),
+    [active, pins.data, selfLocation],
   )
   return (
     <section className={styles.hero} aria-label="Explore the Community Archive">
@@ -155,7 +159,13 @@ export default function HexHero({
         onBlur={() => setTrend('')}
       >
         <div className={styles.search}>
-          <HomepageSearch compact onPreview={setExpression} />
+          <HomepageSearch
+            compact
+            onPreview={(value) => {
+              setExpression(value)
+              setSelfLocation(null)
+            }}
+          />
         </div>
         <div className={styles.stats}>{stats}</div>
         {trends}
@@ -166,9 +176,24 @@ export default function HexHero({
             <SectionReady section="homepage_hex_map" />
             <HexMap
               snapshot={currentSnapshot!}
+              selfLocation={selfLocation}
+              finder={
+                <WhereAmI
+                  onLocated={(person) => {
+                    setSelfLocation(person)
+                    if (person) {
+                      setSelected([person.cell])
+                      setOpen(null)
+                      setHover(null)
+                      setTweetCell(undefined)
+                      preloadSelection([person.cell])
+                    }
+                  }}
+                />
+              }
               coverageLive={!!pins.data}
               pins={visiblePins}
-              anchor={anchor}
+              anchor={selfLocation?.username ?? anchor}
               heat={term && heat.data ? values : undefined}
               heatTerm={term}
               heatStatus={
@@ -210,6 +235,7 @@ export default function HexHero({
               selected={selected}
               onSelectionIntent={onSelectionIntent}
               onSelect={(cells) => {
+                setSelfLocation(null)
                 onSelectionIntent(null)
                 preloadSelection(cells)
                 setSelected(cells)

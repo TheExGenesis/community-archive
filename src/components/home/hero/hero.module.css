@@ -488,3 +488,78 @@
   font-weight: 600;
   color: hsl(var(--muted-foreground));
 }
+
+.finder {
+  position: absolute;
+  z-index: 6;
+  top: 14px;
+  right: 14px;
+  width: 230px;
+  max-width: calc(100% - 28px);
+  font-size: 12px;
+}
+.finderForm {
+  display: flex;
+  align-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--background));
+  box-shadow: 0 2px 8px #00000008;
+}
+.finderForm:focus-within {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+.finderForm input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.finderForm button {
+  padding: 10px;
+  color: #0284c7;
+}
+.finderForm button:disabled {
+  opacity: 0.5;
+}
+.finderMessage {
+  position: relative;
+  margin-top: 6px;
+  padding: 12px 26px 12px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--background));
+  box-shadow: 0 3px 12px #0000000d;
+  line-height: 1.5;
+}
+.finderMessage p {
+  margin-top: 8px;
+}
+.finderMessage a {
+  text-decoration: underline;
+}
+.finderClose {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  padding: 2px;
+}
+.finderAction {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #0284c7;
+  color: white;
+  font-weight: 600;
+  text-decoration: none !important;
+}
+@media (max-width: 600px) {
+  .finder {
+    top: 90px;
+    width: 200px;
+  }
+}

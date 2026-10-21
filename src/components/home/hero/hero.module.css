@@ -450,9 +450,10 @@
   transform: translate(-50%, -50%);
   font-size: 11px;
   font-weight: 700;
-  color: #0284c7;
+  color: #3f3f46;
   white-space: nowrap;
-  text-shadow: 0 1px 2px hsl(var(--background));
+  paint-order: stroke fill;
+  -webkit-text-stroke: 2px white;
 }
 .scrubber {
   position: absolute;
@@ -588,15 +589,33 @@
   position: absolute;
   z-index: 3;
   pointer-events: none;
-  transform: translate(-50%, -50%);
-  padding: 5px 10px;
-  border: 2px solid white;
-  border-radius: 999px;
-  background: #0369a1;
-  color: white;
-  font-size: 13px;
-  font-weight: 800;
+  transform: translate(-50%, -100%);
+  padding: 4px 8px;
+  border: 1px solid #d4d4d8;
+  border-radius: 5px;
+  background: white;
+  color: #3f3f46;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
-  box-shadow: 0 2px 12px #0369a155;
+  box-shadow: 0 1px 4px #18181b18;
+}
+.hoveredAuthorPointer {
+  position: absolute;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-right: 1px solid #d4d4d8;
+  border-bottom: 1px solid #d4d4d8;
+  transform: translateX(-50%) rotate(45deg);
+}
+.hoveredAuthor[data-side='below'] {
+  transform: translate(-50%, 0);
+}
+.hoveredAuthor[data-side='below'] .hoveredAuthorPointer {
+  top: -5px;
+  bottom: auto;
+  transform: translateX(-50%) rotate(225deg);
 }

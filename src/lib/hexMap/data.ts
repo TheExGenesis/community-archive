@@ -18,12 +18,7 @@ import type { MapStory, StoryPage, StoryDetail } from './stories'
 export async function memberTweets(
   tweets: PortalTweet[],
 ): Promise<PortalTweet[]> {
-  const policy = await getAppPolicy(
-    tweets.flatMap((t) => [
-      t.username,
-      ...(t.quotedTweet ? [t.quotedTweet.username] : []),
-    ]),
-  )
+  const policy = await getAppPolicy(tweets.map((t) => t.username))
   const allowed = (t: { username: string; accountId?: string }) =>
     policy.members.has(t.username.toLowerCase()) &&
     !policy.blocked.has(t.username.toLowerCase()) &&

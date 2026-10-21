@@ -23,7 +23,7 @@
 }
 .stats {
   margin-top: 8px;
-  text-align: center;
+  text-align: left;
   font-size: 12px;
   line-height: 1.5;
   color: hsl(var(--muted-foreground));
@@ -222,6 +222,8 @@
   padding-top: 24px;
 }
 .edition h2 {
+  font-weight: 700;
+  color: hsl(var(--foreground));
   font-family: var(--font-petrona), Georgia, serif;
   font-size: 23px;
   line-height: 1.2;

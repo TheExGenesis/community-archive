@@ -1,5 +1,5 @@
 'use client'
-import { mapUrl } from '@/lib/hexMap/version'
+import { MAP_REVISION, mapUrl } from '@/lib/hexMap/version'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -45,7 +45,7 @@ export default function HexHero({
     username: string
   }>()
   const map = useQuery({
-    queryKey: ['hex-map-meta'],
+    queryKey: ['hex-map-meta', MAP_REVISION],
     queryFn: async ({ signal }) => {
       const response = await fetch(mapUrl('meta'), { signal })
       if (!response.ok) throw new Error('Map unavailable')

@@ -1,4 +1,5 @@
 import snapshot from './snapshot.json'
+import { MAP_VERSION, MAP_REVISION } from './version'
 import {
   geometry,
   hitCell,
@@ -70,9 +71,46 @@ describe('hero geometry', () => {
       labels[0],
     ])
   })
+  it('keeps all 38 communities contiguous and their labels anchored within their own cells', () => {
+    expect(snapshot.version).toBe(MAP_VERSION)
+    expect(snapshot.revision).toBe(MAP_REVISION)
+    const neighbours = snapshot.cells.map(() => [] as number[])
+    for (const edge of geo.edges) {
+      if (edge.cells.length === 2) {
+        const [a, b] = edge.cells
+        neighbours[a].push(b)
+        neighbours[b].push(a)
+      }
+    }
+    for (const region of snapshot.regions) {
+      const ids = snapshot.cells.flatMap((cell, id) =>
+        cell.region === region.id ? [id] : [],
+      )
+      expect(ids).toHaveLength(region.hexes)
+      const visited = new Set<number>()
+      const pending = [ids[0]]
+      while (pending.length) {
+        const id = pending.pop()!
+        if (visited.has(id)) continue
+        visited.add(id)
+        pending.push(
+          ...neighbours[id].filter(
+            (n) => snapshot.cells[n].region === region.id && !visited.has(n),
+          ),
+        )
+      }
+      expect(visited.size).toBe(ids.length)
+      const anchor = hitCell(snapshot, { x: region.x, y: -region.y })
+      expect(snapshot.cells[anchor!].region).toBe(region.id)
+    }
+    for (const cluster of snapshot.clusters) {
+      const anchor = hitCell(snapshot, { x: cluster.x, y: -cluster.y })
+      expect(snapshot.cells[anchor!].region).toBe(cluster.region)
+    }
+  })
   it('ships aggregates only, with no private mock content', () => {
     expect(snapshot.cells).toHaveLength(1730)
-    expect(snapshot.regions).toHaveLength(24)
+    expect(snapshot.regions).toHaveLength(38)
     expect(snapshot.clusters.length).toBeGreaterThan(50)
     expect(JSON.stringify(snapshot)).not.toMatch(
       /"(?:username|accountId|avatar|reps|tweets|text)":/,

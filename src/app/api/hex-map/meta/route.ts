@@ -5,7 +5,7 @@ export const dynamic = 'force-static'
 
 // This versioned, aggregate-only snapshot contains no handles, IDs or posts.
 export function GET(request: Request) {
-  const etag = `"${snapshot.version}"`
+  const etag = `"${snapshot.version}-${snapshot.revision}"`
   const headers = {
     'Cache-Control': 'public, max-age=3600, s-maxage=86400',
     ETag: etag,

@@ -3,10 +3,8 @@
 import argparse
 import gzip
 import json
-import math
-import random
-import re
 from pathlib import Path
+from hex_map_clusters import build_clusters
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('source', type=Path, help='Directory containing meta.json and regions.json')
@@ -39,6 +37,7 @@ for i in sorted(range(len(touch)), key=lambda i: -len(touch[i])):
 region_keys = ('id', 'name', 'short', 'note', 'accounts', 'hexes', 'x', 'y', 'terms')
 snapshot = {
     'version': args.version,
+    'revision': args.version,
     'week': meta['weeks'][-1],
     'radius': hexes['size'],
     'cells': [{
@@ -51,44 +50,14 @@ snapshot = {
                 for i, region in enumerate(regions['regions'])],
     'caveats': meta['caveats'],
 }
-# Deterministic k-means per country; labels contain only aggregate cell terms.
-rng = random.Random(7)
-cells = snapshot['cells']
-df = {}
-for cell in cells:
-    for term in set(cell['terms']):
-        df[term] = df.get(term, 0) + 1
-clusters = []
-for region in snapshot['regions']:
-    ids = [i for i, cell in enumerate(cells) if cell['region'] == region['id']]
-    if not ids:
-        continue
-    centres = [(cells[i]['x'], cells[i]['y']) for i in rng.sample(ids, max(1, round(len(ids) / 20)))]
-    for _ in range(15):
-        groups = [[] for _ in centres]
-        for i in ids:
-            c = cells[i]
-            j = min(range(len(centres)), key=lambda j: (centres[j][0]-c['x'])**2 + (centres[j][1]-c['y'])**2)
-            groups[j].append(i)
-        centres = [(sum(cells[i]['x'] for i in g)/len(g), sum(cells[i]['y'] for i in g)/len(g)) if g else centres[j] for j,g in enumerate(groups)]
-    for j, group in enumerate(groups):
-        if len(group) < 5:
-            continue
-        counts, scores = {}, {}
-        for i in group:
-            for rank, term in enumerate(cells[i]['terms']):
-                counts[term] = counts.get(term, 0) + 1
-                scores[term] = scores.get(term, 0) + math.log(len(cells)/df[term])/(rank+1)
-        words = sorted((t for t in counts if counts[t] >= max(2, .12*len(group)) and not re.search(r'\b(fuck\w*|shit\w*|cunt\w*|nigg\w*|bitch\w*|fagg\w*)\b', t, re.I)), key=lambda t: -scores[t]*counts[t])[:2]
-        if not words:
-            continue
-        x,y = centres[j]
-        anchor = min(group, key=lambda i: (cells[i]['x']-x)**2+(cells[i]['y']-y)**2)
-        clusters.append({'x':cells[anchor]['x'], 'y':cells[anchor]['y'], 'label':' · '.join(words), 'region':region['id'], 'size':len(group)})
-snapshot['clusters'] = clusters
+snapshot['clusters'] = build_clusters(snapshot)
 
 target = Path(__file__).resolve().parents[1] / 'src/lib/hexMap/snapshot.json'
 target.write_text(json.dumps(snapshot, separators=(',', ':')) + '\n')
 print(f'{len(snapshot["cells"]):,} cells; {len(gzip.compress(target.read_bytes())):,} bytes gzipped')
 
-(target.parent / "version.ts").write_text("export const MAP_VERSION = " + json.dumps(args.version) + "\nexport function mapUrl(path:string) { return `/api/hex-map/${path}${path.includes(\"?\")?\"&\":\"?\"}version=${MAP_VERSION}` }\n")
+(target.parent / "version.ts").write_text(
+    "export const MAP_VERSION = " + json.dumps(args.version) + "\n"
+    + "export const MAP_REVISION = " + json.dumps(args.version) + "\n"
+    + 'export function mapUrl(path:string) { return `/api/hex-map/${path}${path.includes("?")?"&":"?"}version=${MAP_VERSION}&revision=${MAP_REVISION}` }\n'
+)

@@ -21,6 +21,7 @@ export interface HexRegion {
 
 export interface HexSnapshot {
   version: string
+  revision?: string
   week: string
   radius: number
   cells: HexCell[]

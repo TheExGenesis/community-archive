@@ -62,6 +62,10 @@ for region in cut['regions']:
     anchor = min(ids, key=lambda i: (cells[i]['x'] - region['x']) ** 2 + (cells[i]['y'] - region['y']) ** 2)
     colour = colours[region['id']]
     regions.append({**{k: region[k] for k in keys}, 'x': cells[anchor]['x'], 'y': cells[anchor]['y'], 'color': colour})
+# Editorial display names are independent of the source cut's terminology.
+for region in regions:
+    if region['short'] == '#keep4o':
+        region['name'] = region['short'] = 'AI companions'
 snapshot = {
     **base,
     'revision': args.revision,

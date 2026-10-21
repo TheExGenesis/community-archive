@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Apply a finer region cut to unchanged map cells, preserving parent colours."""
+"""Apply a finer region cut to unchanged map cells, retaining the existing muted palette."""
 import argparse
-import colorsys
+from collections import Counter
 import gzip
 import json
 from pathlib import Path
@@ -21,6 +21,36 @@ assert cut['hex_terms'] == [c['terms'] for c in cells], 'Cell order/terms change
 assert [r['id'] for r in cut['regions']] == list(range(len(cut['regions']))), 'Invalid region IDs'
 assert set(cut['hex_region']) == set(range(len(cut['regions']))), 'Invalid cell region'
 parents = {r['id']: r for r in base['regions']}
+# Keep the largest piece of each old community in its original colour. Give
+# its siblings distinct palette colours, favouring contrast across shared edges.
+palette = list(dict.fromkeys(r['color'] for r in base['regions']))
+children = {}
+for region in cut['regions']:
+    children.setdefault(region['parent_region_24'], []).append(region)
+colours = {}
+for parent, group in children.items():
+    largest = max(group, key=lambda r: (r['hexes'], -r['id']))
+    colours[largest['id']] = parents[parent]['color']
+touch = [set() for _ in cut['regions']]
+for a, cell in enumerate(cells):
+    for b in range(a + 1, len(cells)):
+        ra, rb = cut['hex_region'][a], cut['hex_region'][b]
+        if ra != rb and (cell['x'] - cells[b]['x']) ** 2 + (cell['y'] - cells[b]['y']) ** 2 < (1.8 * base['radius']) ** 2:
+            touch[ra].add(rb)
+            touch[rb].add(ra)
+def distance(a, b):
+    return sum((int(a[i:i+2], 16) - int(b[i:i+2], 16)) ** 2 for i in (1, 3, 5))
+for region in sorted(cut['regions'], key=lambda r: (-len(touch[r['id']]), r['id'])):
+    rid = region['id']
+    if rid in colours:
+        continue
+    siblings = {r['id'] for r in children[region['parent_region_24']]}
+    taken = {colours[i] for i in siblings if i in colours}
+    neighbours = {colours[i] for i in touch[rid] | siblings if i in colours}
+    usage = Counter(colours.values())
+    colours[rid] = max((c for c in palette if c not in taken), key=lambda c: (
+        min(distance(c, other) for other in neighbours), -usage[c],
+    ))
 keys = ('id', 'name', 'short', 'note', 'accounts', 'hexes', 'x', 'y', 'terms')
 regions = []
 for region in cut['regions']:
@@ -30,16 +60,7 @@ for region in cut['regions']:
     assert len(ids) == region['hexes'], 'Region cell count mismatch'
     assert sum(cells[i]['accounts'] for i in ids) == region['accounts'], 'Account count mismatch'
     anchor = min(ids, key=lambda i: (cells[i]['x'] - region['x']) ** 2 + (cells[i]['y'] - region['y']) ** 2)
-    siblings = sorted((r for r in cut['regions'] if r['parent_region_24'] == parent), key=lambda r: (-r['hexes'], r['id']))
-    rank = next(i for i, r in enumerate(siblings) if r['id'] == region['id'])
-    colour = parents[parent]['color']
-    # Largest piece retains its exact old colour; siblings vary only lightness.
-    if rank:
-        rgb = [int(colour[i:i+2], 16) / 255 for i in (1, 3, 5)]
-        hue, light, saturation = colorsys.rgb_to_hls(*rgb)
-        delta = .065 * ((rank + 1) // 2) * (1 if rank % 2 else -1)
-        rgb = colorsys.hls_to_rgb(hue, max(.2, min(.8, light + delta)), saturation)
-        colour = '#' + ''.join(f'{round(c * 255):02x}' for c in rgb)
+    colour = colours[region['id']]
     regions.append({**{k: region[k] for k in keys}, 'x': cells[anchor]['x'], 'y': cells[anchor]['y'], 'color': colour})
 snapshot = {
     **base,

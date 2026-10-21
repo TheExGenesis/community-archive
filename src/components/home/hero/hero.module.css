@@ -565,3 +565,21 @@
     width: 200px;
   }
 }
+
+.feedControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.feedControls select {
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: hsl(var(--background));
+  font-size: 12px;
+}
+.feedControls button {
+  color: hsl(var(--muted-foreground));
+  padding: 6px;
+}

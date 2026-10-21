@@ -37,7 +37,7 @@ const tweet = (username: string, accountId = username): PortalTweet => ({
   likes: 0,
   rts: 0,
 })
-it('requires membership, blocks by ID or handle, and removes nonmember quoted content', async () => {
+it('requires membership, blocks by ID or handle, and preserves public quote context while blocking opt-outs', async () => {
   jest.mocked(getAppPolicy).mockResolvedValue({
     members: new Set(['alice', 'blocked', 'renamed']),
     blocked: new Set(['blocked']),
@@ -53,7 +53,14 @@ it('requires membership, blocks by ID or handle, and removes nonmember quoted co
     tweet('blocked'),
     tweet('renamed', 'old-id'),
   ])
-  expect(result).toEqual([{ ...alice, quotedTweet: undefined }])
+  expect(result).toEqual([alice])
+  expect(
+    (
+      await memberTweets([
+        { ...alice, quotedTweet: { ...tweet('renamed', 'old-id'), media: [] } },
+      ])
+    )[0].quotedTweet,
+  ).toBeUndefined()
 })
 it('fails closed when current consent is unavailable', async () => {
   jest.mocked(getAppPolicy).mockRejectedValue(new Error('unavailable'))
@@ -152,6 +159,11 @@ it('keeps the focal banger first across map regions and filters opted-out posts'
       { account_id: 'reply', username: 'reply', cell: 0 },
     ],
   })
+  jest
+    .mocked(getStrandTweets)
+    .mockResolvedValue(
+      new Map(['jack', 'reply', 'blocked'].map((name) => [name, tweet(name)])),
+    )
   const result = await locatedDetail('digest', '2026-10-21/story')
   expect(result?.tweets.map(({ tweet }) => tweet.username)).toEqual([
     'jack',

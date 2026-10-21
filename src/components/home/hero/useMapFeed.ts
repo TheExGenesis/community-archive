@@ -79,10 +79,14 @@ export function prefetchMapFeed(
 ) {
   return client.prefetchInfiniteQuery(feedOptions(client, path, snapshot))
 }
-export function selectionFeedPath(tab: string, cells: string) {
+export function selectionFeedPath(
+  tab: string,
+  cells: string,
+  period: 'week' | 'all' = 'week',
+) {
   return tab === 'Stories' || tab === 'Strands'
     ? `stories?kind=${tab === 'Stories' ? 'digest' : 'strand'}&cells=${cells}`
-    : `posts?cells=${cells}&sort=${tab === 'Bangers' ? 'quotes' : tab === 'Latest' ? 'time' : 'likes'}`
+    : `posts?cells=${cells}&sort=${tab === 'Bangers' ? 'quotes' : tab === 'Latest' ? 'time' : 'likes'}${tab === 'Bangers' ? `&period=${period}` : ''}`
 }
 
 export function useMapFeed<T extends Page>(

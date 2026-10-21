@@ -1,15 +1,15 @@
 'use client'
-import { mapUrl } from '@/lib/hexMap/version'
+import { storyDetailOptions } from './useStoryDetail'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import StoryCard from './StoryCard'
 import SelectionFeed from './SelectionFeed'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
 import { safeTerm } from '@/lib/hexMap/geometry'
-import type { MapStory, StoryDetail, StoryPage } from '@/lib/hexMap/stories'
+import type { MapStory, StoryPage } from '@/lib/hexMap/stories'
 import { selectionPeopleOptions } from './useSelectionPreview'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -22,13 +22,6 @@ import { useMapFeed, prefetchMapFeed, selectionFeedPath } from './useMapFeed'
 import styles from './hero.module.css'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
 
-async function json<T>(url: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(mapUrl(url.replace('/api/hex-map/', '')), {
-    signal,
-  })
-  if (!response.ok) throw new Error('Content unavailable')
-  return response.json()
-}
 const longDate = (value: string) =>
   new Date(value.slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -61,12 +54,11 @@ export default function StoryPanel({
   onHover: (story: MapStory | null) => void
   onTweetHover: (cell?: number) => void
 }) {
-  const [tab, setTab] = useState<'digest' | 'strand'>('digest')
   const panel = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLButtonElement>(null)
   const queryClient = useQueryClient()
   const query = useMapFeed<StoryPage>(
-    `stories?kind=${tab}`,
+    'stories?kind=digest',
     !open && !selected.length,
   )
   const selectedIds = [...selected].sort((a, b) => a - b).join(',')
@@ -74,21 +66,20 @@ export default function StoryPanel({
     ...selectionPeopleOptions(selectedIds),
     enabled: !!selected.length && !open,
   })
+  useEffect(() => {
+    if (selectedIds && !open)
+      void prefetchMapFeed(
+        queryClient,
+        selectionFeedPath('Latest', selectedIds),
+      )
+  }, [queryClient, selectedIds, open])
   const detail = useQuery({
-    queryKey: ['hex-map-story', open?.kind, open?.id],
-    queryFn: ({ signal }) =>
-      json<StoryDetail>(
-        `/api/hex-map/story?kind=${open!.kind}&id=${encodeURIComponent(open!.id)}`,
-        signal,
-      ),
+    ...storyDetailOptions(open),
     enabled: !!open,
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
   })
   useEffect(() => {
     panel.current?.scrollTo?.(0, 0)
-  }, [tab, selectionTab, open?.id, selected])
+  }, [selectionTab, open?.id, selected])
   const {
     hasNextPage,
     isFetchingNextPage,
@@ -210,9 +201,11 @@ export default function StoryPanel({
               ← Back to browse
             </button>
             <h2>
-              {regions.length === 1
-                ? regions[0].name
-                : `${selected.length} selected cells`}
+              {selected.length === 1
+                ? `Selected hexagon · ${regions[0]?.short ?? regions[0]?.name}`
+                : regions.length === 1
+                  ? regions[0].name
+                  : `${selected.length} selected cells`}
             </h2>
             <div className={styles.selectionSummary}>
               <p>
@@ -308,38 +301,10 @@ export default function StoryPanel({
         </>
       ) : (
         <>
-          <div
-            className={styles.tabs}
-            role="tablist"
-            aria-label="Browse community stories"
-          >
-            {(['digest', 'strand'] as const).map((value) => (
-              <button
-                key={value}
-                onMouseEnter={() =>
-                  void prefetchMapFeed(queryClient, `stories?kind=${value}`)
-                }
-                onFocus={() =>
-                  void prefetchMapFeed(queryClient, `stories?kind=${value}`)
-                }
-                role="tab"
-                aria-selected={tab === value}
-                onClick={() => {
-                  setTab(value)
-                  onHover(null)
-                }}
-              >
-                {value === 'digest' ? 'Digest' : 'Strands'}
-              </button>
-            ))}
-          </div>
-          <div
-            role="tabpanel"
-            aria-label={tab === 'digest' ? 'Digest' : 'Strands'}
-          >
+          <div aria-label="Digest">
             {query.isPending ? (
               <p className={styles.message} role="status">
-                Loading {tab === 'digest' ? 'digest' : 'strands'}…
+                Loading digest…
               </p>
             ) : query.isError && !query.data ? (
               <div className={styles.message}>

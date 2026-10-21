@@ -1,6 +1,9 @@
 'use client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { MapStory } from '@/lib/hexMap/stories'
+import { useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { storyDetailOptions, warmStory } from './useStoryDetail'
 import styles from './hero.module.css'
 export default function StoryCard({
   story,
@@ -13,14 +16,43 @@ export default function StoryCard({
   onOpen: (story: MapStory) => void
   onHover: (story: MapStory | null) => void
 }) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const client = useQueryClient()
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+    let active = true
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return
+        observer.disconnect()
+        warmStory(async () => {
+          if (!active) return
+          void import('@/components/TweetCard')
+          await client.prefetchQuery(storyDetailOptions(story))
+        })
+      },
+      { root: element.closest('aside') },
+    )
+    observer.observe(element)
+    return () => {
+      active = false
+      observer.disconnect()
+    }
+  }, [client, story])
+  const hover = () => {
+    onHover(story)
+    void client.prefetchQuery(storyDetailOptions(story))
+  }
   return (
     <button
+      ref={ref}
       type="button"
       className={styles.story}
       onClick={() => onOpen(story)}
-      onMouseEnter={() => onHover(story)}
+      onMouseEnter={hover}
       onMouseLeave={() => onHover(null)}
-      onFocus={() => onHover(story)}
+      onFocus={hover}
       onBlur={() => onHover(null)}
     >
       <div className={styles.meta}>

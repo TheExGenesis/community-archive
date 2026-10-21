@@ -14,7 +14,7 @@ import { selectStories } from './selectStories'
 import type { MapStory, StoryPage, StoryDetail } from './stories'
 
 // Recheck current membership as well as opt-outs even for published snapshots.
-// The hero has stricter serving requirements than a historical digest permalink.
+// Top-level posts must be members; quoted context follows the permalink opt-out policy.
 export async function memberTweets(
   tweets: PortalTweet[],
 ): Promise<PortalTweet[]> {
@@ -31,7 +31,11 @@ export async function memberTweets(
   return tweets.filter(allowed).map((t) => ({
     ...t,
     quotedTweet:
-      t.quotedTweet && allowed(t.quotedTweet) ? t.quotedTweet : undefined,
+      t.quotedTweet &&
+      !policy.blocked.has(t.quotedTweet.username.toLowerCase()) &&
+      !policy.blockedIds.has(t.quotedTweet.accountId ?? '')
+        ? t.quotedTweet
+        : undefined,
   }))
 }
 
@@ -174,12 +178,14 @@ export async function storyDetail(
     const edition = await getPublishedDigest(date, { strict: true })
     const story = edition?.content.stories.find((s) => s.slug === slug)
     if (!story) return null
+    const ids = Array.from(
+      new Set([...story.bangers, ...story.commentary].map((t) => t.id)),
+    )
+    // Published summaries can lack quote/media hydration. Use the same live card
+    // source as strand/permalink views, preserving the focal-post ordering.
+    const loaded = await getStrandTweets(ids)
     const tweets = await memberTweets(
-      Array.from(
-        new Map(
-          [...story.bangers, ...story.commentary].map((t) => [t.id, t]),
-        ).values(),
-      ),
+      ids.flatMap((id) => (loaded.has(id) ? [loaded.get(id)!] : [])),
     )
     return { tweets: tweets.map((tweet) => ({ tweet })) }
   }

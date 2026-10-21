@@ -265,8 +265,13 @@ export default memo(function HexMap({
       polygon(ctx, geo.vertices[id])
       ctx.stroke()
     })
+    if (selected.length === 1) {
+      ctx.fillStyle = dark ? '#38bdf888' : '#0284c766'
+      polygon(ctx, geo.vertices[selected[0]])
+      ctx.fill()
+    }
     ctx.strokeStyle = dark ? '#7dd3fc' : '#10516b'
-    ctx.lineWidth = 2.4 / t.scale
+    ctx.lineWidth = (selected.length === 1 ? 3.5 : 2.4) / t.scale
     ctx.beginPath()
     outline.forEach((e) => {
       ctx.moveTo(e.a.x, e.a.y)
@@ -305,6 +310,7 @@ export default memo(function HexMap({
     storyCells,
     origin,
     outline,
+    selected,
     hovered,
     tweetCell,
     pins,
@@ -408,24 +414,20 @@ export default memo(function HexMap({
     const c = hovered === null ? undefined : snapshot.cells[hovered]
     onSelectionIntent(
       c
-        ? c.archived === 0
-          ? snapshot.cells.flatMap((cell, i) =>
-              cell.region === c.region ? [i] : [],
-            )
-          : [hovered!]
+        ? snapshot.cells.flatMap((cell, i) =>
+            cell.region === c.region ? [i] : [],
+          )
         : null,
     )
     return () => onSelectionIntent(null)
   }, [hovered, snapshot, onSelectionIntent])
 
-  const selectCell = (id: number, additive = false) => {
-    const c = snapshot.cells[id]
-    const ids =
-      c.archived === 0
-        ? snapshot.cells.flatMap((cell, i) =>
-            cell.region === c.region ? [i] : [],
-          )
-        : [id]
+  const selectCell = (id: number, additive = false, individual = false) => {
+    const ids = individual
+      ? [id]
+      : snapshot.cells.flatMap((cell, i) =>
+          cell.region === snapshot.cells[id].region ? [i] : [],
+        )
     onSelect(additive ? Array.from(new Set([...selected, ...ids])) : ids)
   }
   const atPointer = (e: React.MouseEvent) => {
@@ -459,8 +461,9 @@ export default memo(function HexMap({
           }
         }}
         onDoubleClick={(e) => {
-          const r = e.currentTarget.getBoundingClientRect()
-          camera.zoomAt(1.5, e.clientX - r.left, e.clientY - r.top)
+          e.preventDefault()
+          const id = atPointer(e)
+          if (id !== null) selectCell(id, e.shiftKey, true)
         }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onSelect([])
@@ -479,12 +482,12 @@ export default memo(function HexMap({
           }
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            selectCell(keyboardCell, e.shiftKey)
+            selectCell(keyboardCell, false, e.shiftKey)
           }
         }}
         tabIndex={0}
         role="group"
-        aria-label="Community map. Arrow keys explore cells; Enter selects; Escape clears; plus and minus zoom."
+        aria-label="Community map. Arrow keys explore cells; Enter selects a community; Shift Enter selects one hexagon; Escape clears; plus and minus zoom."
       >
         <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
       </div>
@@ -602,7 +605,8 @@ export default memo(function HexMap({
       </div>
       <span className={styles.hint}>
         <span className={styles.desktopHint}>
-          Scroll to zoom · Drag to pan · Shift + scroll for page
+          Scroll to zoom · Double-click a hex to select · Shift + scroll for
+          page
         </span>
         <span className={styles.touchHint}>
           Pinch to zoom · Scroll to explore below

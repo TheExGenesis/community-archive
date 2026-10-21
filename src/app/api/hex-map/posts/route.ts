@@ -14,11 +14,13 @@ export async function GET(request: NextRequest) {
   const p = request.nextUrl.searchParams,
     cells = p.get('cells') || '',
     sort = p.get('sort') || 'likes',
+    period = p.get('period') || 'all',
     offset = p.get('offset') || '0'
   if (
     !/^\d+(,\d+)*$/.test(cells) ||
     cells.length > 8000 ||
     !['likes', 'time', 'quotes'].includes(sort) ||
+    !['week', 'all'].includes(period) ||
     !/^\d{1,4}$/.test(offset) ||
     Number(offset) > 2000
   )
@@ -28,9 +30,12 @@ export async function GET(request: NextRequest) {
     )
   try {
     const result = await mapGateway<{
+      period?: string
       data: MapPost[]
       nextOffset: number | null
-    }>('hex-posts', { cells, sort, offset })
+    }>('hex-posts', { cells, sort, offset, period })
+    if (sort === 'quotes' && period === 'week' && result.period !== 'week')
+      throw new Error('Map backend does not support this time range yet')
     const allowed = await memberTweets(result.data.map(portalPost)),
       byId = new Map(result.data.map((t) => [t.tweetId, t]))
     return NextResponse.json(

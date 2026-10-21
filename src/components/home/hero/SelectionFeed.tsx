@@ -1,8 +1,15 @@
 'use client'
 import dynamic from 'next/dynamic'
+import { Info } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import Link from 'next/link'
-import { useEffect, useRef } from 'react'
-import { useMapFeed } from './useMapFeed'
+import { useEffect, useRef, useState } from 'react'
+import { useMapFeed, selectionFeedPath } from './useMapFeed'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapStory, StoryPage, MapPostPage } from '@/lib/hexMap/stories'
 import StoryCard from './StoryCard'
@@ -121,14 +128,39 @@ export default function SelectionFeed({
   onHover: (s: MapStory | null) => void
   onTweetHover: (cell?: number) => void
 }) {
-  const ids = [...cells].sort((a, b) => a - b).join(','),
-    sort = tab === 'Bangers' ? 'quotes' : tab === 'Latest' ? 'time' : 'likes'
+  const [period, setPeriod] = useState<'week' | 'all'>('week')
+  const ids = [...cells].sort((a, b) => a - b).join(',')
   const q = useMapFeed<MapPostPage>(
-    `posts?cells=${ids}&sort=${sort}`,
+    selectionFeedPath(tab, ids, period),
     tab !== 'Stories' && tab !== 'Strands',
   )
   return (
     <div role="tabpanel">
+      {tab === 'Bangers' && (
+        <div className={styles.feedControls}>
+          <select
+            aria-label="Best time range"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as 'week' | 'all')}
+          >
+            <option value="week">Last 7 days</option>
+            <option value="all">All time</option>
+          </select>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" aria-label="How Best is calculated">
+                  <Info size={16} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-64">
+                Ranked by quote tweets from Community Archive users. The time
+                range applies to when the original post was published.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
       {tab === 'Stories' || tab === 'Strands' ? (
         <AreaStories
           key={tab}
@@ -150,18 +182,13 @@ export default function SelectionFeed({
           ) : (
             q.data?.pages
               .flatMap((p) => p.tweets)
-              .map(({ tweet, cell, memberQuotes }) => (
+              .map(({ tweet, cell }) => (
                 <div
                   key={tweet.id}
                   className={styles.tweet}
                   onMouseEnter={() => onTweetHover(cell)}
                   onMouseLeave={() => onTweetHover()}
                 >
-                  {sort === 'quotes' && (
-                    <p className={styles.sectionTitle}>
-                      {memberQuotes?.toLocaleString()} member quotes
-                    </p>
-                  )}
                   <TweetCard
                     variant="map"
                     tweet={tweet}

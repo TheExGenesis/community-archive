@@ -7,4 +7,5 @@ export interface TweetLinkPreview {
   imageUrl: string | null
   siteName: string
   isXArticle: boolean
+  isVideo?: boolean
 }

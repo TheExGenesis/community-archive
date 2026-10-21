@@ -64,6 +64,12 @@ it('loads aggregate coverage, selects cells, supports multi-select and clears wi
   expect(screen.getByRole('button', { name: 'Opt in' })).toBeInTheDocument()
   fireEvent.click(cell)
   expect(cell).toHaveAttribute('aria-pressed', 'true')
+  expect(cell).toHaveAttribute('fill-opacity', '0.9')
+  expect(
+    screen.getByRole('button', {
+      name: 'Test, cell 1: 0 of 20 accounts archived',
+    }),
+  ).toHaveAttribute('fill-opacity', '0.2')
   expect(screen.getByRole('link', { name: 'open source' })).toHaveAttribute(
     'href',
     '/search?q=open%20source',
@@ -77,16 +83,15 @@ it('loads aggregate coverage, selects cells, supports multi-select and clears wi
   expect(screen.getByText('2 selected cells')).toBeInTheDocument()
   fireEvent.keyDown(window, { key: 'Escape' })
   expect(screen.getByRole('button', { name: 'Opt in' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Archived' }))
   expect(screen.getByRole('button', { name: 'Archived' })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
-  expect(cell).toHaveAttribute('fill-opacity', '0.65')
+  expect(cell).toHaveAttribute('fill-opacity', '0.9')
   const emptyCell = screen.getByRole('button', {
     name: 'Test, cell 1: 0 of 20 accounts archived',
   })
-  expect(emptyCell).toHaveAttribute('fill-opacity', '0.015')
+  expect(emptyCell).toHaveAttribute('fill-opacity', '0.2')
   expect(emptyCell).toHaveAttribute('stroke-opacity', '0.12')
 })
 
@@ -115,4 +120,33 @@ it('keeps stories and actions usable if the map fails and allows retry', async (
   await waitFor(() =>
     expect(screen.getByLabelText(/Community hex map/)).toBeInTheDocument(),
   )
+})
+
+it('keeps uploader cells bright by default and uses a smaller increase for additional uploaders', async () => {
+  const denser = {
+    ...snapshot,
+    cells: [...snapshot.cells, { ...snapshot.cells[0], archived: 5, x: 2 }],
+  }
+  ;(fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    json: async () => denser,
+  })
+  mount()
+  const one = await screen.findByRole('button', {
+    name: 'Test, cell 0: 1 of 10 accounts archived',
+  })
+  const zero = screen.getByRole('button', {
+    name: 'Test, cell 1: 0 of 20 accounts archived',
+  })
+  const five = screen.getByRole('button', {
+    name: 'Test, cell 2: 5 of 10 accounts archived',
+  })
+  const opacity = (cell: HTMLElement) =>
+    Number(cell.getAttribute('fill-opacity'))
+  expect(opacity(one)).toBeGreaterThan(opacity(zero) + 0.6)
+  expect(opacity(five)).toBeGreaterThan(opacity(one))
+  expect(opacity(five) - opacity(one)).toBeLessThan(0.1)
+  fireEvent.click(zero)
+  expect(opacity(one)).toBe(0.9)
+  expect(one.style.getPropertyValue('--hex-bright-fill')).toContain('white 45%')
 })

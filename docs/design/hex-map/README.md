@@ -6,7 +6,7 @@ route, or production data change is required. `/api/hex-map/meta` serves the
 snapshot separately from the client bundle with an ETag and public cache headers.
 
 Implemented: 1,730 cells and 24 country labels, snapshot activity brightness,
-coverage overlay and counts (a visible jump from zero to one archive, then a saturating count scale), largest coverage gaps, cell/country selection,
+default coverage view and counts (a visible jump from zero to one archive, then a saturating count scale; uploader cells get an extra lightness boost in dark mode, while selection preserves other cells’ brightness), largest coverage gaps, cell/country selection,
 shift-click multi-selection, keyboard selection and Escape, zoom and scroll,
 searchable neighbourhood terms, Digest/Strands tabs (top six consent-checked strands by rating), and compact
 existing audience actions. Homepage search now appears to guests too. The

@@ -1,6 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import Link from 'next/link'
 import { Minus, Plus, RotateCcw, X } from 'lucide-react'
 import { SectionReady } from '@/components/PagePerformance'
@@ -22,7 +28,7 @@ export default function HexMap({
   const [snapshot, setSnapshot] = useState<HexSnapshot | null>(null)
   const [failed, setFailed] = useState(false)
   const [retry, setRetry] = useState(0)
-  const [coverage, setCoverage] = useState(false)
+  const [coverage, setCoverage] = useState(true)
   const [selected, setSelected] = useState<number[]>([])
   const [hovered, setHovered] = useState<number | null>(null)
   const [focusCell, setFocusCell] = useState(0)
@@ -156,23 +162,31 @@ export default function HexMap({
                       const region = snapshot.regions.find(
                         (r) => r.id === cell.region,
                       )
-                      // Presence must be legible even when one archive is a tiny share.
-                      const baseOpacity = coverage
+                      const color = region?.color ?? '#86a878'
+                      // Keep geography visible, but make the first uploader the
+                      // biggest visual jump. Selection only adds an outline.
+                      const countStrength =
+                        cell.archived > 0
+                          ? 1 - Math.exp(-(cell.archived - 1) / 3)
+                          : 0
+                      const opacity = coverage
                         ? cell.archived > 0
-                          ? 0.65 +
-                            0.3 * (1 - Math.exp(-(cell.archived - 1) / 3))
-                          : 0.015
+                          ? 0.9 + 0.1 * countStrength
+                          : 0.2
                         : 0.5 + 0.45 * Math.min(cell.activity / 2, 1)
-                      const opacity =
-                        selected.length && !selectedSet.has(id)
-                          ? baseOpacity * 0.25
-                          : baseOpacity
+                      const darkFill =
+                        coverage && cell.archived > 0
+                          ? `color-mix(in srgb, ${color}, white ${45 + 25 * countStrength}%)`
+                          : color
                       const highlighted = selectedSet.has(id) || hovered === id
                       return (
                         <polygon
                           key={id}
                           points={geometry.points[id]}
-                          fill={region?.color ?? '#86a878'}
+                          fill={color}
+                          style={
+                            { '--hex-bright-fill': darkFill } as CSSProperties
+                          }
                           fillOpacity={opacity}
                           stroke={
                             highlighted ? 'hsl(var(--brand))' : region?.color
@@ -185,7 +199,7 @@ export default function HexMap({
                           tabIndex={focusCell === id ? 0 : -1}
                           aria-label={`${region?.short ?? 'Community'}, cell ${id}: ${cell.archived} of ${cell.accounts} accounts archived`}
                           aria-pressed={selectedSet.has(id)}
-                          className="cursor-pointer outline-none focus:stroke-foreground focus:[stroke-width:0.09]"
+                          className="cursor-pointer outline-none focus:stroke-foreground focus:[stroke-width:0.09] dark:fill-[var(--hex-bright-fill)]"
                           onMouseEnter={() => setHovered(id)}
                           onFocus={() => setHovered(id)}
                           onBlur={() => setHovered(null)}
@@ -340,7 +354,7 @@ export default function HexMap({
           <div className="flex flex-wrap justify-between gap-2 border-t border-border px-4 py-3 text-[10px] text-muted-foreground">
             <span>
               {coverage
-                ? 'Filled cells have archives · brighter means more archived accounts'
+                ? 'Bright cells have archives · brighter means more archived accounts'
                 : 'Brightness shows activity relative to each cell’s weekly average'}
             </span>
             <span>Snapshot · week of {snapshot?.week ?? '…'}</span>

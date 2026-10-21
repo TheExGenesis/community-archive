@@ -6,9 +6,9 @@ route, or production data change is required. `/api/hex-map/meta` serves the
 snapshot separately from the client bundle with an ETag and public cache headers.
 
 Implemented: 1,730 cells and 24 country labels, snapshot activity brightness,
-coverage overlay and counts, largest coverage gaps, cell/country selection,
+coverage overlay and counts (a visible jump from zero to one archive, then a saturating count scale), largest coverage gaps, cell/country selection,
 shift-click multi-selection, keyboard selection and Escape, zoom and scroll,
-searchable neighbourhood terms, the existing digest preview links, and compact
+searchable neighbourhood terms, Digest/Strands tabs (top six consent-checked strands by rating), and compact
 existing audience actions. Homepage search now appears to guests too. The
 below-fold portal, upload section, community apps and testimonials are preserved.
 Mobile shows the map before the stories and details; labels hide on small screens.

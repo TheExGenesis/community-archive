@@ -156,14 +156,18 @@ export default function HexMap({
                       const region = snapshot.regions.find(
                         (r) => r.id === cell.region,
                       )
+                      // Presence must be legible even when one archive is a tiny share.
+                      const baseOpacity = coverage
+                        ? cell.archived > 0
+                          ? 0.65 +
+                            0.3 * (1 - Math.exp(-(cell.archived - 1) / 3))
+                          : 0.015
+                        : 0.5 + 0.45 * Math.min(cell.activity / 2, 1)
                       const opacity =
                         selected.length && !selectedSet.has(id)
-                          ? 0.22
-                          : coverage
-                            ? 0.06 +
-                              (0.94 * cell.archived) /
-                                Math.max(cell.accounts, 1)
-                            : 0.5 + 0.45 * Math.min(cell.activity / 2, 1)
+                          ? baseOpacity * 0.25
+                          : baseOpacity
+                      const highlighted = selectedSet.has(id) || hovered === id
                       return (
                         <polygon
                           key={id}
@@ -171,12 +175,11 @@ export default function HexMap({
                           fill={region?.color ?? '#86a878'}
                           fillOpacity={opacity}
                           stroke={
-                            selectedSet.has(id) || hovered === id
-                              ? 'hsl(var(--brand))'
-                              : region?.color
+                            highlighted ? 'hsl(var(--brand))' : region?.color
                           }
-                          strokeWidth={
-                            selectedSet.has(id) || hovered === id ? 0.09 : 0.012
+                          strokeWidth={highlighted ? 0.09 : 0.008}
+                          strokeOpacity={
+                            highlighted ? 1 : coverage ? 0.12 : 0.25
                           }
                           role="button"
                           tabIndex={focusCell === id ? 0 : -1}
@@ -337,7 +340,7 @@ export default function HexMap({
           <div className="flex flex-wrap justify-between gap-2 border-t border-border px-4 py-3 text-[10px] text-muted-foreground">
             <span>
               {coverage
-                ? 'Opacity shows the archived share'
+                ? 'Filled cells have archives · brighter means more archived accounts'
                 : 'Brightness shows activity relative to each cell’s weekly average'}
             </span>
             <span>Snapshot · week of {snapshot?.week ?? '…'}</span>

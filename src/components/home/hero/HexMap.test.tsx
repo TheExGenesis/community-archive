@@ -25,7 +25,7 @@ const snapshot: HexSnapshot = {
       x: 0,
       y: 0,
       accounts: 10,
-      archived: 2,
+      archived: 1,
       region: 0,
       terms: ['open source'],
       activity: 1,
@@ -58,7 +58,7 @@ beforeEach(() => {
 it('loads aggregate coverage, selects cells, supports multi-select and clears with Escape', async () => {
   mount()
   const cell = await screen.findByRole('button', {
-    name: 'Test, cell 0: 2 of 10 accounts archived',
+    name: 'Test, cell 0: 1 of 10 accounts archived',
   })
   expect(screen.getByText('30')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Opt in' })).toBeInTheDocument()
@@ -82,7 +82,12 @@ it('loads aggregate coverage, selects cells, supports multi-select and clears wi
     'aria-pressed',
     'true',
   )
-  expect(cell).toHaveAttribute('fill-opacity', '0.248')
+  expect(cell).toHaveAttribute('fill-opacity', '0.65')
+  const emptyCell = screen.getByRole('button', {
+    name: 'Test, cell 1: 0 of 20 accounts archived',
+  })
+  expect(emptyCell).toHaveAttribute('fill-opacity', '0.015')
+  expect(emptyCell).toHaveAttribute('stroke-opacity', '0.12')
 })
 
 it('selects a country with the keyboard', async () => {

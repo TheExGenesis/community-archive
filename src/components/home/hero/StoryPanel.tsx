@@ -266,7 +266,7 @@ export default function StoryPanel({
             role="tablist"
             aria-label="Selection content"
           >
-            {['Stories', 'Strands', 'Bangers', 'Most liked', 'Latest'].map(
+            {['Stories', 'Latest', 'Bangers', 'Most liked', 'Strands'].map(
               (label) => (
                 <button
                   role="tab"
@@ -288,7 +288,11 @@ export default function StoryPanel({
                   }
                   onClick={() => onSelectionTab(label)}
                 >
-                  {label}
+                  {label === 'Stories'
+                    ? 'Digest'
+                    : label === 'Bangers'
+                      ? 'Best'
+                      : label}
                 </button>
               ),
             )}

@@ -57,9 +57,9 @@ function AreaStories({
   )
   return (
     <section>
-      <h3 className={styles.sectionTitle}>
-        {kind === 'digest' ? 'Latest from the digest' : 'Strands, all time'}
-      </h3>
+      {kind === 'strand' && (
+        <h3 className={styles.sectionTitle}>Strands, all time</h3>
+      )}
       {q.isPending ? (
         <p className={styles.message}>Loading stories…</p>
       ) : q.isError && !q.data ? (

@@ -2,7 +2,8 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
-import HomepageSearch from '@/components/HomepageSearch'
+import HexHero from './hero/HexHero'
+import HeroTrends from './hero/HeroTrends'
 import FeaturedCommunityApps from './FeaturedCommunityApps'
 import Testimonials from '@/components/home/Testimonials'
 import type { HomepageData } from '@/lib/portal/data'
@@ -62,68 +63,38 @@ export default async function ClassicHomepage({
 
   return (
     <main>
-      <section className="overflow-hidden bg-card pb-8 pt-16 dark:bg-background md:pb-10 md:pt-24">
-        <div className="relative z-10 mx-auto w-full max-w-5xl space-y-12 px-4 text-center sm:px-6 md:space-y-16 lg:px-8">
-          <div className="space-y-4">
-            <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
-              Community Archive
-            </h1>
-            <p className="text-xl leading-8 text-muted-foreground">
-              <Suspense
-                fallback={
-                  <>
-                    We preserve public conversations as open source
-                    infrastructure.
-                  </>
-                }
-              >
-                <HomepageStats data={data.globalStats} />
-              </Suspense>
-            </p>
-          </div>
-
-          {showCta ? (
-            <div className="!mt-11 md:!mt-[50px]">
-              <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
-            </div>
-          ) : isMember ? (
-            <div className="!mt-11 md:!mt-[50px]">
-              <HomepageSearch />
-            </div>
-          ) : null}
-
-          {/* The backers line is a footnote to the social proof above it. */}
-          <div className="!mt-6 md:!mt-[50px]">
-            {homepagePeople}
-
-            <p className="mt-1 text-xs text-muted-foreground/80">
-              Backed by{' '}
-              <Link
-                href="https://survivalandflourishing.fund/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium transition-colors hover:text-brand"
-              >
-                Survival and Flourishing Fund
-              </Link>{' '}
-              and{' '}
-              <Link
-                href="https://x.com/VitalikButerin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium transition-colors hover:text-brand"
-              >
-                Vitalik Buterin
-              </Link>
-            </p>
-            <Link
-              href="#daily-digest"
-              className="mt-5 inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-2 text-sm font-medium text-brand-deep transition-colors hover:bg-brand/20"
-            >
-              Read the daily digest ↓
-            </Link>
-          </div>
-        </div>
+      <HexHero
+        stats={
+          <Suspense fallback={<>Preserving public conversations.</>}>
+            <HomepageStats data={data.globalStats} />
+          </Suspense>
+        }
+        trends={
+          <Suspense fallback={null}>
+            <HeroTrends data={data.trends} />
+          </Suspense>
+        }
+      />
+      <section
+        className="mx-auto max-w-5xl space-y-5 px-4 py-6 text-center"
+        aria-label="Join the archive"
+      >
+        {showCta && <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />}
+        {homepagePeople}
+        <p className="text-xs text-muted-foreground">
+          Backed by{' '}
+          <Link
+            href="https://survivalandflourishing.fund/"
+            className="hover:underline"
+          >
+            Survival and Flourishing Fund
+          </Link>{' '}
+          and{' '}
+          <Link href="https://x.com/VitalikButerin" className="hover:underline">
+            Vitalik Buterin
+          </Link>
+          .
+        </p>
       </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">

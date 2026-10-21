@@ -400,3 +400,31 @@ test('highlights literal queries in tweet and quote text without changing naviga
   rerender(<TweetCard tweet={tweet} highlightQuery="" />)
   expect(container.querySelector('mark')).toBeNull()
 })
+
+test('map preview keeps one cropped image and a single-line byline without dropping the quote', () => {
+  render(
+    <TweetCard
+      variant="map"
+      compact
+      stacked
+      showDate
+      tweet={{
+        ...tweet,
+        media: [
+          ...tweet.media!,
+          { url: 'https://example.com/second.jpg', type: 'photo' },
+        ],
+      }}
+    />,
+  )
+  const images = screen.getAllByTestId('tweet-image')
+  expect(images.map((image) => image.dataset.src)).toEqual([
+    'https://example.com/tweet.jpg',
+    'https://example.com/quoted.jpg',
+  ])
+  expect(images[0]).toHaveClass('aspect-video')
+  expect(
+    screen.getByRole('link', { name: '@alice', exact: true }).parentElement,
+  ).toHaveClass('whitespace-nowrap')
+  expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
+})

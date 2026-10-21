@@ -156,16 +156,30 @@ function TweetImages({
   compact,
   compactGrid = false,
   constrainMedia = false,
+  previewOnly = false,
   label,
 }: {
   media: PortalMedia[] | undefined
   compact: boolean
   compactGrid?: boolean
   constrainMedia?: boolean
+  previewOnly?: boolean
   label: string
 }) {
   const images = imageMedia(media)
   if (images.length === 0) return null
+  if (previewOnly)
+    return (
+      <div className="mt-2">
+        <TweetMediaItem
+          item={images[0]}
+          alt={`${label} 1`}
+          sizes="(max-width: 640px) 100vw, 400px"
+          className="aspect-video w-full overflow-hidden rounded border border-border"
+          imageClassName="h-full w-full object-cover"
+        />
+      </div>
+    )
 
   if (compact && !compactGrid && !constrainMedia) {
     return (
@@ -324,7 +338,7 @@ function QuotedTweet({
 export interface TweetCardProps {
   tweet: PortalTweet
   highlightQuery?: string
-  variant?: 'default' | 'editorial'
+  variant?: 'default' | 'editorial' | 'map'
   animate?: boolean
   compact?: boolean
   collapsible?: boolean
@@ -416,6 +430,7 @@ export function TweetRow({
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
   const isEditorial = variant === 'editorial'
+  const isMap = variant === 'map'
   const isClickable = clickable ?? isFeatured
   const captureAction = (
     action:
@@ -512,7 +527,29 @@ export function TweetRow({
     </button>
   ) : null
 
-  const byline = stacked ? (
+  const byline = isMap ? (
+    <div className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-[11px] text-muted-foreground">
+      <Link
+        href={profileHref}
+        className="min-w-0 flex-1 truncate font-semibold text-foreground"
+      >
+        @{tweet.username}
+      </Link>
+      <span className="shrink-0" suppressHydrationWarning>
+        {shortDate(tweet.createdAt)}
+      </span>
+      {showEngagement && (
+        <span className="shrink-0">
+          <TweetLikeButton
+            tweetId={tweet.id}
+            xLikeCount={tweet.likes}
+            onToggle={captureAction}
+            format={formatCount}
+          />
+        </span>
+      )}
+    </div>
+  ) : stacked ? (
     <div className="min-w-0 leading-tight">
       <Link
         href={profileHref}
@@ -587,6 +624,7 @@ export function TweetRow({
         <TweetImages
           media={tweet.media}
           compact={compact}
+          previewOnly={isMap}
           constrainMedia={constrainMedia}
           label="Tweet image"
         />
@@ -695,7 +733,7 @@ export function TweetRow({
         </Link>
       )}
       {details}
-      {compact && showEngagement && (
+      {compact && showEngagement && !isMap && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           <TweetLikeButton
             tweetId={tweet.id}

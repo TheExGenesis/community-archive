@@ -18,9 +18,18 @@ jest.mock('next/dynamic', () => {
     },
   }
 })
-jest.mock('@/components/HomepageSearch', () => ({
+jest.mock('./hero/HexHero', () => ({
   __esModule: true,
-  default: () => <div data-testid="homepage-search" />,
+  default: () => (
+    <section data-testid="hex-hero">
+      <div data-testid="homepage-search" />
+      <a href="#daily-digest">Continue to digest</a>
+    </section>
+  ),
+}))
+jest.mock('./hero/HeroTrends', () => ({
+  __esModule: true,
+  default: () => null,
 }))
 jest.mock('./FeaturedCommunityApps', () => ({
   __esModule: true,
@@ -89,7 +98,10 @@ describe('ClassicHomepage audience actions', () => {
     )
 
     expect(screen.getByTestId('hero-cta')).toBeInTheDocument()
-    expect(screen.queryByTestId('homepage-search')).not.toBeInTheDocument()
+    expect(screen.getByTestId('homepage-search')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Continue to digest' }),
+    ).toHaveAttribute('href', '#daily-digest')
     expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })

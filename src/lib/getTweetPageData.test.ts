@@ -160,6 +160,7 @@ describe('getTweetPageData', () => {
       clickHouseEnabledMock.mockReturnValue(true)
       const tweet = {
         ...mainTweet,
+        reply_to_username: undefined,
         quote_tweet_id: null,
         retweeted_tweet_id: null,
         media: [],
@@ -199,6 +200,7 @@ describe('getTweetPageData', () => {
   test('isolates a deferred quote failure from a strict permalink', async () => {
     const tweet = {
       ...mainTweet,
+      reply_to_username: undefined,
       quote_tweet_id: null,
       retweeted_tweet_id: null,
       media: [],

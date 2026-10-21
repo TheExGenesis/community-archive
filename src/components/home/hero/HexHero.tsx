@@ -117,6 +117,17 @@ export default function HexHero({
     [map.data, pins.data],
   )
   const active = open ?? hover
+  const visiblePins = useMemo(
+    () =>
+      active
+        ? active.people.flatMap((p) =>
+            p.cell === undefined
+              ? []
+              : [{ username: p.username, cell: p.cell }],
+          )
+        : (pins.data?.people ?? []),
+    [active, pins.data],
+  )
   return (
     <section className={styles.hero} aria-label="Explore the Community Archive">
       <h1 className="sr-only">Community Archive</h1>
@@ -150,7 +161,7 @@ export default function HexHero({
             <HexMap
               snapshot={currentSnapshot!}
               coverageLive={!!pins.data}
-              pins={active ? [] : (pins.data?.people ?? [])}
+              pins={visiblePins}
               anchor={anchor}
               heat={term && heat.data ? values : undefined}
               heatTerm={term}

@@ -222,6 +222,10 @@ export async function storyPage(
       lookup.people.map((p) => [p.username.toLowerCase(), p.cell]),
     )
     for (const story of stories) {
+      story.people = story.people.map((p) => ({
+        ...p,
+        cell: byName.get(p.username.toLowerCase()),
+      }))
       story.cells = Array.from(
         new Set(
           story.people.flatMap((p) =>

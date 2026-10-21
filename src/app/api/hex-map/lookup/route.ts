@@ -35,8 +35,11 @@ export async function GET(request: NextRequest) {
       names: names.join(','),
       cells,
     })
-    const policy = await getAppPolicy(result.people.map((p) => p.username))
-    const people = result.people.filter(
+    // The selection header shows six avatars; avoid eight sequential policy
+    // batches for hundreds of identities it never renders. Counts stay complete.
+    const candidates = cells ? result.people.slice(0, 24) : result.people
+    const policy = await getAppPolicy(candidates.map((p) => p.username))
+    const people = candidates.filter(
       (p) =>
         policy.members.has(p.username.toLowerCase()) &&
         !policy.blocked.has(p.username.toLowerCase()) &&

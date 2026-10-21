@@ -1,30 +1,47 @@
-# Hex-map homepage implementation
+# Hex-map homepage implementation and production-data preview
 
-The design handoff is implemented on `codex/hex-map-hero-design`. The map sits above the existing homepage sections, including the digest, and ordinary wheel/touch scrolling still reaches them. The matching gateway/import work is on `TheExGenesis/community-archive-control-panel`, branch `codex/hex-map-gateway`. **Neither change has been deployed.** Release the backend before merging/releasing this frontend.
+The design handoff is implemented on `codex/hex-map-hero-design` ([PR #1126](https://github.com/TheExGenesis/community-archive/pull/1126)). The approved map backend is live at gateway release `492691e88172`, through control-panel PRs [#286](https://github.com/TheExGenesis/community-archive-control-panel/pull/286) and [#287](https://github.com/TheExGenesis/community-archive-control-panel/pull/287). The frontend remains a separate preview: merging/promoting the live homepage is not authorized. Existing homepage sections and social proof styling are preserved.
 
-## Delivered
+## Current behavior
 
-- Responsive canvas map, country/cluster/cell HTML labels, light/dark layers, country/shift selection and shared outer outlines, keyboard controls, desktop pan/zoom and mobile pinch. Ordinary wheel scroll stays page scroll; Ctrl/Command-wheel zooms.
-- Compact existing search behavior/analytics, seven-day trend chips, typed-term and trend-hover monthly heat, scrubber/play, featured member pins and `from:` anchors.
-- Digest (two editions/page), strands (12/page), full story/strand cards, location highlights, selected-area stories with explicit country fallback, member-quote bangers, most-liked/latest posts and pagination.
-- Current `getAppPolicy()` checks before any people/posts/quoted posts are served. Identity-bearing responses are private/no-store. The generic public analytics proxy cannot bypass these narrow endpoints.
-- Separate static geometry, dynamic bounded pages, lazy TweetCard/map code, batch gateway card hydration and gateway query caches/budgets. The geometry is 300,046 bytes raw / 74,080 gzipped; it contains aggregate data only. One cached canvas bitmap is reused for base rendering; hover/pan do not rebuild 1,730 polygons.
-- Version mismatch rejects dynamic API calls instead of silently placing posts on the wrong geometry.
+- Ordinary wheel scrolling zooms the map, including over community labels. Wheel steps are gentler than pinch gestures. Shift-wheel always scrolls the page; scrolling outward at minimum zoom also continues down the page. Single-finger mobile scrolling, pinch, keyboard controls and the “Continue to the daily digest” link remain available.
+- Cell words appear only at zoom ≥2.7 and projected cell diameter ≥32px. Selecting a community hides other communities’ cell words and topic labels; country names remain for orientation.
+- Hovering/opening stories highlights mapped participant cells and communities, with collision-managed participant handles. Location metadata travels with the story response, so hovering does not fetch anything.
+- Published digest editions paginate two days at a time. Detail reads show current-policy member posts with media and quotes. Strands, selected-community stories, bangers, most-liked/latest feeds and member avatars read production sources.
+- Selected-community avatar headers policy-check at most 24 candidate identities, rather than 300. Full aggregate counts remain intact.
+
+## Preview configuration
+
+Only the `codex/hex-map-hero-design` Vercel branch overrides were changed:
+
+- Production Supabase URL, public key and server-only service-role credential, obtained at runtime from the existing Vercel source.
+- `DIGEST_MOCK_DATA=false`; explicit false now overrides the repository’s automatic development/preview fixture selection.
+- Production analytics URLs, enabled reads, and the current gateway bearer credential obtained at runtime from the gateway’s root-only environment.
+- Staging login and its production-DB exception are explicitly disabled for this branch.
+
+No credentials were printed or saved into repository files. Other previews and production environment values were not changed. The stored shared Vercel analytics credential did not match the live gateway; investigating production environment drift is an optional separate follow-up.
+
+## Backend rollout and performance
+
+The private mapping contains 70,577 unique accounts across 1,730 cells. Every cell count and coordinate was validated before an atomic activation in the separate `community_archive_hex` database. Current policy projection parity: 970 directory rows, 952 members, 18 explicit opt-outs; 800 members are mapped. No corpus backfill, writer change, policy-source change, new service or timer was introduced.
+
+Gateway reads retain their authentication, heavy-query admission, membership/version caches and 12-second / 1 GB / 100M-row / 8 GB per-query caps. Heat aggregates compact flags in account/tweet order using small read blocks. Likes/latest rank numeric columns before bounded text hydration and repost filtering; candidate offsets advance over filtered items, so pages can have fewer than 12 cards.
+
+Observed production timings:
+
+- Single-cell posts: likes 0.64s, latest 0.60s, bangers 0.15s.
+- Full 36-month heat: 6.94s cold, 0.043s cached, 15.2M rows / 3.15 GB.
+- 300-member TPOT community: likes 5.34s, latest 6.09s including hydration; ranking reads 1.34 GB versus 3.44 GB before the fix. Cached rankings avoid repeating that scan for 60 seconds.
+
+The complete gateway was deployed through `scripts/ca-deploy`, with main containing the previous release. Independent health, build metric, zero restarts, authenticated routes, missing-token rejection, wrong-version failure and established neighboring routes passed. Previous complete releases remain available; `e4545c3cd492` is the immediate rollback, and `2114587df21d` predates this feature. Disable `HEX_MAP_ENABLED` before rolling the feature back. The prior map table is retained for atomic exchange rollback.
 
 ## Focused validation
 
-- TypeScript and changed-path ESLint passed. The local commit hook references a missing `.husky/_/husky.sh`; it was bypassed after these focused checks. Unrelated schema/type regeneration was not run.
-- Geometry, consent/fail-closed behavior, strand-card hydration avoidance, exact/country-fallback story placement, version-gated post API and existing homepage tests passed: 12 tests across four files, plus all 19 focused canonical TweetCard tests (including the new map preview).
-- Local browser fixtures verified story open/back, country selection, quote/latest pagination, member-quote labels, heat playback and author pin placement. These fixtures tested UI contracts; they are not evidence that the new production endpoints exist.
-- Desktop wheel over the map scrolled the page 650px. Mobile touch over the map scrolled 472.5px; at a 390px viewport document width was 375px (no horizontal overflow).
-- Real local-dev paths loaded the existing digest and strands with current policy checks; the repository's standard development mode uses a labeled sample digest edition. Remote map endpoints are intentionally unavailable until backend rollout.
-- Final local drag sample: 60 canvas draws, maximum `drawImage` time 0.1ms, animation-frame p95 9ms over 132 frames; it is a browser/dev measurement, not a production LCP/backend-latency claim. Screenshots and raw browser logs remain local under `output/playwright/hex-hero` and `.playwright-cli` and are excluded from the commit.
-- Backend: four focused tests, including exact SQL on isolated synthetic local ClickHouse tables, plus TypeScript and a gateway bundle build. Private import validated 70,577 mapped accounts against every cell's coordinate/count; 16,872 unmapped explorer accounts are excluded.
+- Initial implementation: geometry/data/route/homepage tests, canonical TweetCard tests, TypeScript, lint, build/CI, desktop/mobile scroll and canvas frame checks.
+- Feedback revision: digest override tests; story participant location and policy tests; route tests; TypeScript/lint; isolated ClickHouse SQL integration tests; required gateway deployment checks.
+- Real production data through local browser: Oct 21/20 editions and Oct 19/18 pagination; a real story with two member posts and two mapped participant cells; hover changed canvas paint and displayed a participant handle; selected TPOT digest and strand stories; loaded member avatars.
+- Word trial: zero cell words immediately after community selection; cell words appeared after further zoom, all at focused opacity. Ordinary outward wheel at minimum zoom scrolled the page 600px.
 
-## Release gates and explicit differences
+## Data limits
 
-Follow `ops/clickhouse-hex-map/README.md` in the control-plane PR for the staged/atomic import, reader-only grants, membership health, gateway feature flag, route smokes, frontend release and independent rollbacks. Production SQL/schema compatibility and cold/warm latency checks remain pending approval. No full-corpus scan, production write, new worker, or service was performed.
-
-The shipped aggregate activity source ends in the week of **2026-07-27**. The UI says “Activity · snapshot week of …”; it does not claim this is the current week. Archived counts update from the current map membership lookup after rollout. Monthly heat uses the current member corpus over a bounded rolling 36-month window, which can differ from the mock's fixed historical sample. Country/cluster naming uses the supplied deterministic aggregate algorithm; a curated naming pass is outside this change.
-
-Geometry rebuild: run `scripts/build-hex-map-snapshot.py /path/to/explorer/data --version NEW_VERSION`. Commit the aggregate snapshot and generated version together, and prepare the matching private import before activating the new frontend. Never commit the original mock's private JSON, avatars or media.
+The aggregate activity snapshot ends in the week of **2026-07-27**, explicitly labeled in the UI. Membership, digest editions, users and post feeds are current; this change does not recompute map geometry or the historical activity layer. Accounts absent from the private map receive no invented location. Country/cluster naming uses the supplied aggregate algorithm. Social proof redesign is deferred at the user’s request.

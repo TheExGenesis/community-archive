@@ -95,6 +95,10 @@ export default memo(function HexMap({
     [snapshot, storyCells, selected],
   )
   const selectedSet = useMemo(() => new Set(selected), [selected])
+  const selectedRegions = useMemo(
+    () => new Set(selected.map((id) => snapshot.cells[id]?.region)),
+    [selected, snapshot],
+  )
   const outline = useMemo(
     () => selectionOutline(geo.edges, selectedSet),
     [geo, selectedSet],
@@ -336,6 +340,7 @@ export default memo(function HexMap({
     for (const c of [...(snapshot.clusters ?? [])].sort(
       (a, b) => b.size - a.size,
     )) {
+      if (selectedRegions.size && !selectedRegions.has(c.region)) continue
       if (safeTerm(c.label))
         candidates.push({
           text: c.label,
@@ -346,8 +351,9 @@ export default memo(function HexMap({
           region: c.region,
         })
     }
-    if (snapshot.radius * 2 * t.scale >= 20)
+    if (camera.camera.zoom >= 2.7 && snapshot.radius * 2 * t.scale >= 32)
       snapshot.cells.forEach((c, id) => {
+        if (selectedRegions.size && !selectedRegions.has(c.region)) return
         const text = c.terms.find(safeTerm)
         if (text)
           candidates.push({
@@ -381,6 +387,7 @@ export default memo(function HexMap({
     pins,
     anchor,
     camera.ref,
+    selectedRegions,
   ])
 
   const selectCell = (id: number, additive = false) => {
@@ -546,7 +553,7 @@ export default memo(function HexMap({
       </div>
       <span className={styles.hint}>
         <span className={styles.desktopHint}>
-          Drag to pan · Ctrl/⌘ + scroll to zoom
+          Scroll to zoom · Drag to pan · Shift + scroll for page
         </span>
         <span className={styles.touchHint}>
           Pinch to zoom · Scroll to explore below

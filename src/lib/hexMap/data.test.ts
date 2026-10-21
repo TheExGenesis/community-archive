@@ -99,15 +99,17 @@ it('loads strand cards without hydrating tweet threads and omits nonmember parti
   const page = await storyPage('strand', 0)
   expect(page.stories[0].people).toEqual([{ username: 'alice', avatar: null }])
   expect(getStrandTweets).not.toHaveBeenCalled()
-  jest
-    .mocked(locate)
-    .mockResolvedValue({
-      version: snapshot.version,
-      counts: { 0: 1 },
-      people: [{ account_id: '1', username: 'alice', cell: 0 }],
-    })
+  jest.mocked(locate).mockResolvedValue({
+    version: snapshot.version,
+    counts: { 0: 1 },
+    people: [{ account_id: '1', username: 'alice', cell: 0 }],
+  })
   const exact = await storyPage('strand', 0, [0])
   expect(exact.stories[0].cells).toEqual([0])
+  expect(exact.stories[0].people[0]).toMatchObject({
+    username: 'alice',
+    cell: 0,
+  })
   expect(exact.countryFallback).toBe(false)
   const nearby = snapshot.cells.findIndex(
     (c, i) => i !== 0 && c.region === snapshot.cells[0].region,

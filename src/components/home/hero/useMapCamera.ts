@@ -47,18 +47,34 @@ export default function useMapCamera(
     const element = ref.current
     if (!element) return
     const wheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return // Keep ordinary homepage scrolling.
+      // Let a fully zoomed-out map release scrolling to the rest of the page.
+      // Shift also provides an explicit page-scroll escape at any zoom level.
+      if (
+        e.shiftKey ||
+        (cameraRef.current.zoom <= 1 &&
+          e.deltaY > 0 &&
+          !e.ctrlKey &&
+          !e.metaKey)
+      )
+        return
       e.preventDefault()
       const r = element.getBoundingClientRect()
+      const delta =
+        e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? height : 1)
       zoomAt(
-        Math.exp(-Math.max(-150, Math.min(150, e.deltaY)) * 0.01),
+        Math.exp(
+          -Math.max(-150, Math.min(150, delta)) * (e.ctrlKey ? 0.01 : 0.0025),
+        ),
         e.clientX - r.left,
         e.clientY - r.top,
       )
     }
-    element.addEventListener('wheel', wheel, { passive: false })
-    return () => element.removeEventListener('wheel', wheel)
-  }, [zoomAt])
+    // Labels overlay the canvas as siblings; scrolling over a community name
+    // should zoom just like scrolling over the underlying map.
+    const surface = element.parentElement ?? element
+    surface.addEventListener('wheel', wheel, { passive: false })
+    return () => surface.removeEventListener('wheel', wheel)
+  }, [zoomAt, height])
   return {
     ref,
     camera,

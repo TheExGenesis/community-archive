@@ -750,6 +750,7 @@ interface DigestPreviewEnvironment {
 export function isDigestPreviewEnabled(
   env: DigestPreviewEnvironment = process.env,
 ): boolean {
+  if (env.DIGEST_MOCK_DATA === 'false') return false
   return (
     env.DIGEST_MOCK_DATA === 'true' ||
     env.VERCEL_ENV === 'preview' ||

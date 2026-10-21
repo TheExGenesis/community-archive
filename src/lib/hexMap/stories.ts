@@ -8,7 +8,7 @@ export interface MapStory {
   category: string
   href: string
   totalPosts?: number
-  people: { username: string; avatar: string | null }[]
+  people: { username: string; avatar: string | null; cell?: number }[]
   cells: number[]
   country?: string
   origin?: number

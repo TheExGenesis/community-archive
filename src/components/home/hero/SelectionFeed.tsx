@@ -1,18 +1,12 @@
 'use client'
-import { mapUrl } from '@/lib/hexMap/version'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useEffect, useRef } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useMapFeed, selectionFeedPath } from './useMapFeed'
 import type { MapStory, StoryPage, MapPostPage } from '@/lib/hexMap/stories'
 import StoryCard from './StoryCard'
 import styles from './hero.module.css'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
-async function json<T>(url: string, signal: AbortSignal): Promise<T> {
-  const r = await fetch(mapUrl(url.replace('/api/hex-map/', '')), { signal })
-  if (!r.ok) throw new Error('Content unavailable')
-  return r.json()
-}
 function More({
   next,
   loading,
@@ -31,7 +25,7 @@ function More({
       (e) => {
         if (e[0].isIntersecting) load()
       },
-      { root: ref.current.closest('aside'), rootMargin: '120px' },
+      { root: ref.current.closest('aside'), rootMargin: '800px' },
     )
     obs.observe(ref.current)
     return () => obs.disconnect()
@@ -53,18 +47,7 @@ function AreaStories({
   onOpen: (s: MapStory) => void
   onHover: (s: MapStory | null) => void
 }) {
-  const q = useInfiniteQuery({
-    queryKey: ['hex-selection-stories', kind, cells],
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
-      json<StoryPage>(
-        `/api/hex-map/stories?kind=${kind}&cells=${cells}&offset=${pageParam}`,
-        signal,
-      ),
-    getNextPageParam: (p) => p.nextOffset,
-    staleTime: 0,
-    retry: false,
-  })
+  const q = useMapFeed<StoryPage>(`stories?kind=${kind}&cells=${cells}`)
   return (
     <section>
       <h3 className={styles.sectionTitle}>
@@ -131,20 +114,10 @@ export default function SelectionFeed({
 }) {
   const ids = [...cells].sort((a, b) => a - b).join(','),
     sort = tab === 'Bangers' ? 'quotes' : tab === 'Latest' ? 'time' : 'likes'
-  const q = useInfiniteQuery({
-    queryKey: ['hex-selection-posts', ids, sort],
-    initialPageParam: 0,
-    enabled: tab !== 'Stories' && tab !== 'Strands',
-    queryFn: ({ pageParam, signal }) =>
-      json<MapPostPage>(
-        `/api/hex-map/posts?cells=${ids}&sort=${sort}&offset=${pageParam}`,
-        signal,
-      ),
-    getNextPageParam: (p) => p.nextOffset,
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
-  })
+  const q = useMapFeed<MapPostPage>(
+    selectionFeedPath(tab, ids),
+    tab !== 'Stories' && tab !== 'Strands',
+  )
   return (
     <div role="tabpanel">
       {tab === 'Stories' || tab === 'Strands' ? (

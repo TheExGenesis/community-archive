@@ -47,48 +47,74 @@ export async function getAppDataManifest(): Promise<AppDataManifest> {
 // Policy is checked on every request, independently of the snapshot cache.
 export async function getAppPolicy(usernames: string[]) {
   const admin = createServerServiceRoleClient()
-  const blocked = new Set<string>()
-  const blockedIds = new Set<string>()
-  for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await admin
-      .from('optin')
-      .select('username,twitter_user_id')
-      .eq('explicit_optout', true)
-      .order('id')
-      .range(offset, offset + 999)
-    if (error) throw new Error('Community app consent check failed')
-    for (const row of data ?? []) {
-      blocked.add(row.username.toLowerCase())
-      if (row.twitter_user_id) blockedIds.add(row.twitter_user_id)
-    }
-    if ((data ?? []).length < 1000) break
-  }
-  const members = new Set<string>()
   const names = Array.from(
     new Set(usernames.map((name) => name.toLowerCase())),
   ).filter((name) => /^[a-z0-9_]{1,15}$/.test(name))
-  for (let offset = 0; offset < names.length; offset += 40) {
-    const { data, error } = await admin
-      .from('user_directory')
-      .select('account_id,username,has_archive,is_opted_in')
-      .or(
-        names
-          .slice(offset, offset + 40)
-          .map((name) => `username.ilike.${name}`)
-          .join(','),
-      )
-    if (error) throw new Error('Community app membership check failed')
-    for (const row of data ?? []) {
-      if (
-        row.username &&
-        names.includes(row.username.toLowerCase()) &&
-        !blockedIds.has(row.account_id ?? '') &&
-        (row.has_archive || row.is_opted_in) &&
-        !blocked.has(row.username.toLowerCase())
-      )
-        members.add(row.username.toLowerCase())
+  const nameSet = new Set(names)
+  const loadOptouts = async () => {
+    const blocked = new Set<string>()
+    const blockedIds = new Set<string>()
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await admin
+        .from('optin')
+        .select('username,twitter_user_id')
+        .eq('explicit_optout', true)
+        .order('id')
+        .range(offset, offset + 999)
+      if (error) throw new Error('Community app consent check failed')
+      for (const row of data ?? []) {
+        blocked.add(row.username.toLowerCase())
+        if (row.twitter_user_id) blockedIds.add(row.twitter_user_id)
+      }
+      if ((data ?? []).length < 1000) break
     }
+    return { blocked, blockedIds }
   }
+  const loadCandidates = async () => {
+    const candidates: { username: string; accountId: string }[] = []
+    // Independent reads overlap, with at most four membership batches in flight.
+    for (let offset = 0; offset < names.length; offset += 160) {
+      const batches = Array.from(
+        { length: Math.min(4, Math.ceil((names.length - offset) / 40)) },
+        (_, index) =>
+          names.slice(offset + index * 40, offset + (index + 1) * 40),
+      )
+      const results = await Promise.all(
+        batches.map(async (batch) => {
+          const { data, error } = await admin
+            .from('user_directory')
+            .select('account_id,username,has_archive,is_opted_in')
+            .or(batch.map((name) => `username.ilike.${name}`).join(','))
+          if (error) throw new Error('Community app membership check failed')
+          return data ?? []
+        }),
+      )
+      for (const row of results.flat()) {
+        if (
+          row.username &&
+          nameSet.has(row.username.toLowerCase()) &&
+          (row.has_archive || row.is_opted_in)
+        )
+          candidates.push({
+            username: row.username.toLowerCase(),
+            accountId: row.account_id ?? '',
+          })
+      }
+    }
+    return candidates
+  }
+  // Never publish candidates until BOTH current membership and consent succeed.
+  const [{ blocked, blockedIds }, candidates] = await Promise.all([
+    loadOptouts(),
+    loadCandidates(),
+  ])
+  const members = new Set(
+    candidates
+      .filter(
+        (row) => !blocked.has(row.username) && !blockedIds.has(row.accountId),
+      )
+      .map((row) => row.username),
+  )
   return { blocked, blockedIds, members }
 }
 export function hasBlockedParticipant(

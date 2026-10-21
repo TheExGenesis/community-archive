@@ -1,6 +1,6 @@
 # Hex-map homepage implementation and production-data preview
 
-The design handoff is implemented on `codex/hex-map-hero-design` ([PR #1126](https://github.com/TheExGenesis/community-archive/pull/1126)). The approved map backend is live at gateway release `492691e88172`, through control-panel PRs [#286](https://github.com/TheExGenesis/community-archive-control-panel/pull/286) and [#287](https://github.com/TheExGenesis/community-archive-control-panel/pull/287). The frontend remains a separate preview: merging/promoting the live homepage is not authorized. Existing homepage sections and social proof styling are preserved.
+The design handoff is implemented on `codex/hex-map-hero-design` ([PR #1126](https://github.com/TheExGenesis/community-archive/pull/1126)). The approved map backend is live at gateway release `ce75dbab2d9f` (pagination speedup PR #290), following control-panel PRs [#286](https://github.com/TheExGenesis/community-archive-control-panel/pull/286) and [#287](https://github.com/TheExGenesis/community-archive-control-panel/pull/287). The frontend remains a separate preview: merging/promoting the live homepage is not authorized. Existing homepage sections and social proof styling are preserved.
 
 ## Current behavior
 
@@ -45,3 +45,13 @@ The complete gateway was deployed through `scripts/ca-deploy`, with main contain
 ## Data limits
 
 The aggregate activity snapshot ends in the week of **2026-07-27**, explicitly labeled in the UI. Membership, digest editions, users and post feeds are current; this change does not recompute map geometry or the historical activity layer. Accounts absent from the private map receive no invented location. Country/cluster naming uses the supplied aggregate algorithm. Social proof redesign is deferred at the user’s request.
+
+## Feed speedup — 2026-10-21
+
+Approved backend PR [#290](https://github.com/TheExGenesis/community-archive-control-panel/pull/290) is merged and deployed as `ce75dbab2d9f`. It caches a bounded window of 2,013 ranked IDs per selection/sort/membership version for 60 seconds, avoiding another full ranking scan for every page. Tweet hydration, tombstones and eligibility are still checked on each request. No schema or ingestion changes. Independent post-deploy health passed, membership projection was healthy (957 members / 19 explicit opt-outs), and restart count was zero. Rollback: `scripts/ca-deploy clickhouse-query-gateway --rollback-to 492691e88172`.
+
+Frontend feeds buffer one next page, consume that same request when scrolling, begin loading 800px before the end, prefetch tabs on hover/focus, and retain visited feeds briefly (30s freshness / 60s retention). This includes digest and strand pagination. Current consent and membership queries overlap with bounded concurrency, but results remain withheld until both succeed; no policy cache was added.
+
+Measured TPOT candidate gateway page-two reads were 245ms likes, 303ms latest and 194ms bangers. After deployment, the local website with production data served likes pages two/three in 1.12s each versus 6.25s before; bangers page two took 0.91s. These website times include network and current-policy checks. Browser verification showed old digest days loading on scroll and a return to a loaded tweet tab in 297ms. Cold first-page likes/latest rankings still take roughly five seconds at the gateway (about seven seconds through the local website); this remains a separate optimization opportunity.
+
+Focused validation: 13 frontend tests across the feed hook, policy, map data and routes; TypeScript and targeted lint; required gateway deployment suite (227 passed, one integration skip); live browser feed/pagination checks. The hook test checks one-page buffering, request deduplication and retained tabs; the policy test checks that concurrent reads never publish a blocked renamed account.

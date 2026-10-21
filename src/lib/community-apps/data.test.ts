@@ -54,7 +54,7 @@ test('explicit withdrawal overrides archived membership with case-insensitive ma
 test('policy lookup failure fails closed instead of serving the saved snapshot', async () => {
   const from = stubDatabase({ fail: true })
   await expect(getAppPolicy(['member'])).rejects.toThrow('consent check failed')
-  expect(from).toHaveBeenCalledTimes(1)
+  expect(from).toHaveBeenCalledTimes(2)
 })
 test('rejects path traversal before accessing display storage', async () => {
   await expect(
@@ -91,4 +91,50 @@ test('withholds topics flagged by the original analysis or naming a withdrawn pa
     new Set(['other']),
   )
   expect(analysis.clusters).toEqual([clusters[0]])
+})
+
+test('overlaps membership with consent but waits for consent before accepting renamed accounts', async () => {
+  let resolveConsent: (value: unknown) => void = () => {}
+  const consent = new Promise((resolve) => {
+    resolveConsent = resolve
+  })
+  let membershipStarted = false
+  makeClient.mockReturnValue({
+    from: (table: string) => {
+      const chain: Record<string, unknown> = {
+        then: (resolve: (value: unknown) => void) => {
+          if (table === 'optin') return consent.then(resolve)
+          membershipStarted = true
+          return Promise.resolve({
+            data: [
+              {
+                username: 'renamed',
+                account_id: 'blocked-id',
+                has_archive: true,
+              },
+            ],
+            error: null,
+          }).then(resolve)
+        },
+      }
+      for (const method of ['select', 'eq', 'order', 'range', 'or'])
+        chain[method] = () => chain
+      return chain
+    },
+  } as never)
+  let completed = false
+  const pending = getAppPolicy(['renamed']).then((result) => {
+    completed = true
+    return result
+  })
+  await Promise.resolve()
+  await Promise.resolve()
+  expect(membershipStarted).toBe(true)
+  expect(completed).toBe(false)
+  resolveConsent({
+    data: [{ username: 'previous', twitter_user_id: 'blocked-id' }],
+    error: null,
+  })
+  const policy = await pending
+  expect(Array.from(policy.members)).toEqual([])
 })

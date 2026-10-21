@@ -5,7 +5,7 @@ import Link from 'next/link'
 import StoryCard from './StoryCard'
 import SelectionFeed from './SelectionFeed'
 import { useEffect, useRef, useState } from 'react'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
 import { safeTerm } from '@/lib/hexMap/geometry'
@@ -18,6 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useMapFeed, prefetchMapFeed, selectionFeedPath } from './useMapFeed'
 import styles from './hero.module.css'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
 
@@ -60,19 +61,11 @@ export default function StoryPanel({
   const [selectionTab, setSelectionTab] = useState('Stories')
   const panel = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLButtonElement>(null)
-  const query = useInfiniteQuery({
-    queryKey: ['hex-map-stories', tab],
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
-      json<StoryPage>(
-        `/api/hex-map/stories?kind=${tab}&offset=${pageParam}`,
-        signal,
-      ),
-    getNextPageParam: (last) => last.nextOffset,
-    enabled: !open && !selected.length,
-    staleTime: 60_000,
-    retry: false,
-  })
+  const queryClient = useQueryClient()
+  const query = useMapFeed<StoryPage>(
+    `stories?kind=${tab}`,
+    !open && !selected.length,
+  )
   const selectedIds = [...selected].sort((a, b) => a - b).join(',')
   const people = useQuery({
     queryKey: ['hex-selection-people', selectedIds],
@@ -97,7 +90,7 @@ export default function StoryPanel({
   })
   useEffect(() => {
     panel.current?.scrollTo?.(0, 0)
-  }, [tab, open?.id, selected])
+  }, [tab, selectionTab, open?.id, selected])
   const {
     hasNextPage,
     isFetchingNextPage,
@@ -113,7 +106,7 @@ export default function StoryPanel({
       (entries) => {
         if (entries[0].isIntersecting) void fetchNextPage()
       },
-      { root: panel.current, rootMargin: '160px' },
+      { root: panel.current, rootMargin: '800px' },
     )
     observer.observe(button)
     return () => observer.disconnect()
@@ -281,6 +274,18 @@ export default function StoryPanel({
                   role="tab"
                   aria-selected={selectionTab === label}
                   key={label}
+                  onMouseEnter={() =>
+                    void prefetchMapFeed(
+                      queryClient,
+                      selectionFeedPath(label, selectedIds),
+                    )
+                  }
+                  onFocus={() =>
+                    void prefetchMapFeed(
+                      queryClient,
+                      selectionFeedPath(label, selectedIds),
+                    )
+                  }
                   onClick={() => setSelectionTab(label)}
                 >
                   {label}
@@ -306,6 +311,12 @@ export default function StoryPanel({
             {(['digest', 'strand'] as const).map((value) => (
               <button
                 key={value}
+                onMouseEnter={() =>
+                  void prefetchMapFeed(queryClient, `stories?kind=${value}`)
+                }
+                onFocus={() =>
+                  void prefetchMapFeed(queryClient, `stories?kind=${value}`)
+                }
                 role="tab"
                 aria-selected={tab === value}
                 onClick={() => {

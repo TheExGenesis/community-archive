@@ -47,16 +47,9 @@ export default function useMapCamera(
     const element = ref.current
     if (!element) return
     const wheel = (e: WheelEvent) => {
-      // Let a fully zoomed-out map release scrolling to the rest of the page.
-      // Shift also provides an explicit page-scroll escape at any zoom level.
-      if (
-        e.shiftKey ||
-        (cameraRef.current.zoom <= 1 &&
-          e.deltaY > 0 &&
-          !e.ctrlKey &&
-          !e.metaKey)
-      )
-        return
+      // Keep wheel gestures on the map even when zoom is clamped. Only an
+      // explicit Shift gesture should release scrolling to the page.
+      if (e.shiftKey) return
       e.preventDefault()
       const r = element.getBoundingClientRect()
       const delta =

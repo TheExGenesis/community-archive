@@ -13,7 +13,9 @@ import {
 
 const number = (value: number) => value.toLocaleString('en-US')
 
-function archiveColor(color: string, strength: number) {
+const defaultShading = { saturation: 50, emphasis: 90, ramp: 3, empty: 20 }
+
+function archiveColor(color: string, strength: number, saturation: number) {
   const [r, g, b] = [1, 3, 5].map(
     (start) => parseInt(color.slice(start, start + 2), 16) / 255,
   )
@@ -30,7 +32,7 @@ function archiveColor(color: string, strength: number) {
   const hue = (sector * 60 + 360) % 360
   // Preserve each country's hue and hold lightness steady. More archives
   // increase colour saturation, rather than mixing the colour toward white.
-  return `hsl(${hue.toFixed(1)} ${50 + 45 * strength}% 58%)`
+  return `hsl(${hue.toFixed(1)} ${saturation + (95 - saturation) * strength}% 58%)`
 }
 
 export default function HexMap({
@@ -44,6 +46,7 @@ export default function HexMap({
   const [failed, setFailed] = useState(false)
   const [retry, setRetry] = useState(0)
   const [coverage, setCoverage] = useState(true)
+  const [shading, setShading] = useState(defaultShading)
   const [selected, setSelected] = useState<number[]>([])
   const [hovered, setHovered] = useState<number | null>(null)
   const [focusCell, setFocusCell] = useState(0)
@@ -166,6 +169,84 @@ export default function HexMap({
               Archived
             </button>
           </div>
+          <details className="border-b border-border px-4 py-2 text-xs">
+            <summary className="w-fit cursor-pointer text-muted-foreground hover:text-foreground">
+              Tune shading
+            </summary>
+            <div className="mt-3 grid gap-4 pb-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    key: 'emphasis',
+                    label: 'One uploader emphasis',
+                    min: 20,
+                    max: 100,
+                    suffix: '%',
+                  },
+                  {
+                    key: 'saturation',
+                    label: 'One uploader saturation',
+                    min: 0,
+                    max: 95,
+                    suffix: '%',
+                  },
+                  {
+                    key: 'ramp',
+                    label: 'Accounts to build colour',
+                    min: 1,
+                    max: 20,
+                    suffix: '',
+                  },
+                  {
+                    key: 'empty',
+                    label: 'Empty cell visibility',
+                    min: 0,
+                    max: 60,
+                    suffix: '%',
+                  },
+                ] as const
+              ).map(({ key, label, min, max, suffix }) => (
+                <label key={key} className="grid gap-2">
+                  <span className="flex justify-between gap-2">
+                    <span>{label}</span>
+                    <output>
+                      {shading[key]}
+                      {suffix}
+                    </output>
+                  </span>
+                  <input
+                    type="range"
+                    min={min}
+                    max={max}
+                    step={1}
+                    value={shading[key]}
+                    onChange={(event) =>
+                      setShading((old) => ({
+                        ...old,
+                        [key]: Number(event.target.value),
+                      }))
+                    }
+                    className="w-full accent-brand"
+                    aria-label={label}
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
+              <p className="text-[11px] text-muted-foreground">
+                Lower emphasis softens 1–3 uploaders. A higher colour ramp makes
+                the increase more gradual.
+                {!coverage && ' Turn on Archived to see these changes.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShading(defaultShading)}
+                className="rounded border border-border px-2 py-1 hover:bg-muted"
+              >
+                Reset shading
+              </button>
+            </div>
+          </details>
           <div className="relative bg-muted/45">
             <div
               ref={viewport.viewportRef}
@@ -189,16 +270,22 @@ export default function HexMap({
                       // biggest visual jump. Selection only adds an outline.
                       const countStrength =
                         cell.archived > 0
-                          ? 1 - Math.exp(-(cell.archived - 1) / 3)
+                          ? 1 - Math.exp(-(cell.archived - 1) / shading.ramp)
                           : 0
                       const opacity = coverage
                         ? cell.archived > 0
-                          ? 0.9 + 0.1 * countStrength
-                          : 0.2
+                          ? (shading.emphasis +
+                              (100 - shading.emphasis) * countStrength) /
+                            100
+                          : shading.empty / 100
                         : 0.5 + 0.45 * Math.min(cell.activity / 2, 1)
                       const fill =
                         coverage && cell.archived > 0
-                          ? archiveColor(color, countStrength)
+                          ? archiveColor(
+                              color,
+                              countStrength,
+                              shading.saturation,
+                            )
                           : color
                       const highlighted = selectedSet.has(id) || hovered === id
                       return (

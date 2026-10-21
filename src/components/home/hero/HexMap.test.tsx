@@ -221,3 +221,51 @@ it('pans on a drag without selecting the cell, and preserves a subsequent click'
     window.PointerEvent = original
   }
 })
+
+it('tunes uploader emphasis, colour growth and empty cells, and restores defaults', async () => {
+  ;(fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      ...snapshot,
+      cells: [...snapshot.cells, { ...snapshot.cells[0], archived: 3 }],
+    }),
+  })
+  mount()
+  const one = await screen.findByRole('button', {
+    name: 'Test, cell 0: 1 of 10 accounts archived',
+  })
+  const zero = screen.getByRole('button', {
+    name: 'Test, cell 1: 0 of 20 accounts archived',
+  })
+  const three = screen.getByRole('button', {
+    name: 'Test, cell 2: 3 of 10 accounts archived',
+  })
+  const originalThree = three.getAttribute('fill')
+  fireEvent.change(
+    screen.getByRole('slider', { name: 'One uploader emphasis' }),
+    { target: { value: '30' } },
+  )
+  expect(one).toHaveAttribute('fill-opacity', '0.3')
+  expect(Number(three.getAttribute('fill-opacity'))).toBeLessThan(0.7)
+  fireEvent.change(
+    screen.getByRole('slider', { name: 'Accounts to build colour' }),
+    { target: { value: '15' } },
+  )
+  expect(three.getAttribute('fill')).not.toBe(originalThree)
+  expect(Number(three.getAttribute('fill-opacity'))).toBeLessThan(0.4)
+  fireEvent.change(
+    screen.getByRole('slider', { name: 'One uploader saturation' }),
+    { target: { value: '25' } },
+  )
+  expect(one.getAttribute('fill')).toContain('25% 58%')
+  fireEvent.change(
+    screen.getByRole('slider', { name: 'Empty cell visibility' }),
+    { target: { value: '10' } },
+  )
+  expect(zero).toHaveAttribute('fill-opacity', '0.1')
+  fireEvent.click(screen.getByRole('button', { name: 'Reset shading' }))
+  expect(one).toHaveAttribute('fill-opacity', '0.9')
+  expect(zero).toHaveAttribute('fill-opacity', '0.2')
+  expect(one.getAttribute('fill')).toContain('50% 58%')
+  expect(three).toHaveAttribute('fill', originalThree)
+})

@@ -2,7 +2,7 @@
 
 The public Supabase REST API for the tweet corpus
 (`https://fabxmporizzqflnftavs.supabase.co/rest/v1/...` with the shared
-`anon` key) is being retired. Its replacement is a small read API with a
+`anon` key) is retired on **19 November 2026**. Its replacement is a small read API with a
 personal key:
 
 - **Base URL:** `https://analytics.community-archive.org/v1`
@@ -16,7 +16,7 @@ personal key:
   `Retry-After` seconds and retry. A `422` means the request was too broad
   for its query budget; narrow it (for example, add a date range).
 
-The old API stays up until the retirement date in the announcement.
+The old API keeps working until 19 November 2026 and stops after that.
 
 ## Call by call
 

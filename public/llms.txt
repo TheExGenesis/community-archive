@@ -12,13 +12,13 @@ Source repository: https://github.com/TheExGenesis/community-archive
 - [API v1 migration guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-v1-migration.md): Call-by-call mapping from the legacy Supabase REST API to v1, with paging examples.
 - [API keys](https://www.community-archive.org/settings/api-keys): Sign in and create a personal key for v1.
 - [Agent and schema guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/agents.md): Tables, relationships, fields, and common query patterns.
-- [Legacy API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples for the Supabase API that is being retired.
+- [Legacy API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples for the Supabase API, which is retired on 2026-11-19.
 - [Legacy interactive API reference](https://www.community-archive.org/api/reference) and [legacy OpenAPI specification](https://www.community-archive.org/openapi.json): the PostgREST API.
 - [Examples](https://github.com/TheExGenesis/community-archive/tree/main/docs/examples): Python examples and a canonical notebook.
 
 ## Choose the right data access method
 
-1. Filtered or application queries: use the Community Archive API v1 with a personal key. The public Supabase REST API still works but is being retired; do not start new work on it.
+1. Filtered or application queries: use the Community Archive API v1 with a personal key. The public Supabase REST API still works until 2026-11-19, when it is retired; do not start new work on it.
 2. Bulk analysis: download the daily consent-safe Parquet package from the [latest release](https://github.com/TheExGenesis/community-archive/releases/latest).
 3. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
 
@@ -72,9 +72,9 @@ curl --get "https://analytics.community-archive.org/v1/accounts/exgenesis/tweets
   --data-urlencode "limit=5"
 ```
 
-## Legacy Supabase REST API (being retired)
+## Legacy Supabase REST API (retired on 2026-11-19)
 
-The PostgREST API below is being retired in favour of API v1. It stays up until a retirement date is announced. Existing integrations should move using the migration guide linked above.
+The PostgREST API below is retired on 2026-11-19 in favour of API v1. It keeps working until then. Existing integrations should move before that date using the migration guide linked above.
 
 API base URL: https://fabxmporizzqflnftavs.supabase.co
 REST base URL: https://fabxmporizzqflnftavs.supabase.co/rest/v1

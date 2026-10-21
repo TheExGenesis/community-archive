@@ -52,7 +52,7 @@ export default function StoryPanel({
   open: MapStory | null
   onOpen: (story: MapStory | null) => void
   onHover: (story: MapStory | null) => void
-  onTweetHover: (cell?: number) => void
+  onTweetHover: (cell?: number, username?: string) => void
 }) {
   const panel = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLButtonElement>(null)
@@ -156,7 +156,16 @@ export default function StoryPanel({
             detail.data.tweets.map(({ tweet, annotation, cell }, index) => (
               <div
                 key={tweet.id}
-                onMouseEnter={() => onTweetHover(cell)}
+                onMouseEnter={() => onTweetHover(cell, tweet.username)}
+                onFocusCapture={() => onTweetHover(cell, tweet.username)}
+                onBlurCapture={(event) => {
+                  if (
+                    !event.currentTarget.contains(
+                      event.relatedTarget as Node | null,
+                    )
+                  )
+                    onTweetHover()
+                }}
                 onMouseLeave={() => onTweetHover()}
               >
                 {cell !== undefined &&

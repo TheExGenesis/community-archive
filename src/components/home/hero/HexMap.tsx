@@ -38,7 +38,7 @@ export default memo(function HexMap({
   onSelectionIntent,
   storyCells,
   origin,
-  tweetCell,
+  tweetHover,
   pins,
   anchor,
   heat,
@@ -56,7 +56,7 @@ export default memo(function HexMap({
   onSelectionIntent: (cells: number[] | null) => void
   storyCells: number[]
   origin?: number
-  tweetCell?: number
+  tweetHover?: { cell: number; username: string }
   pins: { username: string; cell: number }[]
   anchor: string
   heat?: Map<number, number>
@@ -291,12 +291,52 @@ export default memo(function HexMap({
             : '#27272a'
       ctx.fill()
     })
-    const active = tweetCell ?? hovered
+    const active = hovered
     if (active != null && geo.vertices[active]) {
       ctx.strokeStyle = dark ? '#fafafa' : '#18181b'
       ctx.lineWidth = 2 / t.scale
       polygon(ctx, geo.vertices[active])
       ctx.stroke()
+    }
+    // Screen-space halo remains obvious at the fully zoomed-out overview. Draw
+    // last so story markers and selection outlines cannot obscure the author.
+    const authorCell = tweetHover && snapshot.cells[tweetHover.cell]
+    if (authorCell && tweetHover) {
+      const radius = Math.max(snapshot.radius * 1.5, 25 / t.scale)
+      ctx.save()
+      const glow = ctx.createRadialGradient(
+        authorCell.x,
+        -authorCell.y,
+        0,
+        authorCell.x,
+        -authorCell.y,
+        radius * 1.6,
+      )
+      glow.addColorStop(0, '#0ea5e9aa')
+      glow.addColorStop(1, '#0ea5e900')
+      ctx.fillStyle = glow
+      ctx.beginPath()
+      ctx.arc(authorCell.x, -authorCell.y, radius * 1.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#0284c7'
+      ctx.lineWidth = 2.5 / t.scale
+      ctx.beginPath()
+      ctx.arc(authorCell.x, -authorCell.y, radius, 0, Math.PI * 2)
+      ctx.stroke()
+      polygon(ctx, geo.vertices[tweetHover.cell])
+      ctx.fillStyle = '#0ea5e999'
+      ctx.fill()
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 7 / t.scale
+      ctx.stroke()
+      ctx.strokeStyle = '#0369a1'
+      ctx.lineWidth = 3.5 / t.scale
+      ctx.stroke()
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(authorCell.x, -authorCell.y, 4 / t.scale, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
     }
   }, [
     base,
@@ -312,7 +352,7 @@ export default memo(function HexMap({
     outline,
     selected,
     hovered,
-    tweetCell,
+    tweetHover,
     pins,
     anchor,
     dark,
@@ -437,6 +477,10 @@ export default memo(function HexMap({
       y: (e.clientY - rect.top - t.y) / t.scale,
     })
   }
+  const authorCell = tweetHover && snapshot.cells[tweetHover.cell]
+  const authorPosition = authorCell
+    ? { x: authorCell.x * t.scale + t.x, y: -authorCell.y * t.scale + t.y }
+    : null
   const cell = hovered === null ? null : snapshot.cells[hovered]
   const region = cell && snapshot.regions.find((r) => r.id === cell.region)
   return (
@@ -553,6 +597,27 @@ export default memo(function HexMap({
           ),
         )}
       </div>
+      {tweetHover &&
+        authorPosition &&
+        authorPosition.x >= 0 &&
+        authorPosition.x <= size.width &&
+        authorPosition.y >= 0 &&
+        authorPosition.y <= size.height && (
+          <div
+            className={styles.hoveredAuthor}
+            style={{
+              left: Math.max(90, Math.min(size.width - 90, authorPosition.x)),
+              top: Math.max(
+                22,
+                authorPosition.y -
+                  Math.max(snapshot.radius * t.scale * 1.5, 25) -
+                  18,
+              ),
+            }}
+          >
+            @{tweetHover.username}
+          </div>
+        )}
       <div className={styles.layers}>
         <div className={styles.segmented}>
           {(['week', 'archived'] as const).map((value) => (

@@ -126,7 +126,7 @@ export default function SelectionFeed({
   tab: string
   onOpen: (s: MapStory) => void
   onHover: (s: MapStory | null) => void
-  onTweetHover: (cell?: number) => void
+  onTweetHover: (cell?: number, username?: string) => void
 }) {
   const [period, setPeriod] = useState<'week' | 'all'>('week')
   const ids = [...cells].sort((a, b) => a - b).join(',')
@@ -186,7 +186,16 @@ export default function SelectionFeed({
                 <div
                   key={tweet.id}
                   className={styles.tweet}
-                  onMouseEnter={() => onTweetHover(cell)}
+                  onMouseEnter={() => onTweetHover(cell, tweet.username)}
+                  onFocusCapture={() => onTweetHover(cell, tweet.username)}
+                  onBlurCapture={(event) => {
+                    if (
+                      !event.currentTarget.contains(
+                        event.relatedTarget as Node | null,
+                      )
+                    )
+                      onTweetHover()
+                  }}
                   onMouseLeave={() => onTweetHover()}
                 >
                   <TweetCard

@@ -38,7 +38,10 @@ export default function HexHero({
   const [selected, setSelected] = useState<number[]>([])
   const [hover, setHover] = useState<MapStory | null>(null)
   const [open, setOpen] = useState<MapStory | null>(null)
-  const [tweetCell, setTweetCell] = useState<number>()
+  const [tweetHover, setTweetHover] = useState<{
+    cell: number
+    username: string
+  }>()
   const map = useQuery({
     queryKey: ['hex-map-meta'],
     queryFn: async ({ signal }) => {
@@ -185,7 +188,7 @@ export default function HexHero({
                         setSelected([person.cell])
                         setOpen(null)
                         setHover(null)
-                        setTweetCell(undefined)
+                        setTweetHover(undefined)
                         preloadSelection([person.cell])
                       }
                     }}
@@ -243,11 +246,11 @@ export default function HexHero({
                   setSelected(cells)
                   setOpen(null)
                   setHover(null)
-                  setTweetCell(undefined)
+                  setTweetHover(undefined)
                 }}
                 storyCells={active?.cells ?? emptyCells}
                 origin={active?.origin}
-                tweetCell={tweetCell}
+                tweetHover={tweetHover}
               />
             </>
           ) : (
@@ -271,15 +274,23 @@ export default function HexHero({
           coverageLive={!!pins.data}
           selected={selected}
           selectionTab={selectionTab}
-          onSelectionTab={setSelectionTab}
+          onSelectionTab={(tab) => {
+            setSelectionTab(tab)
+            setTweetHover(undefined)
+          }}
           onClear={() => setSelected([])}
           open={open}
           onOpen={(story) => {
             setOpen(story)
+            setTweetHover(undefined)
             setHover(null)
           }}
           onHover={setHover}
-          onTweetHover={setTweetCell}
+          onTweetHover={(cell, username) =>
+            setTweetHover(
+              cell !== undefined && username ? { cell, username } : undefined,
+            )
+          }
         />
       </div>
       <Link className={styles.more} href="#daily-digest">

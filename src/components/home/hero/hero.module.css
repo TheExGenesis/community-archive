@@ -583,3 +583,20 @@
   color: hsl(var(--muted-foreground));
   padding: 6px;
 }
+
+.hoveredAuthor {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  padding: 5px 10px;
+  border: 2px solid white;
+  border-radius: 999px;
+  background: #0369a1;
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 2px 12px #0369a155;
+}

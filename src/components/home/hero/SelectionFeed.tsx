@@ -87,13 +87,8 @@ function AreaStories({
               (s) => (
                 <StoryCard
                   key={s.id}
-                  story={{
-                    ...s,
-                    category:
-                      kind === 'digest'
-                        ? `${s.date} · ${s.category}`
-                        : s.category,
-                  }}
+                  story={s}
+                  showDate={kind === 'digest'}
                   onOpen={onOpen}
                   onHover={onHover}
                 />
@@ -139,7 +134,7 @@ export default function SelectionFeed({
   const q = useInfiniteQuery({
     queryKey: ['hex-selection-posts', ids, sort],
     initialPageParam: 0,
-    enabled: tab !== 'Stories',
+    enabled: tab !== 'Stories' && tab !== 'Strands',
     queryFn: ({ pageParam, signal }) =>
       json<MapPostPage>(
         `/api/hex-map/posts?cells=${ids}&sort=${sort}&offset=${pageParam}`,
@@ -152,21 +147,14 @@ export default function SelectionFeed({
   })
   return (
     <div role="tabpanel">
-      {tab === 'Stories' ? (
-        <>
-          <AreaStories
-            kind="digest"
-            cells={ids}
-            onOpen={onOpen}
-            onHover={onHover}
-          />
-          <AreaStories
-            kind="strand"
-            cells={ids}
-            onOpen={onOpen}
-            onHover={onHover}
-          />
-        </>
+      {tab === 'Stories' || tab === 'Strands' ? (
+        <AreaStories
+          key={tab}
+          kind={tab === 'Stories' ? 'digest' : 'strand'}
+          cells={ids}
+          onOpen={onOpen}
+          onHover={onHover}
+        />
       ) : (
         <>
           {q.isPending ? (

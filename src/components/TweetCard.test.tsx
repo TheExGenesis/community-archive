@@ -428,3 +428,33 @@ test('map preview keeps one cropped image and a single-line byline without dropp
   ).toHaveClass('whitespace-nowrap')
   expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
 })
+
+test('map text expands from three lines without navigating and collapses again', () => {
+  const scrollHeight = jest
+    .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    .mockReturnValue(100)
+  const clientHeight = jest
+    .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+    .mockReturnValue(60)
+  try {
+    render(
+      <TweetCard
+        variant="map"
+        compact
+        tweet={{ ...tweet, quotedTweet: undefined, media: [] }}
+      />,
+    )
+    const content = screen
+      .getByText('A complete tweet & media with > one encoding layer.')
+      .closest('.whitespace-pre-wrap')
+    expect(content).toHaveClass('line-clamp-3')
+    fireEvent.click(screen.getByRole('button', { name: 'Read more' }))
+    expect(content).not.toHaveClass('line-clamp-3')
+    expect(push).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Show less' }))
+    expect(content).toHaveClass('line-clamp-3')
+  } finally {
+    scrollHeight.mockRestore()
+    clientHeight.mockRestore()
+  }
+})

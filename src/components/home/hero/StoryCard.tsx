@@ -4,10 +4,12 @@ import type { MapStory } from '@/lib/hexMap/stories'
 import styles from './hero.module.css'
 export default function StoryCard({
   story,
+  showDate = false,
   onOpen,
   onHover,
 }: {
   story: MapStory
+  showDate?: boolean
   onOpen: (story: MapStory) => void
   onHover: (story: MapStory | null) => void
 }) {
@@ -24,7 +26,7 @@ export default function StoryCard({
       <div className={styles.meta}>
         {story.kind === 'strand'
           ? `${story.date.slice(0, 10)} · ${story.totalPosts ?? '—'} posts`
-          : story.category}
+          : `${showDate ? `${story.date.slice(0, 10)} · ` : ''}${story.category}`}
         {story.country ? ` · ${story.country}` : ''}
       </div>
       <h3>{story.title}</h3>

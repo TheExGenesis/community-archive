@@ -3,7 +3,8 @@ import snapshot from './snapshot.json'
 jest.mock('./gateway', () => ({
   locate: jest.fn().mockRejectedValue(new Error('Unavailable')),
 }))
-import { memberTweets, storyPage } from './data'
+import { memberTweets, storyPage, locatedDetail } from './data'
+import { getPublishedDigest } from '@/lib/digest/data'
 import { getAppPolicy, getStrands } from '@/lib/community-apps/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
@@ -16,7 +17,7 @@ jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
 jest.mock('@/lib/digest/database', () => ({}))
-jest.mock('@/lib/digest/data', () => ({}))
+jest.mock('@/lib/digest/data', () => ({ getPublishedDigest: jest.fn() }))
 jest.mock('@/lib/digest/mock', () => ({}))
 jest.mock('@/lib/community-apps/strand-list', () => ({
   filterStrands: (strands: unknown[]) => strands,
@@ -121,4 +122,40 @@ it('loads strand cards without hydrating tweet threads and omits nonmember parti
   await expect(storyPage('strand', 0, [0])).rejects.toThrow(
     'Story locations unavailable',
   )
+})
+
+it('keeps the focal banger first across map regions and filters opted-out posts', async () => {
+  const firstCell = snapshot.cells.findIndex(
+    (c) => c.region > snapshot.cells[0].region,
+  )
+  jest.mocked(getPublishedDigest).mockResolvedValue({
+    content: {
+      stories: [
+        {
+          slug: 'story',
+          bangers: [tweet('jack')],
+          commentary: [tweet('reply'), tweet('blocked'), tweet('jack')],
+        },
+      ],
+    },
+  } as unknown as NonNullable<Awaited<ReturnType<typeof getPublishedDigest>>>)
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(['jack', 'reply', 'blocked']),
+    blocked: new Set(['blocked']),
+    blockedIds: new Set(),
+  })
+  jest.mocked(locate).mockResolvedValue({
+    version: snapshot.version,
+    counts: {},
+    people: [
+      { account_id: 'jack', username: 'jack', cell: firstCell },
+      { account_id: 'reply', username: 'reply', cell: 0 },
+    ],
+  })
+  const result = await locatedDetail('digest', '2026-10-21/story')
+  expect(result?.tweets.map(({ tweet }) => tweet.username)).toEqual([
+    'jack',
+    'reply',
+  ])
+  expect(result?.tweets[0].cell).toBe(firstCell)
 })

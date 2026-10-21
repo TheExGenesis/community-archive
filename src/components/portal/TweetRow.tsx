@@ -424,13 +424,28 @@ export function TweetRow({
     if (previewCollapsed && previewContent.current)
       previewContent.current.scrollTop = 0
   }, [previewCollapsed, tweet.id])
-  const canExpand =
-    isPreview || (collapsible && !noClamp && tweet.text.length > 280)
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
   const isEditorial = variant === 'editorial'
   const isMap = variant === 'map'
+  const mapText = useRef<HTMLDivElement>(null)
+  const [mapTextOverflows, setMapTextOverflows] = useState(false)
+  useEffect(() => {
+    const element = mapText.current
+    if (!isMap || noClamp || isExpanded || !element) return
+    const measure = () =>
+      setMapTextOverflows(element.scrollHeight > element.clientHeight + 1)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [isMap, noClamp, isExpanded, tweet.text])
+  const canExpand =
+    isPreview ||
+    (isMap && !noClamp && mapTextOverflows) ||
+    (collapsible && !noClamp && tweet.text.length > 280)
   const isClickable = clickable ?? isFeatured
   const captureAction = (
     action:
@@ -484,6 +499,7 @@ export function TweetRow({
 
   const tweetContent = (
     <div
+      ref={mapText}
       className={`${
         isEditorial ? 'mt-2.5' : 'mt-0.5'
       } whitespace-pre-wrap break-words text-zinc-700 dark:text-[#d9d9de] ${
@@ -497,13 +513,15 @@ export function TweetRow({
               ? 'text-[14.5px] leading-relaxed'
               : 'text-[14px] leading-relaxed'
       } ${
-        noClamp || isPreview
+        noClamp || isPreview || (isMap && isExpanded)
           ? ''
-          : compact
-            ? 'line-clamp-2'
-            : canExpand && !isExpanded
-              ? 'line-clamp-5'
-              : ''
+          : isMap
+            ? 'line-clamp-3'
+            : compact
+              ? 'line-clamp-2'
+              : canExpand && !isExpanded
+                ? 'line-clamp-5'
+                : ''
       }`}
     >
       <HighlightedText

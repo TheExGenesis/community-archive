@@ -193,7 +193,8 @@
   background: hsl(var(--background));
   z-index: 5;
   display: flex;
-  gap: 16px;
+  gap: 14px;
+  overflow-x: auto;
   border-bottom: 1px solid hsl(var(--border));
   padding: 0 0 8px;
   margin-bottom: 14px;
@@ -476,6 +477,13 @@
 }
 .sectionTitle {
   padding: 16px 20px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.communityLabel {
+  margin: 16px 0 6px;
   font-size: 12px;
   font-weight: 600;
   color: hsl(var(--muted-foreground));

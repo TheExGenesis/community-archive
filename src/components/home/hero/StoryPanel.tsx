@@ -174,7 +174,6 @@ export default function StoryPanel({
             detail.data.tweets.map(({ tweet, annotation, cell }, index) => (
               <div
                 key={tweet.id}
-                className={styles.tweet}
                 onMouseEnter={() => onTweetHover(cell)}
                 onMouseLeave={() => onTweetHover()}
               >
@@ -184,7 +183,7 @@ export default function StoryPanel({
                     snapshot?.cells[cell].region !==
                       snapshot?.cells[detail.data.tweets[index - 1].cell ?? -1]
                         ?.region) && (
-                    <p className={styles.sectionTitle}>
+                    <p className={styles.communityLabel}>
                       {
                         snapshot?.regions.find(
                           (r) => r.id === snapshot.cells[cell].region,
@@ -192,17 +191,19 @@ export default function StoryPanel({
                       }
                     </p>
                   )}
-                {annotation && (
-                  <div className={styles.annotation}>{annotation}</div>
-                )}
-                <TweetCard
-                  variant="map"
-                  tweet={tweet}
-                  compact
-                  stacked
-                  showDate
-                  constrainMedia
-                />
+                <div className={styles.tweet}>
+                  {annotation && (
+                    <div className={styles.annotation}>{annotation}</div>
+                  )}
+                  <TweetCard
+                    variant="map"
+                    tweet={tweet}
+                    compact
+                    stacked
+                    showDate
+                    constrainMedia
+                  />
+                </div>
               </div>
             ))
           ) : (
@@ -274,16 +275,18 @@ export default function StoryPanel({
             role="tablist"
             aria-label="Selection content"
           >
-            {['Stories', 'Bangers', 'Most liked', 'Latest'].map((label) => (
-              <button
-                role="tab"
-                aria-selected={selectionTab === label}
-                key={label}
-                onClick={() => setSelectionTab(label)}
-              >
-                {label}
-              </button>
-            ))}
+            {['Stories', 'Strands', 'Bangers', 'Most liked', 'Latest'].map(
+              (label) => (
+                <button
+                  role="tab"
+                  aria-selected={selectionTab === label}
+                  key={label}
+                  onClick={() => setSelectionTab(label)}
+                >
+                  {label}
+                </button>
+              ),
+            )}
           </div>
           <SelectionFeed
             cells={selected}

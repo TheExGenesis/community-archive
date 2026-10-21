@@ -282,11 +282,5 @@ export async function locatedDetail(
   } catch {
     /* A story remains readable while the optional map is unavailable. */
   }
-  if (kind === 'digest')
-    detail.tweets.sort(
-      (a, b) =>
-        (a.cell === undefined ? 99 : snapshot.cells[a.cell].region) -
-        (b.cell === undefined ? 99 : snapshot.cells[b.cell].region),
-    )
   return detail
 }

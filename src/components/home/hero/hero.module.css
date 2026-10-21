@@ -245,7 +245,6 @@
   font-weight: 700;
 }
 .edition + .edition {
-  border-top: 1px solid hsl(var(--border));
   margin-top: 28px;
   padding-top: 24px;
 }
@@ -454,7 +453,6 @@
 }
 
 .editionPage + .editionPage {
-  border-top: 1px solid hsl(var(--border));
   margin-top: 28px;
   padding-top: 24px;
 }
@@ -685,4 +683,8 @@
   font-weight: 600;
   color: hsl(var(--muted-foreground));
   border-bottom: 1px solid hsl(var(--border));
+}
+
+.edition .story:last-child {
+  border-bottom: 0;
 }

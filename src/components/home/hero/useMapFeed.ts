@@ -87,7 +87,7 @@ export function selectionFeedPath(
 ) {
   return tab === 'Stories' || tab === 'Strands'
     ? `stories?kind=${tab === 'Stories' ? 'digest' : 'strand'}&cells=${cells}`
-    : `posts?cells=${cells}&sort=${tab === 'Bangers' ? 'quotes' : tab === 'Latest' ? 'time' : 'likes'}${tab === 'Bangers' ? `&period=${period}` : ''}`
+    : `posts?cells=${cells}&sort=${tab === 'Bangers' ? 'quotes' : tab === 'Latest' ? 'time' : 'likes'}${tab === 'Bangers' || tab === 'Most liked' ? `&period=${period}` : ''}`
 }
 
 export function useMapFeed<T extends Page>(

@@ -155,13 +155,16 @@ export default function SelectionFeed({
   onHover: (s: MapStory | null) => void
   onTweetHover: (cell?: number, username?: string) => void
 }) {
-  const [period, setPeriod] = useState<BestPeriod>('week')
+  const [bestPeriod, setBestPeriod] = useState<BestPeriod>('week')
+  const [likedPeriod, setLikedPeriod] = useState<BestPeriod>('week')
+  const period = tab === 'Bangers' ? bestPeriod : likedPeriod
+  const setPeriod = tab === 'Bangers' ? setBestPeriod : setLikedPeriod
   const ids = [...cells].sort((a, b) => a - b).join(',')
   const posts = useMapFeed<MapPostPage>(
     selectionFeedPath(tab, ids, period),
     tab !== 'Stories' && tab !== 'Strands' && tab !== 'Bangers',
   )
-  const best = useBestFeed(ids, period, tab === 'Bangers')
+  const best = useBestFeed(ids, bestPeriod, tab === 'Bangers')
   const q = tab === 'Bangers' ? best : posts
   const rows =
     tab === 'Bangers'
@@ -173,10 +176,10 @@ export default function SelectionFeed({
           ) ?? [])
   return (
     <div role="tabpanel">
-      {tab === 'Bangers' && (
+      {(tab === 'Bangers' || tab === 'Most liked') && (
         <div className={styles.feedControls}>
           <select
-            aria-label="Best time range"
+            aria-label={`${tab === 'Bangers' ? 'Best' : 'Most liked'} time range`}
             value={period}
             onChange={(e) => setPeriod(e.target.value as BestPeriod)}
           >
@@ -186,22 +189,24 @@ export default function SelectionFeed({
               </option>
             ))}
           </select>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" aria-label="How Best is calculated">
-                  <Info size={16} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-64">
-                Ranked by quote tweets from Community Archive users. The time
-                range applies to when the original post was published. If the
-                week has no ranked posts, we show its most-liked posts.
-                Scrolling widens to 30 days, 90 days, 365 days, then all time
-                without repeating posts.
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {tab === 'Bangers' && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" aria-label="How Best is calculated">
+                    <Info size={16} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-64">
+                  Ranked by quote tweets from Community Archive users. The time
+                  range applies to when the original post was published. If the
+                  week has no ranked posts, we show its most-liked posts.
+                  Scrolling widens to 30 days, 90 days, 365 days, then all time
+                  without repeating posts.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       )}
       {tab === 'Stories' || tab === 'Strands' ? (

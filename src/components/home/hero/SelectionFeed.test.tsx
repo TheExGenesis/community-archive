@@ -49,13 +49,11 @@ const noop = () => {}
 beforeEach(() => {
   jest.clearAllMocks()
   result = { ...base, data: { pages: [empty] } }
-  jest
-    .mocked(useBestFeed)
-    .mockReturnValue({
-      ...base,
-      hasNextPage: false,
-      data: { pages: [] },
-    } as unknown as ReturnType<typeof useBestFeed>)
+  jest.mocked(useBestFeed).mockReturnValue({
+    ...base,
+    hasNextPage: false,
+    data: { pages: [] },
+  } as unknown as ReturnType<typeof useBestFeed>)
   jest.mocked(useMapFeed).mockImplementation(
     (path) =>
       (path.startsWith('stories?')
@@ -159,4 +157,35 @@ it('keeps Digest selected on a load failure instead of treating it as empty', ()
     'true',
   )
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+})
+
+it('filters Most liked by its selected range independently of Best and Latest', () => {
+  render(<Panel />)
+  fireEvent.change(screen.getByRole('combobox', { name: 'Best time range' }), {
+    target: { value: 'month' },
+  })
+  fireEvent.click(screen.getByRole('tab', { name: 'Most liked' }))
+  const ranges = screen.getByRole('combobox', { name: 'Most liked time range' })
+  expect(ranges).toHaveValue('week')
+  expect(
+    screen.queryByRole('button', { name: 'How Best is calculated' }),
+  ).not.toBeInTheDocument()
+  for (const value of ['week', 'month', 'quarter', 'year', 'all']) {
+    fireEvent.change(ranges, { target: { value } })
+    expect(useMapFeed).toHaveBeenLastCalledWith(
+      `posts?cells=0&sort=likes&period=${value}`,
+      true,
+    )
+  }
+  fireEvent.click(screen.getByRole('tab', { name: 'Best' }))
+  expect(screen.getByRole('combobox', { name: 'Best time range' })).toHaveValue(
+    'month',
+  )
+  fireEvent.click(screen.getByRole('tab', { name: 'Most liked' }))
+  expect(
+    screen.getByRole('combobox', { name: 'Most liked time range' }),
+  ).toHaveValue('all')
+  fireEvent.click(screen.getByRole('tab', { name: 'Latest' }))
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  expect(useMapFeed).toHaveBeenLastCalledWith('posts?cells=0&sort=time', true)
 })

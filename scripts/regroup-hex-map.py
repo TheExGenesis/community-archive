@@ -66,6 +66,8 @@ for region in cut['regions']:
 for region in regions:
     if region['short'] == '#keep4o':
         region['name'] = region['short'] = 'AI companions'
+    elif region['short'] == 'PL & hardware':
+        region['name'] = region['short'] = 'Systems & hardware'
 snapshot = {
     **base,
     'revision': args.revision,

@@ -47,8 +47,36 @@
 }
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 27%, 400px);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 16px var(
+      --sidebar-width,
+      clamp(300px, 27%, 400px)
+    );
+  gap: 0;
+}
+.resizeHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100svh - 146px);
+  min-height: 420px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  border-radius: 6px;
+}
+.resizeHandle span {
+  width: 4px;
+  height: 44px;
+  border-radius: 4px;
+  background: hsl(var(--border));
+}
+.resizeHandle:hover span,
+.resizeHandle:focus-visible span {
+  background: hsl(var(--brand-deep));
+}
+.resizeHandle:focus-visible {
+  outline: 2px solid hsl(var(--brand-deep));
+  outline-offset: -2px;
 }
 .mapShell {
   position: relative;
@@ -398,6 +426,10 @@
   }
   .row {
     grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .resizeHandle {
+    display: none;
   }
   .mapShell {
     height: 64svh;

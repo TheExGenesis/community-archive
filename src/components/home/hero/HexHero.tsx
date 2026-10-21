@@ -10,6 +10,7 @@ import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapLookup } from '@/lib/hexMap/gateway'
 import type { MapStory } from '@/lib/hexMap/stories'
 import StoryPanel from './StoryPanel'
+import ResizableHero from './ResizableHero'
 import WhereAmI, { type SelfLocation } from './WhereAmI'
 import { useSelectionPreview } from './useSelectionPreview'
 import styles from './hero.module.css'
@@ -176,7 +177,7 @@ export default function HexHero({
         </div>
         {trends}
       </div>
-      <div className={styles.row}>
+      <ResizableHero>
         <div className={styles.mapColumn}>
           {map.data ? (
             <>
@@ -189,11 +190,12 @@ export default function HexHero({
                     onLocated={(person) => {
                       setSelfLocation(person)
                       if (person) {
+                        setSelectionTab('Stories')
                         setSelected([person.cell])
                         setOpen(null)
                         setHover(null)
                         setTweetHover(undefined)
-                        preloadSelection([person.cell])
+                        preloadSelection([person.cell], 'Stories')
                       }
                     }}
                   />
@@ -255,7 +257,8 @@ export default function HexHero({
                 onSelect={(cells) => {
                   setSelfLocation(null)
                   onSelectionIntent(null)
-                  preloadSelection(cells)
+                  setSelectionTab('Stories')
+                  preloadSelection(cells, 'Stories')
                   setSelected(cells)
                   setOpen(null)
                   setHover(null)
@@ -305,7 +308,7 @@ export default function HexHero({
             )
           }
         />
-      </div>
+      </ResizableHero>
       <Link className={styles.more} href="#daily-digest">
         Continue to the daily digest and more ↓
       </Link>

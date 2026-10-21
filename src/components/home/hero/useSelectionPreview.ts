@@ -25,10 +25,10 @@ export function useSelectionPreview(tab: string, snapshot?: HexSnapshot) {
   const client = useQueryClient()
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const preloadSelection = useCallback(
-    (cells: number[]) => {
+    (cells: number[], nextTab = tab) => {
       if (!cells.length) return
       const ids = [...cells].sort((a, b) => a - b).join(',')
-      void prefetchMapFeed(client, selectionFeedPath(tab, ids), snapshot)
+      void prefetchMapFeed(client, selectionFeedPath(nextTab, ids), snapshot)
       void client.prefetchQuery(selectionPeopleOptions(ids))
     },
     [client, snapshot, tab],

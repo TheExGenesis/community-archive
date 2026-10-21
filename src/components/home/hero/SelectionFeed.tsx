@@ -20,7 +20,9 @@ function More({
   loading,
   error,
   load,
+  paused = false,
 }: {
+  paused?: boolean
   next: boolean
   loading: boolean
   error: boolean
@@ -28,7 +30,7 @@ function More({
 }) {
   const ref = useRef<HTMLButtonElement>(null)
   useEffect(() => {
-    if (!ref.current || !next || loading || error) return
+    if (!ref.current || !next || loading || error || paused) return
     const obs = new IntersectionObserver(
       (e) => {
         if (e[0].isIntersecting) load()
@@ -37,7 +39,7 @@ function More({
     )
     obs.observe(ref.current)
     return () => obs.disconnect()
-  }, [next, loading, error, load])
+  }, [next, loading, error, paused, load])
   return next ? (
     <button className={styles.load} ref={ref} disabled={loading} onClick={load}>
       {loading ? 'Loading…' : error ? 'Retry loading more' : 'Load more'}
@@ -50,8 +52,10 @@ function AreaStories({
   cells,
   onOpen,
   onHover,
+  onEmpty,
 }: {
   snapshot: HexSnapshot | null
+  onEmpty?: () => void
   kind: 'digest' | 'strand'
   cells: string
   onOpen: (s: MapStory) => void
@@ -62,6 +66,20 @@ function AreaStories({
     true,
     snapshot,
   )
+  const hasStories = !!q.data?.pages.some(
+    (page) =>
+      page.stories.length ||
+      page.editions.some((edition) => edition.stories.length),
+  )
+  const firstFallback = q.data?.pages.findIndex(
+    (page) =>
+      page.countryFallback &&
+      (page.stories.length ||
+        page.editions.some((edition) => edition.stories.length)),
+  )
+  useEffect(() => {
+    if (q.isSuccess && !q.isFetching && !hasStories) onEmpty?.()
+  }, [q.isSuccess, q.isFetching, hasStories, onEmpty])
   return (
     <section>
       {kind === 'strand' && (
@@ -77,7 +95,7 @@ function AreaStories({
       ) : (
         q.data?.pages.map((p, i) => (
           <div key={i}>
-            {p.countryFallback && (
+            {i === firstFallback && (
               <p className={styles.sectionTitle}>From the same country</p>
             )}
             {[...p.stories, ...p.editions.flatMap((e) => e.stories)].map(
@@ -94,19 +112,20 @@ function AreaStories({
           </div>
         ))
       )}
-      {q.data &&
-        !q.data.pages.some((p) => p.stories.length || p.editions.length) && (
-          <p className={styles.message}>
-            No stories in this area on these pages.
-          </p>
-        )}
+      {q.data && !hasStories && (
+        <p className={styles.message}>
+          No stories in this area on these pages.
+        </p>
+      )}
       <More
         next={q.hasNextPage}
         loading={q.isFetchingNextPage}
-        error={
-          q.isFetchNextPageError ||
-          (!q.data?.pages.at(-1)?.stories.length &&
-            !q.data?.pages.at(-1)?.editions.length)
+        error={q.isFetchNextPageError}
+        paused={
+          !q.data?.pages.at(-1)?.stories.length &&
+          !q.data?.pages
+            .at(-1)
+            ?.editions.some((edition) => edition.stories.length)
         }
         load={q.fetchNextPage}
       />
@@ -120,10 +139,12 @@ export default function SelectionFeed({
   onOpen,
   onHover,
   onTweetHover,
+  onEmptyDigest,
 }: {
   snapshot: HexSnapshot | null
   cells: number[]
   tab: string
+  onEmptyDigest?: () => void
   onOpen: (s: MapStory) => void
   onHover: (s: MapStory | null) => void
   onTweetHover: (cell?: number, username?: string) => void
@@ -169,6 +190,7 @@ export default function SelectionFeed({
           cells={ids}
           onOpen={onOpen}
           onHover={onHover}
+          onEmpty={tab === 'Stories' ? onEmptyDigest : undefined}
         />
       ) : (
         <>

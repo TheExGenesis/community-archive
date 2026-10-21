@@ -40,8 +40,16 @@ export default function MapHelp() {
           <div>
             <dt>Explore a community</dt>
             <dd>
-              Click a community to browse its Digest, Latest, Best, Most liked,
+              Click a community to browse its Digest, Best, Latest, Most liked,
               and Strands. Double-click a hexagon to select just that cell.
+            </dd>
+          </div>
+          <div>
+            <dt>Make room for posts</dt>
+            <dd>
+              Drag the divider between the map and sidebar to resize it. Focus
+              the divider and use the left or right arrow keys, or double-click
+              it to reset the width.
             </dd>
           </div>
           <div>

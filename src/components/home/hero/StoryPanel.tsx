@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import StoryCard from './StoryCard'
 import SelectionFeed from './SelectionFeed'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
@@ -62,6 +62,17 @@ export default function StoryPanel({
     !open && !selected.length,
   )
   const selectedIds = [...selected].sort((a, b) => a - b).join(',')
+  const manualTabSelection = useRef<string | null>(null)
+  const showBestWhenEmpty = useCallback(() => {
+    if (
+      manualTabSelection.current !== selectedIds &&
+      selectionTab === 'Stories'
+    )
+      onSelectionTab('Bangers')
+  }, [selectedIds, selectionTab, onSelectionTab])
+  useEffect(() => {
+    manualTabSelection.current = null
+  }, [selectedIds])
   const people = useQuery({
     ...selectionPeopleOptions(selectedIds),
     enabled: !!selected.length && !open,
@@ -70,7 +81,7 @@ export default function StoryPanel({
     if (selectedIds && !open)
       void prefetchMapFeed(
         queryClient,
-        selectionFeedPath('Latest', selectedIds),
+        selectionFeedPath('Bangers', selectedIds),
       )
   }, [queryClient, selectedIds, open])
   const detail = useQuery({
@@ -121,6 +132,7 @@ export default function StoryPanel({
   return (
     <aside
       ref={panel}
+      id="hex-story-panel"
       className={styles.panel}
       aria-label="Stories from the community"
     >
@@ -268,7 +280,7 @@ export default function StoryPanel({
             role="tablist"
             aria-label="Selection content"
           >
-            {['Stories', 'Latest', 'Bangers', 'Most liked', 'Strands'].map(
+            {['Stories', 'Bangers', 'Latest', 'Most liked', 'Strands'].map(
               (label) => (
                 <button
                   role="tab"
@@ -288,7 +300,10 @@ export default function StoryPanel({
                       snapshot,
                     )
                   }
-                  onClick={() => onSelectionTab(label)}
+                  onClick={() => {
+                    manualTabSelection.current = selectedIds
+                    onSelectionTab(label)
+                  }}
                 >
                   {label === 'Stories'
                     ? 'Digest'
@@ -303,6 +318,7 @@ export default function StoryPanel({
             snapshot={snapshot}
             cells={selected}
             tab={selectionTab}
+            onEmptyDigest={showBestWhenEmpty}
             onOpen={onOpen}
             onHover={onHover}
             onTweetHover={onTweetHover}

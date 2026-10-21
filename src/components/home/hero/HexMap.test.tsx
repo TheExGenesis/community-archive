@@ -159,3 +159,64 @@ it('keeps uploader cells bright by default and uses a smaller increase for addit
   expect(fiveSaturation).toBeGreaterThan(oneSaturation)
   expect(fiveLightness).toBe(oneLightness)
 })
+
+it('zooms at the pointer without scrolling the page, and reset restores the viewport', async () => {
+  mount()
+  const svg = await screen.findByLabelText(/Community hex map/)
+  const viewport = svg.parentElement!
+  jest
+    .spyOn(viewport, 'getBoundingClientRect')
+    .mockReturnValue({ left: 0, top: 0, width: 800, height: 600 } as DOMRect)
+  const initial = svg.getAttribute('viewBox')!
+  const before = initial.split(' ').map(Number)
+  const wheel = new WheelEvent('wheel', {
+    bubbles: true,
+    cancelable: true,
+    deltaY: -150,
+    clientX: 600,
+    clientY: 300,
+  })
+  fireEvent(viewport, wheel)
+  expect(wheel.defaultPrevented).toBe(true)
+  const after = svg.getAttribute('viewBox')!.split(' ').map(Number)
+  expect(after[2]).toBeLessThan(before[2])
+  const worldAtPointer = (box: number[]) =>
+    box[0] + box[2] / 2 + 200 * Math.max(box[2] / 800, box[3] / 600)
+  expect(worldAtPointer(after)).toBeCloseTo(worldAtPointer(before))
+  fireEvent.click(screen.getByRole('button', { name: 'Reset map zoom' }))
+  expect(svg).toHaveAttribute('viewBox', initial)
+})
+
+it('pans on a drag without selecting the cell, and preserves a subsequent click', async () => {
+  const original = window.PointerEvent
+  window.PointerEvent = MouseEvent as typeof PointerEvent
+  try {
+    mount()
+    const svg = await screen.findByLabelText(/Community hex map/)
+    const viewport = svg.parentElement!
+    const cell = screen.getByRole('button', {
+      name: 'Test, cell 0: 1 of 10 accounts archived',
+    })
+    jest
+      .spyOn(viewport, 'getBoundingClientRect')
+      .mockReturnValue({ left: 0, top: 0, width: 800, height: 600 } as DOMRect)
+    viewport.setPointerCapture = jest.fn()
+    viewport.hasPointerCapture = jest.fn(() => true)
+    viewport.releasePointerCapture = jest.fn()
+    const initial = svg.getAttribute('viewBox')!
+    fireEvent.pointerDown(cell, { button: 0, clientX: 200, clientY: 200 })
+    fireEvent.pointerMove(viewport, { clientX: 250, clientY: 230 })
+    fireEvent.pointerUp(viewport)
+    fireEvent.click(cell)
+    expect(svg.getAttribute('viewBox')).not.toBe(initial)
+    expect(viewport.setPointerCapture).toHaveBeenCalled()
+    expect(viewport.releasePointerCapture).toHaveBeenCalled()
+    expect(cell).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.pointerDown(cell, { button: 0, clientX: 200, clientY: 200 })
+    fireEvent.pointerUp(cell)
+    fireEvent.click(cell)
+    expect(cell).toHaveAttribute('aria-pressed', 'true')
+  } finally {
+    window.PointerEvent = original
+  }
+})

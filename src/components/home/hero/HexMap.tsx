@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import useMapViewport from './useMapViewport'
 import { Minus, Plus, RotateCcw, X } from 'lucide-react'
 import { SectionReady } from '@/components/PagePerformance'
 import {
@@ -46,7 +47,6 @@ export default function HexMap({
   const [selected, setSelected] = useState<number[]>([])
   const [hovered, setHovered] = useState<number | null>(null)
   const [focusCell, setFocusCell] = useState(0)
-  const [zoom, setZoom] = useState(1)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -84,12 +84,17 @@ export default function HexMap({
     const width = Math.max(...xs) - x + pad,
       height = Math.max(...ys) - y + pad
     return {
-      viewBox: `${x} ${y} ${width} ${height}`,
+      x,
+      y,
+      width,
+      height,
       points: snapshot.cells.map((c) =>
         hexPoints(c.x, c.y, snapshot.radius * 0.96),
       ),
     }
   }, [snapshot])
+
+  const viewport = useMapViewport(geometry)
 
   const totals = useMemo(
     () => (snapshot ? coverageSummary(snapshot.cells) : null),
@@ -162,13 +167,16 @@ export default function HexMap({
             </button>
           </div>
           <div className="relative bg-muted/45">
-            <div className="h-[440px] overflow-auto sm:h-[560px] xl:h-[min(66vh,660px)]">
+            <div
+              ref={viewport.viewportRef}
+              {...viewport.handlers}
+              className={`h-[440px] touch-none select-none overflow-hidden sm:h-[560px] xl:h-[min(66vh,660px)] ${viewport.dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            >
               {snapshot && geometry ? (
                 <svg
-                  viewBox={geometry.viewBox}
-                  className="block h-full min-w-full max-w-none"
-                  style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}
-                  aria-label="Community hex map. Tab to a cell, use arrow keys to explore, Enter to select, Escape to clear."
+                  viewBox={viewport.viewBox}
+                  className={`block h-full w-full ${viewport.dragging ? '[&_*]:cursor-grabbing' : ''}`}
+                  aria-label="Community hex map. Tab to a cell, use arrow keys to explore, Enter to select, Escape to clear. Drag to pan and scroll to zoom."
                   onMouseLeave={() => setHovered(null)}
                 >
                   <g>
@@ -316,7 +324,7 @@ export default function HexMap({
                 </div>
               )}
             </div>
-            {hoveredCell ? (
+            {hoveredCell && !viewport.dragging ? (
               <div
                 className="pointer-events-none absolute left-3 top-3 max-w-[240px] rounded-lg border border-border bg-background/95 px-3 py-2 text-xs shadow-sm"
                 aria-live="polite"
@@ -337,8 +345,8 @@ export default function HexMap({
               <button
                 type="button"
                 aria-label="Zoom out"
-                disabled={zoom <= 1}
-                onClick={() => setZoom((value) => Math.max(1, value - 0.5))}
+                disabled={viewport.zoom <= 1}
+                onClick={() => viewport.zoomAt(1 / 1.5)}
                 className="p-2 hover:bg-muted disabled:opacity-30"
               >
                 <Minus size={15} />
@@ -346,7 +354,7 @@ export default function HexMap({
               <button
                 type="button"
                 aria-label="Reset map zoom"
-                onClick={() => setZoom(1)}
+                onClick={viewport.reset}
                 className="border-x border-border p-2 hover:bg-muted"
               >
                 <RotateCcw size={14} />
@@ -354,8 +362,8 @@ export default function HexMap({
               <button
                 type="button"
                 aria-label="Zoom in"
-                disabled={zoom >= 3}
-                onClick={() => setZoom((value) => Math.min(3, value + 0.5))}
+                disabled={viewport.zoom >= 6}
+                onClick={() => viewport.zoomAt(1.5)}
                 className="p-2 hover:bg-muted disabled:opacity-30"
               >
                 <Plus size={15} />

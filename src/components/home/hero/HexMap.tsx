@@ -362,19 +362,22 @@ export default memo(function HexMap({
     })
     candidates.unshift(...pinLabels.filter((p) => p.kind === 'anchor'))
     candidates.push(...pinLabels.filter((p) => p.kind !== 'anchor'))
-    for (const c of [...(snapshot.clusters ?? [])].sort(
-      (a, b) => b.size - a.size,
-    )) {
-      if (selectedRegions.size && !selectedRegions.has(c.region)) continue
-      if (safeTerm(c.label))
-        candidates.push({
-          text: c.label,
-          x: c.x * t.scale + t.x,
-          y: -c.y * t.scale + t.y,
-          size: 11,
-          kind: 'cluster',
-          region: c.region,
-        })
+    // Keep the overview readable; reveal signature phrases after zooming in.
+    if (camera.camera.zoom >= 1.5) {
+      for (const c of [...(snapshot.clusters ?? [])].sort(
+        (a, b) => b.size - a.size,
+      )) {
+        if (selectedRegions.size && !selectedRegions.has(c.region)) continue
+        if (safeTerm(c.label))
+          candidates.push({
+            text: c.label,
+            x: c.x * t.scale + t.x,
+            y: -c.y * t.scale + t.y,
+            size: 11,
+            kind: 'cluster',
+            region: c.region,
+          })
+      }
     }
     if (camera.camera.zoom >= 2.7 && snapshot.radius * 2 * t.scale >= 32)
       snapshot.cells.forEach((c, id) => {

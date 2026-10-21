@@ -18,8 +18,14 @@
   position: relative;
   z-index: 20;
 }
+.mapColumn {
+  min-width: 0;
+}
 .stats {
-  flex: none;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
   color: hsl(var(--muted-foreground));
 }
 .trends {
@@ -380,9 +386,6 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 @media (max-width: 1100px) {
-  .stats {
-    font-size: 10px;
-  }
   .search {
     flex-basis: 280px;
   }
@@ -401,9 +404,6 @@
   .panel {
     height: 560px;
     min-height: 0;
-  }
-  .stats {
-    display: none;
   }
   .strip {
     gap: 8px;

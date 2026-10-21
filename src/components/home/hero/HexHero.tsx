@@ -167,101 +167,105 @@ export default function HexHero({
             }}
           />
         </div>
-        <div className={styles.stats}>{stats}</div>
         {trends}
       </div>
       <div className={styles.row}>
-        {map.data ? (
-          <>
-            <SectionReady section="homepage_hex_map" />
-            <HexMap
-              snapshot={currentSnapshot!}
-              selfLocation={selfLocation}
-              finder={
-                <WhereAmI
-                  onLocated={(person) => {
-                    setSelfLocation(person)
-                    if (person) {
-                      setSelected([person.cell])
-                      setOpen(null)
-                      setHover(null)
-                      setTweetCell(undefined)
-                      preloadSelection([person.cell])
-                    }
-                  }}
-                />
-              }
-              coverageLive={!!pins.data}
-              pins={visiblePins}
-              anchor={selfLocation?.username ?? anchor}
-              heat={term && heat.data ? values : undefined}
-              heatTerm={term}
-              heatStatus={
-                term
-                  ? heat.isError
-                    ? 'Heat map unavailable'
-                    : heat.isFetching
-                      ? 'Loading heat map…'
-                      : !heat.data?.months.length
-                        ? 'No matching monthly data'
-                        : undefined
-                  : undefined
-              }
-              onRetryHeat={() => heat.refetch()}
-              scrubber={
-                term && heat.data?.months.length ? (
-                  <div className={styles.scrubber}>
-                    <button
-                      onClick={() => setPlaying((p) => !p)}
-                      aria-label={playing ? 'Pause heat map' : 'Play heat map'}
-                    >
-                      {playing ? 'Pause' : 'Play'}
-                    </button>
-                    <input
-                      aria-label="Heat map month"
-                      type="range"
-                      min={0}
-                      max={heat.data.months.length - 1}
-                      value={month}
-                      onChange={(e) => {
-                        setMonth(Number(e.target.value))
-                        setPlaying(false)
-                      }}
-                    />
-                    <span>{heat.data.months[month]?.slice(0, 7)}</span>
-                  </div>
-                ) : null
-              }
-              selected={selected}
-              onSelectionIntent={onSelectionIntent}
-              onSelect={(cells) => {
-                setSelfLocation(null)
-                onSelectionIntent(null)
-                preloadSelection(cells)
-                setSelected(cells)
-                setOpen(null)
-                setHover(null)
-                setTweetCell(undefined)
-              }}
-              storyCells={active?.cells ?? emptyCells}
-              origin={active?.origin}
-              tweetCell={tweetCell}
-            />
-          </>
-        ) : (
-          <div className={styles.mapShell}>
-            <p className={styles.message} role="status">
-              {map.isError ? (
-                <>
-                  The map could not load.{' '}
-                  <button onClick={() => map.refetch()}>Try again</button>
-                </>
-              ) : (
-                'Loading the map…'
-              )}
-            </p>
-          </div>
-        )}
+        <div className={styles.mapColumn}>
+          {map.data ? (
+            <>
+              <SectionReady section="homepage_hex_map" />
+              <HexMap
+                snapshot={currentSnapshot!}
+                selfLocation={selfLocation}
+                finder={
+                  <WhereAmI
+                    onLocated={(person) => {
+                      setSelfLocation(person)
+                      if (person) {
+                        setSelected([person.cell])
+                        setOpen(null)
+                        setHover(null)
+                        setTweetCell(undefined)
+                        preloadSelection([person.cell])
+                      }
+                    }}
+                  />
+                }
+                coverageLive={!!pins.data}
+                pins={visiblePins}
+                anchor={selfLocation?.username ?? anchor}
+                heat={term && heat.data ? values : undefined}
+                heatTerm={term}
+                heatStatus={
+                  term
+                    ? heat.isError
+                      ? 'Heat map unavailable'
+                      : heat.isFetching
+                        ? 'Loading heat map…'
+                        : !heat.data?.months.length
+                          ? 'No matching monthly data'
+                          : undefined
+                    : undefined
+                }
+                onRetryHeat={() => heat.refetch()}
+                scrubber={
+                  term && heat.data?.months.length ? (
+                    <div className={styles.scrubber}>
+                      <button
+                        onClick={() => setPlaying((p) => !p)}
+                        aria-label={
+                          playing ? 'Pause heat map' : 'Play heat map'
+                        }
+                      >
+                        {playing ? 'Pause' : 'Play'}
+                      </button>
+                      <input
+                        aria-label="Heat map month"
+                        type="range"
+                        min={0}
+                        max={heat.data.months.length - 1}
+                        value={month}
+                        onChange={(e) => {
+                          setMonth(Number(e.target.value))
+                          setPlaying(false)
+                        }}
+                      />
+                      <span>{heat.data.months[month]?.slice(0, 7)}</span>
+                    </div>
+                  ) : null
+                }
+                selected={selected}
+                onSelectionIntent={onSelectionIntent}
+                onSelect={(cells) => {
+                  setSelfLocation(null)
+                  onSelectionIntent(null)
+                  preloadSelection(cells)
+                  setSelected(cells)
+                  setOpen(null)
+                  setHover(null)
+                  setTweetCell(undefined)
+                }}
+                storyCells={active?.cells ?? emptyCells}
+                origin={active?.origin}
+                tweetCell={tweetCell}
+              />
+            </>
+          ) : (
+            <div className={styles.mapShell}>
+              <p className={styles.message} role="status">
+                {map.isError ? (
+                  <>
+                    The map could not load.{' '}
+                    <button onClick={() => map.refetch()}>Try again</button>
+                  </>
+                ) : (
+                  'Loading the map…'
+                )}
+              </p>
+            </div>
+          )}
+          <div className={styles.stats}>{stats}</div>
+        </div>
         <StoryPanel
           snapshot={currentSnapshot ?? null}
           coverageLive={!!pins.data}

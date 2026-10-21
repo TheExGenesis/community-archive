@@ -4,6 +4,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import TweetComponent from './TweetComponent'
 import type { TweetData } from '@/lib/tweets/types'
 
+jest.mock('@/components/TweetLinkPreviews', () => ({
+  TweetLinkPreviews: ({ tweetId }: { tweetId: string }) => (
+    <div data-testid="link-previews">{tweetId}</div>
+  ),
+}))
+
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 jest.mock('@/components/TweetAvatarImage', () => ({
@@ -48,6 +54,22 @@ const tweet: TweetData = {
 }
 
 describe('TweetComponent', () => {
+  test('loads previews for a permalink tweet with only a shortened video link', () => {
+    render(
+      <TweetComponent
+        tweet={{
+          ...tweet,
+          full_text:
+            'Incredible things are happening in Spanish television https://t.co/AXAuEVu3ch',
+        }}
+        isPermalinkPage
+      />,
+    )
+    expect(screen.getByTestId('link-previews')).toHaveTextContent(
+      tweet.tweet_id,
+    )
+  })
+
   test('removes its self-link and shows an icon-only external link on a permalink page', () => {
     render(<TweetComponent tweet={tweet} isPermalinkPage />)
 

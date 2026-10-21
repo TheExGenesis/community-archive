@@ -424,7 +424,7 @@ test('map preview keeps one cropped image and a single-line byline without dropp
   ])
   expect(images[0]).toHaveClass('aspect-video')
   expect(
-    screen.getByRole('link', { name: '@alice', exact: true }).parentElement,
+    screen.getByRole('link', { name: /^@alice$/ }).parentElement,
   ).toHaveClass('whitespace-nowrap')
   expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
 })

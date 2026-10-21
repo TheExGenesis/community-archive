@@ -20,6 +20,12 @@ Authenticated deployed range smokes returned 12 correctly dated cards each for a
 
 ## Most liked range controls and digest spacing
 
-Most liked now defaults to Last 7 days and offers Last month, Last 3 months, Last year, and All time using the deployed gateway's publication-date filters. Best and Most liked remember their choices independently while switching tabs; Most liked stays within its chosen range when paginating. Default intent prefetch uses the same weekly query. Digest day boundaries use whitespace without either the edition rule or the preceding story's bottom rule; separators between stories remain.
+Most liked now defaults to Last 7 days and offers Last month, Last 3 months, Last year, and All time using the deployed gateway's publication-date filters. Best and Most liked remember their choices independently while switching tabs; Most liked now expands from its chosen starting range as scrolling continues, just like Best. Default intent prefetch uses the same weekly query. Digest day boundaries use whitespace without either the edition rule or the preceding story's bottom rule; separators between stories remain.
 
 Validation: seven focused SelectionFeed/useMapFeed tests, TypeScript, and scoped lint passed. Local browser verified monthly Most liked returned real in-range posts (including October 1 and 13), and computed day-boundary borders were both zero. No new backend or frontend production deployment is required or performed for this change.
+
+## Progressive Most liked
+
+Both rankings now share `useRankedFeed`: exhaust the current range, then expand through 7/30/90/365 days and all time. Most liked uses likes throughout; Best retains its quote ranking and empty-week likes fallback. Query caches separate the two rankings while sharing raw prefetched pages. Earlier cards remain, tweet IDs are deduplicated across pages and ranges, and each newly displayed range has a small heading. Range choices remain independent between tabs.
+
+Validation: eight focused feed/selection tests passed, including Most liked overlap, duplicate-only pages, empty ranges, all-time completion, cached range changes, and both rankings' retry behavior. TypeScript and scoped lint passed. Local production-data browser scrolling appended Most liked cards successfully. No backend deployment needed.

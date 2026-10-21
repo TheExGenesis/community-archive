@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/tooltip'
 import Link from 'next/link'
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { useBestFeed, bestFeedRows } from './useBestFeed'
+import { useRankedFeed, rankedFeedRows } from './useRankedFeed'
 import {
   BEST_PERIODS,
   PERIOD_LABELS,
@@ -162,18 +162,23 @@ export default function SelectionFeed({
   const ids = [...cells].sort((a, b) => a - b).join(',')
   const posts = useMapFeed<MapPostPage>(
     selectionFeedPath(tab, ids, period),
-    tab !== 'Stories' && tab !== 'Strands' && tab !== 'Bangers',
+    tab === 'Latest',
   )
-  const best = useBestFeed(ids, bestPeriod, tab === 'Bangers')
-  const q = tab === 'Bangers' ? best : posts
-  const rows =
-    tab === 'Bangers'
-      ? bestFeedRows(best.data?.pages ?? [])
-      : tab === 'Stories' || tab === 'Strands'
-        ? []
-        : (posts.data?.pages.flatMap((p) =>
-            p.tweets.map((row) => ({ ...row, heading: undefined })),
-          ) ?? [])
+  const isRanked = tab === 'Bangers' || tab === 'Most liked'
+  const ranked = useRankedFeed(
+    ids,
+    period,
+    isRanked,
+    tab === 'Bangers' ? 'quotes' : 'likes',
+  )
+  const q = isRanked ? ranked : posts
+  const rows = isRanked
+    ? rankedFeedRows(ranked.data?.pages ?? [])
+    : tab === 'Stories' || tab === 'Strands'
+      ? []
+      : (posts.data?.pages.flatMap((p) =>
+          p.tweets.map((row) => ({ ...row, heading: undefined })),
+        ) ?? [])
   return (
     <div role="tabpanel">
       {(tab === 'Bangers' || tab === 'Most liked') && (

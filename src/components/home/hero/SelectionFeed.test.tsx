@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import SelectionFeed from './SelectionFeed'
 import StoryPanel from './StoryPanel'
-import { useBestFeed } from './useBestFeed'
+import { useRankedFeed } from './useRankedFeed'
 import { useMapFeed } from './useMapFeed'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 
@@ -22,9 +22,9 @@ jest.mock('./useMapFeed', () => ({
   useMapFeed: jest.fn(),
   prefetchMapFeed: jest.fn(),
 }))
-jest.mock('./useBestFeed', () => ({
-  ...jest.requireActual('./useBestFeed'),
-  useBestFeed: jest.fn(),
+jest.mock('./useRankedFeed', () => ({
+  ...jest.requireActual('./useRankedFeed'),
+  useRankedFeed: jest.fn(),
 }))
 const empty = {
   stories: [],
@@ -49,11 +49,11 @@ const noop = () => {}
 beforeEach(() => {
   jest.clearAllMocks()
   result = { ...base, data: { pages: [empty] } }
-  jest.mocked(useBestFeed).mockReturnValue({
+  jest.mocked(useRankedFeed).mockReturnValue({
     ...base,
     hasNextPage: false,
     data: { pages: [] },
-  } as unknown as ReturnType<typeof useBestFeed>)
+  } as unknown as ReturnType<typeof useRankedFeed>)
   jest.mocked(useMapFeed).mockImplementation(
     (path) =>
       (path.startsWith('stories?')
@@ -172,10 +172,7 @@ it('filters Most liked by its selected range independently of Best and Latest', 
   ).not.toBeInTheDocument()
   for (const value of ['week', 'month', 'quarter', 'year', 'all']) {
     fireEvent.change(ranges, { target: { value } })
-    expect(useMapFeed).toHaveBeenLastCalledWith(
-      `posts?cells=0&sort=likes&period=${value}`,
-      true,
-    )
+    expect(useRankedFeed).toHaveBeenLastCalledWith('0', value, true, 'likes')
   }
   fireEvent.click(screen.getByRole('tab', { name: 'Best' }))
   expect(screen.getByRole('combobox', { name: 'Best time range' })).toHaveValue(

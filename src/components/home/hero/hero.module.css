@@ -619,3 +619,32 @@
   bottom: auto;
   transform: translateX(-50%) rotate(225deg);
 }
+
+.zoom button {
+  display: grid;
+  place-items: center;
+}
+.clearHeat {
+  pointer-events: auto;
+  margin-left: 8px;
+  text-decoration: underline;
+  color: hsl(var(--foreground));
+}
+.mapHelp {
+  width: calc(100% - 32px);
+  max-height: calc(100svh - 48px);
+  overflow-y: auto;
+}
+.helpTips {
+  display: grid;
+  gap: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.helpTips dt {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.helpTips dd {
+  color: hsl(var(--muted-foreground));
+}

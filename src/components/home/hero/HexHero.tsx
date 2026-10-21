@@ -7,12 +7,13 @@ import { useQuery } from '@tanstack/react-query'
 import { SectionReady } from '@/components/PagePerformance'
 import HomepageSearch from '@/components/HomepageSearch'
 import type { HexSnapshot } from '@/lib/hexMap/types'
-import type { MapLookup, MapHeat } from '@/lib/hexMap/gateway'
+import type { MapLookup } from '@/lib/hexMap/gateway'
 import type { MapStory } from '@/lib/hexMap/stories'
 import StoryPanel from './StoryPanel'
 import WhereAmI, { type SelfLocation } from './WhereAmI'
 import { useSelectionPreview } from './useSelectionPreview'
 import styles from './hero.module.css'
+import { mapHeatOptions } from './useMapHeat'
 const HexMap = dynamic(() => import('./HexMap'), {
   ssr: false,
   loading: () => (
@@ -54,11 +55,13 @@ export default function HexHero({
   })
   const [expression, setExpression] = useState('')
   const [trend, setTrend] = useState('')
-  const [preview, setPreview] = useState('')
+  const [pinnedTrend, setPinnedTrend] = useState('')
+  const [debouncedExpression, setDebouncedExpression] = useState('')
   useEffect(() => {
-    const timer = setTimeout(() => setPreview(trend || expression), 450)
+    const timer = setTimeout(() => setDebouncedExpression(expression), 450)
     return () => clearTimeout(timer)
-  }, [expression, trend])
+  }, [expression])
+  const preview = trend || pinnedTrend || debouncedExpression
   const anchor = preview.match(/(?:^|\s)from:@?(\w{1,15})(?:$|\s)/i)?.[1] ?? ''
   const term = anchor ? '' : preview.trim().slice(0, 80)
   const pins = useQuery({
@@ -74,42 +77,33 @@ export default function HexHero({
     staleTime: 60_000,
     retry: false,
   })
-  const heat = useQuery({
-    queryKey: ['hex-map-heat', term],
-    queryFn: async ({ signal }) => {
-      const res = await fetch(mapUrl(`heat?q=${encodeURIComponent(term)}`), {
-        signal,
-      })
-      if (!res.ok) throw new Error('Heat map unavailable')
-      return res.json() as Promise<MapHeat>
-    },
-    enabled: !!term,
-    staleTime: 60_000,
-    retry: false,
-  })
-  const [month, setMonth] = useState(0),
-    [playing, setPlaying] = useState(false)
+  const heat = useQuery({ ...mapHeatOptions(term), enabled: !!term })
+  const [monthSelection, setMonthSelection] = useState<{
+    term: string
+    month: number
+  }>()
+  const [playing, setPlaying] = useState(false)
+  const lastMonth = Math.max(0, (heat.data?.months.length ?? 1) - 1)
+  const month =
+    monthSelection?.term === term
+      ? Math.min(monthSelection.month, lastMonth)
+      : lastMonth
   useEffect(() => {
-    setMonth(Math.max(0, (heat.data?.months.length ?? 1) - 1))
     setPlaying(false)
-  }, [heat.data])
+  }, [term])
   useEffect(() => {
     if (!playing || !heat.data?.months.length) return
     const timer = setInterval(
-      () => setMonth((m) => (m + 1) % heat.data!.months.length),
+      () =>
+        setMonthSelection({
+          term,
+          month: (month + 1) % heat.data!.months.length,
+        }),
       850,
     )
     return () => clearInterval(timer)
-  }, [playing, heat.data])
-  const values = useMemo(
-    () =>
-      new Map(
-        heat.data?.values
-          .filter((v) => v[1] === month)
-          .map((v) => [v[0], v[3] ? v[2] / v[3] : 0]),
-      ),
-    [heat.data, month],
-  )
+  }, [playing, heat.data, month, term])
+  const values = heat.data?.byMonth[month]
   const currentSnapshot = useMemo(
     () =>
       map.data && pins.data
@@ -146,6 +140,15 @@ export default function HexHero({
       <h1 className="sr-only">Community Archive</h1>
       <div
         className={styles.strip}
+        onClickCapture={(e) => {
+          const value = (e.target as HTMLElement).closest<HTMLElement>(
+            '[data-map-term]',
+          )?.dataset.mapTerm
+          if (!value || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+          e.preventDefault()
+          setPinnedTrend(value)
+          setTrend('')
+        }}
         onMouseOver={(e) =>
           setTrend(
             (e.target as HTMLElement).closest<HTMLElement>('[data-map-term]')
@@ -165,6 +168,7 @@ export default function HexHero({
           <HomepageSearch
             compact
             onPreview={(value) => {
+              setPinnedTrend('')
               setExpression(value)
               setSelfLocation(null)
             }}
@@ -203,7 +207,7 @@ export default function HexHero({
                   term
                     ? heat.isError
                       ? 'Heat map unavailable'
-                      : heat.isFetching
+                      : heat.isFetching && !heat.data
                         ? 'Loading heat map…'
                         : !heat.data?.months.length
                           ? 'No matching monthly data'
@@ -211,6 +215,12 @@ export default function HexHero({
                     : undefined
                 }
                 onRetryHeat={() => heat.refetch()}
+                onClearHeat={() => {
+                  setTrend('')
+                  setPinnedTrend('')
+                  setExpression('')
+                  setDebouncedExpression('')
+                }}
                 scrubber={
                   term && heat.data?.months.length ? (
                     <div className={styles.scrubber}>
@@ -229,7 +239,10 @@ export default function HexHero({
                         max={heat.data.months.length - 1}
                         value={month}
                         onChange={(e) => {
-                          setMonth(Number(e.target.value))
+                          setMonthSelection({
+                            term,
+                            month: Number(e.target.value),
+                          })
                           setPlaying(false)
                         }}
                       />

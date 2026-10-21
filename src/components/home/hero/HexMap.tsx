@@ -20,6 +20,7 @@ import {
 } from '@/lib/hexMap/geometry'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import useMapCamera from './useMapCamera'
+import MapHelp from './MapHelp'
 import styles from './hero.module.css'
 
 function polygon(
@@ -45,6 +46,7 @@ export default memo(function HexMap({
   heatTerm,
   heatStatus,
   onRetryHeat,
+  onClearHeat,
   scrubber,
   coverageLive,
   finder,
@@ -63,6 +65,7 @@ export default memo(function HexMap({
   heatTerm: string
   heatStatus?: string
   onRetryHeat: () => void
+  onClearHeat: () => void
   scrubber: ReactNode
   coverageLive: boolean
   finder?: ReactNode
@@ -247,6 +250,12 @@ export default memo(function HexMap({
       geo.bounds.width,
       geo.bounds.height,
     )
+    const active = hovered
+    if (active != null && geo.vertices[active]) {
+      ctx.fillStyle = '#ffffff99'
+      polygon(ctx, geo.vertices[active])
+      ctx.fill()
+    }
     storyCells.forEach((id) => {
       const c = snapshot.cells[id]
       if (!c) return
@@ -280,12 +289,6 @@ export default memo(function HexMap({
       ctx.fillStyle = '#27272a'
       ctx.fill()
     })
-    const active = hovered
-    if (active != null && geo.vertices[active]) {
-      ctx.fillStyle = dark ? '#ffffff22' : '#18181b11'
-      polygon(ctx, geo.vertices[active])
-      ctx.fill()
-    }
     // Keep author focus compact and constant in screen space at every zoom.
     const authorCell = tweetHover && snapshot.cells[tweetHover.cell]
     if (authorCell) {
@@ -607,6 +610,15 @@ export default memo(function HexMap({
             : layer === 'week'
               ? `Activity · snapshot week of ${snapshot.week}`
               : `Share of each cell’s accounts that are archived${coverageLive ? '' : ` · snapshot ${snapshot.week}`}`}
+          {heatTerm && (
+            <button
+              type="button"
+              className={styles.clearHeat}
+              onClick={onClearHeat}
+            >
+              Clear heatmap
+            </button>
+          )}
           {heatStatus && (
             <>
               <br />
@@ -620,6 +632,7 @@ export default memo(function HexMap({
       </div>
       {scrubber}
       <div className={styles.zoom}>
+        <MapHelp />
         <button
           type="button"
           aria-label="Zoom in"

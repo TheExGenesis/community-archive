@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { buildSearchParams } from '@/lib/searchParams'
 import type { HomepageData } from '@/lib/portal/data'
 import styles from './hero.module.css'
+import TrendHeatPreload from './TrendHeatPreload'
 export default async function HeroTrends({
   data,
 }: {
@@ -11,6 +12,9 @@ export default async function HeroTrends({
   if (result.failed || !result.data.length) return null
   return (
     <div className={styles.trends} aria-label="Trending terms over seven days">
+      <TrendHeatPreload
+        terms={result.data.slice(0, 12).map((term) => term.term)}
+      />
       <span>Trending:</span>
       {result.data.slice(0, 12).map((term) => (
         <Link
@@ -18,6 +22,7 @@ export default async function HeroTrends({
           data-map-term={term.term}
           href={`/search?${buildSearchParams(term.term)}`}
           prefetch={false}
+          title="Preview heatmap; click to keep it open. Ctrl or ⌘ click to search."
         >
           {term.term}
           <span

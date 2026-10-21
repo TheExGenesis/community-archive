@@ -10,7 +10,7 @@ import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
 import { safeTerm } from '@/lib/hexMap/geometry'
 import type { MapStory, StoryDetail, StoryPage } from '@/lib/hexMap/stories'
-import type { MapLookup } from '@/lib/hexMap/gateway'
+import { selectionPeopleOptions } from './useSelectionPreview'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import {
   Tooltip,
@@ -42,6 +42,8 @@ export default function StoryPanel({
   snapshot,
   coverageLive,
   selected,
+  selectionTab,
+  onSelectionTab,
   onClear,
   open,
   onOpen,
@@ -51,6 +53,8 @@ export default function StoryPanel({
   snapshot: HexSnapshot | null
   coverageLive: boolean
   selected: number[]
+  selectionTab: string
+  onSelectionTab: (tab: string) => void
   onClear: () => void
   open: MapStory | null
   onOpen: (story: MapStory | null) => void
@@ -58,7 +62,6 @@ export default function StoryPanel({
   onTweetHover: (cell?: number) => void
 }) {
   const [tab, setTab] = useState<'digest' | 'strand'>('digest')
-  const [selectionTab, setSelectionTab] = useState('Stories')
   const panel = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLButtonElement>(null)
   const queryClient = useQueryClient()
@@ -68,13 +71,8 @@ export default function StoryPanel({
   )
   const selectedIds = [...selected].sort((a, b) => a - b).join(',')
   const people = useQuery({
-    queryKey: ['hex-selection-people', selectedIds],
-    queryFn: ({ signal }) =>
-      json<MapLookup>(`/api/hex-map/lookup?cells=${selectedIds}`, signal),
+    ...selectionPeopleOptions(selectedIds),
     enabled: !!selected.length && !open,
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
   })
   const detail = useQuery({
     queryKey: ['hex-map-story', open?.kind, open?.id],
@@ -278,15 +276,17 @@ export default function StoryPanel({
                     void prefetchMapFeed(
                       queryClient,
                       selectionFeedPath(label, selectedIds),
+                      snapshot,
                     )
                   }
                   onFocus={() =>
                     void prefetchMapFeed(
                       queryClient,
                       selectionFeedPath(label, selectedIds),
+                      snapshot,
                     )
                   }
-                  onClick={() => setSelectionTab(label)}
+                  onClick={() => onSelectionTab(label)}
                 >
                   {label}
                 </button>
@@ -294,6 +294,7 @@ export default function StoryPanel({
             )}
           </div>
           <SelectionFeed
+            snapshot={snapshot}
             cells={selected}
             tab={selectionTab}
             onOpen={onOpen}

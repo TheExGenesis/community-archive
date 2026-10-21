@@ -10,6 +10,7 @@ import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapLookup, MapHeat } from '@/lib/hexMap/gateway'
 import type { MapStory } from '@/lib/hexMap/stories'
 import StoryPanel from './StoryPanel'
+import { useSelectionPreview } from './useSelectionPreview'
 import styles from './hero.module.css'
 const HexMap = dynamic(() => import('./HexMap'), {
   ssr: false,
@@ -31,6 +32,7 @@ export default function HexHero({
   useEffect(() => {
     void import('./HexMap')
   }, [])
+  const [selectionTab, setSelectionTab] = useState('Stories')
   const [selected, setSelected] = useState<number[]>([])
   const [hover, setHover] = useState<MapStory | null>(null)
   const [open, setOpen] = useState<MapStory | null>(null)
@@ -115,6 +117,10 @@ export default function HexHero({
           }
         : map.data,
     [map.data, pins.data],
+  )
+  const { onSelectionIntent, preloadSelection } = useSelectionPreview(
+    selectionTab,
+    map.data,
   )
   const active = open ?? hover
   const visiblePins = useMemo(
@@ -202,7 +208,10 @@ export default function HexHero({
                 ) : null
               }
               selected={selected}
+              onSelectionIntent={onSelectionIntent}
               onSelect={(cells) => {
+                onSelectionIntent(null)
+                preloadSelection(cells)
                 setSelected(cells)
                 setOpen(null)
                 setHover(null)
@@ -231,6 +240,8 @@ export default function HexHero({
           snapshot={currentSnapshot ?? null}
           coverageLive={!!pins.data}
           selected={selected}
+          selectionTab={selectionTab}
+          onSelectionTab={setSelectionTab}
           onClear={() => setSelected([])}
           open={open}
           onOpen={(story) => {

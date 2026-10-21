@@ -10,6 +10,7 @@ import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import type { PortalTweet } from '@/lib/portal/types'
 import { locate } from './gateway'
 import snapshot from './snapshot.json'
+import { selectStories } from './selectStories'
 import type { MapStory, StoryPage, StoryDetail } from './stories'
 
 // Recheck current membership as well as opt-outs even for published snapshots.
@@ -247,21 +248,7 @@ export async function storyPage(
   } catch {
     if (cells.length) throw new Error('Story locations unavailable')
   }
-  if (cells.length) {
-    const selected = new Set(cells),
-      countries = new Set(cells.map((c) => snapshot.cells[c].region))
-    const exact = stories.some((s) => s.cells.some((c) => selected.has(c)))
-    const keep = (s: MapStory) =>
-      s.cells.some((c) =>
-        exact ? selected.has(c) : countries.has(snapshot.cells[c].region),
-      )
-    page.stories = page.stories.filter(keep)
-    page.editions = page.editions
-      .map((e) => ({ ...e, stories: e.stories.filter(keep) }))
-      .filter((e) => e.stories.length)
-    page.countryFallback = !exact
-  }
-  return page
+  return selectStories(page, cells, snapshot)
 }
 
 export async function locatedDetail(

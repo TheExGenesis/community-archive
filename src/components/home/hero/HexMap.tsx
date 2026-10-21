@@ -35,6 +35,7 @@ export default memo(function HexMap({
   snapshot,
   selected,
   onSelect,
+  onSelectionIntent,
   storyCells,
   origin,
   tweetCell,
@@ -50,6 +51,7 @@ export default memo(function HexMap({
   snapshot: HexSnapshot
   selected: number[]
   onSelect: (cells: number[]) => void
+  onSelectionIntent: (cells: number[] | null) => void
   storyCells: number[]
   origin?: number
   tweetCell?: number
@@ -390,6 +392,20 @@ export default memo(function HexMap({
     selectedRegions,
   ])
 
+  useEffect(() => {
+    const c = hovered === null ? undefined : snapshot.cells[hovered]
+    onSelectionIntent(
+      c
+        ? c.archived === 0
+          ? snapshot.cells.flatMap((cell, i) =>
+              cell.region === c.region ? [i] : [],
+            )
+          : [hovered!]
+        : null,
+    )
+    return () => onSelectionIntent(null)
+  }, [hovered, snapshot, onSelectionIntent])
+
   const selectCell = (id: number, additive = false) => {
     const c = snapshot.cells[id]
     const ids =
@@ -415,6 +431,10 @@ export default memo(function HexMap({
         ref={camera.ref}
         className={styles.mapViewport}
         {...camera.handlers}
+        onPointerDown={(e) => {
+          onSelectionIntent(null)
+          camera.handlers.onPointerDown(e)
+        }}
         onMouseMove={(e) => {
           if (!e.buttons) setHovered(atPointer(e))
         }}
@@ -467,6 +487,22 @@ export default memo(function HexMap({
                 top: l.y,
                 opacity: focus.size && !focus.has(l.region) ? 0.28 : 1,
               }}
+              onMouseEnter={() =>
+                onSelectionIntent(
+                  snapshot.cells.flatMap((c, id) =>
+                    c.region === l.region ? [id] : [],
+                  ),
+                )
+              }
+              onMouseLeave={() => onSelectionIntent(null)}
+              onFocus={() =>
+                onSelectionIntent(
+                  snapshot.cells.flatMap((c, id) =>
+                    c.region === l.region ? [id] : [],
+                  ),
+                )
+              }
+              onBlur={() => onSelectionIntent(null)}
               onClick={() => {
                 const r = snapshot.regions.find((r) => r.id === l.region)!
                 onSelect(

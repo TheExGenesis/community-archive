@@ -2,7 +2,8 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useEffect, useRef } from 'react'
-import { useMapFeed, selectionFeedPath } from './useMapFeed'
+import { useMapFeed } from './useMapFeed'
+import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapStory, StoryPage, MapPostPage } from '@/lib/hexMap/stories'
 import StoryCard from './StoryCard'
 import styles from './hero.module.css'
@@ -37,17 +38,23 @@ function More({
   ) : null
 }
 function AreaStories({
+  snapshot,
   kind,
   cells,
   onOpen,
   onHover,
 }: {
+  snapshot: HexSnapshot | null
   kind: 'digest' | 'strand'
   cells: string
   onOpen: (s: MapStory) => void
   onHover: (s: MapStory | null) => void
 }) {
-  const q = useMapFeed<StoryPage>(`stories?kind=${kind}&cells=${cells}`)
+  const q = useMapFeed<StoryPage>(
+    `stories?kind=${kind}&cells=${cells}`,
+    true,
+    snapshot,
+  )
   return (
     <section>
       <h3 className={styles.sectionTitle}>
@@ -100,12 +107,14 @@ function AreaStories({
   )
 }
 export default function SelectionFeed({
+  snapshot,
   cells,
   tab,
   onOpen,
   onHover,
   onTweetHover,
 }: {
+  snapshot: HexSnapshot | null
   cells: number[]
   tab: string
   onOpen: (s: MapStory) => void
@@ -115,7 +124,7 @@ export default function SelectionFeed({
   const ids = [...cells].sort((a, b) => a - b).join(','),
     sort = tab === 'Bangers' ? 'quotes' : tab === 'Latest' ? 'time' : 'likes'
   const q = useMapFeed<MapPostPage>(
-    selectionFeedPath(tab, ids),
+    `posts?cells=${ids}&sort=${sort}`,
     tab !== 'Stories' && tab !== 'Strands',
   )
   return (
@@ -123,6 +132,7 @@ export default function SelectionFeed({
       {tab === 'Stories' || tab === 'Strands' ? (
         <AreaStories
           key={tab}
+          snapshot={snapshot}
           kind={tab === 'Stories' ? 'digest' : 'strand'}
           cells={ids}
           onOpen={onOpen}

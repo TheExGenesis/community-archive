@@ -30,7 +30,7 @@ function archiveColor(color: string, strength: number) {
   const hue = (sector * 60 + 360) % 360
   // Preserve each country's hue and hold lightness steady. More archives
   // increase colour saturation, rather than mixing the colour toward white.
-  return `hsl(${hue.toFixed(1)} ${65 + 30 * strength}% 58%)`
+  return `hsl(${hue.toFixed(1)} ${50 + 45 * strength}% 58%)`
 }
 
 export default function HexMap({

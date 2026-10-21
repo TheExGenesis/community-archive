@@ -155,6 +155,7 @@ it('keeps uploader cells bright by default and uses a smaller increase for addit
       .map(Number)
   const [oneHue, oneSaturation, oneLightness] = channels(one)
   const [fiveHue, fiveSaturation, fiveLightness] = channels(five)
+  expect(oneSaturation).toBe(50)
   expect(fiveHue).toBe(oneHue)
   expect(fiveSaturation).toBeGreaterThan(oneSaturation)
   expect(fiveLightness).toBe(oneLightness)

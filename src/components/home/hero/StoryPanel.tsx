@@ -10,6 +10,14 @@ import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
 import { safeTerm } from '@/lib/hexMap/geometry'
 import type { MapStory, StoryDetail, StoryPage } from '@/lib/hexMap/stories'
+import type { MapLookup } from '@/lib/hexMap/gateway'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import styles from './hero.module.css'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
 
@@ -63,6 +71,16 @@ export default function StoryPanel({
     getNextPageParam: (last) => last.nextOffset,
     enabled: !open && !selected.length,
     staleTime: 60_000,
+    retry: false,
+  })
+  const selectedIds = [...selected].sort((a, b) => a - b).join(',')
+  const people = useQuery({
+    queryKey: ['hex-selection-people', selectedIds],
+    queryFn: ({ signal }) =>
+      json<MapLookup>(`/api/hex-map/lookup?cells=${selectedIds}`, signal),
+    enabled: !!selected.length && !open,
+    staleTime: 0,
+    gcTime: 0,
     retry: false,
   })
   const detail = useQuery({
@@ -204,11 +222,45 @@ export default function StoryPanel({
                 ? regions[0].name
                 : `${selected.length} selected cells`}
             </h2>
-            <p>
-              {active.archived.toLocaleString()} of{' '}
-              {active.accounts.toLocaleString()} archived
-              {coverageLive ? '' : ' · snapshot'}
-            </p>
+            <div className={styles.selectionSummary}>
+              <p>
+                {active.archived.toLocaleString()} of{' '}
+                {active.accounts.toLocaleString()} archived
+                {coverageLive ? '' : ' · snapshot'}
+              </p>
+              {!!people.data?.people.length && (
+                <TooltipProvider delayDuration={150}>
+                  <div
+                    className={styles.selectionAvatars}
+                    aria-label="Community members"
+                  >
+                    {people.data.people.slice(0, 6).map((person) => (
+                      <Tooltip key={person.account_id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={'@' + person.username}
+                          >
+                            <Avatar className="h-6 w-6 border border-background">
+                              <AvatarImage
+                                src={person.avatar ?? undefined}
+                                alt=""
+                              />
+                              <AvatarFallback>
+                                {person.username[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          @{person.username}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </TooltipProvider>
+              )}
+            </div>
             <p>
               {regions
                 .flatMap((r) => r.terms)

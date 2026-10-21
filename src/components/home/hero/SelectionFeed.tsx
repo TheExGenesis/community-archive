@@ -3,11 +3,9 @@ import { mapUrl } from '@/lib/hexMap/version'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useEffect, useRef } from 'react'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import type { MapStory, StoryPage, MapPostPage } from '@/lib/hexMap/stories'
-import type { MapLookup } from '@/lib/hexMap/gateway'
 import StoryCard from './StoryCard'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import styles from './hero.module.css'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
 async function json<T>(url: string, signal: AbortSignal): Promise<T> {
@@ -152,38 +150,8 @@ export default function SelectionFeed({
     gcTime: 0,
     retry: false,
   })
-  const people = useQuery({
-    queryKey: ['hex-selection-people', ids],
-    queryFn: ({ signal }) =>
-      json<MapLookup>(`/api/hex-map/lookup?cells=${ids}`, signal),
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
-  })
   return (
     <div role="tabpanel">
-      {!!people.data?.people.length && (
-        <div className={styles.people} style={{ padding: '12px 20px 0' }}>
-          {people.data.people.slice(0, 6).map((p) => (
-            <Avatar
-              key={p.account_id}
-              className="-ml-1 h-6 w-6 border border-background"
-            >
-              <AvatarImage src={p.avatar ?? undefined} alt={'@' + p.username} />
-              <AvatarFallback>{p.username[0]}</AvatarFallback>
-            </Avatar>
-          ))}
-        </div>
-      )}
-      {!!people.data?.people.length && (
-        <p className={styles.sectionTitle}>
-          {people.data.people
-            .slice(0, 5)
-            .map((p) => '@' + p.username)
-            .join(', ')}
-          {people.data.people.length > 5 ? ' and more' : ''}
-        </p>
-      )}
       {tab === 'Stories' ? (
         <>
           <AreaStories

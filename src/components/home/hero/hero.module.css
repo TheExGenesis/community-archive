@@ -315,11 +315,40 @@
   width: 100%;
 }
 .selection {
-  padding: 4px 0 12px;
+  padding: 0 0 6px;
+}
+.selection .back {
+  margin: 4px 0 6px;
+}
+.selectionSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  min-height: 24px;
+}
+.selectionAvatars {
+  display: flex;
+  padding-left: 4px;
+}
+.selectionAvatars button {
+  margin-left: -4px;
+  border-radius: 50%;
+}
+.selectionAvatars button:hover,
+.selectionAvatars button:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+.selectionAvatars button:focus-visible {
+  outline: 2px solid hsl(var(--brand-deep));
+  outline-offset: 2px;
 }
 .selection h2 {
-  font-size: 23px;
-  margin-bottom: 7px;
+  font-size: 21px;
+  line-height: 1.3;
+  margin-bottom: 4px;
 }
 .selection p {
   font-size: 11px;

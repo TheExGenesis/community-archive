@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Minus, Plus, RotateCcw, X } from 'lucide-react'
 import { SectionReady } from '@/components/PagePerformance'
@@ -17,6 +11,26 @@ import {
 } from '@/lib/hexMap/types'
 
 const number = (value: number) => value.toLocaleString('en-US')
+
+function archiveColor(color: string, strength: number) {
+  const [r, g, b] = [1, 3, 5].map(
+    (start) => parseInt(color.slice(start, start + 2), 16) / 255,
+  )
+  const max = Math.max(r, g, b),
+    delta = max - Math.min(r, g, b)
+  const sector =
+    delta === 0
+      ? 0
+      : max === r
+        ? (g - b) / delta
+        : max === g
+          ? (b - r) / delta + 2
+          : (r - g) / delta + 4
+  const hue = (sector * 60 + 360) % 360
+  // Preserve each country's hue and hold lightness steady. More archives
+  // increase colour saturation, rather than mixing the colour toward white.
+  return `hsl(${hue.toFixed(1)} ${65 + 30 * strength}% 58%)`
+}
 
 export default function HexMap({
   stories,
@@ -174,19 +188,16 @@ export default function HexMap({
                           ? 0.9 + 0.1 * countStrength
                           : 0.2
                         : 0.5 + 0.45 * Math.min(cell.activity / 2, 1)
-                      const darkFill =
+                      const fill =
                         coverage && cell.archived > 0
-                          ? `color-mix(in srgb, ${color}, white ${45 + 25 * countStrength}%)`
+                          ? archiveColor(color, countStrength)
                           : color
                       const highlighted = selectedSet.has(id) || hovered === id
                       return (
                         <polygon
                           key={id}
                           points={geometry.points[id]}
-                          fill={color}
-                          style={
-                            { '--hex-bright-fill': darkFill } as CSSProperties
-                          }
+                          fill={fill}
                           fillOpacity={opacity}
                           stroke={
                             highlighted ? 'hsl(var(--brand))' : region?.color
@@ -199,7 +210,7 @@ export default function HexMap({
                           tabIndex={focusCell === id ? 0 : -1}
                           aria-label={`${region?.short ?? 'Community'}, cell ${id}: ${cell.archived} of ${cell.accounts} accounts archived`}
                           aria-pressed={selectedSet.has(id)}
-                          className="cursor-pointer outline-none focus:stroke-foreground focus:[stroke-width:0.09] dark:fill-[var(--hex-bright-fill)]"
+                          className="cursor-pointer outline-none focus:stroke-foreground focus:[stroke-width:0.09]"
                           onMouseEnter={() => setHovered(id)}
                           onFocus={() => setHovered(id)}
                           onBlur={() => setHovered(null)}
@@ -354,7 +365,7 @@ export default function HexMap({
           <div className="flex flex-wrap justify-between gap-2 border-t border-border px-4 py-3 text-[10px] text-muted-foreground">
             <span>
               {coverage
-                ? 'Bright cells have archives · brighter means more archived accounts'
+                ? 'Bright cells have archives · richer colour means more archived accounts'
                 : 'Brightness shows activity relative to each cell’s weekly average'}
             </span>
             <span>Snapshot · week of {snapshot?.week ?? '…'}</span>

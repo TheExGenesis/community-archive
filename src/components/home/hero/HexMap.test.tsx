@@ -148,5 +148,14 @@ it('keeps uploader cells bright by default and uses a smaller increase for addit
   expect(opacity(five) - opacity(one)).toBeLessThan(0.1)
   fireEvent.click(zero)
   expect(opacity(one)).toBe(0.9)
-  expect(one.style.getPropertyValue('--hex-bright-fill')).toContain('white 45%')
+  const channels = (cell: HTMLElement) =>
+    cell
+      .getAttribute('fill')!
+      .match(/[\d.]+/g)!
+      .map(Number)
+  const [oneHue, oneSaturation, oneLightness] = channels(one)
+  const [fiveHue, fiveSaturation, fiveLightness] = channels(five)
+  expect(fiveHue).toBe(oneHue)
+  expect(fiveSaturation).toBeGreaterThan(oneSaturation)
+  expect(fiveLightness).toBe(oneLightness)
 })

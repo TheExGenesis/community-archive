@@ -20,11 +20,13 @@ import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 import { capturePostHogEvent } from '@/lib/posthog'
 
 interface HeroCTAButtonsProps {
+  compact?: boolean
   initialIsOptedIn?: boolean
 }
 
 export default function HeroCTAButtons({
   initialIsOptedIn = false,
+  compact = false,
 }: HeroCTAButtonsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -222,7 +224,13 @@ export default function HeroCTAButtons({
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex flex-col items-center gap-4">
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:gap-4">
+        <div
+          className={
+            compact
+              ? 'flex w-full flex-col gap-2 [&_a]:h-10 [&_a]:px-3 [&_a]:text-xs [&_button]:h-10 [&_button]:px-3 [&_button]:text-xs'
+              : 'flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:gap-4'
+          }
+        >
           {/* Opt In Button */}
           {isOptedIn !== true ? (
             <Tooltip>

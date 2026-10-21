@@ -1,6 +1,6 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { Suspense, type ReactNode } from 'react'
+import { Suspense } from 'react'
 import { cookies } from 'next/headers'
 import HomepageSearch from '@/components/HomepageSearch'
 import FeaturedCommunityApps from './FeaturedCommunityApps'
@@ -9,6 +9,8 @@ import type { HomepageData } from '@/lib/portal/data'
 import HomepageUpload from './HomepageUpload'
 import { createServerClient } from '@/utils/supabase'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
+import HexMap from './hero/HexMap'
+import StoryColumn from './hero/StoryColumn'
 import {
   HomepagePortal,
   HomepageStats,
@@ -19,7 +21,7 @@ const DynamicHeroCTAButtons = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex flex-col justify-center gap-4 sm:flex-row sm:gap-6">
+      <div className="flex flex-col justify-center gap-4">
         <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
         <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
@@ -30,14 +32,12 @@ const DynamicHeroCTAButtons = dynamic(
 
 interface ClassicHomepageProps {
   data: HomepageData
-  homepagePeople: ReactNode
   isMember: boolean
   showCta: boolean
 }
 
 export default async function ClassicHomepage({
   data,
-  homepagePeople,
   isMember,
   showCta,
 }: ClassicHomepageProps) {
@@ -62,8 +62,8 @@ export default async function ClassicHomepage({
 
   return (
     <main>
-      <section className="overflow-hidden bg-card pb-8 pt-16 dark:bg-background md:pb-10 md:pt-24">
-        <div className="relative z-10 mx-auto w-full max-w-5xl space-y-12 px-4 text-center sm:px-6 md:space-y-16 lg:px-8">
+      <section className="overflow-hidden bg-card pb-8 pt-10 dark:bg-background md:pb-10 md:pt-14">
+        <div className="relative z-10 mx-auto w-full max-w-[1664px] space-y-8 px-4 text-center sm:px-6 md:space-y-10 lg:px-8">
           <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
               Community Archive
@@ -82,20 +82,35 @@ export default async function ClassicHomepage({
             </p>
           </div>
 
-          {showCta ? (
-            <div className="!mt-11 md:!mt-[50px]">
-              <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
-            </div>
-          ) : isMember ? (
-            <div className="!mt-11 md:!mt-[50px]">
-              <HomepageSearch />
-            </div>
-          ) : null}
+          <HomepageSearch />
 
-          {/* The backers line is a footnote to the social proof above it. */}
-          <div className="!mt-6 md:!mt-[50px]">
-            {homepagePeople}
+          <HexMap
+            stories={
+              <Suspense
+                fallback={
+                  <div className="p-6 text-sm text-muted-foreground">
+                    Loading community stories…
+                  </div>
+                }
+              >
+                <StoryColumn />
+              </Suspense>
+            }
+            actions={
+              showCta ? (
+                <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} compact />
+              ) : (
+                <Link
+                  href="#upload-archive"
+                  className="inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand/90"
+                >
+                  Add your archive ↗
+                </Link>
+              )
+            }
+          />
 
+          <div className="!mt-5">
             <p className="mt-1 text-xs text-muted-foreground/80">
               Backed by{' '}
               <Link

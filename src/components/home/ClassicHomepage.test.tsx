@@ -4,6 +4,26 @@ import ClassicHomepage from './ClassicHomepage'
 import type { HomepageData } from '@/lib/portal/data'
 import { createServerClient } from '@/utils/supabase'
 
+jest.mock('./hero/StoryColumn', () => ({
+  __esModule: true,
+  default: () => <div>Stories</div>,
+}))
+jest.mock('./hero/HexMap', () => ({
+  __esModule: true,
+  default: ({
+    stories,
+    actions,
+  }: {
+    stories: React.ReactNode
+    actions: React.ReactNode
+  }) => (
+    <div data-testid="hex-map">
+      {stories}
+      {actions}
+    </div>
+  ),
+}))
+
 jest.mock('next/headers', () => ({ cookies: jest.fn(() => ({})) }))
 jest.mock('next/dynamic', () => {
   const mockReact = jest.requireActual<typeof import('react')>('react')
@@ -66,7 +86,6 @@ describe('ClassicHomepage audience actions', () => {
     render(
       await ClassicHomepage({
         data,
-        homepagePeople: <div data-testid="homepage-people" />,
         isMember: true,
         showCta: false,
       }),
@@ -74,23 +93,22 @@ describe('ClassicHomepage audience actions', () => {
 
     expect(screen.getByTestId('homepage-search')).toBeInTheDocument()
     expect(screen.queryByTestId('hero-cta')).not.toBeInTheDocument()
-    expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
+    expect(screen.getByTestId('hex-map')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })
 
-  it('keeps the CTA above the same dashboard for guests', async () => {
+  it('shows search and keeps guest actions within the map sidebar', async () => {
     render(
       await ClassicHomepage({
         data,
-        homepagePeople: <div data-testid="homepage-people" />,
         isMember: false,
         showCta: true,
       }),
     )
 
     expect(screen.getByTestId('hero-cta')).toBeInTheDocument()
-    expect(screen.queryByTestId('homepage-search')).not.toBeInTheDocument()
-    expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
+    expect(screen.getByTestId('homepage-search')).toBeInTheDocument()
+    expect(screen.getByTestId('hex-map')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })
 })

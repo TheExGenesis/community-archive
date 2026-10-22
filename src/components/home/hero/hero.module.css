@@ -447,16 +447,6 @@
     display: inline;
   }
 }
-.pin {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  font-size: 11px;
-  font-weight: 700;
-  color: #3f3f46;
-  white-space: nowrap;
-  paint-order: stroke fill;
-  -webkit-text-stroke: 2px white;
-}
 .scrubber {
   position: absolute;
   bottom: 32px;
@@ -591,39 +581,42 @@
   padding: 6px;
 }
 
-.hoveredAuthor {
+/* Callouts never intercept map gestures; their leaders mark the exact location. */
+.callouts,
+.calloutLines {
   position: absolute;
-  z-index: 3;
+  inset: 0;
   pointer-events: none;
-  transform: translate(-50%, -100%);
-  padding: 4px 8px;
-  border: 1px solid #d4d4d8;
-  border-radius: 5px;
-  background: white;
-  color: #3f3f46;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.25;
-  white-space: nowrap;
-  box-shadow: 0 1px 4px #18181b18;
 }
-.hoveredAuthorPointer {
+.calloutLineHalo {
+  fill: none;
+  stroke: white;
+  stroke-width: 3px;
+  opacity: 0.75;
+}
+.calloutLine {
+  fill: none;
+  stroke: #71717a;
+  stroke-width: 1px;
+}
+.userCallout {
   position: absolute;
-  bottom: -5px;
-  width: 8px;
-  height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  background: #fffffff2;
+  color: #3f3f46;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px #0000000d;
+}
+.userCallout[data-highlighted='true'] {
+  border-color: #71717a;
   background: white;
-  border-right: 1px solid #d4d4d8;
-  border-bottom: 1px solid #d4d4d8;
-  transform: translateX(-50%) rotate(45deg);
-}
-.hoveredAuthor[data-side='below'] {
-  transform: translate(-50%, 0);
-}
-.hoveredAuthor[data-side='below'] .hoveredAuthorPointer {
-  top: -5px;
-  bottom: auto;
-  transform: translateX(-50%) rotate(225deg);
+  box-shadow: 0 2px 6px #00000018;
 }
 
 .clearHeat {

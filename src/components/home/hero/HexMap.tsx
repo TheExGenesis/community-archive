@@ -19,6 +19,7 @@ import {
   transform,
   type MapLabel,
 } from '@/lib/hexMap/geometry'
+import { placeCallouts } from '@/lib/hexMap/callouts'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import useMapCamera from './useMapCamera'
 import styles from './hero.module.css'
@@ -266,10 +267,6 @@ export default memo(function HexMap({
       ctx.beginPath()
       ctx.arc(c.x, -c.y, (id === origin ? 13 : 10) / t.scale, 0, Math.PI * 2)
       ctx.fill()
-      ctx.fillStyle = '#3f3f46'
-      ctx.beginPath()
-      ctx.arc(c.x, -c.y, 3.5 / t.scale, 0, Math.PI * 2)
-      ctx.fill()
     })
     if (selected.length === 1) {
       ctx.fillStyle = dark ? '#38bdf888' : '#0284c766'
@@ -284,24 +281,12 @@ export default memo(function HexMap({
       ctx.lineTo(e.b.x, e.b.y)
     })
     ctx.stroke()
-    pins.forEach((p) => {
-      const c = snapshot.cells[p.cell]
-      if (!c) return
-      ctx.beginPath()
-      ctx.arc(c.x, -c.y, 3.5 / t.scale, 0, Math.PI * 2)
-      ctx.fillStyle = '#3f3f46'
-      ctx.fill()
-    })
     // Keep author focus compact and constant in screen space at every zoom.
     const authorCell = tweetHover && snapshot.cells[tweetHover.cell]
     if (authorCell) {
       ctx.fillStyle = '#1e9bcd33'
       ctx.beginPath()
       ctx.arc(authorCell.x, -authorCell.y, 12 / t.scale, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = '#3f3f46'
-      ctx.beginPath()
-      ctx.arc(authorCell.x, -authorCell.y, 4 / t.scale, 0, Math.PI * 2)
       ctx.fill()
     }
   }, [
@@ -319,7 +304,6 @@ export default memo(function HexMap({
     selected,
     hovered,
     tweetHover,
-    pins,
     dark,
   ])
 
@@ -341,30 +325,6 @@ export default memo(function HexMap({
         kind: 'country',
         region: r.id,
       }))
-    const pinLabels: MapLabel[] = pins.flatMap((p) => {
-      // The hovered author is named once, in the tooltip pointing to their dot.
-      if (p.username.toLowerCase() === tweetHover?.username.toLowerCase())
-        return []
-      const c = snapshot.cells[p.cell]
-      return c
-        ? [
-            {
-              text: '@' + p.username,
-              x: c.x * t.scale + t.x,
-              y: -c.y * t.scale + t.y - 12,
-              size: 11,
-              kind:
-                p.username.toLowerCase() === anchor.toLowerCase()
-                  ? 'anchor'
-                  : 'pin',
-              region: c.region,
-              id: p.cell,
-            },
-          ]
-        : []
-    })
-    candidates.unshift(...pinLabels.filter((p) => p.kind === 'anchor'))
-    candidates.push(...pinLabels.filter((p) => p.kind !== 'anchor'))
     // Keep the overview readable; reveal signature phrases after zooming in.
     if (camera.camera.zoom >= 1.5) {
       for (const c of [...(snapshot.clusters ?? [])].sort(
@@ -415,9 +375,6 @@ export default memo(function HexMap({
     size,
     totals,
     fontsReady,
-    pins,
-    anchor,
-    tweetHover?.username,
     camera.ref,
     selectedRegions,
   ])
@@ -449,14 +406,53 @@ export default memo(function HexMap({
       y: (e.clientY - rect.top - t.y) / t.scale,
     })
   }
-  const authorCell = tweetHover && snapshot.cells[tweetHover.cell]
-  const authorPosition = authorCell
-    ? { x: authorCell.x * t.scale + t.x, y: -authorCell.y * t.scale + t.y }
-    : null
-  const authorTooltipX = authorPosition
-    ? Math.max(90, Math.min(size.width - 90, authorPosition.x))
-    : 0
-  const authorTooltipBelow = !!authorPosition && authorPosition.y < 48
+  const callouts = useMemo(() => {
+    if (typeof document === 'undefined') return []
+    const ctx = document.createElement('canvas').getContext('2d')!
+    const fontFamily = camera.ref.current
+      ? getComputedStyle(camera.ref.current).fontFamily
+      : 'sans-serif'
+    const people = [
+      ...(tweetHover ? [tweetHover] : []),
+      ...pins.filter((p) => p.username.toLowerCase() === anchor.toLowerCase()),
+      ...pins,
+    ].flatMap((p) => {
+      const cell = snapshot.cells[p.cell]
+      return cell
+        ? [
+            {
+              username: p.username,
+              x: cell.x * t.scale + t.x,
+              y: -cell.y * t.scale + t.y,
+              region: cell.region,
+              highlighted:
+                p.username.toLowerCase() === tweetHover?.username.toLowerCase(),
+            },
+          ]
+        : []
+    })
+    return placeCallouts(
+      people,
+      labels,
+      (text, fontSize) => {
+        ctx.font = `600 ${fontSize}px ${fontFamily}`
+        return ctx.measureText(text).width
+      },
+      size.width,
+      size.height,
+    )
+  }, [
+    pins,
+    tweetHover,
+    anchor,
+    snapshot,
+    t.scale,
+    t.x,
+    t.y,
+    labels,
+    size,
+    camera.ref,
+  ])
   const cell = hovered === null ? null : snapshot.cells[hovered]
   const region = cell && snapshot.regions.find((r) => r.id === cell.region)
   return (
@@ -565,13 +561,7 @@ export default memo(function HexMap({
           ) : (
             <span
               key={`${l.kind}${i}`}
-              className={
-                l.kind === 'cluster'
-                  ? styles.cluster
-                  : l.kind === 'pin' || l.kind === 'anchor'
-                    ? styles.pin
-                    : styles.word
-              }
+              className={l.kind === 'cluster' ? styles.cluster : styles.word}
               style={{
                 left: l.x,
                 top: l.y,
@@ -584,30 +574,57 @@ export default memo(function HexMap({
           ),
         )}
       </div>
-      {tweetHover &&
-        authorPosition &&
-        authorPosition.x >= 0 &&
-        authorPosition.x <= size.width &&
-        authorPosition.y >= 0 &&
-        authorPosition.y <= size.height && (
-          <div
-            className={styles.hoveredAuthor}
-            data-side={authorTooltipBelow ? 'below' : 'above'}
+      <div className={styles.callouts}>
+        <svg
+          className={styles.calloutLines}
+          width={size.width}
+          height={size.height}
+          aria-hidden="true"
+        >
+          {callouts.map((p) => (
+            <g
+              key={p.username}
+              opacity={
+                focus.size && !focus.has(p.region) && !p.highlighted ? 0.35 : 1
+              }
+            >
+              <path
+                d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
+                className={styles.calloutLineHalo}
+              />
+              <path
+                d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
+                className={styles.calloutLine}
+              />
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={2.5}
+                fill="#3f3f46"
+                stroke="white"
+                strokeWidth={1}
+              />
+            </g>
+          ))}
+        </svg>
+        {callouts.map((p) => (
+          <span
+            key={p.username}
+            className={styles.userCallout}
+            data-highlighted={p.highlighted}
             style={{
-              left: authorTooltipX,
-              top: authorPosition.y + (authorTooltipBelow ? 14 : -14),
+              left: p.box.x,
+              top: p.box.y,
+              width: p.box.width,
+              height: p.box.height,
+              opacity:
+                focus.size && !focus.has(p.region) && !p.highlighted ? 0.35 : 1,
             }}
           >
-            @{tweetHover.username}
-            <span
-              className={styles.hoveredAuthorPointer}
-              style={{
-                left: `calc(50% + ${authorPosition.x - authorTooltipX}px)`,
-              }}
-              aria-hidden="true"
-            />
-          </div>
-        )}
+            @{p.username}
+          </span>
+        ))}
+      </div>
       <div className={styles.layers}>
         <div className={styles.segmented}>
           {(['week', 'archived'] as const).map((value) => (

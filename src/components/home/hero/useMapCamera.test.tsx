@@ -13,12 +13,12 @@ function MapSurface() {
     </div>
   )
 }
-function wheel(deltaY: number, shiftKey = false) {
+function wheel(deltaY: number, modifiers: WheelEventInit = { ctrlKey: true }) {
   const event = new WheelEvent('wheel', {
     bubbles: true,
     cancelable: true,
     deltaY,
-    shiftKey,
+    ...modifiers,
   })
   fireEvent(screen.getByTestId('label'), event)
   act(() => jest.advanceTimersByTime(20))
@@ -41,8 +41,19 @@ it('keeps zoom-in gestures on the map at maximum zoom and still permits zooming 
   expect(wheel(150).defaultPrevented).toBe(true)
   expect(Number(screen.getByTestId('zoom').textContent)).toBeLessThan(8)
 })
-it('preserves explicit Shift-scroll as a way to scroll the page', () => {
-  render(<MapSurface />)
-  expect(wheel(150, true).defaultPrevented).toBe(false)
-  expect(screen.getByTestId('zoom')).toHaveTextContent('1')
-})
+it.each([{}, { shiftKey: true }])(
+  'lets ordinary scrolling move the page (%j)',
+  (modifiers) => {
+    render(<MapSurface />)
+    expect(wheel(-150, modifiers).defaultPrevented).toBe(false)
+    expect(screen.getByTestId('zoom')).toHaveTextContent('1')
+  },
+)
+it.each([{ ctrlKey: true }, { metaKey: true }])(
+  'zooms with Ctrl or Cmd over labels (%j)',
+  (modifiers) => {
+    render(<MapSurface />)
+    expect(wheel(-150, modifiers).defaultPrevented).toBe(true)
+    expect(Number(screen.getByTestId('zoom').textContent)).toBeGreaterThan(1)
+  },
+)

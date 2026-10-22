@@ -33,8 +33,8 @@ export default function MapHelp() {
           <div>
             <dt>Move around</dt>
             <dd>
-              Scroll to zoom and drag to pan. On touch screens, pinch to zoom.
-              Use + / − to zoom or ↺ to reset the view.
+              Hold Cmd or Ctrl and scroll to zoom; drag to pan. On touch
+              screens, pinch to zoom. Use + / − to zoom or ↺ to reset the view.
             </dd>
           </div>
           <div>
@@ -77,8 +77,8 @@ export default function MapHelp() {
           <div>
             <dt>Keep exploring below</dt>
             <dd>
-              Hold Shift while scrolling over the map, scroll outside it, or
-              follow “Continue to the daily digest and more.”
+              Scroll normally over the map to move down the page, or follow
+              “Read the Daily Digest.”
             </dd>
           </div>
           <div>

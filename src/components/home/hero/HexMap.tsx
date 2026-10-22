@@ -699,8 +699,8 @@ export default memo(function HexMap({
       {scrubber}
       <span className={styles.hint}>
         <span className={styles.desktopHint}>
-          Scroll to zoom · Click a cluster to select · Double-click a hex to
-          select · Shift + scroll for page
+          Cmd/Ctrl + scroll to zoom · Click a cluster to select · Double-click a
+          hex to select
         </span>
         <span className={styles.touchHint}>
           Pinch to zoom · Scroll to explore below

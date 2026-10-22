@@ -47,9 +47,9 @@ export default function useMapCamera(
     const element = ref.current
     if (!element) return
     const wheel = (e: WheelEvent) => {
-      // Keep wheel gestures on the map even when zoom is clamped. Only an
-      // explicit Shift gesture should release scrolling to the page.
-      if (e.shiftKey) return
+      // Ordinary scrolling belongs to the page. Modified zoom gestures stay
+      // on the map even at its limits, including trackpad pinch (Ctrl-wheel).
+      if (!e.metaKey && !e.ctrlKey) return
       e.preventDefault()
       const r = element.getBoundingClientRect()
       const delta =

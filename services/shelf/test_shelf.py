@@ -467,6 +467,16 @@ def tweet(tid, account, text, urls=(), is_retweet=False):
 
 
 class Echoes(unittest.TestCase):
+    def test_a_source_without_an_echo_route_skips_the_stage(self):
+        # The production gateway has no echo-tweets route yet; the run must not fail on it.
+        db = mock.MagicMock()
+        db.execute.return_value.fetchall.return_value = []
+        counts = {}
+        shelf_worker.find_echoes(db, shelf_worker.SOURCES["gateway"].__new__(shelf_worker.SOURCES["gateway"]),
+                                 "1", counts)
+        self.assertIn("echoes_skipped", counts)
+        self.assertFalse(any("echoes" in str(call.args[0]) for call in db.execute.call_args_list[1:]))
+
     ITEMS = [
         item("name:outofcontrol", "books", "Out of Control", creator="Kevin Kelly"),
         item("name:governingthecommons", "books", "Governing the Commons"),

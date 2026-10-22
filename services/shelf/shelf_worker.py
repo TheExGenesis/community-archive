@@ -385,7 +385,14 @@ def find_echoes(db, source, account_id, counts):
     wanted = echoes.targets(items)
     links = sorted({t["link"] for t in wanted.values() if t["link"]})
     phrases = sorted({t["title"]["phrase"] for t in wanted.values() if t["title"]})
-    found = echoes.match(wanted, source.echo_tweets(links, phrases), account_id)
+    try:
+        others = source.echo_tweets(links, phrases)
+    except NotImplementedError:
+        # The production gateway has no echo-tweets route yet: the shelf ships without echoes,
+        # and the stage fills them in once the route exists.
+        counts["echoes_skipped"] = "source cannot search other members' tweets"
+        return
+    found = echoes.match(wanted, others, account_id)
     if not is_member(db, account_id):  # consent can change during a run
         db.execute("DELETE FROM shelf.echoes WHERE account_id=%s", (account_id,))
         counts["skipped_not_member"] = True

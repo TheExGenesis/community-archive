@@ -24,7 +24,6 @@ const DynamicHeroCTAButtons = dynamic(
       <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
         <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
         <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
-        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
       </div>
     ),
   },
@@ -88,12 +87,13 @@ export default async function ClassicHomepage({
             </p>
           </div>
 
-          <div className="!mt-7 md:!mt-8">
-            <HomepageSearch />
-          </div>
-          {showCta && (
-            <div className={styles.actions}>
+          {showCta ? (
+            <div className={`${styles.actions} !mt-7 md:!mt-8`}>
               <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
+            </div>
+          ) : (
+            <div className="!mt-7 md:!mt-8">
+              <HomepageSearch />
             </div>
           )}
 
@@ -122,10 +122,10 @@ export default async function ClassicHomepage({
               </Link>
             </p>
             <Link
-              href="#community-map"
+              href="#daily-digest"
               className="mt-5 inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-2 text-sm font-medium text-brand-deep transition-colors hover:bg-brand/20"
             >
-              Explore the community ↓
+              Read the daily digest ↓
             </Link>
           </div>
         </div>

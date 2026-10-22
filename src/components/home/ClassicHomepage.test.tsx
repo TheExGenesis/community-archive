@@ -111,9 +111,9 @@ describe('ClassicHomepage audience actions', () => {
     )
 
     expect(screen.getByTestId('hero-cta')).toBeInTheDocument()
-    expect(screen.getByTestId('homepage-search')).toBeInTheDocument()
+    expect(screen.queryByTestId('homepage-search')).not.toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'Continue to digest' }),
+      screen.getByRole('link', { name: 'Read the daily digest ↓' }),
     ).toHaveAttribute('href', '#daily-digest')
     expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()

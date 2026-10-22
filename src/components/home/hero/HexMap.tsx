@@ -263,7 +263,7 @@ export default memo(function HexMap({
       ctx.beginPath()
       ctx.arc(c.x, -c.y, (id === origin ? 13 : 10) / t.scale, 0, Math.PI * 2)
       ctx.fill()
-      ctx.fillStyle = '#27272a'
+      ctx.fillStyle = '#3f3f46'
       ctx.beginPath()
       ctx.arc(c.x, -c.y, 3.5 / t.scale, 0, Math.PI * 2)
       ctx.fill()
@@ -286,7 +286,7 @@ export default memo(function HexMap({
       if (!c) return
       ctx.beginPath()
       ctx.arc(c.x, -c.y, 3.5 / t.scale, 0, Math.PI * 2)
-      ctx.fillStyle = '#27272a'
+      ctx.fillStyle = '#3f3f46'
       ctx.fill()
     })
     // Keep author focus compact and constant in screen space at every zoom.
@@ -296,7 +296,7 @@ export default memo(function HexMap({
       ctx.beginPath()
       ctx.arc(authorCell.x, -authorCell.y, 12 / t.scale, 0, Math.PI * 2)
       ctx.fill()
-      ctx.fillStyle = '#27272a'
+      ctx.fillStyle = '#3f3f46'
       ctx.beginPath()
       ctx.arc(authorCell.x, -authorCell.y, 4 / t.scale, 0, Math.PI * 2)
       ctx.fill()

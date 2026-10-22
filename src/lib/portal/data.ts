@@ -1130,11 +1130,10 @@ export async function getPortalData(
 
 /**
  * Start independent section promises. Never return Promise.all here: the hero,
- * stream, digest and cards have separate Suspense boundaries and failure states.
+ * digest and cards have separate Suspense boundaries and failure states.
  */
 export function startHomepageData() {
   const sourceKey = portalDataSourceKey()
-  const today = new Date().toISOString().slice(0, 10)
   const globalStats = loadPortalComponentData(
     'global-stats',
     () => getCachedGlobalStats(sourceKey),
@@ -1145,58 +1144,8 @@ export function startHomepageData() {
       generatedAt: new Date().toISOString(),
     },
   )
-  const joinedThisWeek = loadPortalComponentData(
-    'joined-this-week',
-    () => getCachedJoinedThisWeek(sourceKey),
-    0,
-  )
-  const corpusRange = loadPortalComponentData(
-    'corpus-range',
-    () => getCachedCorpusRange(sourceKey),
-    { firstYear: 0, currentYear: 0 },
-  )
-  const overview = Promise.all([
-    globalStats,
-    joinedThisWeek,
-    corpusRange,
-  ]).then(([global, joined, range]) => ({
-    stats: {
-      totalTweets: global.data.totalTweets,
-      accountCount: global.data.memberCount,
-      generatedAt: global.data.generatedAt,
-      addedLast24Hours: global.data.addedLast24Hours,
-      joinedThisWeek: joined.data,
-      ...range.data,
-    },
-    failures: {
-      liveAnalytics: global.failed,
-      memberCount: global.failed,
-      joinedThisWeek: joined.failed,
-      corpusRange: range.failed,
-    },
-  }))
   return {
     globalStats,
-    overview,
-    stream: loadPortalComponentData(
-      'initial-stream',
-      async () =>
-        selectHomepageStream(
-          await getCachedHomepageStreamCandidates(sourceKey),
-          30,
-        ),
-      [],
-    ),
-    recentBangers: loadPortalComponentData(
-      'recent-bangers',
-      () => getCachedRecentBangers(sourceKey),
-      [],
-    ),
-    historicalBangers: loadPortalComponentData(
-      'historical-bangers',
-      () => getCachedHistoricalBangers(sourceKey, today),
-      [],
-    ),
     trends: loadPortalComponentData(
       'weekly-trends',
       // The gateway caches by UTC day and membership. Read it directly so a

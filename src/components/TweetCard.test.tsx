@@ -400,3 +400,61 @@ test('highlights literal queries in tweet and quote text without changing naviga
   rerender(<TweetCard tweet={tweet} highlightQuery="" />)
   expect(container.querySelector('mark')).toBeNull()
 })
+
+test('map preview keeps one cropped image and a single-line byline without dropping the quote', () => {
+  render(
+    <TweetCard
+      variant="map"
+      compact
+      stacked
+      showDate
+      tweet={{
+        ...tweet,
+        media: [
+          ...tweet.media!,
+          { url: 'https://example.com/second.jpg', type: 'photo' },
+        ],
+      }}
+    />,
+  )
+  const images = screen.getAllByTestId('tweet-image')
+  expect(images.map((image) => image.dataset.src)).toEqual([
+    'https://example.com/tweet.jpg',
+    'https://example.com/quoted.jpg',
+  ])
+  expect(images[0]).toHaveClass('aspect-video')
+  expect(
+    screen.getByRole('link', { name: /^@alice$/ }).parentElement,
+  ).toHaveClass('whitespace-nowrap')
+  expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
+})
+
+test('map text expands from three lines without navigating and collapses again', () => {
+  const scrollHeight = jest
+    .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    .mockReturnValue(100)
+  const clientHeight = jest
+    .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+    .mockReturnValue(60)
+  try {
+    render(
+      <TweetCard
+        variant="map"
+        compact
+        tweet={{ ...tweet, quotedTweet: undefined, media: [] }}
+      />,
+    )
+    const content = screen
+      .getByText('A complete tweet & media with > one encoding layer.')
+      .closest('.whitespace-pre-wrap')
+    expect(content).toHaveClass('line-clamp-3')
+    fireEvent.click(screen.getByRole('button', { name: 'Read more' }))
+    expect(content).not.toHaveClass('line-clamp-3')
+    expect(push).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Show less' }))
+    expect(content).toHaveClass('line-clamp-3')
+  } finally {
+    scrollHeight.mockRestore()
+    clientHeight.mockRestore()
+  }
+})

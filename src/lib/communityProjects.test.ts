@@ -43,7 +43,14 @@ describe('community project catalog', () => {
       homepageFeaturedProjects(mergeCommunityCatalog([])).map(
         (project) => project.slug,
       ),
-    ).toEqual(['bangers', 'pairwise', 'birdseye'])
+    ).toEqual([
+      'bangers',
+      'pairwise',
+      'birdseye',
+      'strands',
+      'conversation-map',
+      'bangers-page',
+    ])
 
     const edited = mergeCommunityCatalog([
       {
@@ -72,10 +79,29 @@ describe('community project catalog', () => {
     expect(edited[0].name).toBe('Bangers (edited)')
     expect(
       homepageFeaturedProjects(edited).map((project) => project.slug),
-    ).toEqual(['pairwise', 'birdseye', 'strands'])
+    ).toEqual([
+      'pairwise',
+      'birdseye',
+      'strands',
+      'conversation-map',
+      'bangers-page',
+      'tweet-harvest',
+    ])
     expect(
       filterCommunityProjects(edited, '', 'Games', 'Featured')[0].featured,
     ).toBe(true)
+  })
+
+  it('fills two rows when admins have featured fewer than six projects', () => {
+    const catalog = COMMUNITY_PROJECTS.map((project, index) => ({
+      ...project,
+      featured: index >= 6 && index < 9,
+    }))
+    const selected = homepageFeaturedProjects(catalog)
+    expect(selected).toHaveLength(6)
+    expect(selected.slice(0, 3)).toEqual(catalog.slice(6, 9))
+    expect(selected.slice(3)).toEqual(catalog.slice(0, 3))
+    expect(new Set(selected.map((project) => project.slug)).size).toBe(6)
   })
 
   it('searches across project, creator, category, and tag copy', () => {

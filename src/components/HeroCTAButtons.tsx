@@ -12,11 +12,9 @@ import {
 } from '@/components/ui/tooltip'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
-import { Users, Puzzle, Upload } from 'lucide-react'
+import { Users, Upload } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
 import { updateOptIn } from '@/lib/optInApi'
-import { useBrowserExtensionStatus } from '@/hooks/useBrowserExtensionStatus'
-import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 import { capturePostHogEvent } from '@/lib/posthog'
 
 interface HeroCTAButtonsProps {
@@ -32,7 +30,6 @@ export default function HeroCTAButtons({
   const supabase = useMemo(() => createBrowserClient(), [])
   const autoOptInStarted = useRef(false)
   const optInInFlight = useRef(false)
-  const extensionStatus = useBrowserExtensionStatus()
 
   const [user, setUser] = useState<any>(null)
   const [isOptedIn, setIsOptedIn] = useState(initialIsOptedIn)
@@ -272,38 +269,6 @@ export default function HeroCTAButtons({
               Backfill older tweets by importing your full X archive
             </TooltipContent>
           </Tooltip>
-
-          {/* Install Extension Button */}
-          {extensionStatus === 'not-installed' ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-14 w-full border-2 px-8 text-lg font-semibold"
-                  size="lg"
-                >
-                  <a
-                    href={CHROME_EXTENSION_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() =>
-                      capturePostHogEvent('homepage_action_clicked', {
-                        action: 'get_extension',
-                        authenticated: Boolean(user),
-                      })
-                    }
-                  >
-                    <Puzzle className="mr-2 h-5 w-5" />
-                    Get extension
-                  </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Contribute tweets in real time while you browse
-              </TooltipContent>
-            </Tooltip>
-          ) : null}
         </div>
         {optInError ? (
           <Alert variant="destructive" className="max-w-xl" aria-live="polite">

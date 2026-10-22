@@ -5,6 +5,7 @@ import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import OptInForm from '@/components/OptInForm'
+import type { SessionAccount } from '@/hooks/useAuthAndArchive'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 
 jest.mock('next/image', () => ({
@@ -46,7 +47,8 @@ jest.mock('@/hooks/useAuthAndArchive', () => ({
     userMetadata: {
       user_name: 'archive_member',
       provider_id: '42',
-    },
+      avatar_url: null,
+    } satisfies SessionAccount,
   }),
 }))
 

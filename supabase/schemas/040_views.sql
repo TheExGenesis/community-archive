@@ -105,8 +105,19 @@ WITH archived_members AS NOT MATERIALIZED (
   FROM public.account a
   LEFT JOIN public.profile p ON a.account_id = p.account_id
   JOIN LATERAL (
+    -- Explicit list: the migration-built view expanded candidate.* before
+    -- archive_upload gained storage_path/storage_sha256 (20260907031822).
     SELECT
-      candidate.*,
+      candidate.id,
+      candidate.account_id,
+      candidate.archive_at,
+      candidate.created_at,
+      candidate.keep_private,
+      candidate.upload_likes,
+      candidate.start_date,
+      candidate.end_date,
+      candidate.upload_phase,
+      candidate.username,
       min(candidate.created_at) OVER () AS first_archive_uploaded_at
     FROM public.archive_upload candidate
     WHERE candidate.account_id = a.account_id

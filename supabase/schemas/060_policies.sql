@@ -88,11 +88,11 @@ CREATE POLICY "Users can read their own archive" ON "storage"."objects"
     AND ("storage"."filename"("name") = 'archive.json'::"text")
     AND (
       "lower"(("storage"."foldername"("name"))[1]) =
-      "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+      "lower"((("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
     )
     AND public.assert_archive_upload_allowed(
-      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text")),
-      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
+      (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text"),
+      (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")
     )
   );
 
@@ -103,11 +103,11 @@ CREATE POLICY "Users can upload their own archive" ON "storage"."objects"
     AND ("storage"."filename"("name") = 'archive.json'::"text")
     AND (
       "lower"(("storage"."foldername"("name"))[1]) =
-      "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+      "lower"((("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
     )
     AND public.assert_archive_upload_allowed(
-      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text")),
-      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
+      (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text"),
+      (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")
     )
   );
 

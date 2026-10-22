@@ -8,15 +8,17 @@ Source repository: https://github.com/TheExGenesis/community-archive
 ## Start here
 
 - [Docs and access guide](https://www.community-archive.org/docs): Human-readable overview of the bulk dump, API, and raw archives.
+- [API v1 OpenAPI specification](https://analytics.community-archive.org/v1/openapi.json): Machine-readable schema for the current keyed API.
+- [API v1 migration guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-v1-migration.md): Call-by-call mapping from the legacy Supabase REST API to v1, with paging examples.
+- [API keys](https://www.community-archive.org/settings/api-keys): Sign in and create a personal key for v1.
 - [Agent and schema guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/agents.md): Tables, relationships, fields, and common query patterns.
-- [API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples, filters, and pagination.
-- [Interactive API reference](https://www.community-archive.org/api/reference): Browse the PostgREST API.
-- [OpenAPI specification](https://www.community-archive.org/openapi.json): Machine-readable API schema.
+- [Legacy API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples for the Supabase API, which is retired on 2026-11-19.
+- [Legacy interactive API reference](https://www.community-archive.org/api/reference) and [legacy OpenAPI specification](https://www.community-archive.org/openapi.json): the PostgREST API.
 - [Examples](https://github.com/TheExGenesis/community-archive/tree/main/docs/examples): Python examples and a canonical notebook.
 
 ## Choose the right data access method
 
-1. Filtered or application queries: use the Supabase REST API.
+1. Filtered or application queries: use the Community Archive API v1 with a personal key. The public Supabase REST API still works until 2026-11-19, when it is retired; do not start new work on it.
 2. Bulk analysis: download the daily consent-safe Parquet package from the [latest release](https://github.com/TheExGenesis/community-archive/releases/latest).
 3. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
 
@@ -34,7 +36,45 @@ the Parquet files remain in consent-managed storage. Superseded packages are
 removed, so do not bookmark versioned file URLs. Downloads may be temporarily
 withdrawn when consent changes.
 
-## API
+## API v1 (current)
+
+Base URL: https://analytics.community-archive.org/v1
+OpenAPI 3.1: https://analytics.community-archive.org/v1/openapi.json
+Key: a signed-in user creates one at https://www.community-archive.org/settings/api-keys and sends it as `Authorization: Bearer cak_...` on every request. Keys are personal; keep them server-side, never in browser code. There is no anonymous access.
+
+Routes:
+
+- `GET /v1/tweets/{tweet_id}`: one tweet. `GET /v1/tweets?ids=A,B,C`: up to 100 tweets in request order.
+- `GET /v1/tweets?since=&until=`: every tweet created in a window of at most 31 days, keyset-paged.
+- `GET /v1/tweets/search?q=&from_user=&reply_to_user=&since=&until=&limit=&offset=`: full-text search (offset up to 5,000, returns `next_offset`).
+- `GET /v1/accounts/{account}` and `GET /v1/accounts?ids=|usernames=`: profile and membership flags. `{account}` is a numeric account ID or a username; a numeric username needs an `@` prefix.
+- `GET /v1/accounts/{account}/tweets?order=asc|desc&since=&until=&exclude_replies=&exclude_retweets=`: account timeline.
+- `GET /v1/accounts/{account}/likes`, `/followers`, `/following`: archive-derived likes and follow edges.
+- `GET /v1/members`: every current member.
+- `GET /v1/me`: the calling key and its limits.
+
+Rules:
+
+- Responses are `{"data": ..., "next_cursor": ..., "request_id": ...}`; errors are `{"error": {"code", "message"}, "request_id"}`.
+- Page by passing `next_cursor` back as `cursor` until it is `null`. Do not stop on a short or empty page. Up to 200 tweets, 500 likes or follows, or 1,000 members per page.
+- Each tweet carries `tweet_id`, `account_id`, `username`, `account_display_name`, `avatar_media_url`, `created_at` (ISO 8601 UTC), `full_text`, `favorite_count`, `retweet_count`, `reply_to_tweet_id`, `reply_to_user_id`, `reply_to_username`, `quoted_tweet_id`, `retweeted_tweet_id`, `conversation_id`, `media[]`, `urls[]`, `mentioned_account_ids[]`. IDs are strings.
+- Deleted and opted-out tweets are omitted.
+- Limits: 60 requests a minute and 20,000 a day per key, and two requests in flight per account. On `429` or `503`, wait `Retry-After` seconds and retry. A `422` means the query exceeded its budget; narrow it, for example with a date range.
+
+cURL example:
+
+```bash
+export CA_API_KEY='cak_...'
+
+curl --get "https://analytics.community-archive.org/v1/accounts/exgenesis/tweets" \
+  -H "Authorization: Bearer $CA_API_KEY" \
+  --data-urlencode "order=desc" \
+  --data-urlencode "limit=5"
+```
+
+## Legacy Supabase REST API (retired on 2026-11-19)
+
+The PostgREST API below is retired on 2026-11-19 in favour of API v1. It keeps working until then. Existing integrations should move before that date using the migration guide linked above.
 
 API base URL: https://fabxmporizzqflnftavs.supabase.co
 REST base URL: https://fabxmporizzqflnftavs.supabase.co/rest/v1

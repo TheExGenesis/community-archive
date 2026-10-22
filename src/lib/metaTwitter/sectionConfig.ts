@@ -33,6 +33,12 @@ export interface GeneratedSectionsFile {
           bangers: number
           generationSource?: string
           supplementalTweetIds?: string[]
+          /**
+           * When scripts/prune-section-misfits.ts last moved this year's
+           * off-label tweets to the catch-all. Removed supplements stay in
+           * supplementalTweetIds so the page still hydrates them.
+           */
+          misfitsPrunedAt?: string
           sections: ChapterSection[]
         }
       >
@@ -82,4 +88,21 @@ export const supplementalSectionIds = (
           !CURATED_SECTIONS[accountId]?.[Number(year)],
       )
       .map(([year, entry]) => [year, entry.supplementalTweetIds!]),
+  )
+
+/**
+ * Every tweet a curated chapter names. Curation is not limited to bangers, so
+ * the year feed hydrates whichever of these the banger pool lacks; unlike the
+ * generated supplements, some are usually bangers already.
+ */
+export const curatedSectionIds = (
+  accountId: string,
+): Record<number, string[]> =>
+  Object.fromEntries(
+    Object.entries(CURATED_SECTIONS[accountId] ?? {}).map(
+      ([year, sections]) => [
+        year,
+        sections.flatMap((section) => section.tweetIds),
+      ],
+    ),
   )

@@ -1,6 +1,9 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
-import { supplementalSectionIds } from './metaTwitter/sectionConfig'
+import {
+  curatedSectionIds,
+  supplementalSectionIds,
+} from './metaTwitter/sectionConfig'
 
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { devLog } from '@/lib/devLog'
@@ -12,6 +15,7 @@ import {
   type ProfileCurationSection,
 } from './profileCurationState'
 import { getProfileBangers, getProfileBangersPage } from './metaTwitter/bangers'
+import { measureServerRead } from '@/lib/performance/server'
 import type { ProfileBangersPageOptions } from './metaTwitter/bangers'
 import type {
   ArchivePerson,
@@ -174,14 +178,52 @@ const getSectionTweets = unstable_cache(
   { revalidate: 300 },
 )
 
+const getMeasuredProfileBangers = (accountId: string) =>
+  measureServerRead('profile.bangers-collection', () =>
+    getProfileBangers(accountId),
+  )
+
 /** Include configured representatives even when they are outside the banger set. */
 async function getSectionedProfilePage(
   accountId: string,
   options: ProfileBangersPageOptions,
 ) {
-  const page = await getProfileBangersPage(accountId, options)
   const supplemental = supplementalSectionIds(accountId)
-  if (!page.available || !Object.keys(supplemental).length) return page
+  const curated = curatedSectionIds(accountId)
+  // Curated IDs aren't counted until their year is hydrated: most are
+  // bangers already, so adding them below would inflate the chapter counts.
+  const wanted = new Set(
+    options.year === undefined
+      ? []
+      : [
+          ...(supplemental[options.year] ?? []),
+          ...(curated[options.year] ?? []),
+        ],
+  )
+  // A combined chapter needs the full collection below; both reads are
+  // independent gateway queries, so the collection starts alongside the page.
+  const year = options.year
+  const collectionRead =
+    year !== undefined && wanted.size
+      ? getMeasuredProfileBangers(accountId)
+      : null
+  // An early return below leaves it unawaited; its failure must not surface
+  // as an unhandled rejection.
+  collectionRead?.catch(() => undefined)
+  // A combined chapter pages itself below. Its later offsets run past the
+  // banger pool, which the gateway reports as an invalid page, so only the
+  // first page is asked for its counts.
+  const page = await measureServerRead('profile.bangers-page', () =>
+    getProfileBangersPage(
+      accountId,
+      wanted.size ? { ...options, offset: 0 } : options,
+    ),
+  )
+  if (
+    !page.available ||
+    (!Object.keys(supplemental).length && !Object.keys(curated).length)
+  )
+    return page
   const counts = new Map(page.yearCounts.map((row) => [row.year, row.count]))
   for (const [year, ids] of Object.entries(supplemental))
     counts.set(Number(year), (counts.get(Number(year)) ?? 0) + ids.length)
@@ -189,17 +231,18 @@ async function getSectionedProfilePage(
     year,
     count,
   })).sort((a, b) => b.year - a.year)
-  if (options.year === undefined || !supplemental[options.year]?.length)
-    return { ...page, yearCounts }
-  const collection = await getProfileBangers(accountId)
+  if (year === undefined || !collectionRead) return { ...page, yearCounts }
+  const collection = await collectionRead
   if (!collection.available) return { ...page, available: false }
   const known = new Set(collection.tweets.map((tweet) => tweet.tweet_id))
   try {
-    const ids = supplemental[options.year].filter((id) => !known.has(id))
-    const extra = await getSectionTweets(accountId, options.year, ids)
+    const ids = Array.from(wanted).filter((id) => !known.has(id))
+    const extra = await measureServerRead('profile.section-tweets', () =>
+      getSectionTweets(accountId, year, ids),
+    )
     const tweets = [
       ...collection.tweets.filter(
-        (tweet) => new Date(tweet.created_at).getUTCFullYear() === options.year,
+        (tweet) => new Date(tweet.created_at).getUTCFullYear() === year,
       ),
       ...extra,
     ]
@@ -237,17 +280,25 @@ export async function getCuratedProfileBangersPage(
   if (options.year !== undefined) {
     return getSectionedProfilePage(accountId, options)
   }
+  const rowsRead = measureServerRead('profile.curation-rows', () =>
+    getProfileCurationRows(accountId, 'bangers'),
+  )
+  // A featured or manually positioned item may originate beyond the requested
+  // ClickHouse page. Use the cached generated collection whenever overrides
+  // exist so persistent edits remain globally stable across pagination. The
+  // rows answer long before the page, so the collection overlaps it.
+  const collectionRead = rowsRead.then((rows) =>
+    rows.length ? getMeasuredProfileBangers(accountId) : null,
+  )
+  collectionRead.catch(() => undefined)
   const [page, rows] = await Promise.all([
     getSectionedProfilePage(accountId, options),
-    getProfileCurationRows(accountId, 'bangers'),
+    rowsRead,
   ])
   if (!page.available || rows.length === 0) return page
 
-  // A featured or manually positioned item may originate beyond the requested
-  // ClickHouse page. Use the cached generated collection whenever overrides
-  // exist so persistent edits remain globally stable across pagination.
-  const collection = await getProfileBangers(accountId)
-  if (!collection.available) {
+  const collection = await collectionRead
+  if (!collection?.available) {
     return {
       ...page,
       tweets: applyProfileCuration(

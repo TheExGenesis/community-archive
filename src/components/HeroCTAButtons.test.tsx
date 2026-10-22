@@ -1,6 +1,7 @@
 import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import HeroCTAButtons from './HeroCTAButtons'
+import type { SessionAccount } from '@/hooks/useAuthAndArchive'
 
 const mockReplace = jest.fn()
 const mockRefresh = jest.fn()
@@ -31,7 +32,11 @@ jest.mock('next/navigation', () => ({
 
 jest.mock('@/hooks/useAuthAndArchive', () => ({
   useAuthAndArchive: () => ({
-    userMetadata: { user_name: 'ExampleUser', provider_id: 'twitter-123' },
+    userMetadata: {
+      user_name: 'exampleuser',
+      provider_id: '123',
+      avatar_url: null,
+    } satisfies SessionAccount,
   }),
 }))
 

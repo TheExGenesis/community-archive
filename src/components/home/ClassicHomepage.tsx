@@ -122,10 +122,10 @@ export default async function ClassicHomepage({
               </Link>
             </p>
             <Link
-              href="#daily-digest"
+              href="#community-map"
               className="mt-5 inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-2 text-sm font-medium text-brand-deep transition-colors hover:bg-brand/20"
             >
-              Read the daily digest ↓
+              Explore the archive ↓
             </Link>
           </div>
         </div>

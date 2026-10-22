@@ -356,9 +356,18 @@
 .more {
   display: flex;
   justify-content: center;
-  margin-top: 12px;
-  font-size: 12px;
+  width: fit-content;
+  margin: 12px auto 0;
+  padding: 8px 16px;
+  border: 1px solid hsl(var(--brand) / 0.3);
+  border-radius: 9999px;
+  background: hsl(var(--brand) / 0.1);
+  font-size: 14px;
+  font-weight: 500;
   color: hsl(var(--brand-deep));
+}
+.more:hover {
+  background: hsl(var(--brand) / 0.2);
 }
 .tweet {
   border-bottom: 1px solid hsl(var(--border));

@@ -267,7 +267,7 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
         />
       </ResizableHero>
       <Link className={styles.more} href="#daily-digest">
-        Continue to the daily digest and more ↓
+        Read the Daily Digest ↓
       </Link>
     </section>
   )

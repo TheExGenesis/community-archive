@@ -113,8 +113,8 @@ describe('ClassicHomepage audience actions', () => {
     expect(screen.getByTestId('hero-cta')).toBeInTheDocument()
     expect(screen.queryByTestId('homepage-search')).not.toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'Read the daily digest ↓' }),
-    ).toHaveAttribute('href', '#daily-digest')
+      screen.getByRole('link', { name: 'Explore the archive ↓' }),
+    ).toHaveAttribute('href', '#community-map')
     expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })

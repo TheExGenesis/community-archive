@@ -82,6 +82,17 @@ export default memo(function HexMap({
   const dark = resolvedTheme === 'dark'
   const geo = useMemo(() => geometry(snapshot), [snapshot])
   const camera = useMapCamera(geo.bounds, size.width, size.height)
+  const pendingClick = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelPendingClick = () => {
+    if (pendingClick.current !== null) clearTimeout(pendingClick.current)
+    pendingClick.current = null
+  }
+  useEffect(
+    () => () => {
+      if (pendingClick.current !== null) clearTimeout(pendingClick.current)
+    },
+    [],
+  )
   const lastSelfLocation = useRef(selfLocation)
   useEffect(() => {
     if (selfLocation && lastSelfLocation.current !== selfLocation) {
@@ -316,15 +327,27 @@ export default memo(function HexMap({
       ? getComputedStyle(camera.ref.current).fontFamily
       : 'sans-serif'
     const candidates: MapLabel[] = [...snapshot.regions]
-      .sort((a, b) => totals[b.id] - totals[a.id])
-      .map((r) => ({
-        text: camera.camera.zoom >= 2.2 ? r.name : r.short,
-        x: r.x * t.scale + t.x,
-        y: -r.y * t.scale + t.y,
-        size: 12,
-        kind: 'country',
-        region: r.id,
-      }))
+      .sort(
+        (a, b) =>
+          Number(selectedRegions.has(b.id)) -
+            Number(selectedRegions.has(a.id)) || totals[b.id] - totals[a.id],
+      )
+      .map((r) => {
+        ctx.font = `600 12px ${fontFamily}`
+        const text =
+          camera.camera.zoom >= 2.2 &&
+          ctx.measureText(r.name).width + 26 <= size.width
+            ? r.name
+            : r.short
+        return {
+          text,
+          x: r.x * t.scale + t.x,
+          y: -r.y * t.scale + t.y,
+          size: 12,
+          kind: 'country',
+          region: r.id,
+        }
+      })
     // Keep the overview readable; reveal signature phrases after zooming in.
     if (camera.camera.zoom >= 1.5) {
       for (const c of [...(snapshot.clusters ?? [])].sort(
@@ -391,13 +414,27 @@ export default memo(function HexMap({
     return () => onSelectionIntent(null)
   }, [hovered, snapshot, onSelectionIntent])
 
-  const selectCell = (id: number, additive = false, individual = false) => {
-    const ids = individual
-      ? [id]
-      : snapshot.cells.flatMap((cell, i) =>
-          cell.region === snapshot.cells[id].region ? [i] : [],
-        )
+  const selectRegion = (regionId: number, additive = false) => {
+    cancelPendingClick()
+    const region = snapshot.regions.find((r) => r.id === regionId)!
+    const ids = snapshot.cells.flatMap((cell, id) =>
+      cell.region === regionId ? [id] : [],
+    )
     onSelect(additive ? Array.from(new Set([...selected, ...ids])) : ids)
+    const overview = transform(
+      geo.bounds,
+      size.width,
+      size.height,
+      initialCamera,
+    )
+    const wordZoom = Math.max(2.7, 34 / (snapshot.radius * 2 * overview.scale))
+    camera.focus(region.x, -region.y, wordZoom)
+    setHovered(null)
+  }
+  const selectCell = (id: number, additive = false, individual = false) => {
+    if (!individual) return selectRegion(snapshot.cells[id].region, additive)
+    cancelPendingClick()
+    onSelect(additive ? Array.from(new Set([...selected, id])) : [id])
   }
   const atPointer = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -463,6 +500,7 @@ export default memo(function HexMap({
         className={styles.mapViewport}
         {...camera.handlers}
         onPointerDown={(e) => {
+          cancelPendingClick()
           onSelectionIntent(null)
           camera.handlers.onPointerDown(e)
         }}
@@ -471,17 +509,24 @@ export default memo(function HexMap({
         }}
         onMouseLeave={() => setHovered(null)}
         onClick={(e) => {
-          if (!camera.moved.current) {
-            const id = atPointer(e)
-            id === null ? onSelect([]) : selectCell(id, e.shiftKey)
-          }
+          if (camera.moved.current || e.detail > 1) return
+          const id = atPointer(e)
+          const additive = e.shiftKey
+          // Let a double-click pick its original hex before moving the camera.
+          cancelPendingClick()
+          pendingClick.current = setTimeout(() => {
+            pendingClick.current = null
+            id === null ? onSelect([]) : selectCell(id, additive)
+          }, 300)
         }}
         onDoubleClick={(e) => {
           e.preventDefault()
+          cancelPendingClick()
           const id = atPointer(e)
           if (id !== null) selectCell(id, e.shiftKey, true)
         }}
         onKeyDown={(e) => {
+          cancelPendingClick()
           if (e.key === 'Escape') onSelect([])
           if (e.key === '+' || e.key === '=') camera.zoomAt(1.5)
           if (e.key === '-') camera.zoomAt(1 / 1.5)
@@ -535,26 +580,7 @@ export default memo(function HexMap({
                 )
               }
               onBlur={() => onSelectionIntent(null)}
-              onClick={() => {
-                const r = snapshot.regions.find((r) => r.id === l.region)!
-                onSelect(
-                  snapshot.cells.flatMap((c, id) =>
-                    c.region === l.region ? [id] : [],
-                  ),
-                )
-                const overview = transform(
-                  geo.bounds,
-                  size.width,
-                  size.height,
-                  initialCamera,
-                )
-                // Reveal cell words as well as cluster phrases, even in narrow maps.
-                const wordZoom = Math.max(
-                  2.7,
-                  34 / (snapshot.radius * 2 * overview.scale),
-                )
-                camera.focus(r.x, -r.y, wordZoom)
-              }}
+              onClick={(e) => selectRegion(l.region, e.shiftKey)}
             >
               {l.text}
             </button>
@@ -667,8 +693,8 @@ export default memo(function HexMap({
       {scrubber}
       <span className={styles.hint}>
         <span className={styles.desktopHint}>
-          Scroll to zoom · Double-click a hex to select · Shift + scroll for
-          page
+          Scroll to zoom · Click a cluster to select · Double-click a hex to
+          select · Shift + scroll for page
         </span>
         <span className={styles.touchHint}>
           Pinch to zoom · Scroll to explore below

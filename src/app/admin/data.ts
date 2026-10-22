@@ -2,6 +2,7 @@ import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { User } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/portal/auth'
+import { getTwitterProviderId, getTwitterUsername } from '@/lib/twitterIdentity'
 
 export const ADMIN_USERNAME = 'exgenesis'
 export const ADMIN_USERNAMES = [ADMIN_USERNAME, 'christineist'] as const
@@ -83,45 +84,9 @@ const OPT_IN_SELECT =
 const ACCOUNT_SELECT =
   'account_id, username, account_display_name, num_tweets, created_via, updated_at'
 
-// SECURITY: only trust identity_data from the Twitter OAuth identity entry.
-// user_metadata is user-mutable via supabase.auth.updateUser({ data: ... }) —
-// reading user_name from there would let any logged-in user promote themselves
-// to admin by setting user_metadata.user_name = 'exgenesis'. identity_data is
-// set by Supabase during the OAuth callback from the provider's response and
-// is not user-editable.
-function getTwitterIdentity(user: User) {
-  return (
-    user.identities?.find((identity) =>
-      ['twitter', 'x'].includes(identity.provider ?? ''),
-    ) ?? null
-  )
-}
-
-export const getTwitterUsername = (user: User): string | null => {
-  const identity = getTwitterIdentity(user)
-  if (!identity) return null
-  const data = (identity.identity_data ?? {}) as Record<string, unknown>
-  for (const key of [
-    'user_name',
-    'preferred_username',
-    'screen_name',
-    'username',
-  ]) {
-    const v = data[key]
-    if (typeof v === 'string' && v.trim()) {
-      return v.trim().toLowerCase().replace(/^@/, '')
-    }
-  }
-  return null
-}
-
-export const getTwitterProviderId = (user: User): string | null => {
-  const identity = getTwitterIdentity(user)
-  if (!identity) return null
-  const data = (identity.identity_data ?? {}) as Record<string, unknown>
-  const v = data.provider_id ?? data.sub ?? identity.id
-  return typeof v === 'string' && v.trim() ? v.trim() : null
-}
+// SECURITY: identity decisions read the Twitter/X OAuth identity entry, never
+// user_metadata. See src/lib/twitterIdentity.ts.
+export { getTwitterProviderId, getTwitterUsername }
 
 const ADMIN_TWITTER_PROVIDER_ID =
   process.env.ADMIN_TWITTER_PROVIDER_ID?.trim() || null

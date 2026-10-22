@@ -1,10 +1,28 @@
--- prod.sql preserves legacy grants for dump compatibility; policy-sensitive
--- objects are narrowed last so schema rebuilds cannot re-expose snapshots.
+-- prod.sql preserves legacy grants for dump compatibility. This file runs after
+-- it and narrows privileges, so schema rebuilds cannot re-expose write access
+-- or policy-sensitive snapshots.
+
+-- These tables are populated only by trusted service-role routes and workers.
+-- Public/authenticated clients retain read access but no direct write grants.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE
+  "public"."all_profile",
+  "public"."followers",
+  "public"."following",
+  "public"."likes",
+  "public"."tweets",
+  "public"."tweet_media",
+  "public"."tweet_urls",
+  "public"."user_mentions",
+  "public"."optin"
+FROM "anon", "authenticated";
+
 REVOKE ALL ON TABLE public.account_activity_summary
   FROM PUBLIC, anon, authenticated, readclient;
 REVOKE ALL ON TABLE public.global_activity_summary
   FROM PUBLIC, anon, authenticated, readclient;
 REVOKE ALL ON TABLE private.archive_clickhouse_delivery
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE ALL ON TABLE private.archive_clickhouse_graph_purge
   FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 REVOKE ALL ON FUNCTION public.policy_account_is_blocked(text, text)
@@ -39,11 +57,11 @@ REVOKE EXECUTE ON FUNCTION public.search_tweets_exact_phrase(
   text, text, text, date, date, integer, integer
 ) FROM PUBLIC, readclient;
 REVOKE EXECUTE ON FUNCTION tes.get_followers()
-  FROM PUBLIC, anon, authenticated, readclient;
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 REVOKE EXECUTE ON FUNCTION tes.get_followings()
-  FROM PUBLIC, anon, authenticated, readclient;
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 REVOKE EXECUTE ON FUNCTION tes.get_moots()
-  FROM PUBLIC, anon, authenticated, readclient;
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 GRANT EXECUTE ON FUNCTION public.policy_account_is_blocked(text, text)
   TO service_role;
@@ -222,8 +240,25 @@ GRANT EXECUTE ON FUNCTION public.set_bulletin_dismissal(uuid,text,text,boolean) 
 ALTER TABLE bulletin.pipeline_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bulletin.jev_items ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON bulletin.pipeline_state,bulletin.jev_items FROM PUBLIC,anon,authenticated;
+-- The schema-wide service-role grant above predates this table in the
+-- migration history, so the pipeline cursor stays read-only for service_role.
+REVOKE INSERT,UPDATE,DELETE ON bulletin.pipeline_state FROM service_role;
 GRANT SELECT ON bulletin.pipeline_state TO service_role;
 GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.jev_items TO service_role;
+
+ALTER TABLE private.public_api_consumers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE private.public_api_keys ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.public_api_consumers, private.public_api_keys
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+GRANT SELECT, INSERT, UPDATE ON private.public_api_consumers, private.public_api_keys TO service_role;
+REVOKE ALL ON FUNCTION public.create_public_api_key(uuid,text,text,text,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.list_public_api_keys(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.revoke_public_api_key(uuid,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.verify_public_api_key(text,text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_public_api_key(uuid,text,text,text,text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.list_public_api_keys(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.revoke_public_api_key(uuid,text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.verify_public_api_key(text,text) TO service_role;
 
 ALTER TABLE shelf.runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shelf.calls ENABLE ROW LEVEL SECURITY;

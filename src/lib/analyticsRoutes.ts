@@ -9,6 +9,7 @@ export const analyticsRoutes = {
   '/research': ['research', 'product'],
   '/search': ['search', 'product'],
   '/settings': ['settings', 'product'],
+  '/settings/api-keys': ['api_keys', 'product'],
   '/profile': ['settings', 'product'],
   '/trends': ['trends', 'product'],
   '/user-dir': ['user_directory', 'product'],

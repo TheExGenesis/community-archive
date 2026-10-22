@@ -6,9 +6,11 @@ import { BlockList, isIP, type LookupFunction } from 'net'
 import { Agent, fetch as undiciFetch } from 'undici'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { TweetLinkPreview } from './linkPreviewTypes'
+import { xVideoFromUrl } from './xVideoUrl'
 import {
   fetchSyndicatedTweet,
   type SyndicatedArticle,
+  type SyndicatedTweet,
 } from './twitterSyndication'
 
 const MAX_URL_LENGTH = 2048
@@ -499,6 +501,57 @@ const fallbackXArticle = (url: string): PreviewMetadata => ({
   isXArticle: true,
 })
 
+// Older archive records can retain only a t.co URL in the tweet text. Resolve
+// that trusted shortener once, without following its destination blindly.
+export async function resolveVideoPreviewUrl(rawUrl: string, fetcher = fetch) {
+  const url = new URL(normalizePreviewUrl(rawUrl))
+  if (url.hostname !== 't.co' || !/^\/[a-zA-Z0-9]+$/.test(url.pathname)) {
+    return rawUrl
+  }
+  const response = await fetcher(`https://t.co${url.pathname}`, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  })
+  await response.body?.cancel()
+  const location = response.headers.get('location')
+  return response.status >= 300 &&
+    response.status < 400 &&
+    location &&
+    xVideoFromUrl(location)
+    ? normalizePreviewUrl(location)
+    : rawUrl
+}
+
+export async function fetchXVideoSyndicationMetadata(
+  rawUrl: string,
+  fetcher: (
+    tweetId: string,
+  ) => Promise<Pick<SyndicatedTweet, 'tweet_id' | 'media'> | null> = (
+    tweetId,
+  ) =>
+    fetchSyndicatedTweet(tweetId, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }),
+): Promise<PreviewMetadata | null> {
+  const video = xVideoFromUrl(rawUrl)
+  if (!video) return null
+  const tweet = await fetcher(video.tweetId)
+  if (tweet?.tweet_id !== video.tweetId) return null
+  const media = tweet.media?.[video.mediaIndex]
+  if (media?.media_type !== 'video' || !media.media_url) return null
+  const imageUrl = normalizePreviewUrl(media.media_url)
+  if (new URL(imageUrl).hostname !== 'pbs.twimg.com') return null
+  return {
+    canonicalUrl: normalizePreviewUrl(rawUrl),
+    title: 'Video on X',
+    description: 'Watch this video on X.',
+    imageUrl,
+    siteName: 'X',
+    contentType: 'application/json',
+    isXArticle: false,
+  }
+}
+
 function rowToPreview(row: CachedPreviewRow): TweetLinkPreview | null {
   if (row.status !== 'ready' || !row.title) return null
   return {
@@ -512,6 +565,7 @@ function rowToPreview(row: CachedPreviewRow): TweetLinkPreview | null {
       row.site_name ??
       new URL(row.normalized_url).hostname.replace(/^www\./, ''),
     isXArticle: isXArticleUrl(row.canonical_url ?? row.normalized_url),
+    isVideo: xVideoFromUrl(row.canonical_url ?? row.normalized_url) !== null,
   }
 }
 
@@ -534,7 +588,7 @@ export function shouldRefreshCachedPreview(
   )
 }
 
-const previewCandidate = (rawUrl: string) => {
+export const previewCandidate = (rawUrl: string) => {
   const normalized = normalizePreviewUrl(rawUrl)
   const url = new URL(normalized)
   const host = url.hostname.replace(/^www\./, '')
@@ -543,7 +597,8 @@ const previewCandidate = (rawUrl: string) => {
     (host === 'x.com' || host === 'twitter.com') &&
     (/^\/[^/]+\/status\/\d+/.test(url.pathname) ||
       /^\/i\/web\/status\/\d+/.test(url.pathname)) &&
-    !isXArticleUrl(normalized)
+    !isXArticleUrl(normalized) &&
+    !xVideoFromUrl(normalized)
   ) {
     return null
   }
@@ -561,7 +616,14 @@ async function refreshPreview(
   let metadata: PreviewMetadata | null = null
   let expiresAt = new Date(fetchedAt.getTime() + READY_TTL_MS)
   try {
-    if (tweetId && isXArticleUrl(url)) {
+    const resolvedUrl = await resolveVideoPreviewUrl(url)
+    const video = xVideoFromUrl(resolvedUrl)
+    // A tweet's own media is already rendered by the card's media gallery.
+    if (video && video.tweetId === tweetId) return null
+    if (video) {
+      metadata = await fetchXVideoSyndicationMetadata(resolvedUrl)
+      if (!metadata) throw new Error('Video preview unavailable')
+    } else if (tweetId && isXArticleUrl(url)) {
       metadata = await fetchXArticleSyndicationMetadata(url, tweetId)
     }
     metadata ??= await fetchLinkPreviewMetadata(url)
@@ -623,11 +685,29 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
     console.error('Failed to load tweet URLs for previews:', urlError)
     return result
   }
+  const candidateRows = [...(urlRows ?? [])]
+
+  // Some ingestion paths saved the link only in full_text, without tweet_urls.
+  // Fetch only those archived tweets, bounded by the existing request ID limit.
+  const missingUrlIds = safeTweetIds.filter(
+    (id) => !candidateRows.some((row) => row.tweet_id === id),
+  )
+  if (missingUrlIds.length) {
+    const { data: tweets } = await supabase
+      .from('tweets')
+      .select('tweet_id, full_text')
+      .in('tweet_id', missingUrlIds)
+    for (const tweet of tweets ?? []) {
+      for (const url of tweet.full_text.match(/https?:\/\/[^\s<>"']+/g) ?? []) {
+        candidateRows.push({ tweet_id: tweet.tweet_id, url, expanded_url: url })
+      }
+    }
+  }
 
   const candidatesByTweet = new Map<string, string[]>()
   const allCandidates = new Set<string>()
   const sourceTweetByCandidate = new Map<string, string>()
-  for (const row of urlRows ?? []) {
+  for (const row of candidateRows) {
     try {
       const candidate = previewCandidate(row.expanded_url || row.url)
       if (!candidate) continue

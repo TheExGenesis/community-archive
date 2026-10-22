@@ -1,0 +1,15 @@
+/* design-sync stylesheet entry: the app's globals.css (tokens + base layer)
+   plus the brand webfonts next/font injects at runtime in the real app. */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Petrona:ital,wght@0,100..900;1,100..900&display=swap');
+@import '../src/app/globals.css';
+
+:root {
+  --font-manrope: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-petrona: 'Petrona', Georgia, 'Times New Roman', serif;
+}
+html,
+body {
+  font-family: var(--font-manrope);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

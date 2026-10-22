@@ -9,7 +9,6 @@ import {
 import {
   fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
-  fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
   fetchPortalWeeklyTrends,
@@ -53,6 +52,7 @@ interface PortalCorpusRange {
 interface PortalGlobalStats {
   totalTweets: number
   memberCount: number
+  addedLast24Hours: number | null
   generatedAt: string
 }
 
@@ -63,6 +63,7 @@ interface ClickHouseSummaryResponse {
     sourceUpdatedAt: unknown
     collectedAt: unknown
     membershipSnapshotAt: unknown
+    addedLast24Hours?: unknown
     source: string
     countMode: string
   }
@@ -267,6 +268,14 @@ export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
       response.data.memberAccounts,
       'ClickHouse member count',
     ),
+    // Older gateway releases omit the field; null hides the 24h note.
+    addedLast24Hours:
+      response.data.addedLast24Hours == null
+        ? null
+        : portalClickHouseCount(
+            response.data.addedLast24Hours,
+            'ClickHouse 24h corpus growth',
+          ),
     generatedAt: portalClickHouseTimestamp(
       String(response.data.collectedAt),
       'ClickHouse corpus count timestamp',
@@ -793,13 +802,8 @@ const getCachedCorpusRange = unstable_cache(
 )
 const getCachedGlobalStats = unstable_cache(
   async (_sourceKey: string) => fetchPortalGlobalStats(),
-  ['portal-global-stats-v1'],
+  ['portal-global-stats-v2'],
   { revalidate: 60 },
-)
-const getCachedLiveAnalytics = unstable_cache(
-  async (_sourceKey: string) => fetchPortalLiveAnalytics(),
-  ['portal-live-analytics-v1'],
-  { revalidate: 300 },
 )
 const getCachedJoinedThisWeek = unstable_cache(
   async (_sourceKey: string) => fetchPortalJoinedThisWeek(),
@@ -1013,7 +1017,6 @@ export async function getPortalData(
     trends,
     corpusRange,
     globalStats,
-    liveAnalytics,
     joinedThisWeek,
     initialStream,
     research,
@@ -1046,22 +1049,10 @@ export async function getPortalData(
       {
         totalTweets: 0,
         memberCount: 0,
+        addedLast24Hours: null,
         generatedAt: new Date().toISOString(),
       },
     ),
-    view === 'home'
-      ? loadPortalComponentData(
-          'live-analytics',
-          () => getCachedLiveAnalytics(sourceKey),
-          {
-            streamedLast24Hours: 0,
-            latestObservedAt: null,
-          },
-        )
-      : Promise.resolve({
-          data: { streamedLast24Hours: 0, latestObservedAt: null },
-          failed: false,
-        }),
     view === 'home'
       ? loadPortalComponentData(
           'joined-this-week',
@@ -1102,7 +1093,7 @@ export async function getPortalData(
   const stats: PortalStats = {
     totalTweets: globalStats.data.totalTweets,
     accountCount: globalStats.data.memberCount,
-    streamedLast24Hours: liveAnalytics.data.streamedLast24Hours,
+    addedLast24Hours: globalStats.data.addedLast24Hours,
     joinedThisWeek: joinedThisWeek.data,
     firstYear: corpusRange.data.firstYear,
     currentYear: corpusRange.data.currentYear,
@@ -1124,7 +1115,7 @@ export async function getPortalData(
     recentBangers: recentBangers.data,
     historicalBangers: historicalBangers.data,
     failures: {
-      liveAnalytics: globalStats.failed || liveAnalytics.failed,
+      liveAnalytics: globalStats.failed,
       memberCount: globalStats.failed,
       joinedThisWeek: joinedThisWeek.failed,
       corpusRange: corpusRange.failed,
@@ -1150,13 +1141,9 @@ export function startHomepageData() {
     {
       totalTweets: 0,
       memberCount: 0,
+      addedLast24Hours: null,
       generatedAt: new Date().toISOString(),
     },
-  )
-  const liveAnalytics = loadPortalComponentData(
-    'live-analytics',
-    () => getCachedLiveAnalytics(sourceKey),
-    { streamedLast24Hours: 0, latestObservedAt: null },
   )
   const joinedThisWeek = loadPortalComponentData(
     'joined-this-week',
@@ -1170,20 +1157,19 @@ export function startHomepageData() {
   )
   const overview = Promise.all([
     globalStats,
-    liveAnalytics,
     joinedThisWeek,
     corpusRange,
-  ]).then(([global, live, joined, range]) => ({
+  ]).then(([global, joined, range]) => ({
     stats: {
       totalTweets: global.data.totalTweets,
       accountCount: global.data.memberCount,
       generatedAt: global.data.generatedAt,
-      streamedLast24Hours: live.data.streamedLast24Hours,
+      addedLast24Hours: global.data.addedLast24Hours,
       joinedThisWeek: joined.data,
       ...range.data,
     },
     failures: {
-      liveAnalytics: global.failed || live.failed,
+      liveAnalytics: global.failed,
       memberCount: global.failed,
       joinedThisWeek: joined.failed,
       corpusRange: range.failed,
@@ -1239,7 +1225,12 @@ export function startStreamData() {
     stats: loadPortalComponentData(
       'global-stats',
       () => getCachedGlobalStats(portalDataSourceKey()),
-      { totalTweets: 0, memberCount: 0, generatedAt: new Date().toISOString() },
+      {
+        totalTweets: 0,
+        memberCount: 0,
+        addedLast24Hours: null,
+        generatedAt: new Date().toISOString(),
+      },
     ),
   }
 }

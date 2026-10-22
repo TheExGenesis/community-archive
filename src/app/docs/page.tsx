@@ -2,6 +2,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowUpRight, Bot, Braces, Database } from 'lucide-react'
 
+const V1_API_URL = 'https://analytics.community-archive.org/v1'
+const V1_OPENAPI_URL = 'https://analytics.community-archive.org/v1/openapi.json'
+const V1_MIGRATION_GUIDE_URL =
+  'https://github.com/TheExGenesis/community-archive/blob/main/docs/api-v1-migration.md'
+const API_KEYS_URL = '/settings/api-keys'
 const API_URL = 'https://fabxmporizzqflnftavs.supabase.co'
 const EXPORT_RELEASE_URL =
   'https://github.com/TheExGenesis/community-archive/releases/latest'
@@ -14,6 +19,44 @@ export const metadata: Metadata = {
   description:
     'Documentation for the Community Archive API, bulk data dump, and agent resources.',
 }
+
+const v1CurlExample = `export CA_API_KEY='cak_...'   # create one at https://www.community-archive.org/settings/api-keys
+
+# One account's tweets, newest first (page with next_cursor until it is null)
+curl --get "${V1_API_URL}/accounts/exgenesis/tweets" \\
+  -H "Authorization: Bearer $CA_API_KEY" \\
+  --data-urlencode "order=desc" \\
+  --data-urlencode "limit=5"
+
+# Full-text search
+curl --get "${V1_API_URL}/tweets/search" \\
+  -H "Authorization: Bearer $CA_API_KEY" \\
+  --data-urlencode "q=community archive" \\
+  --data-urlencode "limit=5"`
+
+const v1JavascriptExample = `const API = '${V1_API_URL}'
+const headers = { Authorization: \`Bearer \${process.env.CA_API_KEY}\` }
+
+// Every tweet from one account, following the cursor
+let cursor = null
+do {
+  const url = new URL(\`\${API}/accounts/exgenesis/tweets\`)
+  url.searchParams.set('order', 'asc')
+  url.searchParams.set('limit', '200')
+  if (cursor) url.searchParams.set('cursor', cursor)
+
+  const response = await fetch(url, { headers })
+  if (response.status === 429 || response.status === 503) {
+    const wait = Number(response.headers.get('Retry-After') ?? '5')
+    await new Promise((resolve) => setTimeout(resolve, wait * 1000))
+    continue
+  }
+  if (!response.ok) throw new Error(\`\${response.status} \${await response.text()}\`)
+
+  const page = await response.json()
+  for (const tweet of page.data) console.log(tweet.created_at, tweet.full_text)
+  cursor = page.next_cursor
+} while (cursor)`
 
 const curlExample = `export CA_API_URL='${API_URL}'
 export CA_ANON_KEY='${ANON_KEY}'
@@ -90,6 +133,26 @@ export default function DocsPage() {
               Download the daily data export, query public records through the
               API, or give an agent one canonical starting point.
             </p>
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-5">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                API v1 is live
+              </p>
+              <p className="text-sm leading-6 text-foreground">
+                The keyed Community Archive API at{' '}
+                <code className="break-all">{V1_API_URL}</code> replaces the
+                public Supabase REST API, which is retired on{' '}
+                <strong>19 November 2026</strong>. Move existing integrations
+                before then; new projects should start on v1.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-4">
+                <ResourceLink href={API_KEYS_URL}>
+                  Create an API key
+                </ResourceLink>
+                <ResourceLink href={V1_MIGRATION_GUIDE_URL}>
+                  Migration guide
+                </ResourceLink>
+              </div>
+            </div>
             <div className="rounded-lg border border-brand/30 bg-brand/5 p-5">
               <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Point an agent here
@@ -138,17 +201,21 @@ export default function DocsPage() {
             <article className="rounded-lg border border-border bg-card p-6">
               <Braces className="h-6 w-6 text-brand" aria-hidden="true" />
               <h3 className="mt-4 text-lg font-semibold text-foreground">
-                Live API
+                Live API (v1)
               </h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Use the read-only Supabase REST API for filtered, paginated
-                requests and application features.
+                Read tweets, timelines, search, accounts, members, likes and
+                follows with a personal key. Cursor-paged, rate-limited, and
+                served from the analytical store.
               </p>
               <div className="mt-4 flex flex-col items-start gap-2">
-                <ResourceLink href="/api/reference">
-                  Interactive reference
+                <ResourceLink href={API_KEYS_URL}>
+                  Create an API key
                 </ResourceLink>
-                <ResourceLink href="/openapi.json">OpenAPI JSON</ResourceLink>
+                <ResourceLink href={V1_OPENAPI_URL}>OpenAPI JSON</ResourceLink>
+                <ResourceLink href={V1_MIGRATION_GUIDE_URL}>
+                  Migration guide
+                </ResourceLink>
               </div>
             </article>
 
@@ -223,11 +290,121 @@ export default function DocsPage() {
               API quickstart
             </h2>
             <p className="mt-2 leading-7 text-muted-foreground">
-              The API is PostgREST served by Supabase. Send the public anon key
-              in both the <code>apikey</code> and <code>Authorization</code>
-              headers. The anon key is intentionally public; never use a
-              service-role key in client code.
+              Sign in, create a key on the{' '}
+              <Link href={API_KEYS_URL} className="font-medium text-brand">
+                API keys page
+              </Link>
+              , and send it as <code>Authorization: Bearer cak_...</code> on
+              every request to <code>{V1_API_URL}</code>. Keep the key on your
+              server or in your script, never in browser code. The full contract
+              is the{' '}
+              <Link
+                href={V1_OPENAPI_URL}
+                className="font-medium text-brand"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                OpenAPI document
+              </Link>
+              .
             </p>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-foreground">cURL</h3>
+            <CodeBlock>{v1CurlExample}</CodeBlock>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-foreground">
+              JavaScript
+            </h3>
+            <CodeBlock>{v1JavascriptExample}</CodeBlock>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-card p-5">
+              <h3 className="font-semibold text-foreground">Routes</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li>
+                  <code>GET /v1/tweets/&#123;tweet_id&#125;</code> — one tweet;{' '}
+                  <code>?ids=</code> for up to 100
+                </li>
+                <li>
+                  <code>GET /v1/tweets?since=&amp;until=</code> — every tweet in
+                  a window of up to 31 days
+                </li>
+                <li>
+                  <code>GET /v1/tweets/search?q=</code> — full-text search
+                </li>
+                <li>
+                  <code>GET /v1/accounts/&#123;account&#125;</code> — profile by
+                  ID or username; <code>/tweets</code>, <code>/likes</code>,{' '}
+                  <code>/followers</code>, <code>/following</code> beneath it
+                </li>
+                <li>
+                  <code>GET /v1/members</code> — every current member
+                </li>
+                <li>
+                  <code>GET /v1/me</code> — your key and its limits
+                </li>
+              </ul>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-5">
+              <h3 className="font-semibold text-foreground">Rules</h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                <li>
+                  Responses are{' '}
+                  <code>&#123;data, next_cursor, request_id&#125;</code>. Page
+                  until <code>next_cursor</code> is <code>null</code>, not until
+                  a page is short.
+                </li>
+                <li>
+                  Limits: 60 requests a minute and 20,000 a day per key, two in
+                  flight per account. On <code>429</code> or <code>503</code>,
+                  wait <code>Retry-After</code> seconds and retry.
+                </li>
+                <li>
+                  A <code>422</code> means the request was too broad for its
+                  query budget; narrow it, for example with a date range.
+                </li>
+                <li>Treat Twitter IDs as strings, not numbers.</li>
+                <li>
+                  Deleted and opted-out tweets are omitted, so pages can hold
+                  fewer items than <code>limit</code>.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-8" id="legacy-api">
+          <div className="max-w-3xl">
+            <h2 className="text-3xl font-bold text-foreground">
+              Legacy Supabase REST API
+            </h2>
+            <p className="mt-2 leading-7 text-muted-foreground">
+              The PostgREST API served by Supabase is retired on{' '}
+              <strong>19 November 2026</strong> in favour of v1 above. It keeps
+              working until then; follow the{' '}
+              <Link
+                href={V1_MIGRATION_GUIDE_URL}
+                className="font-medium text-brand"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                call-by-call migration guide
+              </Link>{' '}
+              to move. Send the public anon key in both the <code>apikey</code>{' '}
+              and <code>Authorization</code> headers. The anon key is
+              intentionally public; never use a service-role key in client code.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-4">
+              <ResourceLink href="/api/reference">
+                Interactive reference
+              </ResourceLink>
+              <ResourceLink href="/openapi.json">OpenAPI JSON</ResourceLink>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -299,8 +476,11 @@ export default function DocsPage() {
             <ResourceLink href="https://github.com/TheExGenesis/community-archive/blob/main/docs/agents.md">
               Agent and schema guide
             </ResourceLink>
+            <ResourceLink href={V1_MIGRATION_GUIDE_URL}>
+              API v1 migration guide
+            </ResourceLink>
             <ResourceLink href="https://github.com/TheExGenesis/community-archive/blob/main/docs/api-doc.md">
-              API guide
+              Legacy API guide
             </ResourceLink>
             <ResourceLink href="https://github.com/TheExGenesis/community-archive/tree/main/docs/examples">
               Python examples and notebook

@@ -3,14 +3,19 @@ import 'server-only'
 import { cache } from 'react'
 import { measureServerRead } from '@/lib/performance/server'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
+import { isTwitterUsername } from '@/lib/apiInputValidation'
 import {
   getCachedProfileHeader,
+  isPolicyBlockedAccount,
   resolvePublicProfileIdentity,
+  type PublicProfileIdentity,
 } from '@/lib/metaTwitter/data'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
 export interface ResolvedProfile {
   accountId: string
+  /** False for accounts served from the corpus without having joined. */
+  isMember: boolean
   profile: ProfileHeaderData
 }
 
@@ -49,6 +54,105 @@ export const withBackfilledMedia = cache(async function withBackfilledMedia(
   }
 })
 
+async function analyticalProfile(
+  identifier: string,
+  isMember: boolean,
+): Promise<ResolvedProfile | null> {
+  const clickHouseProfile = await measureServerRead('profile.analytical', () =>
+    getClickHouseUserProfile(identifier),
+  )
+  const accountId = clickHouseProfile?.user.account_id
+  if (!clickHouseProfile || !accountId) return null
+  const user = clickHouseProfile.user
+  return {
+    accountId,
+    isMember,
+    profile: {
+      account_id: accountId,
+      username: user.username,
+      account_display_name: user.account_display_name,
+      created_at: user.created_at,
+      num_tweets: user.num_tweets,
+      num_followers: user.num_followers,
+      num_following: user.num_following,
+      num_likes: user.num_likes,
+      has_archive: user.has_archive,
+      is_opted_in: user.is_opted_in,
+      bio: user.bio,
+      website: user.website,
+      location: user.location,
+      avatar_media_url: normalizeMediaUrl(user.avatar_media_url),
+      header_media_url: normalizeMediaUrl(user.header_media_url),
+    },
+  }
+}
+
+async function memberProfile(
+  identity: PublicProfileIdentity,
+): Promise<ResolvedProfile | null> {
+  if (identity.accountId) {
+    const profile = await measureServerRead('profile.header', () =>
+      getCachedProfileHeader(identity.accountId!),
+    )
+    if (profile) {
+      return {
+        accountId: identity.accountId,
+        isMember: true,
+        profile: {
+          ...profile,
+          avatar_media_url: normalizeMediaUrl(profile.avatar_media_url),
+          header_media_url: normalizeMediaUrl(profile.header_media_url),
+        },
+      }
+    }
+  }
+  return analyticalProfile(identity.accountId ?? identity.username, true)
+}
+
+/**
+ * Accounts outside the member directory are served from the analytical corpus
+ * unless PostgreSQL policy withholds them. The directory hides opted-out
+ * members too, so the policy check is what keeps them from reappearing here.
+ */
+async function resolveNonMemberProfile(
+  param: string,
+): Promise<ResolvedProfile | null> {
+  let identifier: string
+  try {
+    identifier = decodeURIComponent(param)
+  } catch {
+    return null
+  }
+  const isAccountId = /^\d{1,20}$/.test(identifier)
+  if (!isAccountId && !isTwitterUsername(identifier)) return null
+
+  // Lowercase handles so every casing shares one cached gateway response.
+  const resolved = await analyticalProfile(
+    isAccountId ? identifier : identifier.toLowerCase(),
+    false,
+  )
+  if (!resolved) return null
+
+  // Both reads are live and need only the resolved ID, so they run together;
+  // the policy answer is ignored when the ID turns out to be a member.
+  const blocked = measureServerRead('profile.policy', () =>
+    isPolicyBlockedAccount(resolved.accountId, resolved.profile.username),
+  )
+  // The directory can still hold a member under a handle they have since
+  // changed; the stable ID finds them.
+  if (!isAccountId) {
+    // Keep a policy failure from surfacing as an unhandled rejection when the
+    // member path below never awaits it.
+    blocked.catch(() => undefined)
+    const member = await measureServerRead('profile.eligibility-by-id', () =>
+      resolvePublicProfileIdentity(resolved.accountId),
+    )
+    if (member) return memberProfile(member)
+  }
+
+  return (await blocked) ? null : resolved
+}
+
 /**
  * Resolves either a stable account ID or a username to the shared profile
  * payload used by the page, its metadata, and its social preview image.
@@ -58,50 +162,9 @@ export const resolveProfileCore = cache(
     const publicIdentity = await measureServerRead('profile.eligibility', () =>
       resolvePublicProfileIdentity(param),
     )
-    if (!publicIdentity) return null
-
-    if (publicIdentity.accountId) {
-      const profile = await measureServerRead('profile.header', () =>
-        getCachedProfileHeader(publicIdentity.accountId!),
-      )
-      if (profile) {
-        return {
-          accountId: publicIdentity.accountId,
-          profile: {
-            ...profile,
-            avatar_media_url: normalizeMediaUrl(profile.avatar_media_url),
-            header_media_url: normalizeMediaUrl(profile.header_media_url),
-          },
-        }
-      }
-    }
-
-    const clickHouseProfile = await getClickHouseUserProfile(
-      publicIdentity.accountId ?? publicIdentity.username,
-    )
-    const accountId = clickHouseProfile?.user.account_id
-    if (!clickHouseProfile || !accountId) return null
-    const user = clickHouseProfile.user
-    return {
-      accountId,
-      profile: {
-        account_id: accountId,
-        username: user.username,
-        account_display_name: user.account_display_name,
-        created_at: user.created_at,
-        num_tweets: user.num_tweets,
-        num_followers: user.num_followers,
-        num_following: user.num_following,
-        num_likes: user.num_likes,
-        has_archive: user.has_archive,
-        is_opted_in: user.is_opted_in,
-        bio: user.bio,
-        website: user.website,
-        location: user.location,
-        avatar_media_url: normalizeMediaUrl(user.avatar_media_url),
-        header_media_url: normalizeMediaUrl(user.header_media_url),
-      },
-    }
+    return publicIdentity
+      ? memberProfile(publicIdentity)
+      : resolveNonMemberProfile(param)
   },
 )
 

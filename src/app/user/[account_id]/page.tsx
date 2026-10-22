@@ -39,6 +39,10 @@ import { SectionReady } from '@/components/PagePerformance'
 import type { SectionsByYear } from '@/lib/metaTwitter/chapterSections'
 import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
+// A cold profile waits on several gateway reads; Vercel's 15s default cut
+// streamed renders off mid-way (504).
+export const maxDuration = 60
+
 interface PageProps {
   params: { account_id: string }
   searchParams: { chapter?: string; section?: string; username?: string }
@@ -49,7 +53,7 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) return { title: 'User not found' }
-  const { accountId, profile } = resolved
+  const { accountId, isMember, profile } = resolved
   const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
   const normalizedBio = profile.bio?.replace(/\s+/g, ' ').trim()
   const description = normalizedBio
@@ -62,6 +66,8 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: canonicalPath },
+    // Only people who joined the archive are offered to search engines.
+    ...(isMember ? {} : { robots: { index: false } }),
     openGraph: {
       type: 'website',
       url: canonicalPath,
@@ -91,10 +97,12 @@ async function ProfileArchiveContent({
   candidateSection: string | null
   displayName: string
 }) {
-  const candidatePage = await getCuratedProfileBangersPage(accountId, {
-    limit: PROFILE_BANGERS_INITIAL_LIMIT,
-    year: candidateYear ?? undefined,
-  })
+  const candidatePage = await measureServerRead('profile.archive-page', () =>
+    getCuratedProfileBangersPage(accountId, {
+      limit: PROFILE_BANGERS_INITIAL_LIMIT,
+      year: candidateYear ?? undefined,
+    }),
+  )
 
   const year = resolveProfileChapterYear(candidateYear, candidatePage)
   const initialPage =
@@ -127,7 +135,9 @@ async function ProfileArchiveContent({
 }
 
 async function ProfileArchivedAt({ accountId }: { accountId: string }) {
-  const archivedAt = await getCachedArchivedAt(accountId)
+  const archivedAt = await measureServerRead('profile.archived-at', () =>
+    getCachedArchivedAt(accountId),
+  )
   if (!archivedAt) return null
   return (
     <span>

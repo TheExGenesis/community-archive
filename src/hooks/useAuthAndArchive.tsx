@@ -2,48 +2,29 @@ import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { createBrowserClient } from '@/utils/supabase'
 import { getTableName } from '@/lib/getTableName'
+import { getAccountIdentity, getTwitterAvatarUrl } from '@/lib/twitterIdentity'
 
-const normalizeUserMetadata = (user: User | null) => {
+export interface SessionAccount {
+  provider_id: string | null
+  user_name: string | null
+  avatar_url: string | null
+}
+
+// Built only from the Twitter/X identity and server-written app_metadata.
+// user_metadata is client-writable, so it never supplies these fields.
+export const toSessionAccount = (user: User | null): SessionAccount | null => {
   if (!user) return null
 
-  const userMeta = user.user_metadata ?? {}
-  const appMeta = user.app_metadata ?? {}
-  const identities = user.identities ?? []
-  const twitterIdentity = identities.find(
-    (identity) => identity.provider === 'twitter',
-  )
-  const identityData = twitterIdentity?.identity_data ?? {}
-
-  const providerId =
-    appMeta.provider_id ??
-    identityData.provider_id ??
-    identityData.sub ??
-    identityData.user_id ??
-    identityData.id ??
-    userMeta.provider_id
-
-  const userName =
-    appMeta.user_name ??
-    identityData.user_name ??
-    identityData.preferred_username ??
-    identityData.username ??
-    identityData.screen_name ??
-    userMeta.user_name
-
-  const normalized = { ...userMeta, ...appMeta }
-
-  if (providerId) {
-    normalized.provider_id = providerId
+  const { providerId, username } = getAccountIdentity(user)
+  return {
+    provider_id: providerId,
+    user_name: username,
+    avatar_url: getTwitterAvatarUrl(user),
   }
-  if (userName) {
-    normalized.user_name = userName
-  }
-
-  return normalized
 }
 
 export function useAuthAndArchive() {
-  const [userMetadata, setUserMetadata] = useState<any>(null)
+  const [userMetadata, setUserMetadata] = useState<SessionAccount | null>(null)
   const [isArchiveUploaded, setIsArchiveUploaded] = useState(false)
 
   useEffect(() => {
@@ -60,7 +41,7 @@ export function useAuthAndArchive() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        setUserMetadata(normalizeUserMetadata(session.user))
+        setUserMetadata(toSessionAccount(session.user))
       } else {
         setUserMetadata(null)
       }
@@ -68,7 +49,7 @@ export function useAuthAndArchive() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        setUserMetadata(normalizeUserMetadata(session.user))
+        setUserMetadata(toSessionAccount(session.user))
       }
     })
 
@@ -79,14 +60,15 @@ export function useAuthAndArchive() {
 
   useEffect(() => {
     const checkArchiveUpload = async () => {
-      if (!userMetadata?.provider_id) return
+      const accountId = userMetadata?.provider_id
+      if (!accountId) return
 
       const supabase = createBrowserClient()
       const { data, error } = await supabase
         .schema('public')
         .from(getTableName('archive_upload') as 'archive_upload')
         .select('id')
-        .eq('account_id', userMetadata.provider_id)
+        .eq('account_id', accountId)
         .limit(1)
 
       if (error) {

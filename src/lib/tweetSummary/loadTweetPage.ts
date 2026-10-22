@@ -16,7 +16,10 @@ import { getStoredTweetPageSummary, getTweetPageSummary } from './store'
  */
 export const loadTweetPage = cache(
   async (tweetId: string, clickhouseOnly = false) => {
-    const data = await getTweetPageData(tweetId, { clickhouseOnly })
+    const data = await getTweetPageData(tweetId, {
+      clickhouseOnly,
+      deferQuotePosts: true,
+    })
     if (!data.tweet) return null
     const subject = buildTweetPageSubject(data.tweet, data.threadTree)
     const page = { ...data, tweet: data.tweet, subject }

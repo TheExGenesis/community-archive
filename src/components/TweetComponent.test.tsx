@@ -4,6 +4,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import TweetComponent from './TweetComponent'
 import type { TweetData } from '@/lib/tweets/types'
 
+jest.mock('@/components/TweetLinkPreviews', () => ({
+  TweetLinkPreviews: ({ tweetId }: { tweetId: string }) => (
+    <div data-testid="link-previews">{tweetId}</div>
+  ),
+}))
+
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 jest.mock('@/components/TweetAvatarImage', () => ({
@@ -12,7 +18,22 @@ jest.mock('@/components/TweetAvatarImage', () => ({
 }))
 jest.mock('@/components/ImageLightbox', () => ({
   __esModule: true,
-  default: () => null,
+  default: ({
+    alt,
+    gallery,
+    index,
+  }: {
+    alt: string
+    gallery?: { src: string }[]
+    index?: number
+  }) => (
+    <span
+      data-testid="lightbox"
+      aria-label={alt}
+      data-index={index}
+      data-gallery={gallery?.map((image) => image.src).join(' ')}
+    />
+  ),
 }))
 
 const tweet: TweetData = {
@@ -33,6 +54,22 @@ const tweet: TweetData = {
 }
 
 describe('TweetComponent', () => {
+  test('loads previews for a permalink tweet with only a shortened video link', () => {
+    render(
+      <TweetComponent
+        tweet={{
+          ...tweet,
+          full_text:
+            'Incredible things are happening in Spanish television https://t.co/AXAuEVu3ch',
+        }}
+        isPermalinkPage
+      />,
+    )
+    expect(screen.getByTestId('link-previews')).toHaveTextContent(
+      tweet.tweet_id,
+    )
+  })
+
   test('removes its self-link and shows an icon-only external link on a permalink page', () => {
     render(<TweetComponent tweet={tweet} isPermalinkPage />)
 
@@ -44,6 +81,58 @@ describe('TweetComponent', () => {
       }),
     ).toHaveAttribute('href', 'https://twitter.com/alice/status/123')
   })
+
+  test.each([false, true])(
+    'lets every thumbnail step through all of a tweet’s images (compact=%s)',
+    (compact) => {
+      const media = [1, 2, 3, 4, 5].map((n) => ({
+        media_url: `https://example.com/${n}.jpg`,
+        media_type: n === 5 ? 'video' : 'photo',
+      }))
+      render(
+        <TweetComponent
+          tweet={{
+            ...tweet,
+            media: [
+              ...media,
+              { media_url: 'https://example.com/x.gif', media_type: 'gif' },
+            ],
+            quote_tweet_id: '789',
+            quoted_tweet: {
+              tweet_id: '789',
+              account_id: '987',
+              created_at: '2026-08-11T12:00:00.000Z',
+              full_text: 'Quoted',
+              retweet_count: 0,
+              favorite_count: 0,
+              username: 'bob',
+              account_display_name: 'Bob',
+              media: media.slice(0, 2),
+            },
+          }}
+          compact={compact}
+        />,
+      )
+
+      const tweetThumbs = screen.getAllByLabelText(/^Tweet image/)
+      // Compact rows show four thumbnails, but the gallery still reaches the fifth.
+      expect(tweetThumbs).toHaveLength(compact ? 4 : 5)
+      tweetThumbs.forEach((thumb, index) => {
+        expect(thumb).toHaveAttribute('data-index', String(index))
+        expect(thumb).toHaveAttribute(
+          'data-gallery',
+          media.map((item) => item.media_url).join(' '),
+        )
+      })
+      const quotedThumbs = screen.getAllByLabelText(/^Quoted tweet image/)
+      expect(quotedThumbs).toHaveLength(2)
+      expect(quotedThumbs[1]).toHaveAttribute('data-index', '1')
+      expect(quotedThumbs[1]).toHaveAttribute(
+        'data-gallery',
+        'https://example.com/1.jpg https://example.com/2.jpg',
+      )
+    },
+  )
 
   test('labels missing quoted tweets as unavailable', () => {
     render(

@@ -143,10 +143,20 @@ export const createServerAnonClient = () => {
   })
 }
 
-export const createServerServiceRoleClient = () => {
+export const createServerServiceRoleClient = (
+  options: { noStore?: boolean } = {},
+) => {
   const { url, serviceRole } = getSupabaseConfig(true)
   return createClient<Database>(url, serviceRole!, {
     auth: { autoRefreshToken: false, persistSession: false },
+    ...(options.noStore
+      ? {
+          global: {
+            fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+              fetch(input, { ...init, cache: 'no-store' }),
+          },
+        }
+      : {}),
   })
 }
 

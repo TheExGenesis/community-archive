@@ -5,6 +5,7 @@ import { unstable_cache } from 'next/cache'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
 import { isTwitterUsername } from '@/lib/apiInputValidation'
+import { createServerServiceRoleClient } from '@/utils/supabase'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -236,6 +237,9 @@ export interface PublicProfileIdentity {
   username: string
 }
 
+const isMissingFunctionError = (error: { code?: string }) =>
+  error.code === 'PGRST202' || error.code === '42883'
+
 /**
  * Resolve only identities that are currently eligible for public serving.
  * This policy lookup is deliberately uncached so an explicit opt-out hides a
@@ -262,19 +266,57 @@ export const resolvePublicProfileIdentity = async (
   }
 
   const supabase = getMetaClient({ noStore: true })
-  const baseQuery = supabase
-    .from('user_directory')
-    .select('account_id, username')
+  const viewLookup = () => {
+    const baseQuery = supabase
+      .from('user_directory')
+      .select('account_id, username')
+    return isDirectoryIdentifier
+      ? baseQuery.eq('directory_id', decoded).limit(1).maybeSingle()
+      : isAccountIdentifier
+        ? baseQuery.eq('account_id', decoded).limit(1).maybeSingle()
+        : baseQuery.ilike('username', decoded).limit(1).maybeSingle()
+  }
+
+  // The RPC skips the directory view entirely when neither base table could
+  // contain the identifier, so a miss costs index probes, not a view scan.
+  const rpcLookup = async () => {
+    const rpc = await supabase.rpc('resolve_directory_identity', {
+      identifier: decoded,
+    })
+    // Migration not applied yet: keep serving through the view.
+    if (rpc.error && isMissingFunctionError(rpc.error)) return viewLookup()
+    return { data: rpc.data?.[0] ?? null, error: rpc.error }
+  }
 
   const { data, error } = isDirectoryIdentifier
-    ? await baseQuery.eq('directory_id', decoded).limit(1).maybeSingle()
-    : isAccountIdentifier
-      ? await baseQuery.eq('account_id', decoded).limit(1).maybeSingle()
-      : await baseQuery.ilike('username', decoded).limit(1).maybeSingle()
+    ? await viewLookup()
+    : await rpcLookup()
 
   if (error) throw error
   if (!data?.username) return null
   return { accountId: data.account_id ?? null, username: data.username }
+}
+
+/**
+ * Whether PostgreSQL policy withholds an account from public serving: an
+ * explicit opt-out or a scrape block. The stable ID is the key; the current
+ * handle rides along because an opt-out recorded by handle for an account that
+ * never joined has no ID to match. Errors propagate so a failed policy read
+ * never renders a profile.
+ */
+export const isPolicyBlockedAccount = async (
+  accountId: string,
+  username: string,
+): Promise<boolean> => {
+  // Next would otherwise cache the RPC and keep serving a stale decision.
+  const { data, error } = await createServerServiceRoleClient({
+    noStore: true,
+  }).rpc('policy_account_is_blocked', {
+    p_account_id: accountId,
+    p_username: username,
+  })
+  if (error) throw error
+  return data !== false
 }
 
 export const getCachedArchivedAt = unstable_cache(

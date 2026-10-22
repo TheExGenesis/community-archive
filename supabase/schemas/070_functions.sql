@@ -91,7 +91,7 @@ BEGIN
     ELSIF OLD.opted_in IS FALSE AND NEW.opted_in IS TRUE THEN
         NEW.opted_in_at = NOW();
         NEW.opted_out_at = NULL;
-        NEW.explicit_optout = false; -- Clear explicit opt-out when opting in
+        NEW.explicit_optout = false;
         NEW.opt_out_reason = NULL;
     ELSIF OLD.opted_in IS TRUE AND NEW.opted_in IS FALSE THEN
         NEW.opted_out_at = NOW();
@@ -114,57 +114,58 @@ CREATE OR REPLACE FUNCTION "public"."propagate_explicit_optout_scrape_block"() R
     SET "search_path" TO ''
     AS $$
 DECLARE
-    v_new_account_id text;
-    v_old_account_id text;
+  v_new_account_id text;
+  v_old_account_id text;
 BEGIN
-    v_new_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
+  v_new_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
+  IF v_new_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
+    SELECT account.account_id
+    INTO v_new_account_id
+    FROM public.all_account AS account
+    WHERE lower(account.username) = lower(BTRIM(NEW.username))
+    ORDER BY account.updated_at DESC NULLS LAST
+    LIMIT 1;
+  END IF;
 
-    IF v_new_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
-        SELECT a.account_id
-        INTO v_new_account_id
-        FROM public.all_account AS a
-        WHERE LOWER(a.username) = LOWER(BTRIM(NEW.username))
-        ORDER BY a.updated_at DESC NULLS LAST
-        LIMIT 1;
+  IF TG_OP = 'UPDATE' THEN
+    v_old_account_id := NULLIF(BTRIM(OLD.twitter_user_id), '');
+    IF v_old_account_id IS NULL AND NULLIF(BTRIM(OLD.username), '') IS NOT NULL THEN
+      SELECT account.account_id
+      INTO v_old_account_id
+      FROM public.all_account AS account
+      WHERE lower(account.username) = lower(BTRIM(OLD.username))
+      ORDER BY account.updated_at DESC NULLS LAST
+      LIMIT 1;
     END IF;
 
-    IF TG_OP = 'UPDATE' THEN
-        v_old_account_id := NULLIF(BTRIM(OLD.twitter_user_id), '');
-        IF v_old_account_id IS NULL AND NULLIF(BTRIM(OLD.username), '') IS NOT NULL THEN
-            SELECT a.account_id
-            INTO v_old_account_id
-            FROM public.all_account AS a
-            WHERE LOWER(a.username) = LOWER(BTRIM(OLD.username))
-            ORDER BY a.updated_at DESC NULLS LAST
-            LIMIT 1;
-        END IF;
-
-        IF v_old_account_id IS NOT NULL
-           AND (
-               NEW.explicit_optout IS NOT TRUE
-               OR v_old_account_id IS DISTINCT FROM v_new_account_id
-           ) THEN
-            DELETE FROM tes.blocked_scraping_users
-            WHERE account_id = v_old_account_id
-              AND block_source = 'explicit_optout';
-        END IF;
+    IF v_old_account_id IS NOT NULL
+       AND (
+         NEW.explicit_optout IS NOT TRUE
+         OR v_old_account_id IS DISTINCT FROM v_new_account_id
+       ) THEN
+      DELETE FROM tes.blocked_scraping_users
+      WHERE account_id = v_old_account_id
+        AND block_source = 'explicit_optout';
     END IF;
+  END IF;
 
-    IF NEW.explicit_optout IS TRUE AND v_new_account_id IS NOT NULL THEN
-        INSERT INTO tes.blocked_scraping_users (account_id, block_source)
-        VALUES (v_new_account_id, 'explicit_optout')
-        ON CONFLICT (account_id, block_source) DO NOTHING;
-    ELSIF v_new_account_id IS NOT NULL THEN
-        DELETE FROM tes.blocked_scraping_users
-        WHERE account_id = v_new_account_id
-          AND block_source = 'explicit_optout';
-    END IF;
+  IF NEW.explicit_optout IS TRUE AND v_new_account_id IS NOT NULL THEN
+    INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+    VALUES (v_new_account_id, 'explicit_optout')
+    ON CONFLICT (account_id, block_source) DO NOTHING;
+  ELSIF v_new_account_id IS NOT NULL THEN
+    DELETE FROM tes.blocked_scraping_users
+    WHERE account_id = v_new_account_id
+      AND block_source = 'explicit_optout';
+  END IF;
 
-    RETURN NEW;
+  RETURN NEW;
 END;
 $$;
 
 ALTER FUNCTION "public"."propagate_explicit_optout_scrape_block"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."propagate_explicit_optout_scrape_block"()
+  FROM PUBLIC, "anon", "authenticated";
 
 
 -- Generic updated_at column maintainer
@@ -412,7 +413,10 @@ $$;
 
 ALTER FUNCTION "private"."update_conversation_ids_since"("since_timestamp" timestamp with time zone) OWNER TO "postgres";
 
-COMMENT ON FUNCTION "private"."update_conversation_ids_since"("since_timestamp" timestamp with time zone) IS 'Optimized version of update_conversation_ids that can process only tweets updated since a given timestamp. \nWhen since_timestamp is NULL, processes all tweets (same as original function).\nWhen since_timestamp is provided, only processes tweets with updated_at >= since_timestamp.\nThis allows for efficient incremental updates instead of reprocessing all tweets.';
+COMMENT ON FUNCTION "private"."update_conversation_ids_since"("since_timestamp" timestamp with time zone) IS 'Optimized version of update_conversation_ids that can process only tweets updated since a given timestamp. 
+When since_timestamp is NULL, processes all tweets (same as original function).
+When since_timestamp is provided, only processes tweets with updated_at >= since_timestamp.
+This allows for efficient incremental updates instead of reprocessing all tweets.';
 
 
 CREATE OR REPLACE FUNCTION "private"."update_conversation_ids_since_v2"("since_timestamp" timestamp with time zone DEFAULT NULL::timestamp with time zone, "batch_size" integer DEFAULT 10000) RETURNS "json"
@@ -1321,6 +1325,9 @@ BEGIN
       MESSAGE = 'At most 100 tweets can be deleted at once';
   END IF;
 
+  -- Fail the whole request if any ID is missing or belongs to another account.
+  -- The intentionally generic error does not disclose whether another tweet
+  -- exists in the archive.
   IF EXISTS (
     SELECT 1
     FROM unnest(v_tweet_ids) AS requested(tweet_id)
@@ -1347,6 +1354,174 @@ GRANT EXECUTE ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) T
 
 COMMENT ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) IS 'Deletes up to 100 tweets only when every ID belongs to the authenticated Twitter account in app_metadata.provider_id.';
 
+-- Cleanup of streamed tweets from accounts outside the allowlist (members and
+-- explicit opt-ins). Backfilled from production by
+-- 20260404184000_add_non_allowlist_stream_cleanup_functions.sql.
+CREATE OR REPLACE FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" integer DEFAULT 500) RETURNS TABLE("tweet_id" text, "account_id" text, "created_at" timestamp with time zone, "reply_to_tweet_id" text, "is_quote" boolean)
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "statement_timeout" TO '10min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
+    AS $$
+    WITH allowed_accounts AS (
+        SELECT a.account_id
+        FROM public.account AS a
+
+        UNION
+
+        SELECT o.twitter_user_id AS account_id
+        FROM public.optin AS o
+        WHERE o.opted_in IS TRUE
+          AND o.explicit_optout IS NOT TRUE
+          AND o.twitter_user_id IS NOT NULL
+
+        UNION
+
+        SELECT a.account_id
+        FROM public.optin AS o
+        JOIN public.all_account AS a
+          ON lower(a.username) = lower(o.username)
+        WHERE o.opted_in IS TRUE
+          AND o.explicit_optout IS NOT TRUE
+    ),
+    streamed_non_allowlist_tweets AS (
+        SELECT
+            t.tweet_id,
+            t.account_id,
+            t.created_at,
+            t.reply_to_tweet_id
+        FROM public.tweets AS t
+        LEFT JOIN allowed_accounts AS aa
+          ON aa.account_id = t.account_id
+        WHERE t.archive_upload_id IS NULL
+          AND aa.account_id IS NULL
+    ),
+    preserved_replies AS (
+        SELECT DISTINCT t.tweet_id
+        FROM streamed_non_allowlist_tweets AS t
+        JOIN public.tweets AS replied_to_tweet
+          ON replied_to_tweet.tweet_id = t.reply_to_tweet_id
+        JOIN allowed_accounts AS aa
+          ON aa.account_id = replied_to_tweet.account_id
+    ),
+    preserved_quotes AS (
+        SELECT DISTINCT t.tweet_id
+        FROM streamed_non_allowlist_tweets AS t
+        JOIN public.quote_tweets AS qt
+          ON qt.tweet_id = t.tweet_id
+        JOIN public.tweets AS quoted_tweet
+          ON quoted_tweet.tweet_id = qt.quoted_tweet_id
+        JOIN allowed_accounts AS aa
+          ON aa.account_id = quoted_tweet.account_id
+    ),
+    ordered_candidates AS (
+        SELECT
+            t.tweet_id,
+            t.account_id,
+            t.created_at,
+            t.reply_to_tweet_id,
+            EXISTS (
+                SELECT 1
+                FROM public.quote_tweets AS qt
+                WHERE qt.tweet_id = t.tweet_id
+            ) AS is_quote,
+            row_number() OVER (
+                ORDER BY t.created_at NULLS LAST, t.tweet_id
+            ) AS row_num
+        FROM streamed_non_allowlist_tweets AS t
+        LEFT JOIN preserved_replies AS pr
+          ON pr.tweet_id = t.tweet_id
+        LEFT JOIN preserved_quotes AS pq
+          ON pq.tweet_id = t.tweet_id
+        WHERE pr.tweet_id IS NULL
+          AND pq.tweet_id IS NULL
+    )
+    SELECT
+        oc.tweet_id,
+        oc.account_id,
+        oc.created_at,
+        oc.reply_to_tweet_id,
+        oc.is_quote
+    FROM ordered_candidates AS oc
+    WHERE p_limit IS NULL OR oc.row_num <= p_limit
+    ORDER BY oc.row_num;
+$$;
+ALTER FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" integer) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" integer) FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" integer) FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" integer) TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"("p_limit" integer DEFAULT 500) RETURNS TABLE("requested_tweets" integer, "deleted_tweets" integer, "deleted_conversations" integer, "deleted_tweet_media" integer, "deleted_user_mentions" integer, "deleted_tweet_urls" integer, "deleted_private_tweet_user" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "statement_timeout" TO '10min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
+    AS $$
+DECLARE
+    v_tweet_ids text[];
+    v_requested_count integer := 0;
+BEGIN
+    IF p_limit IS NULL OR p_limit <= 0 THEN
+        RAISE EXCEPTION 'p_limit must be a positive integer';
+    END IF;
+
+    SELECT COALESCE(array_agg(candidate.tweet_id), ARRAY[]::text[])
+    INTO v_tweet_ids
+    FROM public.get_non_allowlist_streamed_tweet_candidates(p_limit) AS candidate;
+
+    v_requested_count := COALESCE(array_length(v_tweet_ids, 1), 0);
+
+    IF v_requested_count = 0 THEN
+        RETURN QUERY
+        SELECT 0, 0, 0, 0, 0, 0, 0;
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        v_requested_count,
+        deleted.deleted_tweets,
+        deleted.deleted_conversations,
+        deleted.deleted_tweet_media,
+        deleted.deleted_user_mentions,
+        deleted.deleted_tweet_urls,
+        deleted.deleted_private_tweet_user
+    FROM public.delete_tweets(v_tweet_ids) AS deleted;
+END;
+$$;
+ALTER FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"("p_limit" integer) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"("p_limit" integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"("p_limit" integer) FROM "anon";
+REVOKE ALL ON FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"("p_limit" integer) FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"("p_limit" integer) TO "service_role";
+
+-- Daily pg_cron refresh of the legacy global activity snapshot. Backfilled
+-- from production by 20260404173000_schedule_daily_global_activity_summary_refresh.sql.
+-- 20261016203822_restrict_refresh_global_activity_summary_execute.sql revoked
+-- the default EXECUTE grants; the pg_cron job runs as the owner (postgres).
+CREATE OR REPLACE FUNCTION "public"."refresh_global_activity_summary"() RETURNS void
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "statement_timeout" TO '20min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
+    AS $$
+BEGIN
+    BEGIN
+        REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
+    EXCEPTION
+        WHEN OTHERS THEN
+            IF SQLERRM LIKE '%not populated%' THEN
+                REFRESH MATERIALIZED VIEW public.global_activity_summary;
+            ELSE
+                RAISE;
+            END IF;
+    END;
+END;
+$$;
+ALTER FUNCTION "public"."refresh_global_activity_summary"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."refresh_global_activity_summary"() FROM "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."refresh_global_activity_summary"() TO "service_role";
+
 
 CREATE OR REPLACE FUNCTION "public"."delete_user_archive"("p_account_id" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1361,9 +1536,15 @@ BEGIN
     -- Get provider_id from JWT
     SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
     
-    -- Verify the JWT provider_id matches the account_id being deleted, unless postgres/service_role
-    IF (current_role NOT IN ('postgres', 'service_role')) AND 
-       (v_provider_id IS NULL OR v_provider_id != p_account_id) THEN
+    -- Verify the JWT provider_id matches the account_id being deleted, unless
+    -- the caller is service_role or a direct postgres session. current_role is
+    -- always the owner inside SECURITY DEFINER, so identify the caller from the
+    -- request JWT that PostgREST sets on every request instead.
+    IF NOT (
+           COALESCE(auth.jwt()->>'role', '') = 'service_role'
+           OR (COALESCE(auth.jwt(), '{}'::jsonb) = '{}'::jsonb AND session_user = 'postgres')
+       ) AND
+       (v_provider_id IS NULL OR v_provider_id IS DISTINCT FROM p_account_id) THEN
         RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_account_id;
     END IF;
 
@@ -1422,6 +1603,13 @@ BEGIN
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,
         v_schema_name, v_schema_name)
         USING v_archive_upload_ids, p_account_id;
+
+        -- ClickHouse keeps archive likes and follows; the archive processor
+        -- removes them once this request is drained (see
+        -- private.archive_clickhouse_graph_purge).
+        PERFORM private.enqueue_archive_clickhouse_graph_purge(
+            'account', p_account_id, NULL, 'delete_user_archive'
+        );
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error deleting archives for account %: %', p_account_id, SQLERRM;
         RAISE;
@@ -1430,120 +1618,10 @@ END;
 $_$;
 
 ALTER FUNCTION "public"."delete_user_archive"("p_account_id" "text") OWNER TO "postgres";
+-- Archive-delete functions: not callable by anon (#372).
+REVOKE EXECUTE ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") FROM PUBLIC, "anon";
+GRANT EXECUTE ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") TO "authenticated", "service_role";
 
-
-CREATE OR REPLACE FUNCTION public.tombstone_policy_account(p_account_id text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET statement_timeout TO '20min'
-SET search_path = ''
-AS $$
-DECLARE
-  v_provider_id text;
-  v_archive_upload_ids bigint[];
-  v_tweet_ids text[];
-BEGIN
-  IF p_account_id IS NULL OR BTRIM(p_account_id) = '' THEN
-    RAISE EXCEPTION 'p_account_id is required';
-  END IF;
-
-  SELECT auth.jwt()->'app_metadata'->>'provider_id'
-  INTO v_provider_id;
-
-  IF current_role NOT IN ('postgres', 'service_role')
-     AND (v_provider_id IS NULL OR v_provider_id <> p_account_id) THEN
-    RAISE EXCEPTION
-      'Unauthorized: provider_id % does not match account_id %',
-      v_provider_id,
-      p_account_id;
-  END IF;
-
-  SELECT COALESCE(array_agg(id), ARRAY[]::bigint[])
-  INTO v_archive_upload_ids
-  FROM public.archive_upload
-  WHERE account_id = p_account_id;
-
-  SELECT COALESCE(array_agg(tweet_id), ARRAY[]::text[])
-  INTO v_tweet_ids
-  FROM public.tweets
-  WHERE account_id = p_account_id;
-
-  DELETE FROM public.conversations
-  WHERE tweet_id = ANY(v_tweet_ids);
-  DELETE FROM public.tweet_media
-  WHERE tweet_id = ANY(v_tweet_ids);
-  DELETE FROM public.user_mentions
-  WHERE tweet_id = ANY(v_tweet_ids);
-  DELETE FROM public.tweet_urls
-  WHERE tweet_id = ANY(v_tweet_ids);
-  DELETE FROM public.quote_tweets
-  WHERE tweet_id = ANY(v_tweet_ids);
-  DELETE FROM public.retweets
-  WHERE tweet_id = ANY(v_tweet_ids);
-  DELETE FROM private.tweet_user
-  WHERE tweet_id = ANY(v_tweet_ids);
-
-  DELETE FROM public.likes
-  WHERE account_id = p_account_id
-     OR archive_upload_id = ANY(v_archive_upload_ids);
-  DELETE FROM public.followers
-  WHERE account_id = p_account_id
-     OR archive_upload_id = ANY(v_archive_upload_ids);
-  DELETE FROM public.following
-  WHERE account_id = p_account_id
-     OR archive_upload_id = ANY(v_archive_upload_ids);
-  DELETE FROM public.all_profile
-  WHERE account_id = p_account_id;
-
-  UPDATE public.tweet_media
-  SET archive_upload_id = NULL
-  WHERE archive_upload_id = ANY(v_archive_upload_ids);
-  UPDATE public.all_profile
-  SET archive_upload_id = NULL
-  WHERE archive_upload_id = ANY(v_archive_upload_ids);
-  UPDATE public.tweets
-  SET archive_upload_id = NULL
-  WHERE archive_upload_id = ANY(v_archive_upload_ids);
-
-  DELETE FROM public.archive_upload
-  WHERE id = ANY(v_archive_upload_ids);
-  DELETE FROM ca_autorefresh.account_refresh_log
-  WHERE account_id = p_account_id;
-
-  UPDATE public.tweets
-  SET
-    created_at = '1970-01-01 00:00:00+00',
-    full_text = '',
-    favorite_count = 0,
-    retweet_count = 0,
-    reply_to_tweet_id = NULL,
-    reply_to_user_id = NULL,
-    reply_to_username = NULL,
-    archive_upload_id = NULL,
-    is_tombstone = true
-  WHERE account_id = p_account_id;
-
-  UPDATE public.all_account
-  SET
-    created_via = 'policy_tombstone',
-    username = '',
-    created_at = '1970-01-01 00:00:00+00',
-    account_display_name = '',
-    num_tweets = 0,
-    num_following = 0,
-    num_followers = 0,
-    num_likes = 0,
-    is_tombstone = true
-  WHERE account_id = p_account_id;
-END;
-$$;
-
-ALTER FUNCTION public.tombstone_policy_account(text) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.tombstone_policy_account(text)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.tombstone_policy_account(text)
-  TO service_role;
 
 CREATE OR REPLACE FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1558,9 +1636,15 @@ BEGIN
     -- Get provider_id from JWT
     SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
 
-    -- Verify the JWT provider_id matches the account_id being deleted, unless postgres/service_role
-    IF (current_role NOT IN ('postgres', 'service_role')) AND
-       (v_provider_id IS NULL OR v_provider_id != p_account_id) THEN
+    -- Verify the JWT provider_id matches the account_id being deleted, unless
+    -- the caller is service_role or a direct postgres session. current_role is
+    -- always the owner inside SECURITY DEFINER, so identify the caller from the
+    -- request JWT that PostgREST sets on every request instead.
+    IF NOT (
+           COALESCE(auth.jwt()->>'role', '') = 'service_role'
+           OR (COALESCE(auth.jwt(), '{}'::jsonb) = '{}'::jsonb AND session_user = 'postgres')
+       ) AND
+       (v_provider_id IS NULL OR v_provider_id IS DISTINCT FROM p_account_id) THEN
         RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_account_id;
     END IF;
 
@@ -1627,6 +1711,14 @@ BEGIN
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,
         v_schema_name)
         USING p_archive_upload_id, p_account_id;
+
+        -- Remove only this upload's ClickHouse likes and follows; edges that a
+        -- retained upload also contains stay (see
+        -- private.archive_clickhouse_graph_purge).
+        PERFORM private.enqueue_archive_clickhouse_graph_purge(
+            'archive_upload', p_account_id, p_archive_upload_id,
+            'delete_single_archive'
+        );
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error deleting archive % for account %: %', p_archive_upload_id, p_account_id, SQLERRM;
         RAISE;
@@ -1635,6 +1727,67 @@ END;
 $_$;
 
 ALTER FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) OWNER TO "postgres";
+REVOKE EXECUTE ON FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) FROM PUBLIC, "anon";
+GRANT EXECUTE ON FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) TO "authenticated", "service_role";
+
+
+-- =========================
+-- Auth identity claims
+-- =========================
+
+-- Runs as sync_user_meta_data on auth.users (080_triggers.sql). Account
+-- identity comes from the Twitter/X identity, never raw_user_meta_data.
+CREATE OR REPLACE FUNCTION "public"."sync_meta_data"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_app jsonb := COALESCE(NEW.raw_app_meta_data, '{}'::jsonb);
+    v_provider_id text;
+    v_user_name text;
+BEGIN
+    -- GoTrue writes auth.identities from the OAuth provider's response, and
+    -- users cannot edit it.
+    SELECT i.provider_id,
+           COALESCE(NULLIF(i.identity_data->>'user_name', ''),
+                    NULLIF(i.identity_data->>'preferred_username', ''))
+    INTO v_provider_id, v_user_name
+    FROM auth.identities i
+    WHERE i.user_id = NEW.id
+      AND i.provider IN ('twitter', 'x')
+    ORDER BY i.created_at, i.id
+    LIMIT 1;
+
+    IF v_provider_id IS NOT NULL THEN
+        v_app := v_app || jsonb_build_object('provider_id', v_provider_id);
+        IF v_user_name IS NOT NULL THEN
+            v_app := v_app || jsonb_build_object('user_name', v_user_name);
+        END IF;
+    ELSIF TG_OP = 'INSERT' THEN
+        -- GoTrue's OAuth sign-up inserts the user before its identity, with
+        -- raw_user_meta_data set to the provider's claims. app_metadata.provider
+        -- is set by GoTrue, so a client sign-up (provider 'email', 'phone' or
+        -- anonymous) never reaches this branch.
+        IF v_app->>'provider' IN ('twitter', 'x') THEN
+            v_app := v_app || jsonb_strip_nulls(jsonb_build_object(
+                'provider_id', NULLIF(NEW.raw_user_meta_data->>'provider_id', ''),
+                'user_name', NULLIF(NEW.raw_user_meta_data->>'user_name', '')
+            ));
+        END IF;
+    ELSE
+        -- Without a Twitter identity, keep the values the row was created with.
+        v_app := (v_app - 'provider_id' - 'user_name') || jsonb_strip_nulls(jsonb_build_object(
+            'provider_id', OLD.raw_app_meta_data->'provider_id',
+            'user_name', OLD.raw_app_meta_data->'user_name'
+        ));
+    END IF;
+
+    NEW.raw_app_meta_data := v_app;
+    RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."sync_meta_data"() OWNER TO "postgres";
 
 
 -- =========================
@@ -1649,9 +1802,12 @@ DECLARE
     v_account_id TEXT;
 BEGIN
     SELECT a.account_id INTO v_account_id
-    FROM auth.users u
-    JOIN public.account a ON a.account_id = u.raw_user_meta_data->>'provider_id'
-    WHERE u.id = auth.uid();
+    FROM auth.identities i
+    JOIN public.account a ON a.account_id = i.provider_id
+    WHERE i.user_id = auth.uid()
+      AND i.provider IN ('twitter', 'x')
+    ORDER BY i.created_at, i.id
+    LIMIT 1;
 
     RETURN v_account_id;
 END;
@@ -2673,7 +2829,6 @@ DECLARE
     to_account_id TEXT;
     current_user_account_id TEXT;
 BEGIN
-    -- Get the current logged-in user's account_id
     BEGIN
         current_user_account_id := (SELECT (auth.jwt() -> 'app_metadata'::text) ->> 'account_id'::text);
     EXCEPTION
@@ -2681,7 +2836,6 @@ BEGIN
             current_user_account_id := NULL;
     END;
 
-    -- Get account_id for from_user
     IF from_user IS NOT NULL THEN
         SELECT a.account_id INTO from_account_id
         FROM public.all_account AS a
@@ -2692,7 +2846,6 @@ BEGIN
         END IF;
     END IF;
 
-    -- Get account_id for to_user
     IF to_user IS NOT NULL THEN
         SELECT a.account_id INTO to_account_id
         FROM public.all_account AS a
@@ -2772,7 +2925,6 @@ DECLARE
     to_account_id TEXT;
     current_user_account_id TEXT;
 BEGIN
-    -- Get the current logged-in user's account_id
     BEGIN
         current_user_account_id := (SELECT (auth.jwt() -> 'app_metadata'::text) ->> 'account_id'::text);
     EXCEPTION
@@ -2780,7 +2932,6 @@ BEGIN
             current_user_account_id := NULL;
     END;
 
-    -- Get account_id for from_user
     IF from_user IS NOT NULL THEN
         SELECT a.account_id INTO from_account_id
         FROM public.all_account AS a
@@ -2791,7 +2942,6 @@ BEGIN
         END IF;
     END IF;
 
-    -- Get account_id for to_user
     IF to_user IS NOT NULL THEN
         SELECT a.account_id INTO to_account_id
         FROM public.all_account AS a
@@ -2952,7 +3102,6 @@ DECLARE
     v_conversation_id text;
     v_conversation_tweet_ids text[];
 BEGIN
-    -- 1. Get the main tweet from enriched_tweets view
     SELECT * INTO v_tweet_row
     FROM public.enriched_tweets
     WHERE tweet_id = p_tweet_id;
@@ -2970,10 +3119,8 @@ BEGIN
         );
     END IF;
 
-    -- Get conversation_id
     v_conversation_id := v_tweet_row.conversation_id;
 
-    -- 2. Collect conversation tweet IDs once (used by multiple subqueries)
     SELECT array_agg(sub.tweet_id) INTO v_conversation_tweet_ids
     FROM (
         SELECT et.tweet_id
@@ -2990,7 +3137,6 @@ BEGIN
         LIMIT 500
     ) sub;
 
-    -- 3. Build the complete result in a single query
     SELECT jsonb_build_object(
         'tweet', to_jsonb(v_tweet_row),
         'media', COALESCE((
@@ -3118,6 +3264,7 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_tweet_page_data"("p_tweet_id" "text") OWNER TO "postgres";
+GRANT EXECUTE ON FUNCTION "public"."get_tweet_page_data"("p_tweet_id" "text") TO "anon", "authenticated";
 
 
 -- log_archive_upload_event(): write an 'archive_upload' row to public.user_action_log
@@ -3157,14 +3304,18 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT COALESCE(
-    array_agg(DISTINCT b.account_id),
+    array_agg(DISTINCT blocked.account_id),
     ARRAY[]::text[]
   )
-  FROM tes.blocked_scraping_users b
+  FROM tes.blocked_scraping_users AS blocked
   WHERE p_account_ids IS NULL
-     OR b.account_id = ANY(p_account_ids);
+     OR blocked.account_id = ANY(p_account_ids);
 $$;
 ALTER FUNCTION "public"."admin_list_blocked_scraping_users"(text[]) OWNER TO postgres;
+REVOKE ALL ON FUNCTION "public"."admin_list_blocked_scraping_users"(text[])
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION "public"."admin_list_blocked_scraping_users"(text[])
+  TO service_role;
 
 CREATE OR REPLACE FUNCTION "public"."admin_set_scrape_block"(
   "p_account_id" text,
@@ -3191,6 +3342,10 @@ BEGIN
 END;
 $$;
 ALTER FUNCTION "public"."admin_set_scrape_block"(text, boolean) OWNER TO postgres;
+REVOKE ALL ON FUNCTION "public"."admin_set_scrape_block"(text, boolean)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION "public"."admin_set_scrape_block"(text, boolean)
+  TO service_role;
 
 -- admin_enqueue_delete_with_export: Vercel-side entry point for queuing
 -- an admin delete-with-export job. Inserts into private.admin_jobs
@@ -3211,6 +3366,8 @@ AS $$
 DECLARE
   v_key uuid;
 BEGIN
+  -- Input validation — the worker filters on (job_name, account_id,
+  -- username) for forensics, so we hard-require both.
   IF p_account_id IS NULL OR p_account_id = '' THEN
     RAISE EXCEPTION 'p_account_id is required';
   END IF;
@@ -3227,6 +3384,8 @@ BEGIN
       'username',            p_username,
       'reason',              COALESCE(p_reason, 'Admin manual opt-out'),
       'requested_by_user_id', p_requested_by_user_id,
+      -- Wire-format match for what the worker reads — ExportArgs.enqueuedAt
+      -- becomes the timestamp prefix on the export folder.
       'enqueued_at',         to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
     )
   )
@@ -3236,6 +3395,14 @@ BEGIN
 END;
 $$;
 ALTER FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid)
+  TO service_role;
+COMMENT ON FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid) IS
+  'Vercel-side entry point for queuing an admin delete-with-export job. '
+  'Inserts a row into private.admin_jobs (which is not PostgREST-exposed), '
+  'so the Hetzner admin-delete-worker can claim it. Returns the job key.';
 
 -- admin_list_recent_delete_jobs: service-role-only read bridge for the
 -- dashboard. private.admin_jobs remains outside PostgREST's exposed schemas.
@@ -3276,45 +3443,48 @@ REVOKE ALL ON FUNCTION public.admin_list_recent_delete_jobs(integer)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_list_recent_delete_jobs(integer)
   TO service_role;
+COMMENT ON FUNCTION public.admin_list_recent_delete_jobs(integer) IS
+  'Returns recent admin archive-delete jobs for the service-role-gated admin dashboard.';
+
 CREATE OR REPLACE FUNCTION "public"."publish_digest_edition"("p_edition_id" uuid)
 RETURNS "public"."digest_editions"
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
 AS $$
-DECLARE
+declare
   target "public"."digest_editions";
-BEGIN
-  SELECT *
-    INTO target
-    FROM "public"."digest_editions"
-   WHERE id = p_edition_id
-   FOR UPDATE;
+begin
+  select *
+    into target
+    from "public"."digest_editions"
+   where id = p_edition_id
+   for update;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Digest edition not found';
-  END IF;
+  if not found then
+    raise exception 'Digest edition not found';
+  end if;
 
-  IF target.status = 'archived' THEN
-    RAISE EXCEPTION 'Archived digest editions cannot be published';
-  END IF;
+  if target.status = 'archived' then
+    raise exception 'Archived digest editions cannot be published';
+  end if;
 
-  UPDATE "public"."digest_editions"
-     SET status = 'archived',
+  update "public"."digest_editions"
+     set status = 'archived',
          updated_at = now()
-   WHERE digest_date = target.digest_date
-     AND status = 'published'
-     AND id <> target.id;
+   where digest_date = target.digest_date
+     and status = 'published'
+     and id <> target.id;
 
-  UPDATE "public"."digest_editions"
-     SET status = 'published',
+  update "public"."digest_editions"
+     set status = 'published',
          published_at = coalesce(published_at, now()),
          updated_at = now()
-   WHERE id = target.id
-   RETURNING * INTO target;
+   where id = target.id
+   returning * into target;
 
-  RETURN target;
-END;
+  return target;
+end;
 $$;
 
 REVOKE EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
@@ -3453,9 +3623,101 @@ REVOKE ALL ON FUNCTION "public"."search_user_suggestions"(text, integer)
 GRANT EXECUTE ON FUNCTION "public"."search_user_suggestions"(text, integer)
   TO "anon", "authenticated", "readclient", "service_role";
 
+-- Resolve one profile identifier against public.user_directory, skipping the
+-- view when neither all_account nor an opted-in optin row has a candidate.
+-- SECURITY INVOKER keeps the caller's RLS on the prefilter and the view.
+CREATE OR REPLACE FUNCTION public.resolve_directory_identity(identifier text)
+RETURNS TABLE (account_id text, username text)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  -- All-digit identifiers are account IDs; anything else is a handle. A
+  -- numeric handle never matches a username, mirroring the application.
+  IF identifier ~ '^[0-9]+$' THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.all_account a WHERE a.account_id = identifier
+    ) AND NOT EXISTS (
+      SELECT 1
+      FROM public.optin o
+      WHERE o.opted_in = true
+        AND o.twitter_user_id = identifier
+    ) THEN
+      RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT d.account_id, d.username
+    FROM public.user_directory d
+    WHERE d.account_id = identifier
+    LIMIT 1;
+  ELSE
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.all_account a
+      WHERE lower(a.username) = lower(identifier)
+    ) AND NOT EXISTS (
+      SELECT 1
+      FROM public.optin o
+      WHERE o.opted_in = true
+        AND lower(o.username) = lower(identifier)
+    ) THEN
+      RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT d.account_id, d.username
+    FROM public.user_directory d
+    WHERE lower(d.username) = lower(identifier)
+    LIMIT 1;
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION public.resolve_directory_identity(text) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.resolve_directory_identity(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.resolve_directory_identity(text)
+  TO anon, authenticated, service_role;
+
 -- Private, aggregate-only monitoring bridges for the least-privilege
 -- archive_metrics_exporter role. The functions intentionally expose no user,
 -- account, archive, or free-form metadata labels.
+
+-- Exporter view of the purge backlog. RLS hides the outbox itself, so the
+-- restricted monitoring role reads three aggregates through this function.
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_graph_purge()
+RETURNS TABLE (
+  pending_requests double precision,
+  oldest_pending_age_seconds double precision,
+  max_attempts double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF session_user <> 'archive_metrics_exporter' THEN
+    RAISE EXCEPTION 'monitoring function is restricted'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- queued_at restarts when a backfill replays a request, so a replay does
+  -- not look like an hour-old stall; failed attempts keep their age.
+  RETURN QUERY
+  SELECT
+    COUNT(*)::double precision,
+    COALESCE(EXTRACT(EPOCH FROM (now() - MIN(purge.queued_at))), 0)::double precision,
+    COALESCE(MAX(purge.attempt_count), 0)::double precision
+  FROM private.archive_clickhouse_graph_purge AS purge
+  WHERE purge.purge_state = 'pending';
+END;
+$$;
+
+ALTER FUNCTION private.community_archive_monitoring_graph_purge() OWNER TO postgres;
 
 CREATE OR REPLACE FUNCTION private.community_archive_monitoring_membership()
 RETURNS TABLE (currently_opted_in double precision)
@@ -3537,6 +3799,34 @@ $$;
 ALTER FUNCTION private.community_archive_monitoring_activity_day(integer)
   OWNER TO postgres;
 
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_graph_purge()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_roles WHERE rolname = 'archive_metrics_exporter'
+  ) THEN
+    REVOKE SELECT ON public.optin, public.user_action_log
+      FROM archive_metrics_exporter;
+    GRANT USAGE ON SCHEMA private TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_membership()
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_graph_purge()
+      TO archive_metrics_exporter;
+  END IF;
+END;
+$$;
+
 -- An accepted upload cannot be repointed to different bytes. Deletion remains
 -- available through the established policy workflow.
 CREATE OR REPLACE FUNCTION private.preserve_archive_storage_reference()
@@ -3552,6 +3842,44 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Trusted callers are the service_role JWT and direct database logins, which
+-- have no request JWT and are not PostgREST's authenticator. current_role is
+-- not used: inside a SECURITY DEFINER caller it is the function owner.
+CREATE OR REPLACE FUNCTION private.enforce_archive_upload_owner()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+  v_user_name text := auth.jwt()->'app_metadata'->>'user_name';
+BEGIN
+  IF v_role = 'service_role'
+     OR (v_role IS NULL AND session_user <> 'authenticator') THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND NEW.username IS NOT DISTINCT FROM OLD.username
+     AND NEW.storage_path IS NOT DISTINCT FROM OLD.storage_path THEN
+    RETURN NEW;
+  END IF;
+
+  IF NULLIF(BTRIM(v_user_name), '') IS NULL
+     OR lower(NEW.username) IS DISTINCT FROM lower(v_user_name) THEN
+    RAISE EXCEPTION 'archive upload username does not match the authenticated account'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF NEW.storage_path IS NOT NULL
+     AND split_part(NEW.storage_path, '/', 1) IS DISTINCT FROM lower(NEW.username) THEN
+    RAISE EXCEPTION 'archive storage path is outside the authenticated account folder'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.enforce_archive_upload_owner() OWNER TO postgres;
 
 -- Private dashboard read. No consent or archive data is changed by this function.
 CREATE OR REPLACE FUNCTION public.admin_activity_page(
@@ -3891,16 +4219,118 @@ STABLE
 SECURITY INVOKER
 SET search_path = ''
 AS $$
-  SELECT
+  select
     likes.tweet_id,
-    count(*) AS like_count,
-    coalesce(bool_or(likes.account_id = p_viewer_account_id), false) AS viewer_liked
-  FROM public.ca_tweet_likes AS likes
-  WHERE likes.tweet_id = ANY(p_tweet_ids)
-  GROUP BY likes.tweet_id;
+    count(*) as like_count,
+    coalesce(bool_or(likes.account_id = p_viewer_account_id), false) as viewer_liked
+  from public.ca_tweet_likes as likes
+  where likes.tweet_id = any(p_tweet_ids)
+  group by likes.tweet_id;
 $$;
 REVOKE ALL ON FUNCTION public.ca_tweet_like_summary(text[], text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ca_tweet_like_summary(text[], text) TO service_role;
+
+-- Public API keys. Callers are website server routes using the service role
+-- after verifying the session; these functions enforce ownership and caps.
+CREATE FUNCTION public.create_public_api_key(owner_user_id uuid, owner_account_id text, new_key_id text, new_key_sha256 text, key_label text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE
+  consumer private.public_api_consumers;
+  created private.public_api_keys;
+BEGIN
+  IF owner_user_id IS NULL THEN
+    RAISE EXCEPTION 'Invalid API key owner' USING ERRCODE='22023';
+  END IF;
+  -- The upsert locks the consumer row, serializing concurrent creations by
+  -- one owner so the caps below cannot be raced.
+  INSERT INTO private.public_api_consumers AS c(user_id, account_id)
+    VALUES(owner_user_id, nullif(owner_account_id,''))
+    ON CONFLICT (user_id) DO UPDATE
+      SET account_id = coalesce(EXCLUDED.account_id, c.account_id), updated_at = now()
+    RETURNING * INTO consumer;
+  IF consumer.status <> 'active' THEN
+    RAISE EXCEPTION 'api_access_suspended' USING ERRCODE='42501';
+  END IF;
+  IF (SELECT count(*) FROM private.public_api_keys k
+      WHERE k.consumer_id = consumer.id AND k.revoked_at IS NULL
+        AND (k.expires_at IS NULL OR k.expires_at > now())) >= 5 THEN
+    RAISE EXCEPTION 'active_key_limit' USING ERRCODE='P0001';
+  END IF;
+  IF (SELECT count(*) FROM private.public_api_keys k
+      WHERE k.consumer_id = consumer.id AND k.created_at > now() - interval '1 day') >= 10 THEN
+    RAISE EXCEPTION 'daily_creation_limit' USING ERRCODE='P0001';
+  END IF;
+  INSERT INTO private.public_api_keys(id, consumer_id, label, key_sha256)
+    VALUES(new_key_id, consumer.id, nullif(btrim(key_label),''), new_key_sha256)
+    RETURNING * INTO created;
+  RETURN jsonb_build_object(
+    'id', created.id, 'consumer_id', created.consumer_id, 'label', created.label,
+    'scopes', to_jsonb(created.scopes),
+    'requests_per_minute', created.requests_per_minute,
+    'requests_per_day', created.requests_per_day,
+    'created_at', created.created_at, 'expires_at', created.expires_at,
+    'last_used_at', created.last_used_at, 'revoked_at', created.revoked_at);
+END
+$$;
+
+-- Active keys plus keys revoked in the last 30 days, newest first.
+CREATE FUNCTION public.list_public_api_keys(owner_user_id uuid)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'id', k.id, 'label', k.label, 'scopes', to_jsonb(k.scopes),
+    'requests_per_minute', k.requests_per_minute,
+    'requests_per_day', k.requests_per_day,
+    'created_at', k.created_at, 'expires_at', k.expires_at,
+    'last_used_at', k.last_used_at, 'revoked_at', k.revoked_at
+  ) ORDER BY k.created_at DESC), '[]'::jsonb)
+  FROM private.public_api_keys k
+  JOIN private.public_api_consumers c ON c.id = k.consumer_id
+  WHERE c.user_id = owner_user_id
+    AND (k.revoked_at IS NULL OR k.revoked_at > now() - interval '30 days')
+$$;
+
+-- True when this owner's active key was revoked by this call.
+CREATE FUNCTION public.revoke_public_api_key(owner_user_id uuid, target_key_id text)
+RETURNS boolean LANGUAGE sql VOLATILE SECURITY INVOKER SET search_path='' AS $$
+  WITH revoked AS (
+    UPDATE private.public_api_keys k SET revoked_at = now()
+    FROM private.public_api_consumers c
+    WHERE k.id = target_key_id AND k.consumer_id = c.id
+      AND c.user_id = owner_user_id AND k.revoked_at IS NULL
+    RETURNING k.id
+  )
+  SELECT EXISTS (SELECT 1 FROM revoked)
+$$;
+
+-- Gateway key resolution. Unknown, mismatched, revoked, expired, and suspended
+-- keys are indistinguishable to the caller.
+CREATE FUNCTION public.verify_public_api_key(target_key_id text, presented_key_sha256 text)
+RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY INVOKER SET search_path='' AS $$
+DECLARE
+  found_key private.public_api_keys;
+  consumer_status text;
+BEGIN
+  SELECT k.* INTO found_key FROM private.public_api_keys k WHERE k.id = target_key_id;
+  SELECT c.status INTO consumer_status
+  FROM private.public_api_consumers c WHERE c.id = found_key.consumer_id;
+  IF found_key.id IS NULL
+    OR found_key.key_sha256 IS DISTINCT FROM presented_key_sha256
+    OR found_key.revoked_at IS NOT NULL
+    OR (found_key.expires_at IS NOT NULL AND found_key.expires_at <= now())
+    OR consumer_status IS DISTINCT FROM 'active' THEN
+    RETURN jsonb_build_object('valid', false);
+  END IF;
+  UPDATE private.public_api_keys SET last_used_at = now()
+  WHERE id = found_key.id
+    AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute');
+  RETURN jsonb_build_object('valid', true, 'key', jsonb_build_object(
+    'id', found_key.id, 'consumer_id', found_key.consumer_id,
+    'scopes', to_jsonb(found_key.scopes),
+    'requests_per_minute', found_key.requests_per_minute,
+    'requests_per_day', found_key.requests_per_day,
+    'expires_at', found_key.expires_at));
+END
+$$;
 
 -- The shelf for one account, with the owner's curation applied. Public callers
 -- (include_unapproved=false) see approved items whose content has not changed since the

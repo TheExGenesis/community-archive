@@ -1,6 +1,9 @@
 import type { User } from '@supabase/supabase-js'
-import { isTwitterUsername } from '@/lib/apiInputValidation'
 import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
+import {
+  getTwitterUsername,
+  normalizeTwitterUsername,
+} from '@/lib/twitterIdentity'
 
 export interface SessionIdentityEnvironment {
   nodeEnv?: string
@@ -17,34 +20,6 @@ const getDefaultEnvironment = (): SessionIdentityEnvironment => ({
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   localSupabaseUrl: process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL,
 })
-
-const normalizeUsername = (value: unknown): string | null => {
-  if (typeof value !== 'string') return null
-
-  const username = value.trim().toLowerCase().replace(/^@/, '')
-  return isTwitterUsername(username) ? username : null
-}
-
-const getTwitterIdentityUsername = (user: User): string | null => {
-  const identity =
-    user.identities?.find((item) =>
-      ['twitter', 'x'].includes(item.provider ?? ''),
-    ) ?? null
-  if (!identity) return null
-
-  const data = (identity.identity_data ?? {}) as Record<string, unknown>
-  for (const key of [
-    'user_name',
-    'preferred_username',
-    'screen_name',
-    'username',
-  ]) {
-    const username = normalizeUsername(data[key])
-    if (username) return username
-  }
-
-  return null
-}
 
 const getActiveSupabaseUrl = (environment: SessionIdentityEnvironment) =>
   environment.nodeEnv === 'development' && !environment.useRemoteDevDb
@@ -68,7 +43,7 @@ const getTrustedMockUsername = (
     return null
   }
 
-  return normalizeUsername(user.app_metadata?.user_name)
+  return normalizeTwitterUsername(user.app_metadata?.user_name)
 }
 
 // Real OAuth identity data is authoritative in every environment. Mock-user
@@ -80,5 +55,4 @@ const getTrustedMockUsername = (
 export const getSessionTwitterUsername = (
   user: User,
   environment: SessionIdentityEnvironment = getDefaultEnvironment(),
-) =>
-  getTwitterIdentityUsername(user) ?? getTrustedMockUsername(user, environment)
+) => getTwitterUsername(user) ?? getTrustedMockUsername(user, environment)

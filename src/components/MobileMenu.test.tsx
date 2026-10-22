@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MobileMenu from './MobileMenu'
+import type { SessionAccount } from '@/hooks/useAuthAndArchive'
 
 const mockSignOut = jest.fn()
 
@@ -10,7 +11,7 @@ jest.mock('@/hooks/useAuthAndArchive', () => ({
       provider_id: '42',
       user_name: 'alice',
       avatar_url: 'https://pbs.twimg.com/profile_images/42/alice.jpg',
-    },
+    } satisfies SessionAccount,
   }),
 }))
 

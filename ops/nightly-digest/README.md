@@ -1,7 +1,11 @@
 # Nightly digest publisher
 
-`community-archive-nightly-digest.timer` runs at 06:15 UTC (10:15 PM PST or
-11:15 PM PDT), after the 06:00 UTC editorial-day boundary. The oneshot Bun
+`community-archive-nightly-digest.timer` runs at 07:30 UTC (11:30 PM PST or
+12:30 AM PDT). The editorial day closes at 06:00 UTC; the extra ninety minutes
+let the 03:00 UTC Autorefresh run, which normally finishes between about 06:00
+and 07:05 UTC, land its tweets first. This is a fixed margin, not a completion
+check: a slower Autorefresh run still publishes without that night's refresh.
+The oneshot Bun
 publisher reads candidates from the ClickHouse query gateway, asks Opus 5.5 for
 one JSON object, performs one bounded repair only when deterministic validation
 rejects the first response, then stages and publishes through Supabase.

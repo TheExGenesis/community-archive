@@ -27,7 +27,7 @@ administrator blocks continue to take precedence.
 
 ## Coordinated rollout (requires separate production approval)
 
-1. Apply migration `20261022013936_archive_only_collection` and verify its grants.
+1. Apply migration `20261022072609_archive_only_collection` and verify its grants.
 2. Deploy the companion firehose change to every intake/worker/replay/canonical
    consumer and the companion autorefresh change to every scheduler and writer.
    Both fail closed if the new table is absent. Keep the UI flag disabled.

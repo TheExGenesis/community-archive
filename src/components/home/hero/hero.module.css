@@ -155,29 +155,6 @@
   background: hsl(var(--muted));
   font-weight: 700;
 }
-.zoom {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid hsl(var(--border));
-  border-radius: 9px;
-  overflow: hidden;
-  background: hsl(var(--background));
-  box-shadow: 0 2px 8px #0001;
-}
-.zoom button {
-  width: 40px;
-  height: 40px;
-  font-size: 22px;
-}
-.zoom button + button {
-  border-top: 1px solid hsl(var(--border));
-}
-.zoom button:hover {
-  background: hsl(var(--muted));
-}
 .hint {
   position: absolute;
   bottom: 12px;
@@ -622,10 +599,6 @@
   transform: translateX(-50%) rotate(225deg);
 }
 
-.zoom button {
-  display: grid;
-  place-items: center;
-}
 .clearHeat {
   pointer-events: auto;
   margin-left: 8px;

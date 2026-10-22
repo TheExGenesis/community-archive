@@ -20,7 +20,6 @@ import {
 } from '@/lib/hexMap/geometry'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import useMapCamera from './useMapCamera'
-import MapHelp from './MapHelp'
 import styles from './hero.module.css'
 
 function polygon(
@@ -607,53 +606,33 @@ export default memo(function HexMap({
             </button>
           ))}
         </div>
-        <p>
-          {heatTerm
-            ? `“${heatTerm}” · share of member posts each month`
-            : layer === 'week'
-              ? `Activity · snapshot week of ${snapshot.week}`
+        {(heatTerm || layer === 'archived') && (
+          <p>
+            {heatTerm
+              ? `“${heatTerm}” · share of member posts each month`
               : `Share of each cell’s accounts that are archived${coverageLive ? '' : ` · snapshot ${snapshot.week}`}`}
-          {heatTerm && (
-            <button
-              type="button"
-              className={styles.clearHeat}
-              onClick={onClearHeat}
-            >
-              Clear heatmap
-            </button>
-          )}
-          {heatStatus && (
-            <>
-              <br />
-              {heatStatus}
-              {heatStatus === 'Heat map unavailable' && (
-                <button onClick={onRetryHeat}> · Retry</button>
-              )}
-            </>
-          )}
-        </p>
+            {heatTerm && (
+              <button
+                type="button"
+                className={styles.clearHeat}
+                onClick={onClearHeat}
+              >
+                Clear heatmap
+              </button>
+            )}
+            {heatStatus && (
+              <>
+                <br />
+                {heatStatus}
+                {heatStatus === 'Heat map unavailable' && (
+                  <button onClick={onRetryHeat}> · Retry</button>
+                )}
+              </>
+            )}
+          </p>
+        )}
       </div>
       {scrubber}
-      <div className={styles.zoom}>
-        <MapHelp />
-        <button
-          type="button"
-          aria-label="Zoom in"
-          onClick={() => camera.zoomAt(1.5)}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          aria-label="Zoom out"
-          onClick={() => camera.zoomAt(1 / 1.5)}
-        >
-          −
-        </button>
-        <button type="button" aria-label="Reset map" onClick={camera.reset}>
-          ↺
-        </button>
-      </div>
       <span className={styles.hint}>
         <span className={styles.desktopHint}>
           Scroll to zoom · Double-click a hex to select · Shift + scroll for

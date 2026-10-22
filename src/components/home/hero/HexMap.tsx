@@ -383,15 +383,60 @@ export default memo(function HexMap({
             id,
           })
       })
-    return placeLabels(
-      candidates,
-      (text, size) => {
-        ctx.font = `${showDetails ? 700 : 600} ${size}px ${fontFamily}`
-        return ctx.measureText(text).width
-      },
-      size.width,
-      size.height,
-    )
+    const measurements = new Map<string, number>()
+    const measure = (text: string, fontSize: number) => {
+      const key = `${fontSize}:${text}`
+      if (measurements.has(key)) return measurements.get(key)!
+      ctx.font = `${showDetails ? 700 : 600} ${fontSize}px ${fontFamily}`
+      const width = ctx.measureText(text).width
+      measurements.set(key, width)
+      return width
+    }
+    const placed = placeLabels(candidates, measure, size.width, size.height)
+    if (!showDetails) {
+      // Preserve every normal overview label. Fit these central communities
+      // into remaining space near their own region's cells.
+      for (const region of [20, 9, 6]) {
+        if (placed.some((label) => label.region === region)) continue
+        const original = candidates.find((label) => label.region === region)!
+        const label = region === 9 ? { ...original, text: 'Systems' } : original
+        const anchors = snapshot.cells
+          .filter((cell) => cell.region === region)
+          .flatMap((cell) =>
+            [0, -8, 8].flatMap((dx) =>
+              [0, -8, 8].map((dy) => ({
+                x: cell.x * t.scale + t.x + dx,
+                y: -cell.y * t.scale + t.y + dy,
+              })),
+            ),
+          )
+          .sort(
+            (a, b) =>
+              Math.hypot(a.x - label.x, a.y - label.y) -
+              Math.hypot(b.x - label.x, b.y - label.y),
+          )
+        let fitted = false
+        for (const fontSize of [12, 11, 10]) {
+          for (const anchor of anchors) {
+            const candidate = { ...label, ...anchor, size: fontSize }
+            if (
+              placeLabels(
+                [...placed, candidate],
+                measure,
+                size.width,
+                size.height,
+              ).length > placed.length
+            ) {
+              placed.push(candidate)
+              fitted = true
+              break
+            }
+          }
+          if (fitted) break
+        }
+      }
+    }
+    return placed
   }, [
     snapshot,
     camera.camera.zoom,

@@ -9,7 +9,21 @@ import {
   normalizePreviewUrl,
   shouldRefreshCachedPreview,
   xArticleIdFromUrl,
+  fetchXVideoSyndicationMetadata,
+  resolveVideoPreviewUrl,
+  previewCandidate,
+  getTweetLinkPreviews,
+  previewUrlHash,
 } from './linkPreviews'
+
+import { xVideoFromUrl } from './xVideoUrl'
+import { createServerServiceRoleClient } from '@/utils/supabase'
+import { fetchSyndicatedTweet } from './twitterSyndication'
+
+jest.mock('@/utils/supabase', () => ({
+  createServerServiceRoleClient: jest.fn(),
+}))
+jest.mock('./twitterSyndication', () => ({ fetchSyndicatedTweet: jest.fn() }))
 
 const publicResolver = async () => [{ address: '1.1.1.1', family: 4 }]
 
@@ -199,4 +213,150 @@ describe('link preview safety and metadata', () => {
       ),
     ).rejects.toThrow('too large')
   })
+})
+
+const videoUrl = 'https://x.com/therealbuni/status/1781147654623297657/video/1'
+const poster =
+  'https://pbs.twimg.com/ext_tw_video_thumb/1781147615410704385/pu/img/WbJTNBhnCVG_Hzln.jpg'
+
+describe('linked X videos', () => {
+  afterEach(() => jest.restoreAllMocks())
+
+  test('allows explicit video permalinks while continuing to skip ordinary posts', () => {
+    expect(previewCandidate(videoUrl)).toBe(videoUrl)
+    expect(
+      previewCandidate('https://twitter.com/alice/status/1781147654623297657'),
+    ).toBeNull()
+    expect(xVideoFromUrl(videoUrl)).toEqual({
+      tweetId: '1781147654623297657',
+      mediaIndex: 0,
+    })
+    expect(
+      xVideoFromUrl(
+        'https://twitter.com/i/web/status/1781147654623297657/video/2',
+      ),
+    ).toMatchObject({ mediaIndex: 1 })
+    for (const url of [
+      videoUrl.replace('x.com', 'x.com.evil.test'),
+      videoUrl.replace('/video/1', '/video/0'),
+      videoUrl + '/other',
+      videoUrl.replace('https:', 'javascript:'),
+    ]) {
+      expect(xVideoFromUrl(url)).toBeNull()
+    }
+  })
+
+  test('resolves the example shortened link without requesting its destination', async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(null, {
+        status: 301,
+        headers: { location: videoUrl },
+      }),
+    )
+    await expect(
+      resolveVideoPreviewUrl('https://t.co/AXAuEVu3ch', fetcher),
+    ).resolves.toBe(videoUrl)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://t.co/AXAuEVu3ch',
+      expect.objectContaining({ redirect: 'manual' }),
+    )
+    fetcher.mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'http://127.0.0.1/private' },
+      }),
+    )
+    await expect(
+      resolveVideoPreviewUrl('https://t.co/unsafe', fetcher),
+    ).resolves.toBe('https://t.co/unsafe')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  test('uses the requested video slot and never copies the external tweet text', async () => {
+    const fetcher = jest.fn().mockResolvedValue({
+      tweet_id: '1781147654623297657',
+      full_text: 'Do not archive this text',
+      media: [
+        { media_type: 'photo', media_url: 'https://pbs.twimg.com/photo.jpg' },
+        { media_type: 'video', media_url: poster },
+      ],
+    })
+    const metadata = await fetchXVideoSyndicationMetadata(
+      videoUrl.replace('/video/1', '/video/2'),
+      fetcher,
+    )
+    expect(fetcher).toHaveBeenCalledWith('1781147654623297657')
+    expect(metadata).toMatchObject({ title: 'Video on X', imageUrl: poster })
+    expect(JSON.stringify(metadata)).not.toContain('Do not archive')
+    await expect(
+      fetchXVideoSyndicationMetadata(videoUrl, fetcher),
+    ).resolves.toBeNull()
+    fetcher.mockResolvedValue({
+      tweet_id: '99999',
+      media: [{ media_type: 'video', media_url: poster }],
+    })
+    await expect(
+      fetchXVideoSyndicationMetadata(videoUrl, fetcher),
+    ).resolves.toBeNull()
+    fetcher.mockResolvedValue(null)
+    await expect(
+      fetchXVideoSyndicationMetadata(videoUrl, fetcher),
+    ).resolves.toBeNull()
+  })
+
+  test.each(['12345', '1781147654623297657'])(
+    'resolves a text-only video link without duplicating the source tweet’s own media (%s)',
+    async (sourceId) => {
+      const shortUrl = 'https://t.co/AXAuEVu3ch'
+      const readUrls = jest.fn().mockResolvedValue({ data: [], error: null })
+      const readTweets = jest.fn().mockResolvedValue({
+        data: [
+          {
+            tweet_id: sourceId,
+            full_text: `Incredible things are happening in Spanish television ${shortUrl}`,
+          },
+        ],
+      })
+      const readCache = jest.fn().mockResolvedValue({ data: [], error: null })
+      const upsert = jest.fn((row) => ({
+        select: () => ({ single: async () => ({ data: row, error: null }) }),
+      }))
+      const from = jest.fn((table: string): unknown =>
+        table === 'tweet_urls'
+          ? { select: () => ({ in: readUrls }) }
+          : table === 'tweets'
+            ? { select: () => ({ in: readTweets }) }
+            : { select: () => ({ in: readCache }), upsert },
+      )
+      jest
+        .mocked(createServerServiceRoleClient)
+        .mockReturnValue({ from } as never)
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(
+          new Response(null, { status: 301, headers: { location: videoUrl } }),
+        )
+      jest.mocked(fetchSyndicatedTweet).mockResolvedValue({
+        tweet_id: '1781147654623297657',
+        media: [{ media_type: 'video', media_url: poster }],
+      } as never)
+      const previews = await getTweetLinkPreviews([sourceId])
+      expect(readTweets).toHaveBeenCalledWith('tweet_id', [sourceId])
+      if (sourceId === '1781147654623297657') {
+        expect(previews.size).toBe(0)
+        expect(upsert).not.toHaveBeenCalled()
+        return
+      }
+      expect(previews.get(sourceId)).toEqual([
+        expect.objectContaining({
+          urlHash: previewUrlHash(shortUrl),
+          canonicalUrl: videoUrl,
+          imageUrl: poster,
+          isVideo: true,
+        }),
+      ])
+      expect(upsert).toHaveBeenCalledTimes(1)
+    },
+  )
 })

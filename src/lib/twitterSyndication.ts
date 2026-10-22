@@ -8,7 +8,8 @@
  * Hard rules:
  * - Never persist hydrated tweet content to our DB. The link-preview subsystem may
  *   separately cache the bounded title, teaser, and cover image that X publishes for
- *   an Article linked by an archived tweet.
+ *   an Article linked by an archived tweet, or a video's poster thumbnail and
+ *   fixed label. Linked video previews never cache the source tweet's text.
  * - Never include hydrated tweet content in search results, profile listings, or any
  *   other query path. Avatar recovery is render-only and is never persisted.
  * - Caller decides whether to render with a "(from Twitter)" marker.
@@ -73,6 +74,7 @@ export interface SyndicatedTweet {
  */
 export async function fetchSyndicatedTweet(
   tweetId: string,
+  { signal }: { signal?: AbortSignal } = {},
 ): Promise<SyndicatedTweet | null> {
   if (!/^\d{5,}$/.test(tweetId)) return null
 
@@ -86,6 +88,7 @@ export async function fetchSyndicatedTweet(
     response = await fetch(url.toString(), {
       headers: { 'User-Agent': 'Mozilla/5.0 (community-archive hydration)' },
       next: { revalidate: 3600 },
+      signal,
     })
   } catch {
     return null

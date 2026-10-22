@@ -24,6 +24,7 @@ import TweetAvatarImage from '@/components/TweetAvatarImage'
 import ImageLightbox, { type LightboxImage } from '@/components/ImageLightbox'
 import TweetLikeButton from '@/components/TweetLikeButton'
 import TweetLikers from '@/components/TweetLikers'
+import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
 
 import type { TweetData, TweetMedia } from '@/lib/tweets/types'
 
@@ -683,6 +684,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       )}
 
       {renderMedia()}
+      {/https?:\/\//.test(tweet.full_text) && (
+        <TweetLinkPreviews tweetId={tweet.tweet_id} />
+      )}
       {renderQuotedTweet()}
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border pt-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">

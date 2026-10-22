@@ -97,3 +97,38 @@ test('waits for the viewport and shares concurrent requests for the same tweet',
     global.IntersectionObserver = OriginalObserver
   }
 })
+
+test('shows a linked video poster with a play indicator and opens X', async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        previews: [
+          {
+            urlHash: 'b'.repeat(64),
+            canonicalUrl:
+              'https://x.com/therealbuni/status/1781147654623297657/video/1',
+            title: 'Video on X',
+            description: 'Watch this video on X.',
+            imageUrl: 'https://pbs.twimg.com/poster.jpg',
+            siteName: 'X',
+            isXArticle: false,
+            isVideo: true,
+          },
+        ],
+      }),
+    ),
+  )
+  const { container } = render(<TweetLinkPreviews tweetId="12345" />)
+  const link = await screen.findByRole('link', { name: /Video on X/ })
+  expect(link).toHaveAttribute(
+    'href',
+    'https://x.com/therealbuni/status/1781147654623297657/video/1',
+  )
+  expect(link).toHaveAttribute('target', '_blank')
+  expect(container.querySelector('img')).toHaveAttribute(
+    'src',
+    `/api/link-preview/image?hash=${'b'.repeat(64)}`,
+  )
+  expect(container.querySelector('.aspect-video')).toBeInTheDocument()
+  expect(link.querySelector('svg')).toBeInTheDocument()
+})

@@ -1,8 +1,22 @@
+.intro {
+  position: relative;
+}
+.intro::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 24px;
+  right: 24px;
+  max-width: 1392px;
+  margin-inline: auto;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
 /* Keep the hero comfortable on short laptop screens. */
 @media (min-width: 768px) and (max-height: 740px) {
   .intro {
     padding-top: 40px;
-    padding-bottom: 40px;
+    padding-bottom: 64px;
   }
   .content > * + * {
     margin-top: 12px !important;

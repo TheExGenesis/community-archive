@@ -65,7 +65,7 @@ export default async function ClassicHomepage({
   return (
     <main>
       <section
-        className={`${styles.intro} overflow-hidden border-b border-border bg-card py-12 dark:bg-background md:py-16`}
+        className={`${styles.intro} overflow-hidden bg-card pb-[72px] pt-12 dark:bg-background md:pb-[88px] md:pt-16`}
       >
         <div
           className={`${styles.content} relative z-10 mx-auto w-full max-w-5xl space-y-6 px-4 text-center sm:px-6 md:space-y-8 lg:px-8`}

@@ -4,6 +4,11 @@ import ClassicHomepage from './ClassicHomepage'
 import type { HomepageData } from '@/lib/portal/data'
 import { createServerClient } from '@/utils/supabase'
 
+jest.mock('./ExploreArchivePill', () => ({
+  __esModule: true,
+  default: () => <a href="#community-map">Explore the archive ↓</a>,
+}))
+
 jest.mock('./classicHomepage.module.css', () => ({}))
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(() => ({})) }))

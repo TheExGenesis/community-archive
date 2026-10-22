@@ -1,8 +1,8 @@
-/* Leave a glimpse of the map on short laptop screens, including the guest CTA. */
+/* Keep the hero comfortable on short laptop screens. */
 @media (min-width: 768px) and (max-height: 740px) {
   .intro {
-    padding-top: 16px;
-    padding-bottom: 16px;
+    padding-top: 40px;
+    padding-bottom: 40px;
   }
   .content > * + * {
     margin-top: 12px !important;

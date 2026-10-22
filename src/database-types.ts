@@ -77,6 +77,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_search_runs: {
+        Row: {
+          account_id: string
+          answer: string | null
+          cited_tweet_ids: string[]
+          completed_at: string | null
+          conversation_id: string | null
+          cost_usd: number
+          deleted_at: string | null
+          error: string | null
+          id: string
+          input_tokens: number
+          invalid_citation_ids: string[]
+          key_source: string
+          model: string
+          output_tokens: number
+          parts: Json | null
+          question: string
+          started_at: string
+          status: string
+          tool_calls: Json
+          workflow_run_id: string | null
+        }
+        Insert: {
+          account_id: string
+          answer?: string | null
+          cited_tweet_ids?: string[]
+          completed_at?: string | null
+          conversation_id?: string | null
+          cost_usd?: number
+          deleted_at?: string | null
+          error?: string | null
+          id: string
+          input_tokens?: number
+          invalid_citation_ids?: string[]
+          key_source?: string
+          model: string
+          output_tokens?: number
+          parts?: Json | null
+          question: string
+          started_at?: string
+          status: string
+          tool_calls?: Json
+          workflow_run_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          answer?: string | null
+          cited_tweet_ids?: string[]
+          completed_at?: string | null
+          conversation_id?: string | null
+          cost_usd?: number
+          deleted_at?: string | null
+          error?: string | null
+          id?: string
+          input_tokens?: number
+          invalid_citation_ids?: string[]
+          key_source?: string
+          model?: string
+          output_tokens?: number
+          parts?: Json | null
+          question?: string
+          started_at?: string
+          status?: string
+          tool_calls?: Json
+          workflow_run_id?: string | null
+        }
+        Relationships: []
+      }
       all_account: {
         Row: {
           account_display_name: string
@@ -1956,6 +2025,30 @@ export type Database = {
           p_blocked: boolean
         }
         Returns: undefined
+      }
+      agent_search_add_usage: {
+        Args: {
+          p_run_id: string
+          p_input_tokens: number
+          p_output_tokens: number
+          p_cost_usd: number
+        }
+        Returns: undefined
+      }
+      agent_search_admit: {
+        Args: {
+          p_run_id: string
+          p_account_id: string
+          p_conversation_id: string
+          p_question: string
+          p_model: string
+          p_daily_limit: number
+          p_global_daily_usd: number
+          p_stale_after_seconds: number
+          p_key_source: string
+          p_monthly_limit: number
+        }
+        Returns: string
       }
       apply_public_entities_rls_policies: {
         Args: {

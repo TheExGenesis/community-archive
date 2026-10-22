@@ -7,12 +7,15 @@ import { createContext, useContext, useEffect, useState } from 'react'
 type NavigationAudience = {
   isMember: boolean
   isAdmin: boolean
+  /** Ask the archive is taking questions (not paused). */
+  askEnabled: boolean
   localPreview?: 'admin' | 'signed-out' | null
 }
 
 const PUBLIC_AUDIENCE: NavigationAudience = {
   isMember: false,
   isAdmin: false,
+  askEnabled: true,
 }
 
 const NavigationAudienceContext =
@@ -41,6 +44,7 @@ export function NavigationAudienceProvider({
         setAudience({
           isMember: nextAudience.isMember === true,
           isAdmin: nextAudience.isAdmin === true,
+          askEnabled: nextAudience.askEnabled !== false,
           localPreview: nextAudience.localPreview ?? null,
         })
       })

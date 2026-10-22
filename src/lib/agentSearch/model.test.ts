@@ -1,0 +1,374 @@
+// The providers are ESM-only; these tests never build a provider model.
+jest.mock('@ai-sdk/openai', () => ({ createOpenAI: jest.fn() }))
+jest.mock('@ai-sdk/openai-compatible', () => ({
+  createOpenAICompatible: jest.fn(),
+}))
+
+import { createOpenAI } from '@ai-sdk/openai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import {
+  EnvLanguageModel,
+  MODEL_PRICES_USD_PER_MTOK,
+  estimateModelCostUsd,
+  parseModelSpec,
+  readModelCallUsage,
+  resolveModelPrice,
+  setModelUsageRecorder,
+} from './model'
+import { sealOwnKey } from './ownKey'
+
+const mockRecordModelUsage = jest.fn()
+
+describe('agent search model', () => {
+  test('parses provider:model specs', () => {
+    expect(parseModelSpec('openrouter:anthropic/claude-sonnet-5.5')).toEqual({
+      provider: 'openrouter',
+      modelId: 'anthropic/claude-sonnet-5.5',
+    })
+    expect(() => parseModelSpec('gpt-6.1-sol')).toThrow()
+    expect(() => parseModelSpec('anthropic:claude')).toThrow()
+  })
+
+  test('serializes as its spec only, never provider config or keys', () => {
+    const serialize = (EnvLanguageModel as any)[
+      Symbol.for('workflow-serialize')
+    ]
+    const deserialize = (EnvLanguageModel as any)[
+      Symbol.for('workflow-deserialize')
+    ]
+    const data = serialize(new EnvLanguageModel('openai:gpt-6.1-sol'))
+    expect(data).toEqual({ spec: 'openai:gpt-6.1-sol' })
+    expect(deserialize(data)).toBeInstanceOf(EnvLanguageModel)
+  })
+
+  test('prices listed models, with cached input at the cached rate', () => {
+    expect(
+      estimateModelCostUsd('openai:gpt-6.1-sol', {
+        inputTokens: 1_000_000,
+        cachedInputTokens: 500_000,
+        outputTokens: 100_000,
+      }),
+    ).toBeCloseTo(0.5 * 2 + 0.5 * 0.1 + 0.1 * 10)
+  })
+
+  test('an unpriced model has no price and cannot be estimated', () => {
+    expect(resolveModelPrice('openrouter:x/y')).toBeNull()
+    // Both input and output are needed.
+    expect(resolveModelPrice('openrouter:x/y', { input: '3' })).toBeNull()
+    expect(() =>
+      estimateModelCostUsd('openrouter:x/y', { inputTokens: 1e6 }),
+    ).toThrow('No price')
+    expect(
+      estimateModelCostUsd(
+        'openrouter:x/y',
+        { inputTokens: 1e6, cachedInputTokens: 5e5, outputTokens: 1e6 },
+        { input: '3', output: '15' },
+      ),
+    ).toBeCloseTo(1.5 + 1.5 + 15)
+  })
+
+  test('rejects malformed, negative or non-finite env prices', () => {
+    for (const bad of ['abc', '-1', 'Infinity', 'NaN']) {
+      expect(() =>
+        resolveModelPrice('openai:gpt-6.1-sol', { input: bad }),
+      ).toThrow('Invalid input price')
+    }
+    expect(() =>
+      resolveModelPrice('openai:gpt-6.1-sol', { output: '-0.5' }),
+    ).toThrow('Invalid output price')
+    // Blank means unset.
+    expect(resolveModelPrice('openai:gpt-6.1-sol', { input: ' ' })).toEqual(
+      MODEL_PRICES_USD_PER_MTOK['openai:gpt-6.1-sol'],
+    )
+  })
+
+  test('an input override also prices cached input unless that is set', () => {
+    expect(resolveModelPrice('openai:gpt-6.1-sol', { input: '4' })).toEqual({
+      input: 4,
+      cachedInput: 4,
+      output: 10,
+    })
+    expect(
+      resolveModelPrice('openai:gpt-6.1-sol', {
+        input: '4',
+        cachedInput: '0.4',
+      }),
+    ).toEqual({ input: 4, cachedInput: 0.4, output: 10 })
+  })
+
+  test('reads V4 nested and older flat usage', () => {
+    expect(
+      readModelCallUsage({
+        inputTokens: { total: 100, noCache: 60, cacheRead: 40 },
+        outputTokens: { total: 7, text: 5, reasoning: 2 },
+      }),
+    ).toEqual({ inputTokens: 100, cachedInputTokens: 40, outputTokens: 7 })
+    expect(
+      readModelCallUsage({
+        inputTokens: 10,
+        cachedInputTokens: 3,
+        outputTokens: 2,
+      }),
+    ).toEqual({ inputTokens: 10, cachedInputTokens: 3, outputTokens: 2 })
+    expect(readModelCallUsage(undefined)).toEqual({
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+    })
+  })
+})
+
+describe('EnvLanguageModel usage recording', () => {
+  const serialize = (EnvLanguageModel as any)[Symbol.for('workflow-serialize')]
+  const deserialize = (EnvLanguageModel as any)[
+    Symbol.for('workflow-deserialize')
+  ]
+
+  beforeEach(() => {
+    mockRecordModelUsage.mockReset().mockResolvedValue(undefined)
+    setModelUsageRecorder(mockRecordModelUsage)
+    ;(createOpenAI as jest.Mock).mockReset()
+    process.env.OPENAI_API_KEY = 'test-key'
+  })
+
+  afterEach(() => {
+    setModelUsageRecorder(null)
+    delete process.env.OPENAI_API_KEY
+  })
+
+  const providerStreaming = (parts: unknown[]) => {
+    const doStream = jest.fn().mockResolvedValue({
+      stream: new ReadableStream({
+        start(controller) {
+          parts.forEach((part) => controller.enqueue(part))
+          controller.close()
+        },
+      }),
+    })
+    ;(createOpenAI as jest.Mock).mockReturnValue(() => ({ doStream }))
+  }
+
+  const drain = async (stream: ReadableStream<unknown>) => {
+    const parts: unknown[] = []
+    const reader = stream.getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) return parts
+      parts.push(value)
+    }
+  }
+
+  test('carries the run id across steps, still without keys', () => {
+    const data = serialize(new EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1'))
+    expect(data).toEqual({ spec: 'openai:gpt-6.1-sol', runId: 'wrun_1' })
+    expect(deserialize(data).runId).toBe('wrun_1')
+  })
+
+  test('records a streamed call’s usage on its run when the call finishes', async () => {
+    const usage = {
+      inputTokens: { total: 1000, cacheRead: 200 },
+      outputTokens: { total: 50 },
+    }
+    providerStreaming([
+      { type: 'text-delta', delta: 'hi' },
+      { type: 'finish', usage, finishReason: 'stop' },
+    ])
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1')
+    const result = await model.doStream({})
+    const parts = await drain(result.stream)
+    expect(parts).toHaveLength(2)
+    expect(mockRecordModelUsage).toHaveBeenCalledWith(
+      'wrun_1',
+      'openai:gpt-6.1-sol',
+      { inputTokens: 1000, cachedInputTokens: 200, outputTokens: 50 },
+      expect.objectContaining({ finishReason: 'stop', reasoningTokens: 0 }),
+    )
+  })
+
+  test('reads who served an OpenRouter call and what it cost, then drops the raw chunks', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    const doStream = jest.fn().mockResolvedValue({
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'raw',
+            rawValue: { provider: 'DeepInfra' },
+          })
+          controller.enqueue({ type: 'text-delta', delta: 'hi' })
+          controller.enqueue({
+            type: 'raw',
+            rawValue: { provider: 'DeepInfra', usage: { cost: 0.00042 } },
+          })
+          controller.enqueue({
+            type: 'finish',
+            usage: {
+              inputTokens: { total: 1000, cacheRead: 0 },
+              outputTokens: { total: 80, reasoning: 30 },
+            },
+            finishReason: { unified: 'stop', raw: 'stop' },
+          })
+          controller.close()
+        },
+      }),
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({ doStream }))
+    const model = new EnvLanguageModel(
+      'openrouter:deepseek/deepseek-v4.1-flash',
+      'wrun_1',
+    )
+    const parts = await drain((await model.doStream({})).stream)
+    expect(doStream).toHaveBeenCalledWith({ includeRawChunks: true })
+    expect(parts.map((part: any) => part.type)).toEqual([
+      'text-delta',
+      'finish',
+    ])
+    expect(mockRecordModelUsage).toHaveBeenCalledWith(
+      'wrun_1',
+      'openrouter:deepseek/deepseek-v4.1-flash',
+      { inputTokens: 1000, cachedInputTokens: 0, outputTokens: 80 },
+      expect.objectContaining({
+        finishReason: 'stop',
+        reasoningTokens: 30,
+        servedBy: 'DeepInfra',
+        providerCostUsd: 0.00042,
+      }),
+    )
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  test('records nothing without a run id', async () => {
+    providerStreaming([{ type: 'finish', usage: {}, finishReason: 'stop' }])
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol')
+    await drain((await model.doStream({})).stream)
+    expect(mockRecordModelUsage).not.toHaveBeenCalled()
+  })
+
+  test('fails closed when no recorder is registered', async () => {
+    setModelUsageRecorder(null)
+    providerStreaming([{ type: 'finish', usage: {}, finishReason: 'stop' }])
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1')
+    await expect(drain((await model.doStream({})).stream)).rejects.toThrow(
+      'not registered',
+    )
+  })
+
+  test('a failed usage write fails the call', async () => {
+    mockRecordModelUsage.mockRejectedValue(new Error('store down'))
+    providerStreaming([{ type: 'finish', usage: {}, finishReason: 'stop' }])
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1')
+    await expect(drain((await model.doStream({})).stream)).rejects.toThrow(
+      'store down',
+    )
+  })
+})
+
+test('the usage recorder survives this module being evaluated again', async () => {
+  const recorder = jest.fn().mockResolvedValue(undefined)
+  setModelUsageRecorder(recorder)
+  let fresh: typeof import('./model') | undefined
+  jest.isolateModules(() => {
+    fresh = jest.requireActual('./model') as typeof import('./model')
+  })
+  const doStream = jest.fn().mockResolvedValue({
+    stream: new ReadableStream({
+      start(controller) {
+        controller.enqueue({ type: 'finish', usage: {}, finishReason: 'stop' })
+        controller.close()
+      },
+    }),
+  })
+  ;(createOpenAI as jest.Mock).mockReturnValue(() => ({ doStream }))
+  process.env.OPENAI_API_KEY = 'test-key'
+  const model = new fresh!.EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1')
+  const reader = (await model.doStream({})).stream.getReader()
+  while (!(await reader.read()).done);
+  expect(recorder).toHaveBeenCalled()
+  setModelUsageRecorder(null)
+  delete process.env.OPENAI_API_KEY
+})
+
+describe('EnvLanguageModel on a member’s own key', () => {
+  const KEY = `sk-or-v1-${'c3'.repeat(32)}`
+  const SECRET = 'a server secret that is long enough to use'
+  const SPEC = 'openrouter:deepseek/deepseek-v4.1-flash'
+  const serialize = (EnvLanguageModel as any)[Symbol.for('workflow-serialize')]
+  const deserialize = (EnvLanguageModel as any)[
+    Symbol.for('workflow-deserialize')
+  ]
+  const recorder = jest.fn()
+
+  beforeEach(() => {
+    recorder.mockReset().mockResolvedValue(undefined)
+    setModelUsageRecorder(recorder)
+    ;(createOpenAICompatible as jest.Mock).mockReset()
+    process.env.AGENT_SEARCH_KEY_SECRET = SECRET
+    process.env.OPENROUTER_API_KEY = 'house-key'
+  })
+
+  afterEach(() => {
+    setModelUsageRecorder(null)
+    delete process.env.AGENT_SEARCH_KEY_SECRET
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  const streamOf = (parts: unknown[]) =>
+    new ReadableStream({
+      start(controller) {
+        parts.forEach((part) => controller.enqueue(part))
+        controller.close()
+      },
+    })
+
+  test('crosses steps sealed, and calls OpenRouter with the member’s key, not the house’s', async () => {
+    const sealed = await sealOwnKey(KEY, 'asr_1', SECRET)
+    const data = serialize(new EnvLanguageModel(SPEC, 'asr_1', sealed))
+    expect(data).toEqual({ spec: SPEC, runId: 'asr_1', sealedKey: sealed })
+    expect(JSON.stringify(data)).not.toContain(KEY)
+
+    const doStream = jest.fn().mockResolvedValue({
+      stream: streamOf([
+        {
+          type: 'finish',
+          usage: { inputTokens: { total: 10 }, outputTokens: { total: 2 } },
+          finishReason: 'stop',
+        },
+      ]),
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({ doStream }))
+    const model = deserialize(data)
+    const reader = (await model.doStream({})).stream.getReader()
+    while (!(await reader.read()).done);
+    expect(createOpenAICompatible).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: KEY }),
+    )
+    // Its usage is recorded as the member's, which keeps it off house spend.
+    expect(recorder).toHaveBeenCalledWith(
+      'asr_1',
+      SPEC,
+      expect.anything(),
+      expect.objectContaining({ ownKey: true }),
+    )
+  })
+
+  test('a refusal by OpenRouter says what is wrong with the key', async () => {
+    const sealed = await sealOwnKey(KEY, 'asr_1', SECRET)
+    const refusal = Object.assign(new Error('Payment Required'), {
+      statusCode: 402,
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({
+      doStream: jest.fn().mockRejectedValue(refusal),
+    }))
+    await expect(
+      new EnvLanguageModel(SPEC, 'asr_1', sealed).doStream({}),
+    ).rejects.toThrow('Your OpenRouter key has no credit left.')
+  })
+
+  test('without the sealing secret, nothing is called at all', async () => {
+    const sealed = await sealOwnKey(KEY, 'asr_1', SECRET)
+    delete process.env.AGENT_SEARCH_KEY_SECRET
+    await expect(
+      new EnvLanguageModel(SPEC, 'asr_1', sealed).doStream({}),
+    ).rejects.toThrow('Using your own key is not available right now.')
+    expect(createOpenAICompatible).not.toHaveBeenCalled()
+  })
+})

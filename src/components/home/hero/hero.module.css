@@ -114,6 +114,9 @@
   cursor: pointer;
   padding: 2px;
 }
+.country[data-details='true'] {
+  font-weight: 700;
+}
 .country:hover {
   text-decoration: underline;
   color: hsl(var(--brand-deep));

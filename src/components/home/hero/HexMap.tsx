@@ -82,6 +82,7 @@ export default memo(function HexMap({
   const dark = resolvedTheme === 'dark'
   const geo = useMemo(() => geometry(snapshot), [snapshot])
   const camera = useMapCamera(geo.bounds, size.width, size.height)
+  const showDetails = camera.camera.zoom >= 1.5
   const pendingClick = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelPendingClick = () => {
     if (pendingClick.current !== null) clearTimeout(pendingClick.current)
@@ -165,8 +166,8 @@ export default memo(function HexMap({
     }
   }, [camera.ref])
 
-  // Rasterize the static layer only when its actual inputs change, never on
-  // pointer movement, label layout, pan, zoom, or tweet hover.
+  // Rasterize only when layer inputs or the zoom detail threshold change,
+  // never for individual pan/zoom frames, label layout, or tweet hover.
   useEffect(() => {
     const buffer = bufferRef.current ?? document.createElement('canvas')
     bufferRef.current = buffer
@@ -202,7 +203,7 @@ export default memo(function HexMap({
           dark ? '#18181b' : '#ffffff',
           Math.max(0, 0.4 - Math.log1p(c.activity) * 0.18),
         )
-        if (c.archived > 0) fill = mix(fill, '#303038', 0.1)
+        if (showDetails && c.archived > 0) fill = mix(fill, '#303038', 0.1)
       } else if (heat ? heat.get(id) : c.archived) {
         const strength = Math.min(
           1,
@@ -245,7 +246,7 @@ export default memo(function HexMap({
     }
     setBase(buffer)
     setBaseRevision((n) => n + 1)
-  }, [geo, snapshot, layer, focus, dark, heat])
+  }, [geo, snapshot, layer, focus, dark, heat, showDetails])
 
   useEffect(() => {
     void baseRevision
@@ -333,7 +334,7 @@ export default memo(function HexMap({
             Number(selectedRegions.has(a.id)) || totals[b.id] - totals[a.id],
       )
       .map((r) => {
-        ctx.font = `600 12px ${fontFamily}`
+        ctx.font = `${showDetails ? 700 : 500} 12px ${fontFamily}`
         const text =
           camera.camera.zoom >= 2.2 &&
           ctx.measureText(r.name).width + 26 <= size.width
@@ -349,7 +350,7 @@ export default memo(function HexMap({
         }
       })
     // Keep the overview readable; reveal signature phrases after zooming in.
-    if (camera.camera.zoom >= 1.5) {
+    if (showDetails) {
       for (const c of [...(snapshot.clusters ?? [])].sort(
         (a, b) => b.size - a.size,
       )) {
@@ -383,7 +384,7 @@ export default memo(function HexMap({
     return placeLabels(
       candidates,
       (text, size) => {
-        ctx.font = `600 ${size}px ${fontFamily}`
+        ctx.font = `${showDetails ? 700 : 600} ${size}px ${fontFamily}`
         return ctx.measureText(text).width
       },
       size.width,
@@ -392,6 +393,7 @@ export default memo(function HexMap({
   }, [
     snapshot,
     camera.camera.zoom,
+    showDetails,
     t.scale,
     t.x,
     t.y,
@@ -472,7 +474,7 @@ export default memo(function HexMap({
       people,
       labels,
       (text, fontSize) => {
-        ctx.font = `600 ${fontSize}px ${fontFamily}`
+        ctx.font = `${showDetails ? 700 : 600} ${fontSize}px ${fontFamily}`
         return ctx.measureText(text).width
       },
       size.width,
@@ -487,6 +489,7 @@ export default memo(function HexMap({
     t.x,
     t.y,
     labels,
+    showDetails,
     size,
     camera.ref,
   ])
@@ -559,6 +562,7 @@ export default memo(function HexMap({
               key={`r${l.region}`}
               type="button"
               className={styles.country}
+              data-details={showDetails}
               style={{
                 left: l.x,
                 top: l.y,

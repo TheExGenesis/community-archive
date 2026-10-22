@@ -64,6 +64,7 @@ for region in cut['regions']:
     regions.append({**{k: region[k] for k in keys}, 'x': cells[anchor]['x'], 'y': cells[anchor]['y'], 'color': colour})
 # Editorial display names are independent of the source cut's terminology.
 for region in regions:
+    region['name'] = region['name'].removesuffix(' (eigenrobot, aella)')
     if region['short'] == '#keep4o':
         region['name'] = region['short'] = 'AI companions'
     elif region['short'] == 'PL & hardware':

@@ -203,7 +203,7 @@ export default memo(function HexMap({
           dark ? '#18181b' : '#ffffff',
           Math.max(0, 0.4 - Math.log1p(c.activity) * 0.18),
         )
-        if (showDetails && c.archived > 0) fill = mix(fill, '#303038', 0.1)
+        if (showDetails && c.archived === 0) fill = mix(fill, '#303038', 0.15)
       } else if (heat ? heat.get(id) : c.archived) {
         const strength = Math.min(
           1,

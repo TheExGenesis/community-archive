@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { SectionReady } from '@/components/PagePerformance'
-import HomepageSearch from '@/components/HomepageSearch'
+import { useArchiveSearch } from '@/components/ArchiveSearchProvider'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapLookup } from '@/lib/hexMap/gateway'
 import type { MapStory } from '@/lib/hexMap/stories'
@@ -25,13 +25,7 @@ const HexMap = dynamic(() => import('./HexMap'), {
 })
 const emptyCells: number[] = []
 
-export default function HexHero({
-  stats,
-  trends,
-}: {
-  stats: ReactNode
-  trends: ReactNode
-}) {
+export default function HexHero({ stats }: { stats: ReactNode }) {
   useEffect(() => {
     void import('./HexMap')
   }, [])
@@ -54,15 +48,14 @@ export default function HexHero({
     staleTime: Infinity,
     retry: false,
   })
-  const [expression, setExpression] = useState('')
-  const [trend, setTrend] = useState('')
-  const [pinnedTrend, setPinnedTrend] = useState('')
+  const { query: expression, setQuery: setExpression } = useArchiveSearch()
+  useEffect(() => setSelfLocation(null), [expression])
   const [debouncedExpression, setDebouncedExpression] = useState('')
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedExpression(expression), 450)
     return () => clearTimeout(timer)
   }, [expression])
-  const preview = trend || pinnedTrend || debouncedExpression
+  const preview = debouncedExpression
   const anchor = preview.match(/(?:^|\s)from:@?(\w{1,15})(?:$|\s)/i)?.[1] ?? ''
   const term = anchor ? '' : preview.trim().slice(0, 80)
   const pins = useQuery({
@@ -139,44 +132,6 @@ export default function HexHero({
   return (
     <section className={styles.hero} aria-label="Explore the Community Archive">
       <h1 className="sr-only">Community Archive</h1>
-      <div
-        className={styles.strip}
-        onClickCapture={(e) => {
-          const value = (e.target as HTMLElement).closest<HTMLElement>(
-            '[data-map-term]',
-          )?.dataset.mapTerm
-          if (!value || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-          e.preventDefault()
-          setPinnedTrend(value)
-          setTrend('')
-        }}
-        onMouseOver={(e) =>
-          setTrend(
-            (e.target as HTMLElement).closest<HTMLElement>('[data-map-term]')
-              ?.dataset.mapTerm ?? '',
-          )
-        }
-        onMouseLeave={() => setTrend('')}
-        onFocus={(e) =>
-          setTrend(
-            (e.target as HTMLElement).closest<HTMLElement>('[data-map-term]')
-              ?.dataset.mapTerm ?? '',
-          )
-        }
-        onBlur={() => setTrend('')}
-      >
-        <div className={styles.search}>
-          <HomepageSearch
-            compact
-            onPreview={(value) => {
-              setPinnedTrend('')
-              setExpression(value)
-              setSelfLocation(null)
-            }}
-          />
-        </div>
-        {trends}
-      </div>
       <ResizableHero>
         <div className={styles.mapColumn}>
           {map.data ? (
@@ -218,8 +173,6 @@ export default function HexHero({
                 }
                 onRetryHeat={() => heat.refetch()}
                 onClearHeat={() => {
-                  setTrend('')
-                  setPinnedTrend('')
                   setExpression('')
                   setDebouncedExpression('')
                 }}

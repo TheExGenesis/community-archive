@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
 import HexHero from './hero/HexHero'
-import HeroTrends from './hero/HeroTrends'
 import FeaturedCommunityApps from './FeaturedCommunityApps'
 import Testimonials from '@/components/home/Testimonials'
 import type { HomepageData } from '@/lib/portal/data'
@@ -67,11 +66,6 @@ export default async function ClassicHomepage({
         stats={
           <Suspense fallback={<>Preserving public conversations.</>}>
             <HomepageStats data={data.globalStats} />
-          </Suspense>
-        }
-        trends={
-          <Suspense fallback={null}>
-            <HeroTrends data={data.trends} />
           </Suspense>
         }
       />

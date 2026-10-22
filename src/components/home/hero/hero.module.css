@@ -3,21 +3,6 @@
   margin: auto;
   padding: 8px 24px 16px;
 }
-.strip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  white-space: nowrap;
-  font-size: 12px;
-  min-height: 44px;
-  margin-bottom: 8px;
-}
-.search {
-  flex: 0 1 360px;
-  min-width: 220px;
-  position: relative;
-  z-index: 20;
-}
 .mapColumn {
   min-width: 0;
 }
@@ -57,7 +42,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: calc(100svh - 146px);
+  height: calc(100svh - 94px);
   min-height: 420px;
   cursor: col-resize;
   touch-action: none;
@@ -84,7 +69,7 @@
   border-radius: 16px;
   overflow: hidden;
   background: hsl(var(--muted));
-  height: calc(100svh - 146px);
+  height: calc(100svh - 94px);
   min-height: 420px;
   isolation: isolate;
 }
@@ -215,7 +200,7 @@
   box-shadow: 0 2px 10px #0001;
 }
 .panel {
-  height: calc(100svh - 146px);
+  height: calc(100svh - 94px);
   min-height: 420px;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -412,11 +397,6 @@
   color: hsl(var(--muted-foreground));
   border-bottom: 1px solid hsl(var(--border));
 }
-@media (max-width: 1100px) {
-  .search {
-    flex-basis: 280px;
-  }
-}
 @media (max-width: 979px) {
   .hero {
     padding: 8px 12px 16px;
@@ -435,12 +415,6 @@
   .panel {
     height: 560px;
     min-height: 0;
-  }
-  .strip {
-    gap: 8px;
-  }
-  .search {
-    flex-basis: 320px;
   }
   .hint {
     font-size: 9px;

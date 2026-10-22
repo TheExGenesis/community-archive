@@ -177,8 +177,10 @@ export default memo(function HexMap({
       .sort((a, b) => a - b)
     const p98 = shares[Math.floor(shares.length * 0.98)] || 1
     snapshot.cells.forEach((c, id) => {
-      const color =
+      const paletteColor =
         snapshot.regions.find((r) => r.id === c.region)?.color ?? '#888888'
+      // A shared warm gray brings the hues closer without merging split regions.
+      const color = mix(paletteColor, '#b6b3ae', 0.25)
       const focused = !focus.size || focus.has(c.region)
       let fill = mix(color, dark ? '#252530' : '#ffffff', dark ? 0.15 : 0.27)
       if (layer === 'week' && !heat)

@@ -107,7 +107,7 @@
 .country {
   pointer-events: auto;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   color: hsl(var(--foreground));
   background: transparent;
   border: 0;

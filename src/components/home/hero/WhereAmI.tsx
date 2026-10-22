@@ -1,5 +1,7 @@
 'use client'
 import Link from 'next/link'
+import { usePreviewSession } from '@/components/PreviewSession'
+import type { MapLookup } from '@/lib/hexMap/gateway'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { createBrowserClient } from '@/utils/supabase'
@@ -20,6 +22,7 @@ export default function WhereAmI({
 }: {
   onLocated: (person: SelfLocation | null) => void
 }) {
+  const { enabled: preview } = usePreviewSession()
   const [name, setName] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [busy, setBusy] = useState(false)
@@ -39,33 +42,63 @@ export default function WhereAmI({
     callback.current(null)
   }, [cancel])
 
-  const locate = useCallback(async (query = '') => {
-    pending.current?.abort()
-    const controller = new AbortController()
-    pending.current = controller
-    const request = ++generation.current
-    setBusy(true)
-    setResult(null)
-    callback.current(null)
-    try {
-      const response = await fetch(
-        mapUrl(`me?name=${encodeURIComponent(query)}`),
-        { signal: controller.signal, cache: 'no-store' },
-      )
-      const data = (await response.json()) as Result
-      if (request !== generation.current) return
-      if (response.ok && data.status === 'located' && data.person) {
-        callback.current(data.person)
-        setName(`@${data.person.username}`)
+  const locate = useCallback(
+    async (query = '') => {
+      const handle = query.trim().replace(/^@/, '')
+      if (preview && !/^\w{1,15}$/.test(handle)) {
+        cancel()
+        setBusy(false)
+        callback.current(null)
+        setResult({ error: 'Enter a username to find on the map.' })
+        return
       }
-      setResult(data)
-    } catch {
-      if (request === generation.current && !controller.signal.aborted)
-        setResult({ error: 'Could not find your location. Please try again.' })
-    } finally {
-      if (request === generation.current) setBusy(false)
-    }
-  }, [])
+      pending.current?.abort()
+      const controller = new AbortController()
+      pending.current = controller
+      const request = ++generation.current
+      setBusy(true)
+      setResult(null)
+      callback.current(null)
+      try {
+        const response = await fetch(
+          mapUrl(
+            `${preview ? 'lookup' : 'me'}?name=${encodeURIComponent(preview ? handle : query)}`,
+          ),
+          { signal: controller.signal, cache: 'no-store' },
+        )
+        const payload = await response.json()
+        const person =
+          preview && response.ok
+            ? (payload as MapLookup).people.find(
+                (p) => p.username.toLowerCase() === handle.toLowerCase(),
+              )
+            : undefined
+        const data: Result =
+          preview && response.ok
+            ? person
+              ? {
+                  status: 'located',
+                  person: { username: person.username, cell: person.cell },
+                }
+              : { error: 'This username is not available on the map.' }
+            : payload
+        if (request !== generation.current) return
+        if (response.ok && data.status === 'located' && data.person) {
+          callback.current(data.person)
+          setName(`@${data.person.username}`)
+        }
+        setResult(data)
+      } catch {
+        if (request === generation.current && !controller.signal.aborted)
+          setResult({
+            error: 'Could not find your location. Please try again.',
+          })
+      } finally {
+        if (request === generation.current) setBusy(false)
+      }
+    },
+    [preview, cancel],
+  )
 
   useEffect(() => {
     let account: string | null | undefined
@@ -119,7 +152,9 @@ export default function WhereAmI({
     <div className={styles.finder}>
       <form
         role="search"
-        aria-label="Find yourself on the map"
+        aria-label={
+          preview ? 'Find a username on the map' : 'Find yourself on the map'
+        }
         className={styles.finderForm}
         onSubmit={(event) => {
           event.preventDefault()
@@ -127,8 +162,8 @@ export default function WhereAmI({
         }}
       >
         <input
-          aria-label="Where am I?"
-          placeholder="Where am I?"
+          aria-label={preview ? 'Find username' : 'Where am I?'}
+          placeholder={preview ? 'Find any username…' : 'Where am I?'}
           value={name}
           maxLength={16}
           autoComplete="off"
@@ -153,7 +188,9 @@ export default function WhereAmI({
             {busy
               ? 'Finding your place…'
               : result?.status === 'located'
-                ? `You are here, @${result.person?.username}.`
+                ? preview
+                  ? `@${result.person?.username} is here.`
+                  : `You are here, @${result.person?.username}.`
                 : result?.error}
           </div>
           {!busy && result?.status === 'sign_in' && (

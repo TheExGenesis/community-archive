@@ -1,3 +1,4 @@
+import { PreviewHeroActions } from '@/components/PreviewSession'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
@@ -88,15 +89,42 @@ export default async function ClassicHomepage({
             </p>
           </div>
 
-          {showCta ? (
-            <div className={`${styles.actions} !mt-7 md:!mt-8`}>
-              <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
-            </div>
-          ) : (
-            <div className="!mt-7 md:!mt-8">
-              <HomepageSearch />
-            </div>
-          )}
+          <PreviewHeroActions
+            actual={
+              showCta ? (
+                <div className={`${styles.actions} !mt-7 md:!mt-8`}>
+                  <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
+                </div>
+              ) : (
+                <div className="!mt-7 md:!mt-8">
+                  <HomepageSearch />
+                </div>
+              )
+            }
+            signedIn={
+              <div className="!mt-7 md:!mt-8">
+                <HomepageSearch />
+              </div>
+            }
+            signedOut={
+              <div
+                className={`${styles.actions} !mt-7 flex justify-center gap-4 md:!mt-8`}
+              >
+                <Link
+                  className="rounded-lg bg-brand px-6 py-2 text-white"
+                  href="/login?redirect=%2F%3Faction%3Doptin"
+                >
+                  Opt in
+                </Link>
+                <Link
+                  className="rounded-lg border px-6 py-2"
+                  href="#upload-archive"
+                >
+                  Upload archive
+                </Link>
+              </div>
+            }
+          />
 
           {/* The backers line is a footnote to the social proof above it. */}
           <div className="!mt-6 md:!mt-8">

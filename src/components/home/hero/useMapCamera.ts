@@ -74,9 +74,9 @@ export default function useMapCamera(
     moved,
     zoomAt,
     reset: () => update(initialCamera),
-    focus: (x: number, y: number) =>
+    focus: (x: number, y: number, minimumZoom = 2) =>
       update({
-        zoom: Math.max(2, cameraRef.current.zoom),
+        zoom: Math.min(8, Math.max(minimumZoom, cameraRef.current.zoom)),
         x: x - bounds.x - bounds.width / 2,
         y: y - bounds.y - bounds.height / 2,
       }),

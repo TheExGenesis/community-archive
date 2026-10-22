@@ -184,9 +184,17 @@
   scrollbar-width: thin;
   padding-right: 4px;
 }
-.tabs {
+.panelHeader {
   position: sticky;
   top: 0;
+  z-index: 6;
+  background: hsl(var(--background));
+  padding-bottom: 1px;
+}
+.panelHeader .tabs {
+  margin-bottom: 0;
+}
+.tabs {
   background: hsl(var(--background));
   z-index: 5;
   display: flex;
@@ -212,6 +220,11 @@
   padding-top: 24px;
 }
 .edition h2 {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: hsl(var(--background));
+  padding: 8px 0;
   font-weight: 700;
   color: hsl(var(--foreground));
   font-family: var(--font-petrona), Georgia, serif;
@@ -557,6 +570,10 @@
 }
 
 .feedControls {
+  position: sticky;
+  top: var(--panel-header-height, 0px);
+  z-index: 5;
+  background: hsl(var(--background));
   display: flex;
   align-items: center;
   gap: 8px;

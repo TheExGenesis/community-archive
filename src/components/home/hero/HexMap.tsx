@@ -10,6 +10,7 @@ import {
 import { useTheme } from 'next-themes'
 import {
   geometry,
+  initialCamera,
   hitCell,
   mix,
   placeLabels,
@@ -183,13 +184,14 @@ export default memo(function HexMap({
       const color = mix(paletteColor, '#b6b3ae', 0.25)
       const focused = !focus.size || focus.has(c.region)
       let fill = mix(color, dark ? '#252530' : '#ffffff', dark ? 0.15 : 0.27)
-      if (layer === 'week' && !heat)
+      if (layer === 'week' && !heat) {
         fill = mix(
           fill,
           dark ? '#18181b' : '#ffffff',
           Math.max(0, 0.4 - Math.log1p(c.activity) * 0.18),
         )
-      else if (heat ? heat.get(id) : c.archived) {
+        if (c.archived > 0) fill = mix(fill, '#303038', 0.1)
+      } else if (heat ? heat.get(id) : c.archived) {
         const strength = Math.min(
           1,
           Math.log1p(
@@ -544,7 +546,18 @@ export default memo(function HexMap({
                     c.region === l.region ? [id] : [],
                   ),
                 )
-                camera.focus(r.x, -r.y)
+                const overview = transform(
+                  geo.bounds,
+                  size.width,
+                  size.height,
+                  initialCamera,
+                )
+                // Reveal cell words as well as cluster phrases, even in narrow maps.
+                const wordZoom = Math.max(
+                  2.7,
+                  34 / (snapshot.radius * 2 * overview.scale),
+                )
+                camera.focus(r.x, -r.y, wordZoom)
               }}
             >
               {l.text}

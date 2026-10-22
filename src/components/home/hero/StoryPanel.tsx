@@ -56,6 +56,19 @@ export default function StoryPanel({
 }) {
   const panel = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLButtonElement>(null)
+  const header = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const element = header.current
+    if (!element) return
+    const observer = new ResizeObserver(() => {
+      panel.current?.style.setProperty(
+        '--panel-header-height',
+        `${element.getBoundingClientRect().height}px`,
+      )
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [open, selected.length])
   const queryClient = useQueryClient()
   const query = useMapFeed<StoryPage>(
     'stories?kind=digest',
@@ -138,19 +151,21 @@ export default function StoryPanel({
     >
       {open ? (
         <div className={styles.detail}>
-          <button
-            className={styles.back}
-            onClick={() => {
-              onOpen(null)
-              onTweetHover()
-            }}
-          >
-            ← Back to stories
-          </button>
-          <div className={styles.meta}>
-            {open.category} · {open.date.slice(0, 10)}
-          </div>
-          <h2>{open.title}</h2>
+          <header className={styles.panelHeader}>
+            <button
+              className={styles.back}
+              onClick={() => {
+                onOpen(null)
+                onTweetHover()
+              }}
+            >
+              ← Back to stories
+            </button>
+            <div className={styles.meta}>
+              {open.category} · {open.date.slice(0, 10)}
+            </div>
+            <h2>{open.title}</h2>
+          </header>
           <p className={styles.lead}>{open.subtitle}</p>
           <Link href={open.href} className={styles.detailLink}>
             Read the {open.kind === 'digest' ? 'story' : 'whole strand'} ↗
@@ -217,102 +232,104 @@ export default function StoryPanel({
         </div>
       ) : active ? (
         <>
-          <header className={styles.selection}>
-            <button className={styles.back} onClick={onClear}>
-              ← Back to browse
-            </button>
-            <h2>
-              {selected.length === 1
-                ? `Selected hexagon · ${regions[0]?.short ?? regions[0]?.name}`
-                : regions.length === 1
-                  ? regions[0].name
-                  : `${selected.length} selected cells`}
-            </h2>
-            <div className={styles.selectionSummary}>
+          <div ref={header} className={styles.panelHeader}>
+            <header className={styles.selection}>
+              <button className={styles.back} onClick={onClear}>
+                ← Back to browse
+              </button>
+              <h2>
+                {selected.length === 1
+                  ? `Selected hexagon · ${regions[0]?.short ?? regions[0]?.name}`
+                  : regions.length === 1
+                    ? regions[0].name
+                    : `${selected.length} selected cells`}
+              </h2>
+              <div className={styles.selectionSummary}>
+                <p>
+                  {active.archived.toLocaleString()} of{' '}
+                  {active.accounts.toLocaleString()} archived
+                  {coverageLive ? '' : ' · snapshot'}
+                </p>
+                {!!people.data?.people.length && (
+                  <TooltipProvider delayDuration={150}>
+                    <div
+                      className={styles.selectionAvatars}
+                      aria-label="Community members"
+                    >
+                      {people.data.people.slice(0, 6).map((person) => (
+                        <Tooltip key={person.account_id}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={'@' + person.username}
+                            >
+                              <Avatar className="h-6 w-6 border border-background">
+                                <AvatarImage
+                                  src={person.avatar ?? undefined}
+                                  alt=""
+                                />
+                                <AvatarFallback>
+                                  {person.username[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">
+                            @{person.username}
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  </TooltipProvider>
+                )}
+              </div>
               <p>
-                {active.archived.toLocaleString()} of{' '}
-                {active.accounts.toLocaleString()} archived
-                {coverageLive ? '' : ' · snapshot'}
+                {regions
+                  .flatMap((r) => r.terms)
+                  .filter(safeTerm)
+                  .slice(0, 5)
+                  .join(' · ')}
               </p>
-              {!!people.data?.people.length && (
-                <TooltipProvider delayDuration={150}>
-                  <div
-                    className={styles.selectionAvatars}
-                    aria-label="Community members"
+            </header>
+            <div
+              className={styles.tabs}
+              role="tablist"
+              aria-label="Selection content"
+            >
+              {['Stories', 'Bangers', 'Latest', 'Most liked', 'Strands'].map(
+                (label) => (
+                  <button
+                    role="tab"
+                    aria-selected={selectionTab === label}
+                    key={label}
+                    onMouseEnter={() =>
+                      void prefetchMapFeed(
+                        queryClient,
+                        selectionFeedPath(label, selectedIds),
+                        snapshot,
+                      )
+                    }
+                    onFocus={() =>
+                      void prefetchMapFeed(
+                        queryClient,
+                        selectionFeedPath(label, selectedIds),
+                        snapshot,
+                      )
+                    }
+                    onClick={() => {
+                      manualTabSelection.current = selectedIds
+                      onSelectionTab(label)
+                    }}
                   >
-                    {people.data.people.slice(0, 6).map((person) => (
-                      <Tooltip key={person.account_id}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label={'@' + person.username}
-                          >
-                            <Avatar className="h-6 w-6 border border-background">
-                              <AvatarImage
-                                src={person.avatar ?? undefined}
-                                alt=""
-                              />
-                              <AvatarFallback>
-                                {person.username[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          @{person.username}
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
-                  </div>
-                </TooltipProvider>
+                    {label === 'Stories'
+                      ? 'Digest'
+                      : label === 'Bangers'
+                        ? 'Best'
+                        : label}
+                  </button>
+                ),
               )}
             </div>
-            <p>
-              {regions
-                .flatMap((r) => r.terms)
-                .filter(safeTerm)
-                .slice(0, 5)
-                .join(' · ')}
-            </p>
-          </header>
-          <div
-            className={styles.tabs}
-            role="tablist"
-            aria-label="Selection content"
-          >
-            {['Stories', 'Bangers', 'Latest', 'Most liked', 'Strands'].map(
-              (label) => (
-                <button
-                  role="tab"
-                  aria-selected={selectionTab === label}
-                  key={label}
-                  onMouseEnter={() =>
-                    void prefetchMapFeed(
-                      queryClient,
-                      selectionFeedPath(label, selectedIds),
-                      snapshot,
-                    )
-                  }
-                  onFocus={() =>
-                    void prefetchMapFeed(
-                      queryClient,
-                      selectionFeedPath(label, selectedIds),
-                      snapshot,
-                    )
-                  }
-                  onClick={() => {
-                    manualTabSelection.current = selectedIds
-                    onSelectionTab(label)
-                  }}
-                >
-                  {label === 'Stories'
-                    ? 'Digest'
-                    : label === 'Bangers'
-                      ? 'Best'
-                      : label}
-                </button>
-              ),
-            )}
           </div>
           <SelectionFeed
             snapshot={snapshot}

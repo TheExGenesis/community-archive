@@ -1,5 +1,4 @@
 import ClassicHomepage from '@/components/home/ClassicHomepage'
-import HomepagePeople from '@/components/home/HomepagePeople'
 import { hasPendingOptInAction } from '@/lib/homepageAccess'
 import { getIsMember } from '@/lib/portal/auth'
 import { startHomepageData } from '@/lib/portal/data'
@@ -22,7 +21,7 @@ interface HomepageProps {
 
 export default async function Homepage({ searchParams }: HomepageProps = {}) {
   // Start the heavier portal request immediately, but do not hold the hero or
-  // curated people behind it. ClassicHomepage streams the data-dependent
+  // map behind it. ClassicHomepage streams the data-dependent
   // regions through their own Suspense boundaries.
   const data = startHomepageData()
   const isMember = await getIsMember()
@@ -32,7 +31,6 @@ export default async function Homepage({ searchParams }: HomepageProps = {}) {
       data={data}
       isMember={isMember}
       showCta={!isMember || hasPendingOptInAction(searchParams?.action)}
-      homepagePeople={<HomepagePeople />}
     />
   )
 }

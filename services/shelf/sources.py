@@ -6,9 +6,11 @@ below and must ship in community-archive-control-panel before this source is use
 Local development reads a local ClickHouse loaded from the public export, as a read-only user.
 """
 import base64
+import http.client
 import json
 import os
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -48,11 +50,77 @@ class LocalClickHouse:
             WHERE t.account_id = '{account_id}'
             ORDER BY t.tweet_id
             FORMAT JSONEachRow"""
-        request = urllib.request.Request(self.url, data=sql.encode(), method="POST",
+        return [_tweet(r) for r in self._rows(sql)]
+
+    def _rows(self, sql, **params):
+        query = urllib.parse.urlencode({f"param_{k}": v for k, v in params.items()})
+        request = urllib.request.Request(f"{self.url}/?{query}", data=sql.encode(), method="POST",
                                          headers={"Authorization": self.auth})
-        with urllib.request.urlopen(request, timeout=60) as response:
-            rows = [json.loads(line) for line in response.read().decode().splitlines() if line]
-        return [_tweet(r) for r in rows]
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return [json.loads(line) for line in response.read().decode().splitlines() if line]
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"ClickHouse {e.code}: {e.read().decode(errors='replace')[:500]}") from None
+
+    def echo_tweets(self, links, phrases):
+        """Every member's tweets that link to one of `links` (canonical, as view.canonical_url)
+        or contain one of `phrases` (lowercase words). The caller re-checks each match."""
+        rows = []
+
+        def by_links(batch):
+            videos = [k.removeprefix("youtube:") for k in batch if k.startswith("youtube:")]
+            pages = [k for k in batch if not k.startswith("youtube:")]
+            return self._rows(f"""
+                SELECT {ECHO_COLUMNS} FROM community_archive.export_tweets
+                WHERE arrayExists(u -> (
+                    replaceRegexpOne(replaceRegexpOne(lower(netloc(ifNull(u.2, ''))), '^www\\\\.', ''), '^m\\\\.', '')
+                      || lower(trimRight(path(ifNull(u.2, '')), '/'))) IN {{pages:Array(String)}}
+                  OR extractURLParameter(ifNull(u.2, ''), 'v') IN {{videos:Array(String)}}
+                  OR (domain(ifNull(u.2, '')) = 'youtu.be'
+                      AND trim(BOTH '/' FROM path(ifNull(u.2, ''))) IN {{videos:Array(String)}}), urls)
+                FORMAT JSONEachRow""", pages=_array(pages), videos=_array(videos))
+
+        def by_phrases(batch):
+            return self._rows(f"""
+                SELECT {ECHO_COLUMNS} FROM community_archive.export_tweets
+                WHERE multiSearchAnyCaseInsensitive(full_text, {{phrases:Array(String)}})
+                FORMAT JSONEachRow""", phrases=_array(batch))
+
+        # Batches stay inside the reader's 30 s and 100k-row limits; a batch that still breaks
+        # splits in half, and a single key that alone is too much is skipped and counted.
+        self.skipped = []
+        for query, keys, size in ((by_links, links, 200), (by_phrases, phrases, 25)):
+            for i in range(0, len(keys), size):
+                rows += self._split(query, keys[i:i + size])
+        seen, out = set(), []
+        for r in rows:
+            if r["tweet_id"] not in seen:
+                seen.add(r["tweet_id"])
+                out.append({"tweet_id": r["tweet_id"], "account_id": r["account_id"],
+                            "text": r["full_text"] or "", "urls": [u for u in r["expanded_urls"] if u],
+                            "is_retweet": bool(r["is_retweet"])})
+        return out
+
+
+    def _split(self, query, keys):
+        try:
+            return query(keys)
+        except (RuntimeError, http.client.HTTPException, ConnectionError):
+            if len(keys) == 1:
+                self.skipped.append(keys[0])
+                return []
+            middle = len(keys) // 2
+            return self._split(query, keys[:middle]) + self._split(query, keys[middle:])
+
+
+ECHO_COLUMNS = """tweet_id, account_id, full_text,
+    arrayFilter(x -> x != '', arrayMap(u -> ifNull(u.2, ''), urls)) AS expanded_urls,
+    retweeted_tweet_id IS NOT NULL AS is_retweet"""
+
+
+def _array(values):
+    """A ClickHouse Array(String) literal for an HTTP query parameter."""
+    return "[" + ",".join("'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'" for v in values) + "]"
 
 
 class Gateway:
@@ -87,6 +155,16 @@ class Gateway:
             after = body.get("next")
             if not after:
                 return out
+
+    def echo_tweets(self, links, phrases):
+        """Contract for a second route (also to build in community-archive-control-panel):
+          POST echo-tweets {"links": [canonical, ...], "phrases": [lowercase words, ...]}
+          200 {"source": "clickhouse", "data": [{tweet_id, account_id, full_text,
+               urls: [expanded_url, ...], is_retweet}]}
+          Current members only; links compare as view.canonical_url; phrases are
+          case-insensitive substrings (the worker re-checks word boundaries and creators).
+        """
+        raise NotImplementedError("gateway route echo-tweets is not built yet")
 
 
 SOURCES = {"local-clickhouse": LocalClickHouse, "gateway": Gateway}

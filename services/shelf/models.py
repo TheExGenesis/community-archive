@@ -5,6 +5,7 @@ the only generative step: gpt-6-luna with a strict JSON schema names the works i
 Each request carries one tweet or one mention, because both classifier vendors document
 lower accuracy when unrelated records share the state.
 """
+import http.client
 import json
 import time
 import urllib.error
@@ -32,6 +33,90 @@ STANCE = {
                   "recommending or sharing it as worth their time?",
     "made@1": "Did the tweet's author make, write, host, or build the candidate?",
 }
+
+# What the author did with a work, one judgment per question (docs.typesafe.ai/primitives).
+# Consumption is one medium-neutral Choice over exclusive outcomes, read only when consumption_stated says
+# the tweet says anything about it; sentiment is a Score, read only when judgement is high.
+# The rest are Nouls with criteria, because each boundary is subtle (citing vs recommending,
+# alluding vs reacting). Definitions match prototypes/shelf-flavors/RUBRIC.md.
+CONSUMED = "read, watched, listened to, played or used"
+FLAVOR = {
+    "consumption_stated@1": {
+        "type": "noul",
+        "instructions": STANCE_LEAD + f"Does the tweet say or clearly show whether its author has {CONSUMED} the candidate?",
+        "criteria": {
+            "true": "The author says or clearly shows that they did, are doing so now, plan to, or have not.",
+            "false": "The tweet only names, links, cites, recommends or alludes to the candidate without saying whether the author has experienced it.",
+        },
+    },
+    # Option names are medium-neutral: the page turns them into "Read", "Played", "Used"...
+    "consumption@2": {
+        "type": "choice",
+        "instructions": STANCE_LEAD + f"What does the tweet say about whether its author has {CONSUMED} the candidate?",
+        "criteria": {
+            "experienced": "They have: read, watched, played or used it, enough to react to it.",
+            "in_progress": "They are in the middle of it now, or use or play it regularly.",
+            "intends": "They want to or plan to, or have it queued.",
+            "not_yet": "They say they have not, or that they gave up on it.",
+        },
+    },
+    "reacts@1": {
+        "type": "noul",
+        "instructions": STANCE_LEAD + "Does the tweet give its author's own reaction to, or account of, the candidate's content?",
+        "criteria": {
+            "true": "An opinion of the work, what it argues or shows, a part that struck them, a summary, or a quote from it that the author responds to.",
+            "false": "The candidate is only named, linked, cited as a source or used as a comparison.",
+        },
+    },
+    "pointing@2": {
+        "type": "noul",
+        "instructions": STANCE_LEAD + "Does the tweet's author direct others to the candidate as worth their time?",
+        "criteria": {
+            "true": "An endorsement such as 'read this', 'you might like', 'highly recommend', 'great piece', or giving it when someone asked for recommendations.",
+            "false": "A bare link with no endorsement, a link offered only as a source for a claim, or a mention without encouragement.",
+        },
+    },
+    "cites@1": {
+        "type": "noul",
+        "instructions": STANCE_LEAD + "Does the tweet's author offer the candidate as a source or evidence for a claim, or as where some information comes from?",
+        "criteria": {
+            "true": "A link backing a statement, 'here's the article', 'per this report', '(source)', or a quote attributed to it as evidence.",
+            "false": "The candidate is recommended, reacted to, alluded to, or named without supporting a claim.",
+        },
+    },
+    "alludes@1": {
+        "type": "noul",
+        "instructions": STANCE_LEAD + "Does the tweet's author use the candidate only as a comparison, metaphor or cultural reference?",
+        "criteria": {
+            "true": "Like 'making NYC look like Children of Men' or 'very Black Mirror': the work stands in for an idea and is not itself discussed.",
+            "false": "The tweet discusses, recommends, cites or reacts to the work itself.",
+        },
+    },
+    "judgement@1": {
+        "type": "noul",
+        "instructions": STANCE_LEAD + "Does the tweet's author express a positive or negative judgement of the candidate itself?",
+        "criteria": {
+            "true": "Praise or criticism of the work: 'great', 'overrated', 'my favourite', 'mid', 'terrible'.",
+            "false": "No judgement of the work, or a judgement only of its topic, a news event or a person.",
+        },
+    },
+    "sentiment@1": {
+        "type": "score",
+        "instructions": STANCE_LEAD + "How does the tweet's author judge the candidate itself?",
+        "criteria": [
+            "Strong rejection: they hated it or call it terrible.",
+            "Negative: they disliked it or found it weak or wrong.",
+            "Positive: they liked it or found it good or useful.",
+            "Strong praise: they loved it, call it a favourite or essential.",
+        ],
+    },
+}
+FLAVOR_LEVELS = ["hated", "disliked", "liked", "loved"]
+
+
+def flavor_questions():
+    return list(FLAVOR.items())
+
 
 NAMER_PROMPT = """You extract specific works and tools from one person's own tweet.
 A work or tool is a specific book, essay, article, paper, film, show, video, podcast episode or
@@ -83,7 +168,10 @@ class FatalModelError(ModelError):
 
 
 def probability(value):
-    p = float(value)
+    try:
+        p = float(value)
+    except (TypeError, ValueError):
+        raise ModelError("missing_answers") from None
     if not 0.0 <= p <= 1.0:  # also rejects NaN
         raise ModelError("probability_out_of_range")
     return p
@@ -130,34 +218,69 @@ def with_retries(fn, tries=4):
             if e.code not in (408, 429, 500, 502, 503, 504) or attempt == tries - 1:
                 raise ModelError(f"HTTP {e.code}", billed=e.code >= 500) from None
             time.sleep(min(float(e.headers.get("retry-after") or 2 ** attempt), 60))
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as e:
             if attempt == tries - 1:
                 raise ModelError(type(e).__name__) from None
             time.sleep(2 ** attempt)
 
 
-# Each classifier returns ({question: {"p": float} | {"refusal": True}}, latency_ms, usd).
+# Each classifier returns ({question: {"p": float} | {"probs": {...}} | {"refusal": True}},
+# latency_ms, usd). A question is a string (a Noul) or a full question object (a Noul with
+# criteria, a Choice or a Score; docs.typesafe.ai/primitives).
+
+def question(spec):
+    return {"type": "noul", "instructions": spec} if isinstance(spec, str) else spec
+
+
+def jev_answers(raw, questions):
+    """Validate each answer against the question asked. Choice and Score keep their whole
+    distribution (stored in shelf.answers.probs); a Noul keeps its probability."""
+    out = {}
+    for name, spec in questions:
+        q, a = question(spec), raw.get(name)
+        if not isinstance(a, dict):
+            raise ModelError("missing_answers")
+        if q["type"] == "noul":
+            out[name] = {"p": probability(a.get("noul"))}
+            continue
+        probs = a.get("probabilities") or {}
+        options = (list(q["criteria"]) if q["type"] == "choice"
+                   else [str(i) for i in range(len(q["criteria"]))])
+        if set(probs) != set(options):
+            raise ModelError("unexpected_options")
+        dist = {k: probability(v) for k, v in probs.items()}
+        if q["type"] == "choice":
+            if a.get("choice") not in options:
+                raise ModelError("invalid_choice")
+            out[name] = {"probs": {"choice": a["choice"], "probabilities": dist,
+                                   "confidence": probability(a.get("confidence", 0))}}
+        else:
+            try:
+                score = float(a.get("score"))
+            except (TypeError, ValueError):
+                raise ModelError("missing_answers") from None
+            if not 0 <= score <= len(options) - 1:
+                raise ModelError("score_out_of_range")
+            out[name] = {"probs": {"score": score, "probabilities": dist,
+                                   "confidence": probability(a.get("confidence", 0))}}
+    return out
+
 
 def jev(state, questions, key):
     body = {"model": JEV_MODEL, "state": state,
-            "questions": {name: {"type": "noul", "instructions": text} for name, text in questions}}
+            "questions": {name: question(spec) for name, spec in questions}}
     resp, ms = post("https://api.typesafe.ai/v1/systemone", body, key)
-    answers = {name: {"p": probability(a["noul"])} for name, a in resp["answers"].items()
-               if a.get("type") == "noul"}
-    if set(answers) != {name for name, _ in questions}:
-        raise ModelError("missing_answers")
+    answers = jev_answers(resp.get("answers") or {}, questions)
     tokens = (resp.get("usage") or {}).get("input_tokens") or estimate_tokens(body)
     return answers, ms, tokens * JEV_USD_PER_INPUT_TOKEN
 
 
 def jev_openrouter(state, questions, key):
-    """Kept for swapping: the route the Bulletin worker uses."""
+    """Jev through OpenRouter's decisions route (the Bulletin worker's route)."""
     body = {"model": JEV_OPENROUTER_MODEL, "state": state,
-            "questions": {name: {"type": "noul", "instructions": text} for name, text in questions}}
+            "questions": {name: question(spec) for name, spec in questions}}
     resp, ms = post("https://openrouter.ai/api/alpha/decisions", body, key)
-    answers = {name: {"p": probability(a["noul"])} for name, a in resp["answers"].items()}
-    if set(answers) != {name for name, _ in questions}:
-        raise ModelError("missing_answers")
+    answers = jev_answers(resp.get("answers") or {}, questions)
     return answers, ms, float((resp.get("usage") or {}).get("cost") or 0)
 
 
@@ -180,6 +303,13 @@ CLASSIFIERS = {
     "jev-openrouter": (jev_openrouter, "OPENROUTER_API_KEY", "openrouter", JEV_OPENROUTER_MODEL),
     "openai": (openai_decisions, "OPENAI_API_KEY", "openai", OPENAI_DECISIONS_MODEL),
 }
+def same_model(model):
+    """Model names that are one model reached by different routes (Jev direct and via OpenRouter),
+    so facts asked through either count once."""
+    jev = (JEV_MODEL, JEV_OPENROUTER_MODEL)
+    return list(jev) if model in jev else [model]
+
+
 # Upper-bound input price per token, for reservations (OpenRouter bills per byte ≈ per token).
 CLASSIFIER_USD_PER_TOKEN = {"jev": JEV_USD_PER_INPUT_TOKEN, "jev-openrouter": JEV_OPENROUTER_USD_PER_BYTE * 4,
                             "openai": OPENAI_DECISIONS_USD_PER_INPUT_TOKEN}

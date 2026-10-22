@@ -22,7 +22,7 @@ CREATE TABLE shelf.calls (
   run_id bigint REFERENCES shelf.runs(id),
   provider text NOT NULL CHECK (provider IN ('typesafe','openai','openrouter')),
   model text NOT NULL,
-  stage text NOT NULL CHECK (stage IN ('gate','name','stance')),
+  stage text NOT NULL CHECK (stage IN ('gate','name','stance','flavor')),
   reserved_usd numeric(12,8) NOT NULL CHECK (reserved_usd >= 0),
   actual_usd numeric(12,8) CHECK (actual_usd >= 0),
   status text NOT NULL DEFAULT 'reserved'
@@ -83,7 +83,12 @@ CREATE TABLE shelf.items (
   needs_title boolean NOT NULL,
   creator text,
   url text,
-  marks text[] NOT NULL DEFAULT '{}' CHECK (marks <@ ARRAY['loved','recommended','disliked']),
+  marks text[] NOT NULL DEFAULT '{}' CHECK (marks <@ ARRAY['loved','liked','recommended','disliked','hated']),
+  -- What the member did with the work (services/shelf/view.py RELATIONS); NULL before the
+  -- flavor stage has run. Verbs ("Read", "Played", "Used") come from the medium at display time.
+  relation text CHECK (relation IS NULL OR relation IN ('made','experienced','in_progress','intends','not_yet','discussed','cited','referenced','shared','mentioned')),
+  -- A finer format within a medium (film, tv, video, podcast, music), from the namer's kinds.
+  format text CHECK (format IS NULL OR format ~ '^[a-z_]{1,40}$'),
   evidence_tweet_ids text[] NOT NULL CHECK (cardinality(evidence_tweet_ids) >= 1),
   first_at timestamptz NOT NULL,
   last_at timestamptz NOT NULL,
@@ -127,29 +132,64 @@ CREATE TABLE shelf.curation (
   PRIMARY KEY (account_id, work_key)
 );
 
+-- Other members' tweets that link to or name a work on a shelf (services/shelf/echoes.py).
+-- Derived and rebuilt per account; read through get_shelf and get_shelf_echoes, which keep
+-- only current members, so an opt-out disappears without a rebuild.
+CREATE TABLE shelf.echoes (
+  account_id text NOT NULL CHECK (account_id ~ '^[0-9]{1,20}$'),
+  work_key text NOT NULL CHECK (length(work_key) BETWEEN 3 AND 300),
+  other_account_id text NOT NULL CHECK (other_account_id ~ '^[0-9]{1,20}$' AND other_account_id <> account_id),
+  tweet_ids text[] NOT NULL CHECK (cardinality(tweet_ids) BETWEEN 1 AND 50),
+  match text NOT NULL CHECK (match IN ('url','title')),
+  matcher text NOT NULL,
+  computed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, work_key, other_account_id)
+);
+
 -- The shelf for one account, with the owner's curation applied. Public callers
 -- (include_unapproved=false) see approved items whose content has not changed since the
--- approval; the owner sees everything, with status 'changed' for an approved item that
+-- approval and that have a real title (a placeholder such as "Untitled essay" waits for the
+-- owner to name it); the owner sees everything, with status 'changed' for an approved item that
 -- needs another look and 'hidden' items so they can be restored. Both require membership.
 CREATE FUNCTION public.get_shelf(p_account_id text, include_unapproved boolean)
 RETURNS TABLE (
   work_key text, shelf_row text, medium text, label text, needs_title boolean,
   creator text, url text, marks text[], evidence_tweet_ids text[],
   first_at timestamptz, last_at timestamptz, image_url text, image_source text,
-  status text, computed_at timestamptz
+  status text, computed_at timestamptz, echo_account_ids text[], relation text, format text
 ) LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
   SELECT i.work_key, i.shelf_row, i.medium, coalesce(c.title, i.label),
          i.needs_title AND c.title IS NULL, i.creator, i.url, i.marks,
          i.evidence_tweet_ids, i.first_at, i.last_at, i.image_url, i.image_source,
          CASE WHEN c.status='approved' AND c.approved_hash IS DISTINCT FROM i.content_hash
-              THEN 'changed' ELSE coalesce(c.status, 'pending') END, i.computed_at
+              THEN 'changed' ELSE coalesce(c.status, 'pending') END, i.computed_at,
+         ARRAY(SELECT e.other_account_id FROM shelf.echoes e
+               WHERE e.account_id=i.account_id AND e.work_key=i.work_key
+                 AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=e.other_account_id)
+               ORDER BY cardinality(e.tweet_ids) DESC, e.other_account_id LIMIT 50),
+         i.relation, i.format
   FROM shelf.items i
   LEFT JOIN shelf.curation c ON c.account_id=i.account_id AND c.work_key=i.work_key
   WHERE i.account_id=p_account_id
     AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=p_account_id)
-    AND (include_unapproved OR (c.status='approved' AND c.approved_hash=i.content_hash))
+    AND (include_unapproved OR (c.status='approved' AND c.approved_hash=i.content_hash
+                               AND NOT (i.needs_title AND c.title IS NULL)))
   ORDER BY i.shelf_row, cardinality(i.evidence_tweet_ids) DESC, i.last_at DESC
   LIMIT 2000
+$$;
+
+-- Other current members' tweets about one work. The caller must have checked that the
+-- work is visible to the requester (approved, or the requester curates the shelf).
+CREATE FUNCTION public.get_shelf_echoes(p_account_id text, p_work_key text)
+RETURNS TABLE (other_account_id text, tweet_ids text[], match text)
+LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+  SELECT e.other_account_id, e.tweet_ids, e.match
+  FROM shelf.echoes e
+  WHERE e.account_id=p_account_id AND e.work_key=p_work_key
+    AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=p_account_id)
+    AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=e.other_account_id)
+  ORDER BY cardinality(e.tweet_ids) DESC, e.other_account_id
+  LIMIT 50
 $$;
 
 -- Owner curation. status NULL clears the decision (back to pending); title NULL keeps
@@ -190,6 +230,7 @@ ALTER TABLE shelf.items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shelf.curation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shelf.resolutions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shelf.short_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shelf.echoes ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON SCHEMA shelf FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON ALL TABLES IN SCHEMA shelf FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA shelf FROM PUBLIC,anon,authenticated;
@@ -198,10 +239,12 @@ GRANT SELECT,INSERT,UPDATE ON shelf.runs TO service_role;
 GRANT SELECT,INSERT,UPDATE ON shelf.calls TO service_role;
 -- Facts are append-only.
 GRANT SELECT,INSERT ON shelf.mentions,shelf.named_tweets,shelf.answers TO service_role;
-GRANT SELECT,INSERT,UPDATE,DELETE ON shelf.items,shelf.curation,shelf.resolutions TO service_role;
+GRANT SELECT,INSERT,UPDATE,DELETE ON shelf.items,shelf.curation,shelf.resolutions,shelf.echoes TO service_role;
 GRANT SELECT,INSERT,UPDATE ON shelf.short_links TO service_role;
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA shelf TO service_role;
 REVOKE ALL ON FUNCTION public.get_shelf(text,boolean) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.set_shelf_curation(text,text[],text,text) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.get_shelf_echoes(text,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.get_shelf(text,boolean) TO service_role;
 GRANT EXECUTE ON FUNCTION public.set_shelf_curation(text,text[],text,text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_shelf_echoes(text,text) TO service_role;

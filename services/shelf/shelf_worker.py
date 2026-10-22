@@ -7,11 +7,13 @@
   gate    Jev: P(tweet refers to a specific work or tool)
   name    gpt-6-luna structured output: which works (gated tweets only)
   stance  Jev: engaged / warm / cold / pointing / made / is_work per mention
+  flavor  Jev: what the author did with each work (read it, cites it, recommends it...)
   derive  rebuild shelf.items from facts, then resolve titles and images
+  echoes  other members' tweets linking to or naming those works (no model calls)
 
 Facts (mentions, answers) are append-only, so reruns only pay for new tweets.
 
-This phase runs for an explicit allowlist of two consenting accounts only. There is no
+This phase runs for an explicit allowlist of four consenting accounts only. There is no
 "all members" mode; any other account is refused. The database must be on loopback.
 
   uv run --env-file .env.local shelf_worker.py --accounts maskys_ GarrisonLovely
@@ -30,6 +32,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+import echoes
 import images
 import models
 import shortlinks
@@ -37,7 +40,8 @@ import view
 from sources import SOURCES
 
 # Phase guard. Widening this list needs the product owner's explicit go-ahead.
-PHASE_ALLOWLIST = {"815615492429754369": "maskys_", "370323535": "GarrisonLovely"}
+PHASE_ALLOWLIST = {"815615492429754369": "maskys_", "370323535": "GarrisonLovely",
+                   "322603863": "exGenesis", "826134955549790208": "christineist"}
 GATE_THRESHOLD = 0.5
 NAMER_ID = models.NAMER_MODEL + "/namer@1"
 # Namer version for tweets re-read after t.co resolution added URLs.
@@ -260,10 +264,46 @@ def stance(db, ledger, account_id, tweets, classifier, workers, counts):
                workers, counts)
 
 
+def flavor(db, ledger, account_id, tweets, classifier, workers, counts):
+    """What the author did with each work they named (models.FLAVOR), one request per mention.
+    Only mentions the stance stage judged to be works are asked."""
+    call, env, provider, model = models.CLASSIFIERS[classifier]
+    key = os.environ.get(env) or sys.exit(f"{env} is not set")
+    family = models.same_model(model)
+    by_id = {t["tweet_id"]: t for t in tweets}
+    rows = db.execute("""SELECT m.* FROM shelf.mentions m WHERE m.account_id=%s AND m.verbatim
+                         AND EXISTS (SELECT 1 FROM shelf.answers a WHERE a.subject=m.id
+                           AND a.question='is_work@1' AND a.model = ANY(%s) AND a.p >= %s)
+                         AND NOT EXISTS (SELECT 1 FROM shelf.answers a WHERE a.subject=m.id
+                           AND a.question='reacts@1' AND a.model = ANY(%s))""",
+                      (account_id, family, view.IS_WORK, family)).fetchall()
+    todo = [m for m in rows if m["tweet_id"] in by_id]
+    questions = models.flavor_questions()
+
+    def persist(m, answers, ms, usd):
+        with db.transaction():
+            for q, a in answers.items():
+                db.execute("INSERT INTO shelf.answers(subject,question,model,account_id,p,probs,refusal,cost_usd,latency_ms) "
+                           "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                           (m["id"], q, model, account_id, a.get("p"),
+                            Jsonb(a["probs"]) if "probs" in a else None, bool(a.get("refusal")),
+                            usd / len(answers), ms))
+        counts["flavored"] = counts.get("flavored", 0) + 1
+
+    def state(m):
+        return models.mention_state(by_id[m["tweet_id"]], m)
+
+    paid_stage(ledger, todo, lambda m: models.estimate_classifier_usd(classifier, state(m), questions),
+               lambda m: call(state(m), questions, key), persist, provider, model, "flavor",
+               workers, counts)
+
+
 def content_hash(item):
     """What the public sees about an item; approvals are tied to it (shelf.curation.approved_hash).
     New evidence alone does not reopen review; a new label, row, creator, link or mark does."""
     public = [item["shelf_row"], item["label"][:500], item["creator"], item["url"], sorted(item["marks"])]
+    if item.get("relation") in view.CLAIMS:  # "read it", "hasn't read it": a claim the owner approves
+        public.append(item["relation"])
     return hashlib.sha256(json.dumps(public, ensure_ascii=False).encode()).hexdigest()
 
 
@@ -305,16 +345,21 @@ def derive(db, account_id, tweets, classifier, counts, resolve_images=True):
     # A tweet re-read with resolved links supersedes its first reading.
     mentions = [m for m in mentions if m["namer"] == (NAMER_ID2 if m["tweet_id"] in renamed else NAMER_ID)]
     answers = {}
-    for r in db.execute("SELECT subject, question, p FROM shelf.answers WHERE account_id=%s AND model=%s "
-                        "AND subject LIKE 'mention:%%' AND p IS NOT NULL", (account_id, model)):
-        answers.setdefault(r["subject"], {})[r["question"].split("@")[0]] = r["p"]
+    # Either Jev route answers the same model; this classifier's own answers win on a tie.
+    for r in db.execute("SELECT subject, question, p, probs FROM shelf.answers WHERE account_id=%s "
+                        "AND model = ANY(%s) AND subject LIKE 'mention:%%' AND (p IS NOT NULL OR probs IS NOT NULL) "
+                        "ORDER BY (model = %s)", (account_id, models.same_model(model), model)):
+        key = view.FLAVOR_KEYS.get(r["question"], r["question"].split("@")[0])
+        answers.setdefault(r["subject"], {})[key] = r["p"] if r["p"] is not None else r["probs"]
     items = view.build(tweet_map, mentions, answers)
     for item in items:
         item["work_key"] = short_key(item["work_key"])
         item["image_url"] = item["image_source"] = None
         if resolve_images and item["shelf_row"] not in ("mentioned",):
-            apply_image(db, item, counts)
-    items = view.merge_same_titles(items)
+            apply_image(db, item, counts, fetch=resolve_images != "cache")
+    approved = {r["work_key"] for r in db.execute(
+        "SELECT work_key FROM shelf.curation WHERE account_id=%s AND status='approved'", (account_id,))}
+    items = view.merge_works(items, approved)
     if not is_member(db, account_id):  # consent can change during a run
         db.execute("DELETE FROM shelf.items WHERE account_id=%s", (account_id,))
         counts["skipped_not_member"] = True
@@ -323,27 +368,71 @@ def derive(db, account_id, tweets, classifier, counts, resolve_images=True):
         db.execute("DELETE FROM shelf.items WHERE account_id=%s", (account_id,))
         for i in items:
             db.execute("""INSERT INTO shelf.items(account_id,work_key,shelf_row,medium,label,needs_title,creator,url,
-                          marks,evidence_tweet_ids,first_at,last_at,image_url,image_source,content_hash)
-                          VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                          marks,relation,format,evidence_tweet_ids,first_at,last_at,image_url,image_source,content_hash)
+                          VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                        (account_id, i["work_key"], i["shelf_row"], i["medium"], i["label"][:500],
-                        i["needs_title"], i["creator"], i["url"], i["marks"], i["evidence_tweet_ids"],
+                        i["needs_title"], i["creator"], i["url"], i["marks"], i.get("relation"),
+                        i.get("format"), i["evidence_tweet_ids"],
                         i["first_at"], i["last_at"], i["image_url"], i["image_source"], content_hash(i)))
     counts["items"] = len(items)
 
 
-def apply_image(db, item, counts):
-    key = images.resolution_key(item)
-    if not key:
+def find_echoes(db, source, account_id, counts):
+    """Rebuild shelf.echoes for an account: other members' tweets about the works on its shelf.
+    Deterministic and free; the website filters echoes through membership at read time."""
+    items = db.execute("SELECT work_key, shelf_row, label, needs_title, creator, url FROM shelf.items "
+                       "WHERE account_id=%s", (account_id,)).fetchall()
+    wanted = echoes.targets(items)
+    links = sorted({t["link"] for t in wanted.values() if t["link"]})
+    phrases = sorted({t["title"]["phrase"] for t in wanted.values() if t["title"]})
+    found = echoes.match(wanted, source.echo_tweets(links, phrases), account_id)
+    if not is_member(db, account_id):  # consent can change during a run
+        db.execute("DELETE FROM shelf.echoes WHERE account_id=%s", (account_id,))
+        counts["skipped_not_member"] = True
         return
+    with db.transaction():
+        db.execute("DELETE FROM shelf.echoes WHERE account_id=%s", (account_id,))
+        for (work_key, other), e in found.items():
+            db.execute("INSERT INTO shelf.echoes(account_id,work_key,other_account_id,tweet_ids,match,matcher) "
+                       "VALUES (%s,%s,%s,%s,%s,%s)",
+                       (account_id, work_key, other, sorted(e["tweet_ids"], key=lambda t: (len(t), t),
+                                                             reverse=True)[:50],
+                        e["match"], echoes.MATCHER))
+    counts["echo_targets"] = len(wanted)
+    counts["echoed_works"] = len({k for k, _ in found})
+    counts["echoes"] = len(found)
+    if getattr(source, "skipped", None):
+        counts["echo_keys_skipped"] = len(source.skipped)
+
+
+def resolution(db, key, item, counts, fetch):
+    """The cached lookup for key, looked up now when fetching. None when there is none yet."""
     row = db.execute("SELECT * FROM shelf.resolutions WHERE key=%s", (key,)).fetchone()
-    if row is None:
+    if row is not None or not fetch:
+        return row
+    try:
         found = images.resolve(key, item)
-        db.execute("INSERT INTO shelf.resolutions(key,title,image_url,source,found) VALUES (%s,%s,%s,%s,%s) "
-                   "ON CONFLICT (key) DO NOTHING",
-                   (key, (found["title"] or None) and found["title"][:500], found["image_url"],
-                    found["source"], found["found"]))
-        row = found
-        counts["resolved"] = counts.get("resolved", 0) + 1
+    except images.LookupFailed:
+        # Not a miss: leave it uncached so the next run asks again.
+        counts["lookups_failed"] = counts.get("lookups_failed", 0) + 1
+        return None
+    db.execute("INSERT INTO shelf.resolutions(key,title,image_url,source,found) VALUES (%s,%s,%s,%s,%s) "
+               "ON CONFLICT (key) DO NOTHING",
+               (key, (found["title"] or None) and found["title"][:500], found["image_url"],
+                found["source"], found["found"]))
+    counts["resolved"] = counts.get("resolved", 0) + 1
+    return found
+
+
+def apply_image(db, item, counts, fetch=True):
+    # A linked film's poster first; the link's own image when there is no poster.
+    poster = images.poster_key(item)
+    row = resolution(db, poster, item, counts, fetch) if poster else None
+    if not (row and row["image_url"]):
+        key = images.resolution_key(item)
+        row = (resolution(db, key, item, counts, fetch) if key else None) or row
+    if row is None:
+        return
     if row["image_url"]:
         item["image_url"], item["image_source"] = row["image_url"], row["source"]
     title = (row.get("title") or "").strip()
@@ -367,14 +456,17 @@ def better_title(label, title):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--accounts", nargs="+", required=True, help="usernames or ids (allowlisted)")
-    ap.add_argument("--stages", nargs="+", default=["links", "gate", "name", "stance", "derive"],
-                    choices=["links", "gate", "name", "stance", "derive"])
+    ap.add_argument("--stages", nargs="+",
+                    default=["links", "gate", "name", "stance", "flavor", "derive", "echoes"],
+                    choices=["links", "gate", "name", "stance", "flavor", "derive", "echoes"])
     ap.add_argument("--source", choices=sorted(SOURCES), default="local-clickhouse")
     ap.add_argument("--classifier", choices=sorted(models.CLASSIFIERS), default="jev")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--max-usd", type=float, default=2.0, help="cap for this run")
     ap.add_argument("--day-usd", type=float, default=5.0, help="cap across runs today")
     ap.add_argument("--no-images", action="store_true")
+    ap.add_argument("--cached-images", action="store_true",
+                    help="use cached titles and covers only; never fetch (e.g. behind a fake-IP VPN)")
     ap.add_argument("--limit", type=int, help="process only the newest N tweets (smoke tests)")
     a = ap.parse_args(argv)
     accounts = resolve_accounts(a.accounts)
@@ -405,9 +497,12 @@ def main(argv=None):
                 if stage == "links":
                     links(db, account_id, tweets, counts)
                 elif stage == "derive":
-                    derive(db, account_id, tweets, a.classifier, counts, not a.no_images)
+                    derive(db, account_id, tweets, a.classifier, counts,
+                           "cache" if a.cached_images else not a.no_images)
+                elif stage == "echoes":
+                    find_echoes(db, source, account_id, counts)
                 else:
-                    {"gate": gate, "name": name, "stance": stance}[stage](
+                    {"gate": gate, "name": name, "stance": stance, "flavor": flavor}[stage](
                         db, ledger, account_id, tweets, a.classifier, a.workers, counts)
                 print(json.dumps({"account": PHASE_ALLOWLIST[account_id], "stage": stage, **counts}),
                       flush=True)

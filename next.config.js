@@ -10,6 +10,19 @@ const nextConfig = {
       '/user/*/opengraph-image': [
         './src/app/user/*/community-archive-logo-white.png',
       ],
+      // Shelf cards read the logo and their fonts from disk at render time.
+      '/user/*/shelf/opengraph-image': [
+        './src/app/user/*/community-archive-logo-white.png',
+        './src/lib/shelf/card-fonts/*',
+      ],
+      '/user/*/shelf/*/opengraph-image': [
+        './src/app/user/*/community-archive-logo-white.png',
+        './src/lib/shelf/card-fonts/*',
+      ],
+      '/api/shelf/top9': [
+        './src/app/user/*/community-archive-logo-white.png',
+        './src/lib/shelf/card-fonts/*',
+      ],
     },
   },
   images: {

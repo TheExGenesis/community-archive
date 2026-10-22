@@ -773,7 +773,7 @@ function CuratorTile({
           </span>
         ) : item.needsTitle ? (
           <span className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-            Title guessed; rename it
+            Hidden from your shelf until you name it
           </span>
         ) : null}
         {item.marks.length || count ? (

@@ -1,197 +1,59 @@
 'use client'
 
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useState } from 'react'
 import { cn } from '@/utils/tailwind'
-import {
-  COVER_ROWS,
-  SHELF_COVER_SIZE,
-  shelfHost,
-  shelfRowTitle,
-  shelfTweetCount,
-} from '@/lib/shelf/labels'
 import type { Shelf, ShelfItem, ShelfRow } from '@/lib/shelf/types'
-import { ShelfCover } from './ShelfCover'
-import { ShelfItemDrawer } from './ShelfItemDrawer'
-import { ShelfMarks } from './ShelfMarks'
+import { ShelfTweetCount } from './ShelfMarks'
 
 const FOCUS =
-  'rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-card'
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 
-function ItemMeta({ item }: { item: ShelfItem }) {
-  const count = shelfTweetCount(item)
-  if (!item.marks.length && !count) return null
-  return (
-    <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-      <ShelfMarks marks={item.marks} />
-      {count ? <span>{count}</span> : null}
-    </span>
-  )
-}
-
-/** Rows show this many works until the reader asks for the rest. */
-export const SHELF_ROW_PREVIEW = 12
-
-function LedgeItem({
+/** One work as a pill: its site icon when it has one, the name, and how often. */
+function ShelfPill({
   item,
-  w,
-  h,
   onOpen,
-  ledge,
 }: {
   item: ShelfItem
-  w: number
-  h: number
   onOpen: (item: ShelfItem) => void
-  /** Draw this item's piece of the ledge (wrapped layout). */
-  ledge?: boolean
 }) {
+  const [failed, setFailed] = useState(false)
+  const icon =
+    item.imageSource === 'favicon' && item.coverPath && !failed
+      ? item.coverPath
+      : null
   return (
-    <li className="relative" style={{ width: Math.max(w, 116) }}>
-      {ledge ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute -inset-x-2.5 h-1.5 border-t border-border bg-muted"
-          style={{ top: h }}
+    <button
+      type="button"
+      onClick={() => onOpen(item)}
+      title={item.label}
+      className={cn(
+        'inline-flex max-w-full items-center gap-2 rounded-full bg-muted py-1.5 pr-3 text-sm transition-colors hover:bg-muted/60',
+        icon ? 'pl-1.5' : 'pl-3',
+        FOCUS,
+      )}
+    >
+      {icon ? (
+        // A 16–32px favicon; next/image adds nothing here.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={icon}
+          alt=""
+          className="h-5 w-5 shrink-0 rounded-[5px] object-contain"
+          onError={() => setFailed(true)}
         />
       ) : null}
-      <button
-        type="button"
-        onClick={() => onOpen(item)}
-        className={cn('group relative flex w-full flex-col text-left', FOCUS)}
-      >
-        <span className="flex items-end justify-center" style={{ height: h }}>
-          <ShelfCover
-            item={item}
-            width={w}
-            height={h}
-            className="transition-transform duration-150 ease-out group-hover:-translate-y-1 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0"
-          />
-        </span>
-        <span className="mt-4 line-clamp-2 text-sm font-medium leading-snug [overflow-wrap:anywhere] group-hover:underline group-hover:underline-offset-2">
-          {item.label}
-        </span>
-        {item.creator ? (
-          <span className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-            {item.creator}
-          </span>
-        ) : null}
-        <ItemMeta item={item} />
-      </button>
-    </li>
+      <span className="max-w-[16rem] truncate">{item.label}</span>
+      <span className="shrink-0 text-xs text-muted-foreground">
+        <ShelfTweetCount count={item.evidenceTweetIds.length} size={11} />
+      </span>
+    </button>
   )
 }
 
 /**
- * One medium as a shelf: covers standing on a ledge. A long row shows its
- * first works on one scrolling ledge; "Show all" stacks the rest on as many
- * ledges as they need.
+ * Tools, Wikipedia pages and passing mentions as compact pills. Marks and the
+ * rest are in the drawer.
  */
-export function ShelfLedge({
-  row,
-  title,
-  onOpen,
-  action,
-}: {
-  row: ShelfRow
-  title: string
-  onOpen: (item: ShelfItem) => void
-  action?: ReactNode
-}) {
-  const { w, h } = SHELF_COVER_SIZE[row.key]
-  const headingId = `shelf-row-${row.key}`
-  const [expanded, setExpanded] = useState(false)
-  const hidden = row.items.length - SHELF_ROW_PREVIEW
-  const toggle =
-    hidden > 0 ? (
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls={`${headingId}-items`}
-        onClick={() => setExpanded((value) => !value)}
-        className={cn('text-sm font-medium text-brand hover:underline', FOCUS)}
-      >
-        {expanded ? 'Show fewer' : `Show all ${row.items.length}`}
-      </button>
-    ) : null
-  return (
-    <section aria-labelledby={headingId} className="py-5">
-      <div className="flex items-baseline gap-2 px-4 sm:px-6">
-        <h2 id={headingId} className="text-lg font-semibold">
-          {title}
-        </h2>
-        <span className="text-sm text-muted-foreground">
-          {row.items.length}
-        </span>
-        {action || toggle ? (
-          <div className="ml-auto flex items-baseline gap-4">
-            {action}
-            {toggle}
-          </div>
-        ) : null}
-      </div>
-      {expanded ? (
-        <ul
-          id={`${headingId}-items`}
-          className="mt-3 flex flex-wrap gap-x-5 gap-y-8 px-4 pb-3 sm:px-6"
-        >
-          {row.items.map((item) => (
-            <LedgeItem
-              key={item.workKey}
-              item={item}
-              w={w}
-              h={h}
-              onOpen={onOpen}
-              ledge
-            />
-          ))}
-        </ul>
-      ) : (
-        <div className="mt-3 overflow-x-auto overscroll-x-contain pb-3 [scrollbar-width:thin]">
-          <div
-            className="relative w-max min-w-full px-4 sm:px-6"
-            style={{ '--ledge': `${h}px` } as CSSProperties}
-          >
-            {/* The ledge every cover stands on. */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-[var(--ledge)] h-1.5 border-t border-border bg-muted"
-            />
-            <ul id={`${headingId}-items`} className="relative flex gap-5">
-              {row.items.slice(0, SHELF_ROW_PREVIEW).map((item) => (
-                <LedgeItem
-                  key={item.workKey}
-                  item={item}
-                  w={w}
-                  h={h}
-                  onOpen={onOpen}
-                />
-              ))}
-              {hidden > 0 ? (
-                <li style={{ width: Math.max(Math.round(w * 0.8), 96) }}>
-                  <button
-                    type="button"
-                    onClick={() => setExpanded(true)}
-                    className={cn(
-                      'flex w-full items-end justify-center rounded-sm border border-dashed border-border text-sm font-medium text-muted-foreground hover:border-foreground/40 hover:text-foreground',
-                      FOCUS,
-                    )}
-                    style={{ height: h - 6 }}
-                  >
-                    <span className="pb-3 text-center leading-snug">
-                      {hidden} more
-                    </span>
-                  </button>
-                </li>
-              ) : null}
-            </ul>
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
-
-/** Links and passing mentions: a compact list rather than covers. */
 export function ShelfList({
   row,
   onOpen,
@@ -200,121 +62,45 @@ export function ShelfList({
   onOpen: (item: ShelfItem) => void
 }) {
   return (
-    <ul className="grid gap-x-6 gap-y-1 px-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
+    <ul className="flex flex-wrap gap-2 px-4 sm:px-6">
       {row.items.map((item) => (
-        <li key={item.workKey}>
-          <button
-            type="button"
-            onClick={() => onOpen(item)}
-            className={cn(
-              'flex w-full flex-col py-2 text-left hover:underline hover:underline-offset-2',
-              FOCUS,
-            )}
-          >
-            <span className="line-clamp-2 text-sm font-medium [overflow-wrap:anywhere]">
-              {item.label}
-            </span>
-            <span className="flex items-center gap-2 text-xs text-muted-foreground">
-              {shelfHost(item.url) ?? item.creator ?? item.medium}
-              <ShelfMarks marks={item.marks} />
-              {shelfTweetCount(item)}
-            </span>
-          </button>
+        <li key={item.workKey} className="min-w-0 max-w-full">
+          <ShelfPill item={item} onOpen={onOpen} />
         </li>
       ))}
     </ul>
   )
 }
 
-export function ShelfCredits({ shelf }: { shelf: Shelf }) {
-  const openLibrary = shelf.rows.some((row) =>
-    row.items.some(
-      (item) => item.coverPath && item.imageSource === 'openlibrary',
-    ),
-  )
-  if (!openLibrary) return null
-  return (
-    <p className="px-4 pb-5 text-xs text-muted-foreground sm:px-6">
-      Cover:{' '}
-      <a
-        href="https://openlibrary.org"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline underline-offset-2 hover:text-foreground"
-      >
-        Open Library
-      </a>
-    </p>
-  )
+/** Sources whose covers the shelf shows, credited under the grid when used. */
+const COVER_CREDITS: Record<string, { name: string; href: string }> = {
+  openlibrary: { name: 'Open Library', href: 'https://openlibrary.org' },
+  wikipedia: { name: 'Wikipedia', href: 'https://en.wikipedia.org' },
 }
 
-/** The public shelf: approved items only, grouped by medium. */
-export function ShelfView({
-  shelf,
-  ownerName,
-}: {
-  shelf: Shelf
-  ownerName: string
-}) {
-  const [open, setOpen] = useState<ShelfItem | null>(null)
-  const covers = shelf.rows.filter((row) => COVER_ROWS.includes(row.key))
-  const links = shelf.rows.find((row) => row.key === 'links')
-  const mentioned = shelf.rows.find((row) => row.key === 'mentioned')
+export function ShelfCredits({ shelf }: { shelf: Shelf }) {
+  const used = Object.keys(COVER_CREDITS).filter((source) =>
+    shelf.rows.some((row) =>
+      row.items.some((item) => item.coverPath && item.imageSource === source),
+    ),
+  )
+  if (!used.length) return null
   return (
-    <>
-      <div className="divide-y divide-border">
-        {covers.map((row) => (
-          <ShelfLedge
-            key={row.key}
-            row={row}
-            title={shelfRowTitle(row.key, ownerName)}
-            onOpen={setOpen}
-          />
-        ))}
-        {links ? (
-          <section aria-labelledby="shelf-row-links" className="py-5">
-            <div className="flex items-baseline gap-2 px-4 sm:px-6">
-              <h2 id="shelf-row-links" className="text-lg font-semibold">
-                Links
-              </h2>
-              <span className="text-sm text-muted-foreground">
-                {links.items.length}
-              </span>
-            </div>
-            <div className="mt-2">
-              <ShelfList row={links} onOpen={setOpen} />
-            </div>
-          </section>
-        ) : null}
-        {mentioned ? (
-          <details className="group py-5">
-            <summary
-              className={cn(
-                'mx-4 flex cursor-pointer list-none items-baseline gap-2 sm:mx-6 [&::-webkit-details-marker]:hidden',
-                FOCUS,
-              )}
-            >
-              <h2 className="text-lg font-semibold">Also mentioned</h2>
-              <span className="text-sm text-muted-foreground">
-                {mentioned.items.length}
-              </span>
-              <span className="text-sm text-brand group-open:hidden">Show</span>
-              <span className="hidden text-sm text-brand group-open:inline">
-                Hide
-              </span>
-            </summary>
-            <div className="mt-2">
-              <ShelfList row={mentioned} onOpen={setOpen} />
-            </div>
-          </details>
-        ) : null}
-      </div>
-      <ShelfCredits shelf={shelf} />
-      <ShelfItemDrawer
-        accountId={shelf.accountId}
-        item={open}
-        onClose={() => setOpen(null)}
-      />
-    </>
+    <p className="px-4 pb-5 text-xs text-muted-foreground sm:px-6">
+      {used.length > 1 ? 'Covers' : 'Cover'}:{' '}
+      {used.map((source, index) => (
+        <Fragment key={source}>
+          {index ? ', ' : null}
+          <a
+            href={COVER_CREDITS[source].href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            {COVER_CREDITS[source].name}
+          </a>
+        </Fragment>
+      ))}
+    </p>
   )
 }

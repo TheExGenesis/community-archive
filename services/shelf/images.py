@@ -16,13 +16,20 @@ import json
 import re
 import socket
 import ssl
+import string
 import time
+import unicodedata
 import urllib.parse
 
 from view import host_of, norm, youtube_id
 
 USER_AGENT = "CommunityArchiveShelf/0.1 (+https://github.com/TheExGenesis/community-archive)"
 _last_call = {}
+
+
+class LookupFailed(Exception):
+    """A lookup that could not be made (network, rate limit, server error). Unlike a miss it
+    is not cached, so the next run asks again."""
 
 
 def _polite(host, gap):
@@ -61,9 +68,10 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
         self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
 
 
-def _get(url, gap=1.0, limit=1_500_000, accept="application/json", hops=3):
+def _get(url, gap=1.0, limit=1_500_000, accept="application/json", hops=3, strict=False):
     """GET a public https URL. Every redirect hop is validated and pinned the same way.
-    Plain http links are tried over https. Any failure returns None."""
+    Plain http links are tried over https. Any failure returns None; with strict, a failure
+    that is not the server's answer (no address, network, 429, 5xx) raises LookupFailed."""
     if url.startswith("http://"):
         url = "https://" + url[7:]
     for _ in range(hops + 1):
@@ -72,6 +80,8 @@ def _get(url, gap=1.0, limit=1_500_000, accept="application/json", hops=3):
             return None
         ip = _global_ip(p.hostname)
         if ip is None:
+            if strict:
+                raise LookupFailed(f"no public address for {p.hostname}")
             return None
         _polite(p.hostname, gap)
         conn = _PinnedHTTPS(p.hostname, ip)
@@ -86,17 +96,21 @@ def _get(url, gap=1.0, limit=1_500_000, accept="application/json", hops=3):
                 url = urllib.parse.urljoin(url, location)
                 continue
             if response.status != 200:
+                if strict and (response.status == 429 or response.status >= 500):
+                    raise LookupFailed(f"{p.hostname} answered {response.status}")
                 return None
             return response.read(limit), response.getheader("Content-Type", "")
-        except (OSError, http.client.HTTPException, ssl.SSLError, ValueError):
+        except (OSError, http.client.HTTPException, ssl.SSLError, ValueError) as e:
+            if strict:
+                raise LookupFailed(f"{p.hostname}: {e}") from e
             return None
         finally:
             conn.close()
     return None
 
 
-def _json(url, gap=1.0):
-    got = _get(url, gap)
+def _json(url, gap=1.0, strict=False):
+    got = _get(url, gap, strict=strict)
     if not got:
         return None
     try:
@@ -114,6 +128,15 @@ def resolution_key(item):
     return key[:400] if key else None
 
 
+def poster_key(item):
+    """A film or show is known by its poster, not by a linked trailer's frame or a review page's
+    image, so a linked one is looked up by name first; the link's image is the fallback."""
+    if (item.get("url") and item["medium"] == "watching" and item.get("format") in ("film", "tv")
+            and item.get("name") and not item["needs_title"]):
+        return f"screen:{norm(item['name'])}|{norm(item.get('creator'))}"[:400]
+    return None
+
+
 def _resolution_key(item):
     url = item.get("url")
     if url:
@@ -129,6 +152,9 @@ def _resolution_key(item):
         return f"book:{norm(item['name'])}|{norm(item.get('creator'))}"[:400]
     if item["medium"] == "tools":
         return f"tool:{norm(item['name'])}"
+    kind = WIKI_KINDS.get(item["medium"]) or WIKI_KINDS.get(item["shelf_row"])
+    if kind:
+        return f"{kind}:{norm(item['name'])}|{norm(item.get('creator'))}"[:400]
     return None
 
 
@@ -149,20 +175,22 @@ def _resolve(key, item):
     kind, _, rest = key.partition(":")
     if kind == "youtube":
         meta = _json("https://www.youtube.com/oembed?format=json&url="
-                     + urllib.parse.quote(f"https://www.youtube.com/watch?v={rest}"), gap=0.3)
+                     + urllib.parse.quote(f"https://www.youtube.com/watch?v={rest}"), gap=0.3, strict=True)
         if not meta:
             return {"title": None, "image_url": None, "source": "youtube", "found": False}
         return {"title": meta.get("title"), "image_url": f"https://i.ytimg.com/vi/{rest}/hqdefault.jpg",
                 "source": "youtube", "found": True}
     if kind == "spotify":
         target = (item.get("url") or rest).split("?")[0]
-        meta = _json("https://open.spotify.com/oembed?url=" + urllib.parse.quote(target), gap=0.5)
+        meta = _json("https://open.spotify.com/oembed?url=" + urllib.parse.quote(target), gap=0.5, strict=True)
         return {"title": (meta or {}).get("title"), "image_url": _https((meta or {}).get("thumbnail_url")),
                 "source": "spotify", "found": bool(meta)}
     if kind == "book":
         return openlibrary(item["name"], item.get("creator"))
     if kind == "tool":
         return tool_icon(item["name"])
+    if kind in WIKI_DESCRIBES:
+        return wikipedia(item["name"], item.get("creator"), kind)
     if kind == "url":
         target = item.get("url") or rest  # the key may be truncated; the item has the full URL
         found = og(target)
@@ -177,8 +205,14 @@ def _resolve(key, item):
 STOP = {"the", "a", "an", "of", "and"}
 
 
+def _fold(text):
+    """Lowercase without accents, so "amelie" is "Amélie"."""
+    text = unicodedata.normalize("NFKD", text or "")
+    return "".join(c for c in text if not unicodedata.combining(c)).lower()
+
+
 def _tokens(text):
-    return set(re.findall(r"[a-z0-9]+", re.sub(r"['’]", "", (text or "").lower()))) - STOP
+    return set(re.findall(r"[a-z0-9]+", re.sub(r"['’]", "", _fold(text)))) - STOP
 
 
 def similarity(a, b):
@@ -186,25 +220,165 @@ def similarity(a, b):
     return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
 
 
+def _words(text):
+    return re.findall(r"[a-z0-9]+", re.sub(r"['’]", "", _fold(text)))
+
+
+def starts_with(name, title):
+    """A series or short name that opens a book's title: "Harry Potter" and "Harry Potter and
+    the Philosopher's Stone". Needs two words that are not stop words, so "Memorial" or
+    "The Hike" never takes a longer title."""
+    a, b = _words(name), _words(title)
+    return len([w for w in a if w not in STOP]) >= 2 and len(b) > len(a) and b[: len(a)] == a
+
+
 def openlibrary(title, creator):
-    """Title (+ author) search; keep a result only if the title matches and the cover exists.
-    Prefers an English edition because title search can return a translation's cover."""
-    q = urllib.parse.urlencode({"q": f"{title} {creator or ''}".strip(), "limit": 5,
-                                "fields": "key,title,author_name,cover_i,language"})
-    data = _json(f"https://openlibrary.org/search.json?{q}", gap=1.0)
+    """Title search; keep a result only if a title matches and a cover exists. A work's own
+    title can be the original language's ("Le città invisibili"), so its English edition's
+    title counts too, and that edition's cover is preferred. The author joins the search only
+    when it reads as a name: a tweet's "@sapinker" or "kevinsimlerandrobinhanson" finds nothing."""
+    person = creator if creator and "@" not in creator and " " in creator.strip() else ""
+    q = urllib.parse.urlencode({
+        "q": f"{title} {person}".strip(), "limit": 5, "lang": "en",
+        "fields": "key,title,author_name,cover_i,language,editions,editions.title,editions.cover_i"})
+    data = _json(f"https://openlibrary.org/search.json?{q}", gap=1.0, strict=True)
+    if data is None:
+        raise LookupFailed("Open Library search did not answer")
+
     def author_match(d):
         return bool(creator) and any(similarity(creator, a) for a in d.get("author_name") or [])
 
+    def edition(d):
+        return ((d.get("editions") or {}).get("docs") or [{}])[0]
+
+    def titles(d):
+        return [t for t in (edition(d).get("title"), d.get("title")) if t]
+
+    def best(d):
+        return max(titles(d), key=lambda t: similarity(title, t))
+
     # A stated creator must match, unless the title match is near-exact: creators taken from
-    # tweets are often handles ("sapinker") that no catalogue knows.
-    docs = [d for d in (data or {}).get("docs", []) if d.get("cover_i")
-            and (similarity(title, d.get("title")) >= 0.8
-                 or (similarity(title, d.get("title")) >= 0.6 and (not creator or author_match(d))))]
+    # tweets are often handles that no catalogue knows.
+    def matches(d):
+        score = similarity(title, best(d))
+        return score >= 0.8 or ((score >= 0.6 or any(starts_with(title, t) for t in titles(d)))
+                                and (not creator or author_match(d)))
+
+    docs = [d for d in data.get("docs", []) if (edition(d).get("cover_i") or d.get("cover_i")) and matches(d)]
     docs.sort(key=lambda d: (not author_match(d), "eng" not in (d.get("language") or [])))
     if not docs:
         return {"title": None, "image_url": None, "source": "openlibrary", "found": False}
-    return {"title": docs[0].get("title"), "image_url": f"https://covers.openlibrary.org/b/id/{docs[0]['cover_i']}-M.jpg",
+    top = docs[0]
+    cover = edition(top).get("cover_i") or top["cover_i"]
+    # -L (about 500px wide): -M is blurry on large tiles and high-density screens.
+    return {"title": best(top), "image_url": f"https://covers.openlibrary.org/b/id/{cover}-L.jpg",
             "source": "openlibrary", "found": True}
+
+
+WIKI_KINDS = {"watching": "screen", "playing": "game", "listening": "listen"}
+# What a page's short description must say for each kind of work, so "Portal" finds the game
+# and never the disambiguation page or the web portal.
+WIKI_DESCRIBES = {
+    "screen": re.compile(r"\b(film|movie|television|tv|series|miniseries|sitcom|anime|documentary)\b", re.I),
+    "game": re.compile(r"\bgames?\b", re.I),
+    "listen": re.compile(r"\b(album|ep|mixtape|soundtrack|song|single|podcast)\b", re.I),
+}
+
+
+def wikipedia(name, creator, kind):
+    """A film, show, game, album or song's lead image from its English Wikipedia page. First the
+    page titles such a work would have ("Her (film)", "Happy Together (1997 film)", "Sunbather
+    (album)"), whose redirects also catch other names ("Hausu", "EEAAO"); then a search. A page
+    counts when its short description says it is that kind of work and, from a search, its title
+    matches. A year in the name ("The Fountain (2006)") picks that year's release. Music names
+    repeat ("Blonde", "Nights"), so a music page must also name the artist, or the title must have
+    two real words. Many such images are non-free uploads; the shelf credits Wikipedia under the
+    grid."""
+    dated = re.fullmatch(r"(.*\S)\s*\((\d{4})\)", name.strip())
+    name, year = (dated.group(1), dated.group(2)) if dated else (name.strip(), None)
+    person = creator if creator and "@" not in creator else ""
+    found = _wiki_titles(name, person, kind, year)
+    if found:
+        return found
+    queries = {"screen": [name, f"{name} film", f"{name} TV series"],
+               "game": [name, f"{name} video game"],
+               "listen": [f"{name} {person}".strip(), f"{name} album"]}[kind]
+    for q in dict.fromkeys(queries):
+        found = _wiki_page(q, name, person, kind, year)
+        if found:
+            return found
+    return {"title": None, "image_url": None, "source": "wikipedia", "found": False}
+
+
+# A page title's qualifier, "(film)", "(1997 film)", "(Frank Ocean album)", but not a parenthesis
+# that belongs to the title itself, as in "Lions, Love (...and Lies)".
+QUALIFIER = re.compile(r"\s*\((?:[^()]*\b(?:film|movie|series|tv|miniseries|show|game|album|song|ep|single|"
+                       r"soundtrack|podcast|anime|band|novel|book)\b[^()]*|\d{4})\)$", re.I)
+WIKI_PROPS = {"prop": "pageimages|description", "piprop": "thumbnail", "pithumbsize": 500,
+              "pilicense": "any", "redirects": 1}
+
+
+def _wiki_api(params, what):
+    query = urllib.parse.urlencode({"action": "query", "format": "json", "formatversion": 2, **params})
+    data = _json(f"https://en.wikipedia.org/w/api.php?{query}", gap=0.5, strict=True)
+    if data is None:
+        raise LookupFailed(f"Wikipedia {what} did not answer")
+    return data.get("query", {})
+
+
+def _wiki_fits(page, kind, artist, year):
+    description = page.get("description") or ""
+    if page.get("missing") or not WIKI_DESCRIBES[kind].search(description):
+        return False
+    if kind == "game" and re.search(r"\bengine\b", description, re.I):
+        return False  # "Godot" the game engine is a tool, not a game
+    if kind == "listen" and artist and not artist & _tokens(description):
+        return False
+    # Another year in the description is another release: the 1979 "Deep End" is not the 1970 one.
+    return not (year and re.search(r"\b\d{4}\b", description) and year not in description)
+
+
+def _wiki_found(page, name):
+    title = QUALIFIER.sub("", page.get("title", "")) or name
+    # The right page without an image still gives the work's proper title.
+    return {"title": title, "image_url": _https((page.get("thumbnail") or {}).get("source")),
+            "source": "wikipedia", "found": True}
+
+
+def _wiki_titles(name, person, kind, year):
+    """The titles Wikipedia gives such a work, tried in one request, best first."""
+    names = list(dict.fromkeys([name, string.capwords(name)]))
+    suffixes = {"screen": ([f" ({year} film)"] if year else []) + ["", " (film)", " (TV series)", " (miniseries)"],
+                "game": ["", " (video game)"],
+                "listen": ([f" ({person} album)", f" ({person} song)"] if person else [])
+                + [" (album)", " (song)", " (EP)", ""]}[kind]
+    titles = list(dict.fromkeys(n + s for s in suffixes for n in names))
+    result = _wiki_api({"titles": "|".join(titles), **WIKI_PROPS}, "title lookup")
+    moved = {r["from"]: r["to"] for r in result.get("normalized", []) + result.get("redirects", [])}
+    pages = {p.get("title"): p for p in result.get("pages", [])}
+    artist = {w for w in _tokens(person) if len(w) >= 3}
+    if kind == "listen" and not artist and len([w for w in _words(name) if w not in STOP]) < 2:
+        return None
+    for title in titles:
+        seen = set()
+        while title in moved and title not in seen:
+            seen.add(title)
+            title = moved[title]
+        page = pages.get(title)
+        if page and _wiki_fits(page, kind, artist, year):
+            return _wiki_found(page, name)
+    return None
+
+
+def _wiki_page(query, name, person, kind, year):
+    result = _wiki_api({"generator": "search", "gsrsearch": query, "gsrlimit": 8, **WIKI_PROPS}, "search")
+    artist = {w for w in _tokens(person) if len(w) >= 3}
+    if kind == "listen" and not artist and len([w for w in _words(name) if w not in STOP]) < 2:
+        return None
+    for page in sorted(result.get("pages", []), key=lambda p: p.get("index", 99)):
+        if similarity(name, QUALIFIER.sub("", page.get("title", ""))) >= 0.8 and _wiki_fits(page, kind, artist, year):
+            return _wiki_found(page, name)
+    return None
 
 
 META = re.compile(r'<meta\s+[^>]*?(?:property|name)\s*=\s*["\'](og:image|og:title|twitter:image|twitter:title)["\'][^>]*?>', re.I)

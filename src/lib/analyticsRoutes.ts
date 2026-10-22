@@ -15,6 +15,7 @@ export const analyticsRoutes = {
   '/user-dir': ['user_directory', 'product'],
   '/user/[account_id]': ['user_profile', 'product'],
   '/user/[account_id]/shelf': ['user_shelf', 'product'],
+  '/user/[account_id]/shelf/[work]': ['user_shelf_work', 'product'],
   '/shelf': ['shelf', 'product'],
   '/tweets': ['tweets', 'product'],
   '/tweets/[tweet_id]': ['tweet', 'product'],

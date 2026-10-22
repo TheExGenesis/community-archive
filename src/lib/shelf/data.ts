@@ -6,7 +6,7 @@ import { fetchClickHouseTweetPageData } from '@/lib/clickhouseTweetPage'
 import type { PortalTweet } from '@/lib/portal/types'
 import type { TweetData } from '@/lib/tweets/types'
 import { ACCOUNT_ID_PATTERN, shapeShelf, type ShelfDbRow } from './shape'
-import type { Shelf, ShelfDecision } from './types'
+import type { Shelf, ShelfDecision, ShelfPerson } from './types'
 
 export const SHELF_EVIDENCE_LIMIT = 12
 export const COVER_KEY_PATTERN = /^[0-9a-f]{32}$/
@@ -41,13 +41,13 @@ const approvedOnly = (rows: ShelfDbRow[]) =>
 const cachedPublicRows = (accountId: string) =>
   unstable_cache(
     () => readShelfRows(accountId, false),
-    ['shelf-public-v1', accountId],
+    ['shelf-public-v3', accountId],
     { revalidate: 300, tags: [shelfTag(accountId)] },
   )()
 const cachedOwnerRows = (accountId: string) =>
   unstable_cache(
     () => readShelfRows(accountId, true),
-    ['shelf-owner-v1', accountId],
+    ['shelf-owner-v3', accountId],
     { revalidate: 60, tags: [shelfTag(accountId)] },
   )()
 
@@ -57,6 +57,22 @@ export async function getPublicShelf(accountId: string): Promise<Shelf> {
     accountId,
     approvedOnly(await cachedPublicRows(accountId)),
     shelfCoverKey,
+  )
+}
+
+/**
+ * Remote image URLs of approved works, by work key. Server-rendered share
+ * cards only: pages get same-origin proxy paths and never see these.
+ */
+export async function getPublicShelfImageUrls(
+  accountId: string,
+): Promise<Record<string, string>> {
+  return Object.fromEntries(
+    approvedOnly(await cachedPublicRows(accountId)).flatMap((row) =>
+      row.image_url && /^https:\/\//i.test(row.image_url)
+        ? [[row.work_key, row.image_url]]
+        : [],
+    ),
   )
 }
 
@@ -83,6 +99,208 @@ export async function findShelfRow(
   if (!(await ownerView())) return null
   const owned = match(await cachedOwnerRows(accountId))
   return owned ? { row: owned, isPublic: false } : null
+}
+
+async function readPeople(ids: string[]): Promise<ShelfPerson[]> {
+  if (!ids.length) return []
+  const { data, error } = await createServerServiceRoleClient()
+    .from('user_directory')
+    .select('account_id, username, account_display_name, avatar_media_url')
+    .in('account_id', ids)
+  if (error) throw new Error('Members could not be loaded')
+  const found = new Map<string, ShelfPerson>()
+  for (const row of data ?? []) {
+    if (!row.account_id || !row.username || found.has(row.account_id)) continue
+    found.set(row.account_id, {
+      accountId: row.account_id,
+      username: row.username,
+      name: row.account_display_name,
+      avatar: row.avatar_media_url,
+    })
+  }
+  return ids.flatMap((id) => found.get(id) ?? [])
+}
+
+/**
+ * Names and avatars for the faces drawn next to works. Unknown ids are
+ * dropped rather than drawn as blank faces. Cached with the shelf.
+ */
+export async function getShelfPeople(
+  accountId: string,
+  ids: string[],
+): Promise<ShelfPerson[]> {
+  const wanted = Array.from(
+    new Set(ids.filter((id) => ACCOUNT_ID_PATTERN.test(id))),
+  ).sort()
+  if (!wanted.length) return []
+  const digest = createHash('sha256').update(wanted.join(',')).digest('hex')
+  return unstable_cache(() => readPeople(wanted), ['shelf-people-v1', digest], {
+    revalidate: 3600,
+    tags: [shelfTag(accountId)],
+  })()
+}
+
+export const SHELF_ECHO_TWEETS = 12
+
+/**
+ * Who else tweeted about one work, and one tweet from each of the first
+ * dozen of them, newest first. Rows come from get_shelf_echoes, which keeps
+ * current members only; a tweet whose author is not that member is dropped.
+ */
+export async function getShelfEchoes(
+  accountId: string,
+  workKey: string,
+  fetchTweet = fetchClickHouseTweetPageData,
+): Promise<{
+  people: ShelfPerson[]
+  tweets: (PortalTweet & { match: 'url' | 'title' })[]
+  total: number
+  failed: boolean
+}> {
+  const { data, error } = await createServerServiceRoleClient().rpc(
+    'get_shelf_echoes',
+    { p_account_id: accountId, p_work_key: workKey },
+  )
+  if (error) throw new Error('Echoes could not be loaded')
+  const rows = (data ?? []).filter(
+    (row) =>
+      ACCOUNT_ID_PATTERN.test(row.other_account_id) &&
+      row.other_account_id !== accountId,
+  )
+  const people = await getShelfPeople(
+    accountId,
+    rows.map((row) => row.other_account_id),
+  )
+  const picks = rows
+    .slice(0, SHELF_ECHO_TWEETS)
+    .flatMap((row) => {
+      const id = row.tweet_ids.find((t) => /^\d{1,20}$/.test(t))
+      return id ? [{ id, author: row.other_account_id, match: row.match }] : []
+    })
+  const tweets: (PortalTweet & { match: 'url' | 'title' })[] = []
+  let errors = 0
+  for (let offset = 0; offset < picks.length; offset += 4) {
+    const batch = await Promise.all(
+      picks.slice(offset, offset + 4).map((pick) =>
+        fetchTweet(pick.id)
+          .then((tweet) => ({ pick, tweet }))
+          .catch(() => {
+            errors += 1
+            return { pick, tweet: null }
+          }),
+      ),
+    )
+    for (const { pick, tweet } of batch)
+      if (tweet && tweet.account_id === pick.author)
+        tweets.push({
+          ...portalTweet(tweet),
+          match: pick.match === 'url' ? 'url' : 'title',
+        })
+  }
+  tweets.sort(
+    (a, b) => b.id.length - a.id.length || b.id.localeCompare(a.id),
+  )
+  return {
+    people,
+    tweets,
+    total: rows.length,
+    failed: picks.length > 0 && errors === picks.length,
+  }
+}
+
+/** Tweet text as a quote: no links, no leading @replies, entities decoded. */
+export function quoteText(text: string) {
+  return text
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/^(?:@\w+\s+)+/, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim()
+}
+
+/** A quote in the member's own words, with the tweet's first photo when it has one. */
+export type ShelfOwnQuote = { text: string; image: string | null }
+
+/** The first photo attached to a tweet, from Twitter's media CDN only. */
+function tweetPhoto(tweet: TweetData) {
+  const photo = (tweet.media ?? []).find((m) => m.media_type === 'photo')
+  if (!photo?.media_url) return null
+  try {
+    const url = new URL(photo.media_url)
+    return url.protocol === 'https:' && url.hostname === 'pbs.twimg.com' ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The member's own words about one work: the newest of its two newest tweets
+ * that says something beyond a link or an @reply. Throws when every read
+ * failed, so an outage is not cached as "no quote".
+ */
+async function readOwnQuote(
+  accountId: string,
+  workKey: string,
+  tweetIds: string[],
+  fetchTweet: typeof fetchClickHouseTweetPageData,
+): Promise<[string, ShelfOwnQuote] | null> {
+  const ids = tweetIds
+    .filter((id) => /^\d{1,20}$/.test(id))
+    .sort((a, b) => b.length - a.length || b.localeCompare(a))
+    .slice(0, 2)
+  let failures = 0
+  for (const id of ids) {
+    const tweet = await fetchTweet(id).catch(() => {
+      failures += 1
+      return null
+    })
+    const text = tweet?.account_id === accountId ? quoteText(tweet.full_text ?? '') : ''
+    if (tweet && text.length >= 12) return [workKey, { text, image: tweetPhoto(tweet) }]
+  }
+  if (ids.length && failures === ids.length) throw new Error('Tweets are unavailable')
+  return null
+}
+
+export const SHELF_QUOTE_LIMIT = 16
+
+/**
+ * One line in the member's own words for the tiles that show a quote
+ * (conversation tiles and larger tiles without a cover), four reads at a
+ * time. A work without a usable tweet gets no quote. Cached with the shelf.
+ */
+export async function getOwnQuotes(
+  accountId: string,
+  works: { workKey: string; evidenceTweetIds: string[] }[],
+  fetchTweet = fetchClickHouseTweetPageData,
+): Promise<Record<string, ShelfOwnQuote>> {
+  const picked = works.slice(0, SHELF_QUOTE_LIMIT)
+  if (!picked.length) return {}
+  const digest = createHash('sha256')
+    .update(picked.map((w) => `${w.workKey}|${w.evidenceTweetIds.join(',')}`).sort().join('\n'))
+    .digest('hex')
+  return unstable_cache(
+    async () => {
+      const out: Record<string, ShelfOwnQuote> = {}
+      let down = 0
+      for (let offset = 0; offset < picked.length; offset += 4) {
+        const batch = await Promise.all(
+          picked.slice(offset, offset + 4).map((w) =>
+            readOwnQuote(accountId, w.workKey, w.evidenceTweetIds, fetchTweet).catch(() => {
+              down += 1
+              return null
+            }),
+          ),
+        )
+        for (const entry of batch) if (entry) out[entry[0]] = entry[1]
+      }
+      // A tweet-source outage must not be cached as "no quotes" for an hour.
+      if (down === picked.length) throw new Error('Tweets are unavailable')
+      return out
+    },
+    ['shelf-own-quotes-v2', accountId, digest],
+    { revalidate: 3600, tags: [shelfTag(accountId)] },
+  )()
 }
 
 export class ShelfCurationError extends Error {

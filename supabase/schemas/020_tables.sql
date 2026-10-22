@@ -1054,7 +1054,7 @@ CREATE TABLE shelf.calls (
   run_id bigint REFERENCES shelf.runs(id),
   provider text NOT NULL CHECK (provider IN ('typesafe','openai','openrouter')),
   model text NOT NULL,
-  stage text NOT NULL CHECK (stage IN ('gate','name','stance')),
+  stage text NOT NULL CHECK (stage IN ('gate','name','stance','flavor')),
   reserved_usd numeric(12,8) NOT NULL CHECK (reserved_usd >= 0),
   actual_usd numeric(12,8) CHECK (actual_usd >= 0),
   status text NOT NULL DEFAULT 'reserved'
@@ -1115,7 +1115,12 @@ CREATE TABLE shelf.items (
   needs_title boolean NOT NULL,
   creator text,
   url text,
-  marks text[] NOT NULL DEFAULT '{}' CHECK (marks <@ ARRAY['loved','recommended','disliked']),
+  marks text[] NOT NULL DEFAULT '{}' CHECK (marks <@ ARRAY['loved','liked','recommended','disliked','hated']),
+  -- What the member did with the work (services/shelf/view.py RELATIONS); NULL before the
+  -- flavor stage has run. Verbs ("Read", "Played", "Used") come from the medium at display time.
+  relation text CHECK (relation IS NULL OR relation IN ('made','experienced','in_progress','intends','not_yet','discussed','cited','referenced','shared','mentioned')),
+  -- A finer format within a medium (film, tv, video, podcast, music), from the namer's kinds.
+  format text CHECK (format IS NULL OR format ~ '^[a-z_]{1,40}$'),
   evidence_tweet_ids text[] NOT NULL CHECK (cardinality(evidence_tweet_ids) >= 1),
   first_at timestamptz NOT NULL,
   last_at timestamptz NOT NULL,
@@ -1157,4 +1162,18 @@ CREATE TABLE shelf.curation (
   approved_hash text CHECK (approved_hash IS NULL OR approved_hash ~ '^[0-9a-f]{64}$'),
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (account_id, work_key)
+);
+
+-- Other members' tweets that link to or name a work on a shelf (services/shelf/echoes.py).
+-- Derived and rebuilt per account; read through get_shelf and get_shelf_echoes, which keep
+-- only current members, so an opt-out disappears without a rebuild.
+CREATE TABLE shelf.echoes (
+  account_id text NOT NULL CHECK (account_id ~ '^[0-9]{1,20}$'),
+  work_key text NOT NULL CHECK (length(work_key) BETWEEN 3 AND 300),
+  other_account_id text NOT NULL CHECK (other_account_id ~ '^[0-9]{1,20}$' AND other_account_id <> account_id),
+  tweet_ids text[] NOT NULL CHECK (cardinality(tweet_ids) BETWEEN 1 AND 50),
+  match text NOT NULL CHECK (match IN ('url','title')),
+  matcher text NOT NULL,
+  computed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, work_key, other_account_id)
 );

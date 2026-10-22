@@ -4334,27 +4334,48 @@ $$;
 
 -- The shelf for one account, with the owner's curation applied. Public callers
 -- (include_unapproved=false) see approved items whose content has not changed since the
--- approval; the owner sees everything, with status 'changed' for an approved item that
+-- approval and that have a real title (a placeholder such as "Untitled essay" waits for the
+-- owner to name it); the owner sees everything, with status 'changed' for an approved item that
 -- needs another look and 'hidden' items so they can be restored. Both require membership.
 CREATE FUNCTION public.get_shelf(p_account_id text, include_unapproved boolean)
 RETURNS TABLE (
   work_key text, shelf_row text, medium text, label text, needs_title boolean,
   creator text, url text, marks text[], evidence_tweet_ids text[],
   first_at timestamptz, last_at timestamptz, image_url text, image_source text,
-  status text, computed_at timestamptz
+  status text, computed_at timestamptz, echo_account_ids text[], relation text, format text
 ) LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
   SELECT i.work_key, i.shelf_row, i.medium, coalesce(c.title, i.label),
          i.needs_title AND c.title IS NULL, i.creator, i.url, i.marks,
          i.evidence_tweet_ids, i.first_at, i.last_at, i.image_url, i.image_source,
          CASE WHEN c.status='approved' AND c.approved_hash IS DISTINCT FROM i.content_hash
-              THEN 'changed' ELSE coalesce(c.status, 'pending') END, i.computed_at
+              THEN 'changed' ELSE coalesce(c.status, 'pending') END, i.computed_at,
+         ARRAY(SELECT e.other_account_id FROM shelf.echoes e
+               WHERE e.account_id=i.account_id AND e.work_key=i.work_key
+                 AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=e.other_account_id)
+               ORDER BY cardinality(e.tweet_ids) DESC, e.other_account_id LIMIT 50),
+         i.relation, i.format
   FROM shelf.items i
   LEFT JOIN shelf.curation c ON c.account_id=i.account_id AND c.work_key=i.work_key
   WHERE i.account_id=p_account_id
     AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=p_account_id)
-    AND (include_unapproved OR (c.status='approved' AND c.approved_hash=i.content_hash))
+    AND (include_unapproved OR (c.status='approved' AND c.approved_hash=i.content_hash
+                               AND NOT (i.needs_title AND c.title IS NULL)))
   ORDER BY i.shelf_row, cardinality(i.evidence_tweet_ids) DESC, i.last_at DESC
   LIMIT 2000
+$$;
+
+-- Other current members' tweets about one work. The caller must have checked that the
+-- work is visible to the requester (approved, or the requester curates the shelf).
+CREATE FUNCTION public.get_shelf_echoes(p_account_id text, p_work_key text)
+RETURNS TABLE (other_account_id text, tweet_ids text[], match text)
+LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+  SELECT e.other_account_id, e.tweet_ids, e.match
+  FROM shelf.echoes e
+  WHERE e.account_id=p_account_id AND e.work_key=p_work_key
+    AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=p_account_id)
+    AND EXISTS (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=e.other_account_id)
+  ORDER BY cardinality(e.tweet_ids) DESC, e.other_account_id
+  LIMIT 50
 $$;
 
 -- Owner curation. status NULL clears the decision (back to pending); title NULL keeps

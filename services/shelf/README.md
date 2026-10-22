@@ -18,7 +18,7 @@ choice, thresholds and their measurements are in `prototypes/shelf/research/` (l
 
 ## Guards in this phase
 
-- `--accounts` is required and must name accounts in `PHASE_ALLOWLIST` (@maskys_, @GarrisonLovely).
+- `--accounts` is required and must name accounts in `PHASE_ALLOWLIST` (@maskys_, @GarrisonLovely, @exGenesis, @christineist).
   There is no "all members" mode. Widening the list needs the product owner's go-ahead.
 - `POSTGRES_HOST` must be loopback unless `SHELF_ALLOW_REMOTE_DB=1`.
 - Membership (`bulletin.allowed_accounts`) is checked before processing and again before
@@ -44,7 +44,7 @@ Env: `POSTGRES_HOST/PORT/USER/PASSWORD` (defaults: local Supabase 127.0.0.1:5432
 
 1. Gateway route `member-tweets` in community-archive-control-panel (contract in `sources.py`),
    released before the worker uses `--source gateway`.
-2. Manual production migration `20261008120000_shelf.sql`, then `pnpm migrations:check`.
+2. Manual production migration `20261022120000_shelf.sql`, then `pnpm migrations:check`.
 3. Encrypted credentials for the TypeSafe and OpenAI keys on the worker host, as Bulletin does.
 4. A trigger: a daily sweep keyed on `private.archive_clickhouse_delivery.delivered_at`.
 Each step needs explicit authorization.

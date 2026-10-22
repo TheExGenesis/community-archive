@@ -1,10 +1,12 @@
 import {
   SHELF_MARKS,
+  SHELF_RELATIONS,
   SHELF_ROWS,
   SHELF_STATUSES,
   type Shelf,
   type ShelfItem,
   type ShelfMark,
+  type ShelfRelation,
   type ShelfRow,
   type ShelfRowKey,
   type ShelfStatus,
@@ -27,7 +29,13 @@ export interface ShelfDbRow {
   image_source: string | null
   status: string
   computed_at: string
+  echo_account_ids?: string[] | null
+  relation?: string | null
+  format?: string | null
 }
+
+/** Faces drawn per work; the drawer lists everyone. */
+export const SHELF_ECHO_LIMIT = 50
 
 export const ACCOUNT_ID_PATTERN = /^\d{1,20}$/
 const TWEET_ID_PATTERN = /^\d{1,20}$/
@@ -112,6 +120,17 @@ export function mapShelfRow(
     coverPath: coverPath(accountId, key, row.image_url, coverKey),
     imageSource: row.image_source,
     status,
+    relation: (SHELF_RELATIONS as readonly string[]).includes(row.relation ?? '')
+      ? (row.relation as ShelfRelation)
+      : null,
+    format: row.format && /^[a-z_]{1,40}$/.test(row.format) ? row.format : null,
+    echoAccountIds: Array.from(
+      new Set(
+        (row.echo_account_ids ?? []).filter(
+          (id) => ACCOUNT_ID_PATTERN.test(id) && id !== accountId,
+        ),
+      ),
+    ).slice(0, SHELF_ECHO_LIMIT),
   }
 }
 

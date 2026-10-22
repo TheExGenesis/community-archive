@@ -2399,6 +2399,20 @@ export type Database = {
           image_source: string
           status: string
           computed_at: string
+          echo_account_ids: string[]
+          relation: string
+          format: string
+        }[]
+      }
+      get_shelf_echoes: {
+        Args: {
+          p_account_id: string
+          p_work_key: string
+        }
+        Returns: {
+          other_account_id: string
+          tweet_ids: string[]
+          match: string
         }[]
       }
       get_simple_streamed_tweet_counts: {

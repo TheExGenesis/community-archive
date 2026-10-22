@@ -46,6 +46,16 @@ const base = {
 }
 let result: Record<string, unknown>
 const noop = () => {}
+const originalResizeObserver = window.ResizeObserver
+beforeAll(() => {
+  window.ResizeObserver = jest.fn().mockImplementation(() => ({
+    observe: jest.fn(),
+    disconnect: jest.fn(),
+  }))
+})
+afterAll(() => {
+  window.ResizeObserver = originalResizeObserver
+})
 beforeEach(() => {
   jest.clearAllMocks()
   result = { ...base, data: { pages: [empty] } }

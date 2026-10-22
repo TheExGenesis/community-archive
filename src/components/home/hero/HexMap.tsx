@@ -198,12 +198,14 @@ export default memo(function HexMap({
       const focused = !focus.size || focus.has(c.region)
       let fill = mix(color, dark ? '#252530' : '#ffffff', dark ? 0.15 : 0.27)
       if (layer === 'week' && !heat) {
-        fill = mix(
-          fill,
-          dark ? '#18181b' : '#ffffff',
-          Math.max(0, 0.4 - Math.log1p(c.activity) * 0.18),
-        )
-        if (showDetails && c.archived === 0) fill = mix(fill, '#303038', 0.15)
+        if (showDetails) {
+          fill = mix(
+            fill,
+            dark ? '#18181b' : '#ffffff',
+            Math.max(0, 0.4 - Math.log1p(c.activity) * 0.18),
+          )
+          if (c.archived === 0) fill = mix(fill, '#303038', 0.15)
+        }
       } else if (heat ? heat.get(id) : c.archived) {
         const strength = Math.min(
           1,

@@ -1058,6 +1058,12 @@ export type Database = {
         }
         Relationships: []
       }
+      account_collection_preferences: {
+        Row: { account_id: string; enabled: boolean; updated_at: string }
+        Insert: { account_id: string; enabled: boolean; updated_at?: string }
+        Update: { account_id?: string; enabled?: boolean; updated_at?: string }
+        Relationships: []
+      }
       profile_curation: {
         Row: {
           account_id: string

@@ -130,8 +130,12 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
     [active, pins.data, selfLocation],
   )
   return (
-    <section className={styles.hero} aria-label="Explore the Community Archive">
-      <h1 className="sr-only">Community Archive</h1>
+    <section
+      id="community-map"
+      className={styles.hero}
+      aria-label="Explore the Community Archive"
+    >
+      <h2 className="sr-only">Explore the community</h2>
       <ResizableHero>
         <div className={styles.mapColumn}>
           {map.data ? (

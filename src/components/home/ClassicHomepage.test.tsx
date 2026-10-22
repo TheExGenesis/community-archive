@@ -4,6 +4,8 @@ import ClassicHomepage from './ClassicHomepage'
 import type { HomepageData } from '@/lib/portal/data'
 import { createServerClient } from '@/utils/supabase'
 
+jest.mock('./classicHomepage.module.css', () => ({}))
+
 jest.mock('next/headers', () => ({ cookies: jest.fn(() => ({})) }))
 jest.mock('next/dynamic', () => {
   const mockReact = jest.requireActual<typeof import('react')>('react')
@@ -22,14 +24,13 @@ jest.mock('./hero/HexHero', () => ({
   __esModule: true,
   default: () => (
     <section data-testid="hex-hero">
-      <div data-testid="homepage-search" />
       <a href="#daily-digest">Continue to digest</a>
     </section>
   ),
 }))
-jest.mock('./hero/HeroTrends', () => ({
+jest.mock('@/components/HomepageSearch', () => ({
   __esModule: true,
-  default: () => null,
+  default: () => <div data-testid="homepage-search" />,
 }))
 jest.mock('./FeaturedCommunityApps', () => ({
   __esModule: true,
@@ -53,10 +54,6 @@ jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
 const pending = new Promise<never>(() => undefined)
 const data: HomepageData = {
   globalStats: pending,
-  overview: pending,
-  stream: pending,
-  recentBangers: pending,
-  historicalBangers: pending,
   trends: pending,
   research: pending,
 }
@@ -85,6 +82,22 @@ describe('ClassicHomepage audience actions', () => {
     expect(screen.queryByTestId('hero-cta')).not.toBeInTheDocument()
     expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
+    const sections = [
+      screen.getByRole('heading', { name: 'Community Archive' }),
+      screen.getByTestId('homepage-search'),
+      screen.getByTestId('homepage-people'),
+      screen.getByTestId('hex-hero'),
+      screen.getByTestId('shared-dashboard'),
+      screen.getByTestId('featured-community-apps'),
+      screen.getByTestId('archive-upload'),
+      screen.getByTestId('testimonials'),
+    ]
+    sections.slice(1).forEach((section, index) => {
+      expect(
+        sections[index].compareDocumentPosition(section) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    })
   })
 
   it('keeps the CTA above the same dashboard for guests', async () => {

@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
 import HexHero from './hero/HexHero'
+import styles from './classicHomepage.module.css'
+import HomepageSearch from '@/components/HomepageSearch'
 import FeaturedCommunityApps from './FeaturedCommunityApps'
 import Testimonials from '@/components/home/Testimonials'
 import type { HomepageData } from '@/lib/portal/data'
@@ -19,10 +21,10 @@ const DynamicHeroCTAButtons = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex flex-col justify-center gap-4 sm:flex-row sm:gap-6">
-        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
-        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
-        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
+      <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
+        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
+        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
+        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
       </div>
     ),
   },
@@ -62,6 +64,73 @@ export default async function ClassicHomepage({
 
   return (
     <main>
+      <section
+        className={`${styles.intro} overflow-hidden bg-card pb-6 pt-8 dark:bg-background md:pb-8 md:pt-10`}
+      >
+        <div
+          className={`${styles.content} relative z-10 mx-auto w-full max-w-5xl space-y-6 px-4 text-center sm:px-6 md:space-y-8 lg:px-8`}
+        >
+          <div className="space-y-4">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+              Community Archive
+            </h1>
+            <p className="text-base leading-6 text-muted-foreground sm:text-xl sm:leading-8">
+              <Suspense
+                fallback={
+                  <>
+                    We preserve public conversations as open source
+                    infrastructure.
+                  </>
+                }
+              >
+                <HomepageStats data={data.globalStats} />
+              </Suspense>
+            </p>
+          </div>
+
+          <div className="!mt-7 md:!mt-8">
+            <HomepageSearch />
+          </div>
+          {showCta && (
+            <div className={styles.actions}>
+              <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
+            </div>
+          )}
+
+          {/* The backers line is a footnote to the social proof above it. */}
+          <div className="!mt-6 md:!mt-8">
+            <div className={styles.people}>{homepagePeople}</div>
+
+            <p className="mt-1 text-xs text-muted-foreground/80">
+              Backed by{' '}
+              <Link
+                href="https://survivalandflourishing.fund/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium transition-colors hover:text-brand"
+              >
+                Survival and Flourishing Fund
+              </Link>{' '}
+              and{' '}
+              <Link
+                href="https://x.com/VitalikButerin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium transition-colors hover:text-brand"
+              >
+                Vitalik Buterin
+              </Link>
+            </p>
+            <Link
+              href="#community-map"
+              className="mt-5 inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-2 text-sm font-medium text-brand-deep transition-colors hover:bg-brand/20"
+            >
+              Explore the community ↓
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <HexHero
         stats={
           <Suspense fallback={<>Preserving public conversations.</>}>
@@ -69,31 +138,12 @@ export default async function ClassicHomepage({
           </Suspense>
         }
       />
-      <section
-        className="mx-auto max-w-5xl space-y-5 px-4 py-6 text-center"
-        aria-label="Join the archive"
-      >
-        {showCta && <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />}
-        {homepagePeople}
-        <p className="text-xs text-muted-foreground">
-          Backed by{' '}
-          <Link
-            href="https://survivalandflourishing.fund/"
-            className="hover:underline"
-          >
-            Survival and Flourishing Fund
-          </Link>{' '}
-          and{' '}
-          <Link href="https://x.com/VitalikButerin" className="hover:underline">
-            Vitalik Buterin
-          </Link>
-          .
-        </p>
-      </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
         <HomepagePortal data={data} isMember={isMember} />
       </section>
+
+      <FeaturedCommunityApps />
 
       <section
         id="upload-archive"
@@ -108,7 +158,6 @@ export default async function ClassicHomepage({
         </div>
       </section>
 
-      <FeaturedCommunityApps />
       <Testimonials />
     </main>
   )

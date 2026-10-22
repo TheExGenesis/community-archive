@@ -1,0 +1,57 @@
+/* Leave a glimpse of the map on short laptop screens, including the guest CTA. */
+@media (min-width: 768px) and (max-height: 740px) {
+  .intro {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  .content > * + * {
+    margin-top: 12px !important;
+  }
+  .intro h1 {
+    font-size: 40px;
+    line-height: 1.1;
+  }
+  .intro form input {
+    height: 40px;
+  }
+  .intro form + div {
+    margin-top: 12px;
+  }
+  .actions button,
+  .actions a {
+    height: 40px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 767px) {
+  .content > * + * {
+    margin-top: 16px !important;
+  }
+  .actions > div > div {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  .actions button,
+  .actions a {
+    width: auto;
+    height: 36px;
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+  .actions svg {
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+  }
+  .people :global(.flex-wrap) {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .people a {
+    flex-shrink: 0;
+  }
+}

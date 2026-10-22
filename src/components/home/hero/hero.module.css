@@ -1,4 +1,5 @@
 .hero {
+  scroll-margin-top: 64px;
   max-width: 1440px;
   margin: auto;
   padding: 8px 24px 16px;

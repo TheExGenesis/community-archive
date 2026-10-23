@@ -272,7 +272,7 @@ it('plots immediately after the signed-in visitor saves consent', async () => {
   submit()
   fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
   await screen.findByText('You are here, @me_one.')
-  expect(onLocated).toHaveBeenLastCalledWith({ username: 'me_one', cell: 4 })
+  expect(onLocated).toHaveBeenLastCalledWith([{ username: 'me_one', cell: 4 }])
   expect(fetchMock.mock.calls.map(([url]) => url.split('?')[0])).toEqual([
     '/api/hex-map/me',
     '/api/opt-in',

@@ -52,6 +52,8 @@ export default memo(function HexMap({
   coverageLive,
   finder,
   selfLocation,
+  showDefaultLabels,
+  onToggleDefaultLabels,
 }: {
   snapshot: HexSnapshot
   selected: number[]
@@ -69,6 +71,8 @@ export default memo(function HexMap({
   onClearHeat: () => void
   scrubber: ReactNode
   coverageLive: boolean
+  showDefaultLabels: boolean
+  onToggleDefaultLabels: () => void
   finder?: ReactNode
   selfLocation?: { username: string; cell: number } | null
 }) {
@@ -714,6 +718,17 @@ export default memo(function HexMap({
               {value === 'week' ? 'Activity' : 'Archived'}
             </button>
           ))}
+        </div>
+        <div className={styles.defaultLabelsControl}>
+          <button
+            type="button"
+            aria-pressed={!showDefaultLabels}
+            onClick={onToggleDefaultLabels}
+          >
+            {showDefaultLabels
+              ? 'Hide default usernames'
+              : 'Show default usernames'}
+          </button>
         </div>
         {(heatTerm || layer === 'archived') && (
           <p>

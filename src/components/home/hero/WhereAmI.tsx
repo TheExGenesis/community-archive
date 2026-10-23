@@ -14,6 +14,7 @@ type Result = {
   status?: 'sign_in' | 'opt_in' | 'not_mapped' | 'located'
   username?: string
   error?: string
+  isSelf?: boolean
   person?: SelfLocation
 }
 
@@ -24,6 +25,7 @@ export default function WhereAmI({
 }) {
   const { enabled: previewEnabled, view } = usePreviewSession()
   const preview = previewEnabled && view !== 'signed-out'
+  const [canSearch, setCanSearch] = useState(false)
   const [name, setName] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [busy, setBusy] = useState(false)
@@ -44,9 +46,10 @@ export default function WhereAmI({
   }, [cancel])
 
   const locate = useCallback(
-    async (query = '') => {
+    async (query = '', findSelf = false) => {
+      const publicLookup = preview && !findSelf
       const handle = query.trim().replace(/^@/, '')
-      if (preview && !/^\w{1,15}$/.test(handle)) {
+      if (publicLookup && !/^\w{1,15}$/.test(handle)) {
         cancel()
         setBusy(false)
         callback.current(null)
@@ -63,19 +66,19 @@ export default function WhereAmI({
       try {
         const response = await fetch(
           mapUrl(
-            `${preview ? 'lookup' : 'me'}?name=${encodeURIComponent(preview ? handle : query)}`,
+            `${publicLookup ? 'lookup' : 'me'}?name=${encodeURIComponent(preview ? handle : query)}`,
           ),
           { signal: controller.signal, cache: 'no-store' },
         )
         const payload = await response.json()
         const person =
-          preview && response.ok
+          publicLookup && response.ok
             ? (payload as MapLookup).people.find(
                 (p) => p.username.toLowerCase() === handle.toLowerCase(),
               )
             : undefined
         const data: Result =
-          preview && response.ok
+          publicLookup && response.ok
             ? person
               ? {
                   status: 'located',
@@ -87,6 +90,7 @@ export default function WhereAmI({
         if (response.ok && data.status === 'located' && data.person) {
           callback.current(data.person)
           setName(`@${data.person.username}`)
+          setCanSearch(true)
         }
         setResult(data)
       } catch {
@@ -112,12 +116,13 @@ export default function WhereAmI({
         (account !== undefined && account !== next)
       ) {
         clear()
+        setCanSearch(false)
         setName('')
       }
       account = next
     })
     if (new URLSearchParams(window.location.search).get('findme') === '1')
-      void locate()
+      void locate('', true)
     return () => {
       subscription.unsubscribe()
       cancel()
@@ -157,7 +162,7 @@ export default function WhereAmI({
         optedIn: true,
         termsVersion: 'v1.0',
       })
-      if (request === generation.current) await locate()
+      if (request === generation.current) await locate(name)
     } catch (error) {
       if (request === generation.current) {
         setResult({
@@ -177,7 +182,9 @@ export default function WhereAmI({
       <form
         role="search"
         aria-label={
-          preview ? 'Find a username on the map' : 'Find yourself on the map'
+          preview || canSearch
+            ? 'Find a username on the map'
+            : 'Find yourself on the map'
         }
         className={styles.finderForm}
         onSubmit={(event) => {
@@ -186,8 +193,10 @@ export default function WhereAmI({
         }}
       >
         <input
-          aria-label={preview ? 'Find username' : 'Where am I?'}
-          placeholder={preview ? 'Find any username…' : 'Where am I?'}
+          aria-label={preview || canSearch ? 'Find username' : 'Where am I?'}
+          placeholder={
+            preview || canSearch ? 'Find any username…' : 'Where am I?'
+          }
           value={name}
           maxLength={16}
           autoComplete="off"
@@ -214,7 +223,7 @@ export default function WhereAmI({
                 ? 'Opening Twitter…'
                 : 'Finding your place…'
               : result?.status === 'located'
-                ? preview
+                ? preview || result.isSelf === false
                   ? `@${result.person?.username} is here.`
                   : `You are here, @${result.person?.username}.`
                 : result?.error}

@@ -241,3 +241,46 @@ it('does not plot an unavailable username in preview', async () => {
     expect.objectContaining({ cell: expect.any(Number) }),
   )
 })
+
+it('lets an opted-in visitor search another member and identifies the result correctly', async () => {
+  fetchMock.mockResolvedValue(
+    response(200, {
+      status: 'located',
+      isSelf: false,
+      person: { username: 'someone', cell: 5 },
+    }),
+  )
+  const onLocated = jest.fn()
+  render(<WhereAmI onLocated={onLocated} />)
+  fireEvent.change(screen.getByRole('textbox', { name: 'Where am I?' }), {
+    target: { value: '@someone' },
+  })
+  submit()
+  await screen.findByText('@someone is here.')
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('/me?name=%40someone'),
+    expect.anything(),
+  )
+  expect(
+    screen.getByRole('textbox', { name: 'Find username' }),
+  ).toHaveAttribute('placeholder', 'Find any username…')
+  expect(onLocated).toHaveBeenLastCalledWith({ username: 'someone', cell: 5 })
+})
+
+it('resumes the authenticated self flow after OAuth even in the default preview view', async () => {
+  window.history.replaceState(null, '', '/?findme=1')
+  fetchMock.mockResolvedValue(
+    response(403, { status: 'opt_in', username: 'me' }),
+  )
+  render(
+    <PreviewSessionProvider enabled>
+      <WhereAmI onLocated={jest.fn()} />
+    </PreviewSessionProvider>,
+  )
+  await screen.findByRole('button', { name: 'Opt in and find me' })
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('/me?name='),
+    expect.anything(),
+  )
+  expect(updateOptIn).not.toHaveBeenCalled()
+})

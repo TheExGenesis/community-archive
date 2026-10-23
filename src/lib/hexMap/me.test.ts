@@ -80,8 +80,31 @@ it('does not trust client-mutable profile identity', async () => {
   expect((await GET(request())).status).toBe(403)
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })
-it('cannot be used to plot a different account', async () => {
+it('lets an opted-in user locate another member', async () => {
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(['me_one', 'someone']),
+    blocked: new Set(),
+    blockedIds: new Set(),
+  })
+  const res = await GET(request('&name=someone'))
+  expect(res.status).toBe(200)
+  expect(await res.json()).toEqual({
+    status: 'located',
+    isSelf: false,
+    person: { username: 'someone', cell: 5 },
+  })
+  expect(mapGateway).toHaveBeenCalledWith('hex-lookup', { names: 'someone' })
+})
+it('requires viewer consent before searching another username', async () => {
+  range.mockResolvedValue({ data: [], error: null })
   expect((await GET(request('&name=someone'))).status).toBe(403)
+  expect(mapGateway).not.toHaveBeenCalled()
+})
+it('does not plot a target excluded by policy', async () => {
+  expect((await GET(request('&name=someone'))).status).toBe(404)
+})
+it('rejects invalid target names', async () => {
+  expect((await GET(request('&name=bad!'))).status).toBe(400)
   expect(mapGateway).not.toHaveBeenCalled()
 })
 it('returns only the verified self pin with no-store caching', async () => {
@@ -90,6 +113,7 @@ it('returns only the verified self pin with no-store caching', async () => {
   expect(res.headers.get('Cache-Control')).toBe('private, no-store')
   expect(await res.json()).toEqual({
     status: 'located',
+    isSelf: true,
     person: { username: 'me_one', cell: 4 },
   })
   expect(mapGateway).toHaveBeenCalledWith('hex-lookup', { names: 'me_one' })

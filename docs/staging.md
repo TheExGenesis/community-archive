@@ -60,21 +60,16 @@ must be the public anonymous key, never the production service-role key.
 
 ### Reviewing real members on the homepage map
 
-The map geometry and gateway positions use production members, while preview
-authentication and membership checks use staging. A real username can therefore
-be absent from an unconfigured preview even when it appears on the live map.
+The homepage lookup reads the existing authenticated analytical gateway directly.
+The gateway's `hexMembers` applies its freshness-checked production membership
+projection, including explicit opt-outs, before returning any identities. Preview
+lookups use those filtered public results without rechecking them against the
+unrelated staging directory. Production retains its additional live Supabase
+policy check. No production website proxy, firewall bypass, or new secret is needed.
 
-For an approved production-backed map preview, set `HEX_MAP_PREVIEW_READ_SECRET`
-only on the intended Preview branch. The lookup route then reads the public
-production `/api/hex-map/lookup` endpoint with an `x-ca-hex-map-preview` header.
-Production bot protection needs a separately approved exception matching GET,
-that exact path, and the secret header value. Keep all other firewall rules and
-preview protection in place. Production still applies current membership and
-opt-out checks; authentication and writes remain on staging. No production
-database credentials are supplied to the preview. Remove the branch variable
-and firewall exception when the review is over; redeploy the preview after
-removing the variable. Without the variable, lookup uses the original staging
-policy checks.
+Authentication and consent writes still use staging. An opted-in staging user can
+search other public map members; the signed-out preview view exercises the OAuth
+and explicit consent flow. Preview view controls never grant server authorization.
 
 ### Reviewing production Bulletin items in a protected PR preview
 

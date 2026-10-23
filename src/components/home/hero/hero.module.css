@@ -373,18 +373,10 @@
 }
 .selectionAvatars {
   display: flex;
+  align-items: center;
   padding-left: 4px;
 }
-.selectionAvatars button {
-  margin-left: -4px;
-  border-radius: 50%;
-}
-.selectionAvatars button:hover,
-.selectionAvatars button:focus-visible {
-  position: relative;
-  z-index: 1;
-}
-.selectionAvatars button:focus-visible {
+.selectionAvatars:focus-visible {
   outline: 2px solid hsl(var(--brand-deep));
   outline-offset: 2px;
 }

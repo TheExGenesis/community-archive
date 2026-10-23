@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/portal/auth'
 import { getTwitterProviderId, getTwitterUsername } from '@/lib/twitterIdentity'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getAppPolicy } from '@/lib/community-apps/data'
+import { mapGateway } from '@/lib/hexMap/gateway'
 import { readMapLookup } from '@/lib/hexMap/lookup'
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import snapshot from '@/lib/hexMap/snapshot.json'
@@ -97,9 +98,31 @@ export async function GET(request: NextRequest) {
         status: 'not_mapped',
         username,
         error: isSelf
-          ? 'Your account is not available on this map yet. New opt-ins can take time to appear.'
+          ? 'We do not have a saved map location for your account yet.'
           : 'This username is not available on the map.',
       })
+    // Fresh opt-ins use their verified account ID without waiting for the
+    // analytical membership projection. Other searches keep the public policy.
+    if (isSelf) {
+      const result = await mapGateway<{
+        version: string
+        person: { account_id: string; cell: number } | null
+      }>('hex-self', { account_id: accountId })
+      if (result.version !== MAP_VERSION)
+        throw new Error('Map version mismatch')
+      const person = result.person
+      if (
+        person?.account_id !== accountId ||
+        !Number.isInteger(person.cell) ||
+        !snapshot.cells[person.cell]
+      )
+        return unavailable()
+      return reply(200, {
+        status: 'located',
+        person: { username, cell: person.cell },
+        isSelf: true,
+      })
+    }
     const result = await readMapLookup({ names: targets.join(',') })
     if (result.version !== MAP_VERSION) throw new Error('Map version mismatch')
     const people = targets.flatMap((target) => {

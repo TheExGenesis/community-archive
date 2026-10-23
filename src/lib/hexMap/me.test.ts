@@ -54,14 +54,18 @@ beforeEach(() => {
     blocked: new Set(),
     blockedIds: new Set(),
   })
-  jest.mocked(mapGateway).mockResolvedValue({
-    version: MAP_VERSION,
-    people: [
-      { account_id: '123', username: 'me_one', cell: 4 },
-      { account_id: '456', username: 'someone', cell: 5 },
-    ],
-    counts: { 4: 100 },
-  })
+  jest.mocked(mapGateway).mockImplementation(async (endpoint) =>
+    endpoint === 'hex-self'
+      ? { version: MAP_VERSION, person: { account_id: '123', cell: 4 } }
+      : {
+          version: MAP_VERSION,
+          people: [
+            { account_id: '123', username: 'me_one', cell: 4 },
+            { account_id: '456', username: 'someone', cell: 5 },
+          ],
+          counts: { 4: 100 },
+        },
+  )
 })
 it('requires authentication, with no downstream identity reads', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue(null)
@@ -116,7 +120,7 @@ it('returns only the verified self pin with no-store caching', async () => {
     isSelf: true,
     person: { username: 'me_one', cell: 4 },
   })
-  expect(mapGateway).toHaveBeenCalledWith('hex-lookup', { names: 'me_one' })
+  expect(mapGateway).toHaveBeenCalledWith('hex-self', { account_id: '123' })
 })
 it('requires explicit opt-in even when an archive makes the account a member', async () => {
   range.mockResolvedValue({ data: [], error: null })
@@ -191,13 +195,13 @@ it('fails closed on unavailable consent or policy', async () => {
   expect(mapGateway).not.toHaveBeenCalled()
 })
 it.each([
-  { people: [] },
-  { people: [{ account_id: '456', username: 'me_one', cell: 4 }] },
-  { people: [{ account_id: '123', username: 'me_one', cell: -1 }] },
+  { person: null },
+  { person: { account_id: '456', cell: 4 } },
+  { person: { account_id: '123', cell: -1 } },
 ])(
   'does not guess a location when the verified account is absent',
-  async ({ people }) => {
-    jest.mocked(mapGateway).mockResolvedValue({ version: MAP_VERSION, people })
+  async ({ person }) => {
+    jest.mocked(mapGateway).mockResolvedValue({ version: MAP_VERSION, person })
     const res = await GET(request())
     expect(res.status).toBe(404)
     expect((await res.json()).status).toBe('not_mapped')
@@ -262,4 +266,34 @@ it('rejects invalid and oversized batches before lookup', async () => {
       (await GET(request(`&name=${encodeURIComponent(names)}`))).status,
     ).toBe(400)
   expect(mapGateway).not.toHaveBeenCalled()
+})
+it('locates a fresh opt-in before either directory or analytical membership catches up', async () => {
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(),
+    blocked: new Set(),
+    blockedIds: new Set(),
+  })
+  const res = await GET(request('&account_id=456'))
+  expect(res.status).toBe(200)
+  expect(await res.json()).toEqual({
+    status: 'located',
+    isSelf: true,
+    person: { username: 'me_one', cell: 4 },
+  })
+  expect(mapGateway).toHaveBeenCalledTimes(1)
+  expect(mapGateway).toHaveBeenCalledWith('hex-self', { account_id: '123' })
+})
+it('reports a missing saved location without promising a membership-sync delay', async () => {
+  jest
+    .mocked(mapGateway)
+    .mockResolvedValue({ version: MAP_VERSION, person: null })
+  const res = await GET(request())
+  expect(res.status).toBe(404)
+  expect((await res.json()).error).toBe(
+    'We do not have a saved map location for your account yet.',
+  )
+})
+it('fails closed when the private self location backend is unavailable', async () => {
+  jest.mocked(mapGateway).mockRejectedValueOnce(new Error('offline'))
+  expect((await GET(request())).status).toBe(503)
 })

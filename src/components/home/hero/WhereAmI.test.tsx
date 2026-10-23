@@ -1,3 +1,4 @@
+import { PreviewSessionProvider } from '@/components/PreviewSession'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import WhereAmI from './WhereAmI'
 import { updateOptIn } from '@/lib/optInApi'
@@ -136,4 +137,50 @@ it('clears a pin when the signed-in account changes', async () => {
   act(() => authChange('SIGNED_IN', { user: { id: 'second' } }))
   expect(onLocated).toHaveBeenLastCalledWith(null)
   expect(screen.getByRole('textbox', { name: 'Where am I?' })).toHaveValue('')
+})
+
+it('lets preview visitors locate another public member without a session or consent mutation', async () => {
+  fetchMock.mockResolvedValue(
+    response(200, {
+      people: [{ username: 'Other_User', cell: 4 }],
+      counts: {},
+    }),
+  )
+  const onLocated = jest.fn()
+  render(
+    <PreviewSessionProvider enabled>
+      <WhereAmI onLocated={onLocated} />
+    </PreviewSessionProvider>,
+  )
+  fireEvent.change(screen.getByRole('textbox', { name: 'Find username' }), {
+    target: { value: '@other_user' },
+  })
+  submit()
+  await screen.findByText('@Other_User is here.')
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('lookup?name=other_user'),
+    expect.anything(),
+  )
+  expect(onLocated).toHaveBeenLastCalledWith({
+    username: 'Other_User',
+    cell: 4,
+  })
+  expect(updateOptIn).not.toHaveBeenCalled()
+})
+it('does not plot an unavailable username in preview', async () => {
+  fetchMock.mockResolvedValue(response(200, { people: [], counts: {} }))
+  const onLocated = jest.fn()
+  render(
+    <PreviewSessionProvider enabled>
+      <WhereAmI onLocated={onLocated} />
+    </PreviewSessionProvider>,
+  )
+  fireEvent.change(screen.getByRole('textbox', { name: 'Find username' }), {
+    target: { value: 'unknown' },
+  })
+  submit()
+  await screen.findByText('This username is not available on the map.')
+  expect(onLocated).not.toHaveBeenCalledWith(
+    expect.objectContaining({ cell: expect.any(Number) }),
+  )
 })

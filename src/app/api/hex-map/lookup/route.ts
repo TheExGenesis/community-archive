@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     // Preview auth uses staging, but the map contains production members. Read
     // the public production endpoint so its current consent policy is applied
     // without granting the preview production credentials or write access.
-    if (process.env.VERCEL_ENV === 'preview') {
+    const previewReadSecret = process.env.HEX_MAP_PREVIEW_READ_SECRET
+    if (process.env.VERCEL_ENV === 'preview' && previewReadSecret) {
       const url = new URL(
         'https://www.community-archive.org/api/hex-map/lookup',
       )
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
         version: MAP_VERSION,
       }).toString()
       const response = await fetch(url, {
+        headers: { 'x-ca-hex-map-preview': previewReadSecret },
         cache: 'no-store',
         signal: AbortSignal.timeout(8000),
       })

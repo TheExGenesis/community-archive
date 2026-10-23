@@ -16,6 +16,7 @@ jest.mock('@/lib/featuredArchives', () => ({
 const fetchMock = jest.fn()
 const originalFetch = global.fetch
 const originalEnvironment = process.env.VERCEL_ENV
+const originalPreviewSecret = process.env.HEX_MAP_PREVIEW_READ_SECRET
 const result = {
   version: MAP_VERSION,
   counts: { 1414: 1 },
@@ -29,6 +30,7 @@ const request = (query = 'name=exgenesis') =>
 beforeEach(() => {
   jest.clearAllMocks()
   process.env.VERCEL_ENV = 'preview'
+  process.env.HEX_MAP_PREVIEW_READ_SECRET = 'test-only-preview-secret'
   global.fetch = fetchMock
   fetchMock.mockResolvedValue({ ok: true, json: async () => result })
 })
@@ -36,6 +38,9 @@ afterAll(() => {
   global.fetch = originalFetch
   if (originalEnvironment === undefined) delete process.env.VERCEL_ENV
   else process.env.VERCEL_ENV = originalEnvironment
+  if (originalPreviewSecret === undefined)
+    delete process.env.HEX_MAP_PREVIEW_READ_SECRET
+  else process.env.HEX_MAP_PREVIEW_READ_SECRET = originalPreviewSecret
 })
 
 it('uses current production policy for real map members in staging previews', async () => {
@@ -46,7 +51,11 @@ it('uses current production policy for real map members in staging previews', as
     new URL(
       `https://www.community-archive.org/api/hex-map/lookup?name=exgenesis&cells=&version=${MAP_VERSION}`,
     ),
-    { cache: 'no-store', signal: expect.any(AbortSignal) },
+    {
+      headers: { 'x-ca-hex-map-preview': 'test-only-preview-secret' },
+      cache: 'no-store',
+      signal: expect.any(AbortSignal),
+    },
   )
   expect(response.headers.get('Cache-Control')).toBe('private, no-store')
   expect(mapGateway).not.toHaveBeenCalled()
@@ -78,15 +87,19 @@ it('rejects invalid input before requesting production', async () => {
   expect(fetchMock).not.toHaveBeenCalled()
 })
 
-it('keeps production on its own gateway and authoritative membership checks', async () => {
-  process.env.VERCEL_ENV = 'production'
-  jest.mocked(mapGateway).mockResolvedValue(result)
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    members: new Set(['exgenesis']),
-    blocked: new Set(),
-    blockedIds: new Set(),
-  })
-  expect((await (await GET(request())).json()).people).toEqual(result.people)
-  expect(fetchMock).not.toHaveBeenCalled()
-  expect(getAppPolicy).toHaveBeenCalledWith(['exgenesis'])
-})
+it.each(['production', 'unconfigured preview'])(
+  'keeps %s on its own gateway and authoritative membership checks',
+  async (mode) => {
+    if (mode === 'production') process.env.VERCEL_ENV = 'production'
+    else delete process.env.HEX_MAP_PREVIEW_READ_SECRET
+    jest.mocked(mapGateway).mockResolvedValue(result)
+    jest.mocked(getAppPolicy).mockResolvedValue({
+      members: new Set(['exgenesis']),
+      blocked: new Set(),
+      blockedIds: new Set(),
+    })
+    expect((await (await GET(request())).json()).people).toEqual(result.people)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(getAppPolicy).toHaveBeenCalledWith(['exgenesis'])
+  },
+)

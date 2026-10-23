@@ -83,9 +83,7 @@ it('simulates one consent action, plots a public member, and resets on sign-out'
     target: { value: 'exgenesis' },
   })
   submit()
-  fireEvent.click(
-    await screen.findByRole('button', { name: 'Opt In' }),
-  )
+  fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
   await screen.findByText('@exgenesis is here.')
   expect(
     screen.getByText('Thanks for opting in to the Community Archive!'),
@@ -143,4 +141,48 @@ it('does not plot a late response after sign-out', async () => {
   expect(onLocated).not.toHaveBeenCalledWith(
     expect.objectContaining({ cell: 4 }),
   )
+})
+
+it('plots immediately after the signed-in visitor saves consent', async () => {
+  getSession.mockResolvedValue({
+    data: {
+      session: {
+        user: {
+          identities: [
+            {
+              provider: 'twitter',
+              identity_data: { user_name: 'me_one', provider_id: '123' },
+            },
+          ],
+        },
+      },
+    },
+  })
+  fetchMock
+    .mockResolvedValueOnce(
+      response(403, { status: 'opt_in', username: 'me_one' }),
+    )
+    .mockResolvedValueOnce(response(200, { success: true }))
+    .mockResolvedValueOnce(
+      response(200, {
+        status: 'located',
+        isSelf: true,
+        person: { username: 'me_one', cell: 4 },
+      }),
+    )
+  const onLocated = jest.fn()
+  render(
+    <CommunityOptInProvider>
+      <WhereAmI onLocated={onLocated} />
+    </CommunityOptInProvider>,
+  )
+  submit()
+  fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
+  await screen.findByText('You are here, @me_one.')
+  expect(onLocated).toHaveBeenLastCalledWith({ username: 'me_one', cell: 4 })
+  expect(fetchMock.mock.calls.map(([url]) => url.split('?')[0])).toEqual([
+    '/api/hex-map/me',
+    '/api/opt-in',
+    '/api/hex-map/me',
+  ])
 })

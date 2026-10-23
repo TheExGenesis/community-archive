@@ -8,6 +8,7 @@ import {
 } from '@/lib/twitterIdentity'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getAppPolicy } from '@/lib/community-apps/data'
+import { mapGateway } from '@/lib/hexMap/gateway'
 import { readMapLookup } from '@/lib/hexMap/lookup'
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import snapshot from '@/lib/hexMap/snapshot.json'
@@ -98,16 +99,26 @@ export async function GET(request: NextRequest) {
         status: 'not_mapped',
         username,
         error: isSelf
-          ? 'Your account is not available on this map yet. New opt-ins can take time to appear.'
+          ? 'We do not have a saved map location for your account yet.'
           : 'This username is not available on the map.',
       })
-    const result = await readMapLookup({ names: target })
-    if (result.version !== MAP_VERSION) throw new Error('Map version mismatch')
-    const person = result.people.find(
-      (p) =>
-        (!isSelf || p.account_id === accountId) &&
-        p.username.toLowerCase() === target,
-    )
+    // The saved map includes nonmembers. Consent above is authoritative now;
+    // waiting for the gateway's member projection would hide a fresh opt-in.
+    // Only self can use this path, keyed by the verified OAuth provider ID.
+    let person: { username: string; cell: number } | undefined
+    if (isSelf) {
+      const result = await mapGateway<{
+        version: string
+        person: { account_id: string; cell: number } | null
+      }>('hex-self', { account_id: accountId })
+      if (result.version !== MAP_VERSION)
+        throw new Error('Map version mismatch')
+      if (result.person?.account_id === accountId)
+        person = { username, cell: result.person.cell }
+    } else {
+      const result = await readMapLookup({ names: target })
+      person = result.people.find((p) => p.username.toLowerCase() === target)
+    }
     if (
       !person ||
       !Number.isInteger(person.cell) ||

@@ -219,7 +219,11 @@ export function CommunityOptInProvider({ children }: { children: ReactNode }) {
             </p>
           )}
           {error && <p role="alert">{error}</p>}
-          <Button disabled={busy} onClick={() => void confirm(dialog === true)}>
+          <Button
+            className="bg-brand text-brand-foreground hover:bg-brand/90"
+            disabled={busy}
+            onClick={() => void confirm(dialog === true)}
+          >
             {busy ? 'Processing…' : 'Opt In'}
           </Button>
         </DialogContent>

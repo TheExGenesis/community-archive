@@ -160,8 +160,9 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
               <HexMap
                 snapshot={currentSnapshot!}
                 selfLocations={selfLocations}
-                finder={
+                finder={(hasVisibleUsernames) => (
                   <WhereAmI
+                    hasVisibleUsernames={hasVisibleUsernames}
                     onLocated={(people) => {
                       setSelfLocations(people)
                       if (people.length) {
@@ -187,7 +188,7 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
                       }
                     }}
                   />
-                }
+                )}
                 coverageLive={!!pins.data}
                 pins={visiblePins}
                 anchor={labelsCleared ? '' : anchor}

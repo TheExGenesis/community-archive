@@ -157,7 +157,9 @@ it('plots multiple names, retains partial matches, and clears without a restore 
   )
   const onLocated = jest.fn(),
     onClear = jest.fn()
-  render(<WhereAmI onLocated={onLocated} onClear={onClear} />)
+  render(
+    <WhereAmI onLocated={onLocated} onClear={onClear} hasVisibleUsernames />,
+  )
   fireEvent.change(screen.getByRole('textbox'), {
     target: { value: '@One, two, @ONE, absent' },
   })
@@ -189,7 +191,7 @@ it('cancels a pending search when usernames are cleared', async () => {
     }),
   )
   const onLocated = jest.fn()
-  render(<WhereAmI onLocated={onLocated} />)
+  render(<WhereAmI onLocated={onLocated} hasVisibleUsernames />)
   fireEvent.change(screen.getByRole('textbox'), {
     target: { value: 'one, two' },
   })
@@ -216,4 +218,20 @@ it('rejects invalid lists before requesting a lookup', () => {
   submit()
   expect(fetchMock).not.toHaveBeenCalled()
   expect(screen.getByText(/Enter up to 20 valid/)).toBeVisible()
+})
+
+it('only offers clearing while map username labels are visible', () => {
+  const onLocated = jest.fn()
+  const { rerender } = render(
+    <WhereAmI onLocated={onLocated} hasVisibleUsernames={false} />,
+  )
+  expect(
+    screen.queryByRole('button', { name: 'Clear usernames' }),
+  ).not.toBeInTheDocument()
+  rerender(<WhereAmI onLocated={onLocated} hasVisibleUsernames />)
+  expect(screen.getByRole('button', { name: 'Clear usernames' })).toBeVisible()
+  rerender(<WhereAmI onLocated={onLocated} hasVisibleUsernames={false} />)
+  expect(
+    screen.queryByRole('button', { name: 'Clear usernames' }),
+  ).not.toBeInTheDocument()
 })

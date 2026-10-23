@@ -23,9 +23,11 @@ type Result = {
 export default function WhereAmI({
   onLocated,
   onClear,
+  hasVisibleUsernames = false,
 }: {
   onLocated: (people: SelfLocation[]) => void
   onClear?: () => void
+  hasVisibleUsernames?: boolean
 }) {
   const { enabled: previewEnabled, view, optedIn } = usePreviewSession()
   const optIn = useCommunityOptIn()
@@ -203,16 +205,18 @@ export default function WhereAmI({
           <Search size={17} aria-hidden="true" />
         </button>
       </form>
-      <button
-        type="button"
-        className={styles.defaultLabelsControl}
-        onClick={() => {
-          clear()
-          onClear?.()
-        }}
-      >
-        Clear usernames
-      </button>
+      {hasVisibleUsernames && (
+        <button
+          type="button"
+          className={styles.defaultLabelsControl}
+          onClick={() => {
+            clear()
+            onClear?.()
+          }}
+        >
+          Clear usernames
+        </button>
+      )}
       {previewEnabled && view !== 'actual' && (
         <p className="text-xs text-muted-foreground">
           Simulation · no login or consent saved

@@ -70,7 +70,7 @@ export default memo(function HexMap({
   onClearHeat: () => void
   scrubber: ReactNode
   coverageLive: boolean
-  finder?: ReactNode
+  finder?: (hasVisibleUsernames: boolean) => ReactNode
   selfLocations?: { username: string; cell: number }[]
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -214,7 +214,7 @@ export default memo(function HexMap({
               ? selectedArchiveColor(color, null)
               : mix(fill, dark ? '#18181b' : '#f4f4f5', 0.65)
       }
-      ctx.globalAlpha = focused ? 1 : 0.22
+      ctx.globalAlpha = focused ? 1 : dark ? 0.22 : 0.34
       ctx.fillStyle = fill
       polygon(ctx, geo.vertices[id])
       ctx.fill()
@@ -542,7 +542,7 @@ export default memo(function HexMap({
   return (
     <>
       <div className={styles.mapShell}>
-        {finder}
+        {finder?.(callouts.length > 0)}
         <div
           ref={camera.ref}
           className={styles.mapSurface}

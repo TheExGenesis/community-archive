@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import useMapCamera from './useMapCamera'
+import { transform } from '@/lib/hexMap/geometry'
 
 const selected = jest.fn()
 const bounds = { x: 0, y: 0, width: 100, height: 100 }
@@ -22,6 +23,16 @@ function MapSurface() {
       <output data-testid="zoom">{camera.camera.zoom}</output>
       <button onClick={() => camera.zoomAt(100)}>Maximum zoom</button>
       <button onClick={() => camera.focus(20, 30, 3)}>Focus community</button>
+      <button
+        onClick={() =>
+          camera.fit([
+            { x: 10, y: 20 },
+            { x: 90, y: 80 },
+          ])
+        }
+      >
+        Fit usernames
+      </button>
       <button onClick={() => camera.reset()}>Reset view</button>
     </div>
   )
@@ -40,11 +51,17 @@ function wheel(deltaY: number, modifiers: WheelEventInit = { ctrlKey: true }) {
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
 
-it('keeps repeated zoom-out gestures from scrolling the page at minimum zoom', () => {
-  render(<MapSurface />)
-  for (let i = 0; i < 3; i++) expect(wheel(150).defaultPrevented).toBe(true)
-  expect(screen.getByTestId('zoom')).toHaveTextContent('1')
-})
+it.each([{ ctrlKey: true }, { metaKey: true }])(
+  'zooms out to 0.5× and keeps gestures on the map at the minimum (%j)',
+  (modifiers) => {
+    render(<MapSurface />)
+    for (let i = 0; i < 3; i++)
+      expect(wheel(150, modifiers).defaultPrevented).toBe(true)
+    expect(screen.getByTestId('zoom').textContent).toBe('0.5')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset view' }))
+    expect(screen.getByTestId('zoom').textContent).toBe('1')
+  },
+)
 it('keeps zoom-in gestures on the map at maximum zoom and still permits zooming back out', () => {
   render(<MapSurface />)
   fireEvent.click(screen.getByRole('button', { name: 'Maximum zoom' }))
@@ -125,6 +142,25 @@ it('pans with a constant two-finger distance, then zooms around their midpoint',
   expect(screen.getByTestId('position')).toHaveTextContent('-5,-2.5')
 })
 
+it('pinches out to 0.5× and clamps further shrinking around the same midpoint', () => {
+  render(<MapSurface />)
+  touch('touchstart', [
+    [200, 300],
+    [600, 300],
+  ])
+  touch('touchmove', [
+    [300, 300],
+    [500, 300],
+  ])
+  expect(screen.getByTestId('zoom').textContent).toBe('0.5')
+  touch('touchmove', [
+    [350, 300],
+    [450, 300],
+  ])
+  expect(screen.getByTestId('zoom').textContent).toBe('0.5')
+  expect(screen.getByTestId('position').textContent).toBe('0,0')
+})
+
 it('suppresses selection throughout a multi-touch gesture and recovers after cancellation', () => {
   selected.mockClear()
   render(<MapSurface />)
@@ -197,5 +233,29 @@ it('skips focus animation when reduced motion is requested', () => {
     expect(screen.getByTestId('zoom')).toHaveTextContent('3')
   } finally {
     window.matchMedia = previous
+  }
+})
+
+it('fits separated username locations together even after zooming in', () => {
+  render(<MapSurface />)
+  fireEvent.click(screen.getByRole('button', { name: 'Maximum zoom' }))
+  act(() => jest.advanceTimersByTime(20))
+  fireEvent.click(screen.getByRole('button', { name: 'Fit usernames' }))
+  act(() => jest.advanceTimersByTime(240))
+  const [x, y] = screen
+    .getByTestId('position')
+    .textContent!.split(',')
+    .map(Number)
+  const zoom = Number(screen.getByTestId('zoom').textContent)
+  const t = transform(bounds, 800, 600, { x, y, zoom })
+  expect(zoom).toBeLessThan(8)
+  for (const point of [
+    { x: 10, y: 20 },
+    { x: 90, y: 80 },
+  ]) {
+    expect(point.x * t.scale + t.x).toBeGreaterThanOrEqual(60)
+    expect(point.x * t.scale + t.x).toBeLessThanOrEqual(740)
+    expect(point.y * t.scale + t.y).toBeGreaterThanOrEqual(60)
+    expect(point.y * t.scale + t.y).toBeLessThanOrEqual(540)
   }
 })

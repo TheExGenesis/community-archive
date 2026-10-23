@@ -6,6 +6,7 @@ import {
   initialCamera,
   placeLabels,
   selectionOutline,
+  selectedArchiveColor,
   transform,
 } from './geometry'
 
@@ -116,4 +117,28 @@ describe('hero geometry', () => {
       /"(?:username|accountId|avatar|reps|tweets|text)":/,
     )
   })
+})
+
+it('keeps archived cells lighter than empty cells for every selected region in both themes', () => {
+  const luminance = (hex: string) => {
+    const channels = hex
+      .replace('#', '')
+      .match(/.{2}/g)!
+      .map((c) => {
+        const value = parseInt(c, 16) / 255
+        return value <= 0.04045
+          ? value / 12.92
+          : ((value + 0.055) / 1.055) ** 2.4
+      })
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
+  }
+  for (const region of snapshot.regions) {
+    for (const color of [region.color, region.colorDark ?? region.color]) {
+      const empty = luminance(selectedArchiveColor(color, null))
+      for (const strength of [0, 0.25, 1])
+        expect(
+          luminance(selectedArchiveColor(color, strength)),
+        ).toBeGreaterThan(empty)
+    }
+  }
 })

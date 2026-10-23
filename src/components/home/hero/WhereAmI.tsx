@@ -7,6 +7,7 @@ import { createBrowserClient } from '@/utils/supabase'
 import { OptInDisclosure, useCommunityOptIn } from '@/components/CommunityOptIn'
 import { mapUrl } from '@/lib/hexMap/version'
 import styles from './hero.module.css'
+import { parseMapUsernames } from '@/lib/hexMap/usernames'
 
 export type SelfLocation = { username: string; cell: number }
 type Result = {
@@ -15,12 +16,18 @@ type Result = {
   error?: string
   isSelf?: boolean
   person?: SelfLocation
+  people?: SelfLocation[]
+  missing?: string[]
 }
 
 export default function WhereAmI({
   onLocated,
+  onClear,
+  hasVisibleUsernames = false,
 }: {
-  onLocated: (person: SelfLocation | null) => void
+  onLocated: (people: SelfLocation[]) => void
+  onClear?: () => void
+  hasVisibleUsernames?: boolean
 }) {
   const { enabled: previewEnabled, view, optedIn } = usePreviewSession()
   const optIn = useCommunityOptIn()
@@ -41,16 +48,25 @@ export default function WhereAmI({
     cancel()
     setBusy(false)
     setResult(null)
-    callback.current(null)
+    setName('')
+    callback.current([])
   }, [cancel])
 
   const locate = useCallback(
     async (query = '') => {
+      const names = query.trim() ? parseMapUsernames(query) : []
+      if (!names) {
+        clear()
+        setResult({
+          error: 'Enter up to 20 valid X usernames, separated by commas.',
+        })
+        return
+      }
       const simulated = previewEnabled && view !== 'actual'
       if (simulated && !optedIn) {
         cancel()
         setBusy(false)
-        callback.current(null)
+        callback.current([])
         setResult(
           view === 'signed-out'
             ? {
@@ -70,22 +86,29 @@ export default function WhereAmI({
       const request = ++generation.current
       setBusy(true)
       setResult(null)
-      callback.current(null)
+      callback.current([])
       try {
         const response = await fetch(
           mapUrl(
-            `${simulated ? 'lookup' : 'me'}?name=${encodeURIComponent(simulated ? query.trim().replace(/^@/, '') || 'exgenesis' : query)}`,
+            `${simulated ? 'lookup' : 'me'}?name=${encodeURIComponent(simulated ? names.join(',') || 'exgenesis' : names.join(','))}`,
           ),
           { signal: controller.signal, cache: 'no-store' },
         )
         const payload = await response.json()
-        const person = simulated ? (payload as MapLookup).people?.[0] : null
+        const people = simulated ? ((payload as MapLookup).people ?? []) : []
         const data: Result =
           simulated && response.ok
-            ? person
+            ? people.length
               ? {
                   status: 'located',
-                  person: { username: person.username, cell: person.cell },
+                  people: people.map(({ username, cell }) => ({
+                    username,
+                    cell,
+                  })),
+                  missing: names.filter(
+                    (name) =>
+                      !people.some((p) => p.username.toLowerCase() === name),
+                  ),
                   isSelf: false,
                 }
               : {
@@ -94,9 +117,14 @@ export default function WhereAmI({
                 }
             : payload
         if (request !== generation.current) return
-        if (response.ok && data.status === 'located' && data.person) {
-          callback.current(data.person)
-          setName(`@${data.person.username}`)
+        const located = data.people ?? (data.person ? [data.person] : [])
+        if (response.ok && data.status === 'located' && located.length) {
+          callback.current(located)
+          setName(
+            names.length
+              ? names.map((name) => `@${name}`).join(', ')
+              : `@${located[0].username}`,
+          )
           setCanSearch(true)
         }
         setResult(data)
@@ -109,7 +137,7 @@ export default function WhereAmI({
         if (request === generation.current) setBusy(false)
       }
     },
-    [previewEnabled, view, optedIn, cancel],
+    [previewEnabled, view, optedIn, cancel, clear],
   )
 
   useEffect(() => {
@@ -154,7 +182,7 @@ export default function WhereAmI({
       <form
         role="search"
         aria-label={
-          canSearch ? 'Find a username on the map' : 'Find yourself on the map'
+          canSearch ? 'Find usernames on the map' : 'Find yourself on the map'
         }
         className={styles.finderForm}
         onSubmit={(event) => {
@@ -163,10 +191,12 @@ export default function WhereAmI({
         }}
       >
         <input
-          aria-label={canSearch ? 'Find username' : 'Where am I?'}
-          placeholder={canSearch ? 'Find any username…' : 'Where am I?'}
+          aria-label={canSearch ? 'Find usernames' : 'Where am I?'}
+          placeholder={
+            canSearch ? 'Usernames, comma separated…' : 'Where am I?'
+          }
           value={name}
-          maxLength={16}
+          maxLength={358}
           autoComplete="off"
           spellCheck={false}
           onChange={(event) => setName(event.target.value)}
@@ -175,6 +205,18 @@ export default function WhereAmI({
           <Search size={17} aria-hidden="true" />
         </button>
       </form>
+      {hasVisibleUsernames && (
+        <button
+          type="button"
+          className={styles.defaultLabelsControl}
+          onClick={() => {
+            clear()
+            onClear?.()
+          }}
+        >
+          Clear usernames
+        </button>
+      )}
       {previewEnabled && view !== 'actual' && (
         <p className="text-xs text-muted-foreground">
           Simulation · no login or consent saved
@@ -196,13 +238,21 @@ export default function WhereAmI({
                 ? 'Opening Twitter…'
                 : 'Finding your place…'
               : result?.status === 'located'
-                ? result.isSelf === false
-                  ? `@${result.person?.username} is here.`
-                  : `You are here, @${result.person?.username}.`
+                ? result.people
+                  ? `${result.people.map((p) => `@${p.username}`).join(', ')} ${result.people.length === 1 ? 'is' : 'are'} here.`
+                  : result.isSelf === false
+                    ? `@${result.person?.username} is here.`
+                    : `You are here, @${result.person?.username}.`
                 : result?.status === 'sign_in' || result?.status === 'opt_in'
                   ? 'Opt in to the Community Archive to find yourself on the map!'
                   : result?.error}
           </div>
+          {!!result?.missing?.length && (
+            <p>
+              Not found on the map:{' '}
+              {result.missing.map((name) => `@${name}`).join(', ')}.
+            </p>
+          )}
           {!busy &&
             !optIn.busy &&
             (result?.status === 'sign_in' || result?.status === 'opt_in') && (

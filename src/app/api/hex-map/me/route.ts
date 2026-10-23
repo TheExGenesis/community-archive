@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { Database } from '@/database-types'
 import { getCurrentUser } from '@/lib/portal/auth'
-import {
-  getTwitterProviderId,
-  getTwitterUsername,
-  normalizeTwitterUsername,
-} from '@/lib/twitterIdentity'
+import { getTwitterProviderId, getTwitterUsername } from '@/lib/twitterIdentity'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getAppPolicy } from '@/lib/community-apps/data'
 import { mapGateway } from '@/lib/hexMap/gateway'
 import { readMapLookup } from '@/lib/hexMap/lookup'
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import snapshot from '@/lib/hexMap/snapshot.json'
+import { parseMapUsernames } from '@/lib/hexMap/usernames'
 
 export const dynamic = 'force-dynamic'
 type ConsentRow = Pick<
@@ -39,10 +36,12 @@ export async function GET(request: NextRequest) {
         error: 'Sign in with a verified X account to find yourself.',
       })
     const requested = request.nextUrl.searchParams.get('name')?.trim()
-    const target = requested ? normalizeTwitterUsername(requested) : username
-    if (!target || !/^\w{1,15}$/.test(target))
-      return reply(400, { error: 'Enter a valid X username.' })
-    const isSelf = target === username
+    const targets = parseMapUsernames(requested || username)
+    if (!targets)
+      return reply(400, {
+        error: 'Enter up to 20 valid X usernames, separated by commas.',
+      })
+    const isSelf = targets.length === 1 && targets[0] === username
 
     // Recognize existing manual consent as well as OAuth-linked records. The
     // stable provider ID prevents a recycled handle from granting consent.
@@ -102,10 +101,8 @@ export async function GET(request: NextRequest) {
           ? 'We do not have a saved map location for your account yet.'
           : 'This username is not available on the map.',
       })
-    // The saved map includes nonmembers. Consent above is authoritative now;
-    // waiting for the gateway's member projection would hide a fresh opt-in.
-    // Only self can use this path, keyed by the verified OAuth provider ID.
-    let person: { username: string; cell: number } | undefined
+    // Fresh opt-ins use their verified account ID without waiting for the
+    // analytical membership projection. Other searches keep the public policy.
     if (isSelf) {
       const result = await mapGateway<{
         version: string
@@ -113,22 +110,41 @@ export async function GET(request: NextRequest) {
       }>('hex-self', { account_id: accountId })
       if (result.version !== MAP_VERSION)
         throw new Error('Map version mismatch')
-      if (result.person?.account_id === accountId)
-        person = { username, cell: result.person.cell }
-    } else {
-      const result = await readMapLookup({ names: target })
-      person = result.people.find((p) => p.username.toLowerCase() === target)
+      const person = result.person
+      if (
+        person?.account_id !== accountId ||
+        !Number.isInteger(person.cell) ||
+        !snapshot.cells[person.cell]
+      )
+        return unavailable()
+      return reply(200, {
+        status: 'located',
+        person: { username, cell: person.cell },
+        isSelf: true,
+      })
     }
-    if (
-      !person ||
-      !Number.isInteger(person.cell) ||
-      !snapshot.cells[person.cell]
-    )
-      return unavailable()
+    const result = await readMapLookup({ names: targets.join(',') })
+    if (result.version !== MAP_VERSION) throw new Error('Map version mismatch')
+    const people = targets.flatMap((target) => {
+      const person = result.people.find(
+        (p) =>
+          (target !== username || p.account_id === accountId) &&
+          p.username.toLowerCase() === target &&
+          Number.isInteger(p.cell) &&
+          snapshot.cells[p.cell],
+      )
+      return person ? [{ username: person.username, cell: person.cell }] : []
+    })
+    if (!people.length) return unavailable()
+    if (targets.length === 1)
+      return reply(200, { status: 'located', person: people[0], isSelf })
     return reply(200, {
       status: 'located',
-      person: { username: person.username, cell: person.cell },
-      isSelf,
+      people,
+      missing: targets.filter(
+        (target) => !people.some((p) => p.username.toLowerCase() === target),
+      ),
+      isSelf: false,
     })
   } catch {
     return reply(503, {

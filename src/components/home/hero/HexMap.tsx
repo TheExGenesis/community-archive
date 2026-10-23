@@ -16,6 +16,7 @@ import {
   placeLabels,
   safeTerm,
   selectionOutline,
+  selectedArchiveColor,
   transform,
   type MapLabel,
 } from '@/lib/hexMap/geometry'
@@ -51,9 +52,7 @@ export default memo(function HexMap({
   scrubber,
   coverageLive,
   finder,
-  selfLocation,
-  showDefaultLabels,
-  onToggleDefaultLabels,
+  selfLocations,
 }: {
   snapshot: HexSnapshot
   selected: number[]
@@ -71,10 +70,8 @@ export default memo(function HexMap({
   onClearHeat: () => void
   scrubber: ReactNode
   coverageLive: boolean
-  showDefaultLabels: boolean
-  onToggleDefaultLabels: () => void
-  finder?: ReactNode
-  selfLocation?: { username: string; cell: number } | null
+  finder?: (hasVisibleUsernames: boolean) => ReactNode
+  selfLocations?: { username: string; cell: number }[]
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ width: 800, height: 650 })
@@ -89,14 +86,17 @@ export default memo(function HexMap({
   const showDetails = camera.camera.zoom >= 1.5
   // Keep the first hex for double-clicks even after its single click zooms.
   const clickedCell = useRef<number | null>(null)
-  const lastSelfLocation = useRef(selfLocation)
+  const lastSelfLocations = useRef(selfLocations)
   useEffect(() => {
-    if (selfLocation && lastSelfLocation.current !== selfLocation) {
-      const cell = snapshot.cells[selfLocation.cell]
-      if (cell) camera.focus(cell.x, -cell.y)
+    if (selfLocations?.length && lastSelfLocations.current !== selfLocations) {
+      const cells = selfLocations.flatMap((p) =>
+        snapshot.cells[p.cell] ? [snapshot.cells[p.cell]] : [],
+      )
+      if (cells.length === 1) camera.focus(cells[0].x, -cells[0].y)
+      else if (cells.length) camera.fit(cells.map((c) => ({ x: c.x, y: -c.y })))
     }
-    lastSelfLocation.current = selfLocation
-  }, [selfLocation, snapshot, camera])
+    lastSelfLocations.current = selfLocations
+  }, [selfLocations, snapshot, camera])
   const lastAnchor = useRef('')
   useEffect(() => {
     const pin = pins.find(
@@ -206,11 +206,15 @@ export default memo(function HexMap({
           )
           fill =
             focus.size && focused && !heat
-              ? mix(color, '#593315', strength * 0.45)
+              ? selectedArchiveColor(color, strength)
               : mix('#f3d8ad', '#b54a0c', strength)
-        } else fill = mix(fill, dark ? '#18181b' : '#f4f4f5', 0.65)
+        } else
+          fill =
+            focus.size && focused && !heat
+              ? selectedArchiveColor(color, null)
+              : mix(fill, dark ? '#18181b' : '#f4f4f5', 0.65)
       }
-      ctx.globalAlpha = focused ? 1 : 0.22
+      ctx.globalAlpha = focused ? 1 : dark ? 0.22 : 0.34
       ctx.fillStyle = fill
       polygon(ctx, geo.vertices[id])
       ctx.fill()
@@ -500,7 +504,11 @@ export default memo(function HexMap({
               highlighted:
                 p.username.toLowerCase() ===
                   tweetHover?.username.toLowerCase() ||
-                p.username.toLowerCase() === anchor.toLowerCase(),
+                p.username.toLowerCase() === anchor.toLowerCase() ||
+                !!selfLocations?.some(
+                  (person) =>
+                    person.username.toLowerCase() === p.username.toLowerCase(),
+                ),
             },
           ]
         : []
@@ -517,6 +525,7 @@ export default memo(function HexMap({
     )
   }, [
     pins,
+    selfLocations,
     tweetHover,
     anchor,
     snapshot,
@@ -533,7 +542,7 @@ export default memo(function HexMap({
   return (
     <>
       <div className={styles.mapShell}>
-        {finder}
+        {finder?.(callouts.length > 0)}
         <div
           ref={camera.ref}
           className={styles.mapSurface}
@@ -602,6 +611,19 @@ export default memo(function HexMap({
           aria-label="Community map. Arrow keys explore cells; Enter selects a community; Shift Enter selects one hexagon; Escape clears; plus and minus zoom."
         >
           <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
+          <label
+            className={styles.archivedToggle}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              role="switch"
+              checked={showArchived}
+              onChange={(event) => setShowArchived(event.target.checked)}
+            />
+            Show archived
+          </label>
           <div className={styles.labels}>
             {labels.map((l, i) =>
               l.kind === 'country' ? (
@@ -779,25 +801,6 @@ export default memo(function HexMap({
         )}
       </div>
       <div className={styles.layers}>
-        <label className={styles.archivedToggle}>
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(event) => setShowArchived(event.target.checked)}
-          />
-          Show archived
-        </label>
-        <div className={styles.defaultLabelsControl}>
-          <button
-            type="button"
-            aria-pressed={!showDefaultLabels}
-            onClick={onToggleDefaultLabels}
-          >
-            {showDefaultLabels
-              ? 'Hide default usernames'
-              : 'Show default usernames'}
-          </button>
-        </div>
         {(heatTerm || showArchived) && (
           <p>
             {heatTerm

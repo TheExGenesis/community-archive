@@ -79,7 +79,7 @@ export default function useMapCamera(
     (factor: number, x = width / 2, y = height / 2) => {
       const old = cameraRef.current
       const t = transform(bounds, width, height, old)
-      const zoom = Math.max(1, Math.min(8, old.zoom * factor))
+      const zoom = Math.max(0.5, Math.min(8, old.zoom * factor))
       update({
         zoom,
         x: old.x + ((x - width / 2) / t.scale) * (1 - old.zoom / zoom),
@@ -160,7 +160,7 @@ export default function useMapCamera(
         const old = cameraRef.current
         const t = transform(bounds, width, height, old)
         const zoom = Math.max(
-          1,
+          0.5,
           Math.min(8, old.zoom * (distance > 0 ? nextDistance / distance : 1)),
         )
         const scale = (t.scale * zoom) / old.zoom
@@ -213,6 +213,25 @@ export default function useMapCamera(
         x: x - bounds.x - bounds.width / 2,
         y: y - bounds.y - bounds.height / 2,
       }),
+    fit: (points: Point[]) => {
+      if (!points.length) return
+      const xs = points.map((p) => p.x),
+        ys = points.map((p) => p.y)
+      const left = Math.min(...xs),
+        right = Math.max(...xs)
+      const top = Math.min(...ys),
+        bottom = Math.max(...ys)
+      const overview = transform(bounds, width, height, initialCamera)
+      const scale = Math.min(
+        (width - 120) / Math.max(right - left, bounds.width / 8),
+        (height - 120) / Math.max(bottom - top, bounds.height / 8),
+      )
+      focusCamera({
+        x: (left + right) / 2 - bounds.x - bounds.width / 2,
+        y: (top + bottom) / 2 - bounds.y - bounds.height / 2,
+        zoom: Math.max(0.5, Math.min(8, scale / overview.scale)),
+      })
+    },
     handlers: {
       onPointerDown: (e: React.PointerEvent) => {
         if (e.pointerType === 'touch' || e.button !== 0) return

@@ -84,6 +84,11 @@ export const useNavigationAudience = () => {
   const audience = useContext(NavigationAudienceContext)
   const preview = usePreviewSession()
   return preview.enabled && preview.view !== 'actual'
-    ? { isMember: preview.optedIn, isAdmin: false, localPreview: null }
+    ? {
+        isMember: preview.optedIn,
+        isAdmin: false,
+        localPreview: null,
+        askEnabled: audience.askEnabled,
+      }
     : audience
 }

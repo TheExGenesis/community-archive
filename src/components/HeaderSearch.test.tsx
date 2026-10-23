@@ -3,6 +3,7 @@
 import '@testing-library/jest-dom'
 import { fireEvent, render, screen } from '@testing-library/react'
 import HeaderSearch from './HeaderSearch'
+import { ArchiveSearchProvider } from './ArchiveSearchProvider'
 
 const mockPush = jest.fn()
 
@@ -42,7 +43,11 @@ jest.mock('@/components/UserSearchInput', () => ({
 beforeEach(() => jest.clearAllMocks())
 
 test('⌘↵ or Ctrl↵ in the header box asks; an empty box does nothing', () => {
-  render(<HeaderSearch />)
+  render(
+    <ArchiveSearchProvider>
+      <HeaderSearch />
+    </ArchiveSearchProvider>,
+  )
   const box = screen.getByRole('textbox', { name: 'Search Community Archive' })
   fireEvent.keyDown(box, { key: 'Enter', metaKey: true })
   expect(mockPush).not.toHaveBeenCalled()
@@ -54,7 +59,11 @@ test('⌘↵ or Ctrl↵ in the header box asks; an empty box does nothing', () =
 })
 
 test('the header box shows an Ask chip once it has text, which asks', () => {
-  render(<HeaderSearch />)
+  render(
+    <ArchiveSearchProvider>
+      <HeaderSearch />
+    </ArchiveSearchProvider>,
+  )
   expect(
     screen.queryByRole('button', { name: 'Ask the archive instead' }),
   ).toBeNull()
@@ -68,7 +77,11 @@ test('the header box shows an Ask chip once it has text, which asks', () => {
 
 test('signed out, Ask explains and offers a sign-in that returns to the question', async () => {
   mockIsMember = false
-  render(<HeaderSearch />)
+  render(
+    <ArchiveSearchProvider>
+      <HeaderSearch />
+    </ArchiveSearchProvider>,
+  )
   const box = screen.getByRole('textbox', { name: 'Search Community Archive' })
   fireEvent.change(box, { target: { value: 'singapore' } })
   fireEvent.click(
@@ -87,7 +100,11 @@ test('signed out, Ask explains and offers a sign-in that returns to the question
 
 test('while Ask the archive is paused, the chip and the shortcut do nothing', () => {
   mockAskEnabled = false
-  render(<HeaderSearch />)
+  render(
+    <ArchiveSearchProvider>
+      <HeaderSearch />
+    </ArchiveSearchProvider>,
+  )
   const box = screen.getByRole('textbox', { name: 'Search Community Archive' })
   fireEvent.change(box, { target: { value: 'singapore' } })
   expect(

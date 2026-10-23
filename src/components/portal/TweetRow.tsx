@@ -433,14 +433,6 @@ export function TweetRow({
     if (previewCollapsed && previewContent.current)
       previewContent.current.scrollTop = 0
   }, [previewCollapsed, tweet.id])
-  // A compact card clamps at two lines, so its text needs Read more sooner.
-  const canExpand =
-    isPreview ||
-    (collapsible && !noClamp && tweet.text.length > (compact ? 140 : 280))
-  // A compact card's Read more ends its second line, after the cut text,
-  // instead of taking a line of its own.
-  const inlineMore =
-    compact && canExpand && !isExpanded && !noClamp && !isPreview
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
@@ -459,10 +451,15 @@ export function TweetRow({
     observer.observe(element)
     return () => observer.disconnect()
   }, [isMap, noClamp, isExpanded, tweet.text])
+  // A compact card clamps at two lines, so its text needs Read more sooner.
   const canExpand =
     isPreview ||
     (isMap && !noClamp && mapTextOverflows) ||
-    (collapsible && !noClamp && tweet.text.length > 280)
+    (collapsible && !noClamp && tweet.text.length > (compact ? 140 : 280))
+  // A compact card's Read more ends its second line, after the cut text,
+  // instead of taking a line of its own.
+  const inlineMore =
+    compact && !isMap && canExpand && !isExpanded && !noClamp && !isPreview
   const isClickable = clickable ?? isFeatured
   const captureAction = (
     action:

@@ -227,13 +227,11 @@ it('looks up a normalized batch once and reports policy-excluded targets as miss
   })
 })
 it('returns all mapped members in a batch', async () => {
-  jest
-    .mocked(getAppPolicy)
-    .mockResolvedValue({
-      members: new Set(['me_one', 'someone']),
-      blocked: new Set(),
-      blockedIds: new Set(),
-    })
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(['me_one', 'someone']),
+    blocked: new Set(),
+    blockedIds: new Set(),
+  })
   const res = await GET(request('&name=me_one,someone'))
   expect(await res.json()).toEqual({
     status: 'located',
@@ -249,12 +247,10 @@ it('requires consent and verified self identity for batch lookups too', async ()
   range.mockResolvedValueOnce({ data: [], error: null })
   expect((await GET(request('&name=me_one,someone'))).status).toBe(403)
   expect(mapGateway).not.toHaveBeenCalled()
-  jest
-    .mocked(mapGateway)
-    .mockResolvedValue({
-      version: MAP_VERSION,
-      people: [{ account_id: '999', username: 'me_one', cell: 4 }],
-    })
+  jest.mocked(mapGateway).mockResolvedValue({
+    version: MAP_VERSION,
+    people: [{ account_id: '999', username: 'me_one', cell: 4 }],
+  })
   expect((await GET(request('&name=me_one,absent'))).status).toBe(404)
 })
 it('rejects invalid and oversized batches before lookup', async () => {

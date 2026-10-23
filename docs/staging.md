@@ -67,10 +67,13 @@ lookups use those filtered public results without rechecking them against the
 unrelated staging directory. Production retains its additional live Supabase
 policy check. No production website proxy, firewall bypass, or new secret is needed.
 
-Authentication and consent writes still use staging. The map finder always uses the authenticated consent route, in every preview
-view. Signed-out visitors receive the Opt In action; signed-in visitors must
-explicitly opt in on staging before searching other public map members. Preview
-view controls never grant server authorization.
+Authentication and consent writes still use staging. In development and Vercel
+previews, the map's Opt In action simulates signing in instead of opening Twitter
+OAuth. The separate consent button simulates consent locally, then searches public
+map members through the existing lookup API. Nothing is saved and no server
+permissions are granted. The preview controls reset the simulation; choose Signed
+out to test the prompt again. Actual session mode uses the authenticated finder
+until Opt In is clicked. Production keeps real Twitter OAuth and consent checks.
 
 ### Reviewing production Bulletin items in a protected PR preview
 

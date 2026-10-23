@@ -1,5 +1,7 @@
 'use client'
 import Link from 'next/link'
+import { usePreviewSession } from '@/components/PreviewSession'
+import type { MapLookup } from '@/lib/hexMap/gateway'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { createBrowserClient } from '@/utils/supabase'
@@ -21,6 +23,8 @@ export default function WhereAmI({
 }: {
   onLocated: (person: SelfLocation | null) => void
 }) {
+  const { enabled: previewEnabled, view, setView } = usePreviewSession()
+  const simulatedConsent = useRef(false)
   const [canSearch, setCanSearch] = useState(false)
   const [name, setName] = useState('')
   const [result, setResult] = useState<Result | null>(null)
@@ -43,6 +47,25 @@ export default function WhereAmI({
 
   const locate = useCallback(
     async (query = '') => {
+      const simulated = previewEnabled && view !== 'actual'
+      if (simulated && (view === 'signed-out' || !simulatedConsent.current)) {
+        cancel()
+        setBusy(false)
+        callback.current(null)
+        setResult(
+          view === 'signed-out'
+            ? {
+                status: 'sign_in',
+                error: 'Opt in with Twitter to find yourself on the map.',
+              }
+            : {
+                status: 'opt_in',
+                username: 'preview_user',
+                error: 'Signed in (simulation). Opt in to continue.',
+              },
+        )
+        return
+      }
       pending.current?.abort()
       const controller = new AbortController()
       pending.current = controller
@@ -52,10 +75,26 @@ export default function WhereAmI({
       callback.current(null)
       try {
         const response = await fetch(
-          mapUrl(`me?name=${encodeURIComponent(query)}`),
+          mapUrl(
+            `${simulated ? 'lookup' : 'me'}?name=${encodeURIComponent(simulated ? query.trim().replace(/^@/, '') || 'exgenesis' : query)}`,
+          ),
           { signal: controller.signal, cache: 'no-store' },
         )
-        const data: Result = await response.json()
+        const payload = await response.json()
+        const person = simulated ? (payload as MapLookup).people?.[0] : null
+        const data: Result =
+          simulated && response.ok
+            ? person
+              ? {
+                  status: 'located',
+                  person: { username: person.username, cell: person.cell },
+                  isSelf: false,
+                }
+              : {
+                  status: 'not_mapped',
+                  error: 'This username is not available on the map.',
+                }
+            : payload
         if (request !== generation.current) return
         if (response.ok && data.status === 'located' && data.person) {
           callback.current(data.person)
@@ -72,8 +111,21 @@ export default function WhereAmI({
         if (request === generation.current) setBusy(false)
       }
     },
-    [],
+    [previewEnabled, view, cancel],
   )
+
+  useEffect(() => {
+    if (!previewEnabled) return
+    clear()
+    setCanSearch(false)
+    simulatedConsent.current = false
+    if (view === 'signed-in')
+      setResult({
+        status: 'opt_in',
+        username: 'preview_user',
+        error: 'Signed in (simulation). Opt in to continue.',
+      })
+  }, [previewEnabled, view, clear])
 
   useEffect(() => {
     let account: string | null | undefined
@@ -101,6 +153,10 @@ export default function WhereAmI({
 
   const authenticate = async () => {
     if (busy) return
+    if (previewEnabled) {
+      setView('signed-in')
+      return
+    }
     const request = ++generation.current
     setBusy(true)
     try {
@@ -124,6 +180,12 @@ export default function WhereAmI({
 
   const optIn = async () => {
     if (!result?.username || busy) return
+    if (previewEnabled && view === 'signed-in') {
+      simulatedConsent.current = true
+      setCanSearch(true)
+      await locate(name)
+      return
+    }
     const request = ++generation.current
     setBusy(true)
     try {
@@ -173,6 +235,11 @@ export default function WhereAmI({
           <Search size={17} aria-hidden="true" />
         </button>
       </form>
+      {previewEnabled && view !== 'actual' && (
+        <p className="text-xs text-muted-foreground">
+          Simulation · no login or consent saved
+        </p>
+      )}
       {(busy || result) && (
         <div className={styles.finderMessage}>
           <button

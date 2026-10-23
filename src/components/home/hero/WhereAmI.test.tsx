@@ -167,69 +167,64 @@ it('clears a pin when the signed-in account changes', async () => {
   expect(screen.getByRole('textbox', { name: 'Where am I?' })).toHaveValue('')
 })
 
-it('exposes the real opt-in flow in the signed-out preview view', async () => {
+it('simulates login and explicit consent before looking up public map members', async () => {
+  fetchMock.mockResolvedValue(
+    response(200, { people: [{ username: 'exgenesis', cell: 1414 }] }),
+  )
+  const onLocated = jest.fn()
+  render(
+    <PreviewSessionProvider enabled>
+      <WhereAmI onLocated={onLocated} />
+    </PreviewSessionProvider>,
+  )
+  fireEvent.change(
+    screen.getByRole('combobox', { name: 'Preview sign-in state' }),
+    { target: { value: 'signed-out' } },
+  )
+  fireEvent.change(screen.getByRole('textbox', { name: 'Where am I?' }), {
+    target: { value: 'exgenesis' },
+  })
+  submit()
+  fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
+  const consent = await screen.findByRole('button', {
+    name: 'Opt in and find me',
+  })
+  expect(fetchMock).not.toHaveBeenCalled()
+  expect(signInWithOAuth).not.toHaveBeenCalled()
+  fireEvent.click(consent)
+  await screen.findByText('@exgenesis is here.')
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('/lookup?name=exgenesis'),
+    expect.anything(),
+  )
+  expect(updateOptIn).not.toHaveBeenCalled()
+  expect(onLocated).toHaveBeenLastCalledWith({
+    username: 'exgenesis',
+    cell: 1414,
+  })
+  fireEvent.change(
+    screen.getByRole('combobox', { name: 'Preview sign-in state' }),
+    { target: { value: 'signed-out' } },
+  )
+  expect(onLocated).toHaveBeenLastCalledWith(null)
+  submit()
+  await screen.findByRole('button', { name: 'Opt In' })
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
+it('simulates the Opt In action from the actual dev session without opening OAuth', async () => {
   fetchMock.mockResolvedValue(response(401, { status: 'sign_in' }))
   render(
     <PreviewSessionProvider enabled>
       <WhereAmI onLocated={jest.fn()} />
     </PreviewSessionProvider>,
   )
-  fireEvent.change(
-    screen.getByRole('combobox', { name: 'Preview sign-in state' }),
-    {
-      target: { value: 'signed-out' },
-    },
-  )
-  expect(screen.getByRole('textbox', { name: 'Where am I?' })).toBeVisible()
   submit()
   fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
-  expect(fetchMock).toHaveBeenCalledWith(
-    expect.stringContaining('/me?name='),
-    expect.anything(),
-  )
-  expect(signInWithOAuth).toHaveBeenCalledWith({
-    provider: 'twitter',
-    options: {
-      redirectTo: `${window.location.origin}/api/auth/callback?next=%2F%3Ffindme%3D1`,
-    },
-  })
+  await screen.findByRole('button', { name: 'Opt in and find me' })
+  expect(signInWithOAuth).not.toHaveBeenCalled()
   expect(updateOptIn).not.toHaveBeenCalled()
 })
-
-it.each(['actual', 'signed-in', 'signed-out'])(
-  'requires opt-in for signed-out visitors even in the %s preview view',
-  async (view) => {
-    fetchMock.mockResolvedValue(
-      response(401, {
-        status: 'sign_in',
-        error: 'Opt in with Twitter to find yourself on the map.',
-      }),
-    )
-    const onLocated = jest.fn()
-    render(
-      <PreviewSessionProvider enabled>
-        <WhereAmI onLocated={onLocated} />
-      </PreviewSessionProvider>,
-    )
-    fireEvent.change(
-      screen.getByRole('combobox', { name: 'Preview sign-in state' }),
-      { target: { value: view } },
-    )
-    fireEvent.change(screen.getByRole('textbox', { name: 'Where am I?' }), {
-      target: { value: 'exgenesis' },
-    })
-    submit()
-    await screen.findByRole('button', { name: 'Opt In' })
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/me?name=exgenesis'),
-      expect.anything(),
-    )
-    expect(onLocated).not.toHaveBeenCalledWith(
-      expect.objectContaining({ cell: expect.any(Number) }),
-    )
-    expect(updateOptIn).not.toHaveBeenCalled()
-  },
-)
 
 it('lets an opted-in visitor search another member and identifies the result correctly', async () => {
   fetchMock.mockResolvedValue(

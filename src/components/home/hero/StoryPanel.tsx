@@ -11,13 +11,7 @@ import { coverageSummary } from '@/lib/hexMap/types'
 import { safeTerm } from '@/lib/hexMap/geometry'
 import type { MapStory, StoryPage } from '@/lib/hexMap/stories'
 import { selectionPeopleOptions } from './useSelectionPreview'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import SelectionPeople from './SelectionPeople'
 import { useMapFeed, prefetchMapFeed, selectionFeedPath } from './useMapFeed'
 import styles from './hero.module.css'
 import useMobileMapLayout from './useMobileMapLayout'
@@ -253,38 +247,16 @@ export default function StoryPanel({
                   {active.accounts.toLocaleString()} archived
                   {coverageLive ? '' : ' · snapshot'}
                 </p>
-                {!!people.data?.people.length && (
-                  <TooltipProvider delayDuration={150}>
-                    <div
-                      className={styles.selectionAvatars}
-                      aria-label="Community members"
-                    >
-                      {people.data.people.slice(0, 6).map((person) => (
-                        <Tooltip key={person.account_id}>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label={'@' + person.username}
-                            >
-                              <Avatar className="h-6 w-6 border border-background">
-                                <AvatarImage
-                                  src={person.avatar ?? undefined}
-                                  alt=""
-                                />
-                                <AvatarFallback>
-                                  {person.username[0]}
-                                </AvatarFallback>
-                              </Avatar>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            @{person.username}
-                          </TooltipContent>
-                        </Tooltip>
-                      ))}
-                    </div>
-                  </TooltipProvider>
-                )}
+                <SelectionPeople
+                  key={selectedIds}
+                  cells={selectedIds}
+                  preview={people.data?.people ?? []}
+                  title={
+                    regions.length === 1
+                      ? regions[0].name
+                      : `${selected.length} selected cells`
+                  }
+                />
               </div>
               <p>
                 {regions

@@ -14,6 +14,7 @@ export type MapLookup = {
   counts: Record<number, number>
   people: MapPerson[]
 }
+export type MapPeoplePage = MapLookup & { nextOffset: number | null }
 export type MapHeat = {
   version: string
   term: string

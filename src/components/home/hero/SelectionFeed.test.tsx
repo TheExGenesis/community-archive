@@ -46,8 +46,25 @@ const base = {
 }
 let result: Record<string, unknown>
 const noop = () => {}
+let mobile = false
+const originalMatchMedia = window.matchMedia
+const originalIntersectionObserver = window.IntersectionObserver
+const originalScrollTo = HTMLElement.prototype.scrollTo
+const scrollTo = jest.fn()
+const observe = jest.fn()
 const originalResizeObserver = window.ResizeObserver
 beforeAll(() => {
+  window.matchMedia = jest
+    .fn()
+    .mockImplementation(() => ({
+      matches: mobile,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    }))
+  window.IntersectionObserver = jest
+    .fn()
+    .mockImplementation(() => ({ observe, disconnect: jest.fn() }))
+  HTMLElement.prototype.scrollTo = scrollTo
   window.ResizeObserver = jest.fn().mockImplementation(() => ({
     observe: jest.fn(),
     disconnect: jest.fn(),
@@ -55,9 +72,13 @@ beforeAll(() => {
 })
 afterAll(() => {
   window.ResizeObserver = originalResizeObserver
+  window.matchMedia = originalMatchMedia
+  window.IntersectionObserver = originalIntersectionObserver
+  HTMLElement.prototype.scrollTo = originalScrollTo
 })
 beforeEach(() => {
   jest.clearAllMocks()
+  mobile = false
   result = { ...base, data: { pages: [empty] } }
   jest.mocked(useRankedFeed).mockReturnValue({
     ...base,
@@ -196,3 +217,24 @@ it('filters Most liked by its selected range independently of Best and Latest', 
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   expect(useMapFeed).toHaveBeenLastCalledWith('posts?cells=0&sort=time', true)
 })
+
+it.each([true, false])(
+  'uses the correct pagination root and scroll ownership (mobile: %s)',
+  (isMobile) => {
+    mobile = isMobile
+    result = {
+      ...base,
+      data: { pages: [{ ...empty, stories: [{ id: 'story' }] }] },
+    }
+    render(<Panel />)
+    expect(window.IntersectionObserver).toHaveBeenCalledWith(
+      expect.any(Function),
+      {
+        root: isMobile ? null : screen.getByRole('complementary'),
+        rootMargin: '800px',
+      },
+    )
+    if (isMobile) expect(scrollTo).not.toHaveBeenCalled()
+    else expect(scrollTo).toHaveBeenCalledWith(0, 0)
+  },
+)

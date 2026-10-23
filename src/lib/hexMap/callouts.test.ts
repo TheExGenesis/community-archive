@@ -51,3 +51,27 @@ it('keeps callouts within map edges and omits offscreen points', () => {
   expect(result[0].box.x).toBeGreaterThanOrEqual(8)
   expect(result[0].box.y).toBeGreaterThanOrEqual(66)
 })
+
+it('keeps a searched account visible when background labels fill every placement', () => {
+  const labels = [
+    {
+      text: 'crowded'.repeat(100),
+      x: 200,
+      y: 200,
+      size: 400,
+      region: 1,
+      kind: 'country' as const,
+    },
+  ]
+  expect(placeCallouts([person], labels, measure, 400, 400)).toEqual([])
+  const result = placeCallouts(
+    [{ ...person, highlighted: true }],
+    labels,
+    measure,
+    400,
+    400,
+  )
+  expect(result).toHaveLength(1)
+  expect(result[0].box.x).toBeGreaterThanOrEqual(8)
+  expect(result[0].box.y).toBeGreaterThanOrEqual(66)
+})

@@ -81,6 +81,28 @@ export function placeCallouts(
         ]
       }
     }
+    // A searched/highlighted account must stay visible even in a dense word
+    // cluster. Prefer the collision-free placements above, then keep its label
+    // inside the map and let it take priority over background text.
+    if (person.highlighted && w <= width - 16 && height >= 132) {
+      const box = {
+        x: Math.max(8, Math.min(width - w - 8, person.x - w / 2)),
+        y: Math.max(66, Math.min(height - h - 42, person.y - 44)),
+        width: w,
+        height: h,
+      }
+      occupied.push(box)
+      return [
+        {
+          ...person,
+          box,
+          pointer: {
+            x: Math.max(box.x, Math.min(box.x + w, person.x)),
+            y: Math.max(box.y, Math.min(box.y + h, person.y)),
+          },
+        },
+      ]
+    }
     return []
   })
 }

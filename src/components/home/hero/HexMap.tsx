@@ -516,7 +516,9 @@ export default memo(function HexMap({
               y: -cell.y * t.scale + t.y,
               region: cell.region,
               highlighted:
-                p.username.toLowerCase() === tweetHover?.username.toLowerCase(),
+                p.username.toLowerCase() ===
+                  tweetHover?.username.toLowerCase() ||
+                p.username.toLowerCase() === anchor.toLowerCase(),
             },
           ]
         : []

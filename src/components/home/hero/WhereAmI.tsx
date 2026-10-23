@@ -22,7 +22,8 @@ export default function WhereAmI({
 }: {
   onLocated: (person: SelfLocation | null) => void
 }) {
-  const { enabled: preview } = usePreviewSession()
+  const { enabled: previewEnabled, view } = usePreviewSession()
+  const preview = previewEnabled && view !== 'signed-out'
   const [name, setName] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [busy, setBusy] = useState(false)

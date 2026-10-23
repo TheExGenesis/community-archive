@@ -167,6 +167,35 @@ it('clears a pin when the signed-in account changes', async () => {
   expect(screen.getByRole('textbox', { name: 'Where am I?' })).toHaveValue('')
 })
 
+it('exposes the real opt-in flow in the signed-out preview view', async () => {
+  fetchMock.mockResolvedValue(response(401, { status: 'sign_in' }))
+  render(
+    <PreviewSessionProvider enabled>
+      <WhereAmI onLocated={jest.fn()} />
+    </PreviewSessionProvider>,
+  )
+  fireEvent.change(
+    screen.getByRole('combobox', { name: 'Preview sign-in state' }),
+    {
+      target: { value: 'signed-out' },
+    },
+  )
+  expect(screen.getByRole('textbox', { name: 'Where am I?' })).toBeVisible()
+  submit()
+  fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('/me?name='),
+    expect.anything(),
+  )
+  expect(signInWithOAuth).toHaveBeenCalledWith({
+    provider: 'twitter',
+    options: {
+      redirectTo: `${window.location.origin}/api/auth/callback?next=%2F%3Ffindme%3D1`,
+    },
+  })
+  expect(updateOptIn).not.toHaveBeenCalled()
+})
+
 it('lets preview visitors locate another public member without a session or consent mutation', async () => {
   fetchMock.mockResolvedValue(
     response(200, {

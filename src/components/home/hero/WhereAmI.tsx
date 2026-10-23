@@ -200,7 +200,7 @@ export default function WhereAmI({
                   ? `@${result.person?.username} is here.`
                   : `You are here, @${result.person?.username}.`
                 : result?.status === 'sign_in' || result?.status === 'opt_in'
-                  ? 'Opt in to the Community Archive to find yourself on the map.'
+                  ? 'Opt in to the Community Archive to find yourself on the map!'
                   : result?.error}
           </div>
           {!busy &&

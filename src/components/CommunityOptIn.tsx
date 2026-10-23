@@ -28,15 +28,15 @@ const THANKS = 'Thanks for opting in to the Community Archive!'
 export function OptInDisclosure() {
   return (
     <p>
-      Opting in to the Community Archive lets us keep and share your public
-      tweets. You can always opt out later. By opting in, you agree to our{' '}
+      This lets us keep and share your public tweets. You can always opt out
+      later. By opting in, you agree to our{' '}
       <Link
         href="/data-policy"
         target="_blank"
         rel="noopener noreferrer"
         className="underline"
       >
-        Data Policy
+        <strong>Data Policy</strong>
       </Link>
       .
     </p>
@@ -206,7 +206,7 @@ export function CommunityOptInProvider({ children }: { children: ReactNode }) {
       >
         <DialogContent>
           <DialogTitle>
-            Opt in to the Community Archive to find yourself on the map.
+            Opt in to the Community Archive to find yourself on the map!
           </DialogTitle>
           <DialogDescription asChild>
             <div>

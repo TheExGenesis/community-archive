@@ -48,7 +48,7 @@ it('shows the requested disclosure before proceeding straight to Twitter', async
   )
   submit()
   await screen.findByText(
-    'Opt in to the Community Archive to find yourself on the map.',
+    'Opt in to the Community Archive to find yourself on the map!',
   )
   expect(
     screen.getByText(/lets us keep and share your public tweets/),

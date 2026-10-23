@@ -51,7 +51,7 @@ it('discloses consent before OAuth and saves pending intent only after confirmat
   renderFlow()
   fireEvent.click(screen.getByRole('button', { name: 'Opt in' }))
   expect(await screen.findByRole('dialog')).toHaveTextContent(
-    'Opt in to the Community Archive to find yourself on the map.',
+    'Opt in to the Community Archive to find yourself on the map!',
   )
   expect(screen.getByRole('link', { name: 'Data Policy' })).toHaveAttribute(
     'href',

@@ -131,11 +131,8 @@
   color: #ffffff;
 }
 .layers {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  pointer-events: none;
-  max-width: calc(100% - 28px);
+  margin-top: 8px;
+  max-width: 100%;
 }
 .layers p {
   margin-top: 7px;
@@ -145,22 +142,18 @@
   padding: 2px 5px;
   border-radius: 4px;
 }
-.segmented {
+.archivedToggle {
   display: inline-flex;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--background));
-  border-radius: 8px;
-  padding: 3px;
-  pointer-events: auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 13px;
+  cursor: pointer;
 }
-.segmented button {
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 5px;
-}
-.segmented button[aria-pressed='true'] {
-  background: hsl(var(--muted));
-  font-weight: 700;
+.archivedToggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: hsl(var(--brand-deep));
 }
 .hint {
   position: absolute;
@@ -713,13 +706,8 @@
     font-size: 16px;
     min-height: 44px;
   }
-  .finderForm button,
-  .segmented button {
+  .finderForm button {
     min-height: 44px;
-  }
-  .layers {
-    order: 1;
-    pointer-events: auto;
   }
   .layers p {
     font-size: 12px;

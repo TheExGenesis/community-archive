@@ -1,8 +1,12 @@
 # Homepage map on mobile
 
 Below 980 CSS pixels, the homepage map and stories share the page's scroll.
-The username finder, Activity/Archived switch, heat status, time scrubber,
+The username finder, heat status, time scrubber,
 zoom/reset buttons, and selection summary occupy rows outside the map canvas.
+The “Show archived” checkbox sits below the map on every screen size. Default
+community colors stay flat at every zoom level; archive coverage shading is
+opt-in. Explicit keyword heat searches retain their separate heat layer.
+The featured-account row shows three accounts without horizontal scrolling on phones.
 The development preview selector sits after page content; query devtools do
 not float over the mobile page.
 

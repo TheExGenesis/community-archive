@@ -1,7 +1,5 @@
 'use client'
 import Link from 'next/link'
-import { usePreviewSession } from '@/components/PreviewSession'
-import type { MapLookup } from '@/lib/hexMap/gateway'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { createBrowserClient } from '@/utils/supabase'
@@ -23,8 +21,6 @@ export default function WhereAmI({
 }: {
   onLocated: (person: SelfLocation | null) => void
 }) {
-  const { enabled: previewEnabled, view } = usePreviewSession()
-  const preview = previewEnabled && view !== 'signed-out'
   const [canSearch, setCanSearch] = useState(false)
   const [name, setName] = useState('')
   const [result, setResult] = useState<Result | null>(null)
@@ -46,16 +42,7 @@ export default function WhereAmI({
   }, [cancel])
 
   const locate = useCallback(
-    async (query = '', findSelf = false) => {
-      const publicLookup = preview && !findSelf
-      const handle = query.trim().replace(/^@/, '')
-      if (publicLookup && !/^\w{1,15}$/.test(handle)) {
-        cancel()
-        setBusy(false)
-        callback.current(null)
-        setResult({ error: 'Enter a username to find on the map.' })
-        return
-      }
+    async (query = '') => {
       pending.current?.abort()
       const controller = new AbortController()
       pending.current = controller
@@ -65,27 +52,10 @@ export default function WhereAmI({
       callback.current(null)
       try {
         const response = await fetch(
-          mapUrl(
-            `${publicLookup ? 'lookup' : 'me'}?name=${encodeURIComponent(preview ? handle : query)}`,
-          ),
+          mapUrl(`me?name=${encodeURIComponent(query)}`),
           { signal: controller.signal, cache: 'no-store' },
         )
-        const payload = await response.json()
-        const person =
-          publicLookup && response.ok
-            ? (payload as MapLookup).people.find(
-                (p) => p.username.toLowerCase() === handle.toLowerCase(),
-              )
-            : undefined
-        const data: Result =
-          publicLookup && response.ok
-            ? person
-              ? {
-                  status: 'located',
-                  person: { username: person.username, cell: person.cell },
-                }
-              : { error: 'This username is not available on the map.' }
-            : payload
+        const data: Result = await response.json()
         if (request !== generation.current) return
         if (response.ok && data.status === 'located' && data.person) {
           callback.current(data.person)
@@ -102,7 +72,7 @@ export default function WhereAmI({
         if (request === generation.current) setBusy(false)
       }
     },
-    [preview, cancel],
+    [],
   )
 
   useEffect(() => {
@@ -122,7 +92,7 @@ export default function WhereAmI({
       account = next
     })
     if (new URLSearchParams(window.location.search).get('findme') === '1')
-      void locate('', true)
+      void locate()
     return () => {
       subscription.unsubscribe()
       cancel()
@@ -182,9 +152,7 @@ export default function WhereAmI({
       <form
         role="search"
         aria-label={
-          preview || canSearch
-            ? 'Find a username on the map'
-            : 'Find yourself on the map'
+          canSearch ? 'Find a username on the map' : 'Find yourself on the map'
         }
         className={styles.finderForm}
         onSubmit={(event) => {
@@ -193,10 +161,8 @@ export default function WhereAmI({
         }}
       >
         <input
-          aria-label={preview || canSearch ? 'Find username' : 'Where am I?'}
-          placeholder={
-            preview || canSearch ? 'Find any username…' : 'Where am I?'
-          }
+          aria-label={canSearch ? 'Find username' : 'Where am I?'}
+          placeholder={canSearch ? 'Find any username…' : 'Where am I?'}
           value={name}
           maxLength={16}
           autoComplete="off"
@@ -223,7 +189,7 @@ export default function WhereAmI({
                 ? 'Opening Twitter…'
                 : 'Finding your place…'
               : result?.status === 'located'
-                ? preview || result.isSelf === false
+                ? result.isSelf === false
                   ? `@${result.person?.username} is here.`
                   : `You are here, @${result.person?.username}.`
                 : result?.error}

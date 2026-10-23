@@ -67,9 +67,10 @@ lookups use those filtered public results without rechecking them against the
 unrelated staging directory. Production retains its additional live Supabase
 policy check. No production website proxy, firewall bypass, or new secret is needed.
 
-Authentication and consent writes still use staging. An opted-in staging user can
-search other public map members; the signed-out preview view exercises the OAuth
-and explicit consent flow. Preview view controls never grant server authorization.
+Authentication and consent writes still use staging. The map finder always uses the authenticated consent route, in every preview
+view. Signed-out visitors receive the Opt In action; signed-in visitors must
+explicitly opt in on staging before searching other public map members. Preview
+view controls never grant server authorization.
 
 ### Reviewing production Bulletin items in a protected PR preview
 

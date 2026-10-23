@@ -196,51 +196,40 @@ it('exposes the real opt-in flow in the signed-out preview view', async () => {
   expect(updateOptIn).not.toHaveBeenCalled()
 })
 
-it('lets preview visitors locate another public member without a session or consent mutation', async () => {
-  fetchMock.mockResolvedValue(
-    response(200, {
-      people: [{ username: 'Other_User', cell: 4 }],
-      counts: {},
-    }),
-  )
-  const onLocated = jest.fn()
-  render(
-    <PreviewSessionProvider enabled>
-      <WhereAmI onLocated={onLocated} />
-    </PreviewSessionProvider>,
-  )
-  fireEvent.change(screen.getByRole('textbox', { name: 'Find username' }), {
-    target: { value: '@other_user' },
-  })
-  submit()
-  await screen.findByText('@Other_User is here.')
-  expect(fetchMock).toHaveBeenCalledWith(
-    expect.stringContaining('lookup?name=other_user'),
-    expect.anything(),
-  )
-  expect(onLocated).toHaveBeenLastCalledWith({
-    username: 'Other_User',
-    cell: 4,
-  })
-  expect(updateOptIn).not.toHaveBeenCalled()
-})
-it('does not plot an unavailable username in preview', async () => {
-  fetchMock.mockResolvedValue(response(200, { people: [], counts: {} }))
-  const onLocated = jest.fn()
-  render(
-    <PreviewSessionProvider enabled>
-      <WhereAmI onLocated={onLocated} />
-    </PreviewSessionProvider>,
-  )
-  fireEvent.change(screen.getByRole('textbox', { name: 'Find username' }), {
-    target: { value: 'unknown' },
-  })
-  submit()
-  await screen.findByText('This username is not available on the map.')
-  expect(onLocated).not.toHaveBeenCalledWith(
-    expect.objectContaining({ cell: expect.any(Number) }),
-  )
-})
+it.each(['actual', 'signed-in', 'signed-out'])(
+  'requires opt-in for signed-out visitors even in the %s preview view',
+  async (view) => {
+    fetchMock.mockResolvedValue(
+      response(401, {
+        status: 'sign_in',
+        error: 'Opt in with Twitter to find yourself on the map.',
+      }),
+    )
+    const onLocated = jest.fn()
+    render(
+      <PreviewSessionProvider enabled>
+        <WhereAmI onLocated={onLocated} />
+      </PreviewSessionProvider>,
+    )
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Preview sign-in state' }),
+      { target: { value: view } },
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Where am I?' }), {
+      target: { value: 'exgenesis' },
+    })
+    submit()
+    await screen.findByRole('button', { name: 'Opt In' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/me?name=exgenesis'),
+      expect.anything(),
+    )
+    expect(onLocated).not.toHaveBeenCalledWith(
+      expect.objectContaining({ cell: expect.any(Number) }),
+    )
+    expect(updateOptIn).not.toHaveBeenCalled()
+  },
+)
 
 it('lets an opted-in visitor search another member and identifies the result correctly', async () => {
   fetchMock.mockResolvedValue(

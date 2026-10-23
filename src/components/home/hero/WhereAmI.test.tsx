@@ -10,9 +10,11 @@ let authChange: (
   session: { user: { id: string } } | null,
 ) => void
 const unsubscribe = jest.fn()
+const signInWithOAuth = jest.fn()
 jest.mock('@/utils/supabase', () => ({
   createBrowserClient: () => ({
     auth: {
+      signInWithOAuth,
       onAuthStateChange: (callback: typeof authChange) => {
         authChange = callback
         return { data: { subscription: { unsubscribe } } }
@@ -31,27 +33,53 @@ const submit = () =>
   fireEvent.click(screen.getByRole('button', { name: 'Find me on the map' }))
 beforeEach(() => {
   jest.clearAllMocks()
+  signInWithOAuth.mockReset().mockResolvedValue({ error: null })
   global.fetch = fetchMock
   window.history.replaceState(null, '', '/')
 })
-it('offers sign-in without opting the visitor in', async () => {
+it('opens Twitter directly from Opt In and returns to the map without automatic consent', async () => {
   fetchMock.mockResolvedValue(
     response(401, {
       status: 'sign_in',
-      error: 'Sign in with X to find yourself on the map.',
+      error: 'Opt in with Twitter to find yourself on the map.',
     }),
   )
   const onLocated = jest.fn()
   render(<WhereAmI onLocated={onLocated} />)
   submit()
+  fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
+  await screen.findByText('Opening Twitter…')
+  expect(signInWithOAuth).toHaveBeenCalledWith({
+    provider: 'twitter',
+    options: {
+      redirectTo: `${window.location.origin}/api/auth/callback?next=%2F%3Ffindme%3D1`,
+    },
+  })
   expect(
-    await screen.findByRole('link', { name: 'Sign in with X' }),
-  ).toHaveAttribute('href', '/login?redirect=%2F%3Ffindme%3D1')
+    screen.queryByRole('link', { name: /sign in/i }),
+  ).not.toBeInTheDocument()
   expect(updateOptIn).not.toHaveBeenCalled()
   expect(onLocated).not.toHaveBeenCalledWith(
     expect.objectContaining({ cell: expect.any(Number) }),
   )
 })
+it.each(['returned', 'thrown'])(
+  'allows retry after a %s OAuth error',
+  async (failure) => {
+    fetchMock.mockResolvedValue(response(401, { status: 'sign_in' }))
+    if (failure === 'returned')
+      signInWithOAuth.mockResolvedValueOnce({ error: new Error('Unavailable') })
+    else signInWithOAuth.mockRejectedValueOnce(new Error('Unavailable'))
+    render(<WhereAmI onLocated={jest.fn()} />)
+    submit()
+    fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
+    await screen.findByText('Could not connect to Twitter. Please try again.')
+    fireEvent.click(screen.getByRole('button', { name: 'Opt In' }))
+    await screen.findByText('Opening Twitter…')
+    expect(signInWithOAuth).toHaveBeenCalledTimes(2)
+    expect(updateOptIn).not.toHaveBeenCalled()
+  },
+)
 it('requires a separate explicit consent action before plotting', async () => {
   fetchMock
     .mockResolvedValueOnce(

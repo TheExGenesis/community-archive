@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (!user)
       return reply(401, {
         status: 'sign_in',
-        error: 'Sign in with X to find yourself on the map.',
+        error: 'Opt in with Twitter to find yourself on the map.',
       })
     const username = getTwitterUsername(user)
     const accountId = getTwitterProviderId(user)

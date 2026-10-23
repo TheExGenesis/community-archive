@@ -123,6 +123,29 @@ export default function WhereAmI({
     }
   }, [clear, locate, cancel])
 
+  const authenticate = async () => {
+    if (busy) return
+    const request = ++generation.current
+    setBusy(true)
+    try {
+      const { error } = await createBrowserClient().auth.signInWithOAuth({
+        provider: 'twitter',
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent('/?findme=1')}`,
+        },
+      })
+      if (error) throw error
+    } catch {
+      if (request === generation.current) {
+        setResult({
+          status: 'sign_in',
+          error: 'Could not connect to Twitter. Please try again.',
+        })
+        setBusy(false)
+      }
+    }
+  }
+
   const optIn = async () => {
     if (!result?.username || busy) return
     const request = ++generation.current
@@ -186,7 +209,9 @@ export default function WhereAmI({
           </button>
           <div role="status" aria-live="polite">
             {busy
-              ? 'Finding your place…'
+              ? result?.status === 'sign_in'
+                ? 'Opening Twitter…'
+                : 'Finding your place…'
               : result?.status === 'located'
                 ? preview
                   ? `@${result.person?.username} is here.`
@@ -194,12 +219,13 @@ export default function WhereAmI({
                 : result?.error}
           </div>
           {!busy && result?.status === 'sign_in' && (
-            <Link
-              href="/login?redirect=%2F%3Ffindme%3D1"
+            <button
+              type="button"
+              onClick={() => void authenticate()}
               className={styles.finderAction}
             >
-              Sign in with X
-            </Link>
+              Opt In
+            </button>
           )}
           {!busy && result?.status === 'opt_in' && (
             <>

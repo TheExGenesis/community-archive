@@ -160,6 +160,7 @@ it('widens Most liked after each exhausted range, preserves posts, and deduplica
     await act(async () => {
       await result.current.fetchNextPage()
     })
+    await waitFor(() => expect(result.current.data!.pages).toHaveLength(i + 2))
   }
   expect(result.current.hasNextPage).toBe(false)
   expect(

@@ -52,8 +52,6 @@ export default memo(function HexMap({
   coverageLive,
   finder,
   selfLocation,
-  showDefaultLabels,
-  onToggleDefaultLabels,
 }: {
   snapshot: HexSnapshot
   selected: number[]
@@ -71,8 +69,6 @@ export default memo(function HexMap({
   onClearHeat: () => void
   scrubber: ReactNode
   coverageLive: boolean
-  showDefaultLabels: boolean
-  onToggleDefaultLabels: () => void
   finder?: ReactNode
   selfLocation?: { username: string; cell: number } | null
 }) {
@@ -602,6 +598,19 @@ export default memo(function HexMap({
           aria-label="Community map. Arrow keys explore cells; Enter selects a community; Shift Enter selects one hexagon; Escape clears; plus and minus zoom."
         >
           <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
+          <label
+            className={styles.archivedToggle}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              role="switch"
+              checked={showArchived}
+              onChange={(event) => setShowArchived(event.target.checked)}
+            />
+            Show archived
+          </label>
           <div className={styles.labels}>
             {labels.map((l, i) =>
               l.kind === 'country' ? (
@@ -779,25 +788,6 @@ export default memo(function HexMap({
         )}
       </div>
       <div className={styles.layers}>
-        <label className={styles.archivedToggle}>
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(event) => setShowArchived(event.target.checked)}
-          />
-          Show archived
-        </label>
-        <div className={styles.defaultLabelsControl}>
-          <button
-            type="button"
-            aria-pressed={!showDefaultLabels}
-            onClick={onToggleDefaultLabels}
-          >
-            {showDefaultLabels
-              ? 'Hide default usernames'
-              : 'Show default usernames'}
-          </button>
-        </div>
         {(heatTerm || showArchived) && (
           <p>
             {heatTerm

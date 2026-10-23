@@ -160,11 +160,16 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
                         preloadSelection([person.cell], 'Stories')
                       }
                     }}
-                  />
-                }
-                showDefaultLabels={showDefaultLabels}
-                onToggleDefaultLabels={() =>
-                  setShowDefaultLabels((shown) => !shown)
+                  >
+                    <button
+                      type="button"
+                      className={styles.defaultLabelsControl}
+                      aria-pressed={!showDefaultLabels}
+                      onClick={() => setShowDefaultLabels((shown) => !shown)}
+                    >
+                      {showDefaultLabels ? 'Clear usernames' : 'Show usernames'}
+                    </button>
+                  </WhereAmI>
                 }
                 coverageLive={!!pins.data}
                 pins={visiblePins}

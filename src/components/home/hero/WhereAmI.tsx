@@ -1,7 +1,7 @@
 'use client'
 import { usePreviewSession } from '@/components/PreviewSession'
 import type { MapLookup } from '@/lib/hexMap/gateway'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Search, X } from 'lucide-react'
 import { createBrowserClient } from '@/utils/supabase'
 import { OptInDisclosure, useCommunityOptIn } from '@/components/CommunityOptIn'
@@ -19,8 +19,10 @@ type Result = {
 
 export default function WhereAmI({
   onLocated,
+  children,
 }: {
   onLocated: (person: SelfLocation | null) => void
+  children?: ReactNode
 }) {
   const { enabled: previewEnabled, view, optedIn } = usePreviewSession()
   const optIn = useCommunityOptIn()
@@ -175,6 +177,7 @@ export default function WhereAmI({
           <Search size={17} aria-hidden="true" />
         </button>
       </form>
+      {children}
       {previewEnabled && view !== 'actual' && (
         <p className="text-xs text-muted-foreground">
           Simulation · no login or consent saved

@@ -145,17 +145,48 @@
   border-radius: 4px;
 }
 .archivedToggle {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-height: 44px;
-  font-size: 13px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: hsl(var(--background) / 0.8);
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
   cursor: pointer;
 }
 .archivedToggle input {
-  width: 16px;
+  appearance: none;
+  flex: none;
+  width: 26px;
   height: 16px;
-  accent-color: hsl(var(--brand-deep));
+  padding: 2px;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground) / 0.35);
+  cursor: pointer;
+}
+.archivedToggle input::before {
+  content: '';
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: hsl(var(--background));
+}
+.archivedToggle input:checked {
+  background: hsl(var(--brand-deep));
+}
+.archivedToggle input:checked::before {
+  transform: translateX(10px);
+}
+.archivedToggle input:focus-visible {
+  outline: 2px solid hsl(var(--brand-deep));
+  outline-offset: 3px;
 }
 .hint {
   position: absolute;
@@ -659,15 +690,23 @@
 }
 
 .defaultLabelsControl {
-  margin-top: 6px;
-  pointer-events: auto;
-}
-.defaultLabelsControl button {
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
-  padding: 4px 8px;
+  display: block;
+  margin-top: 4px;
+  padding: 4px 2px;
+  color: hsl(var(--muted-foreground));
   font-size: 11px;
+  text-underline-offset: 3px;
+}
+.defaultLabelsControl:hover,
+.defaultLabelsControl:focus-visible {
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+}
+@media (max-width: 979px) {
+  .defaultLabelsControl {
+    min-height: 44px;
+    font-size: 12px;
+  }
 }
 
 /* Mobile controls occupy their own rows, never the map's gesture surface. */

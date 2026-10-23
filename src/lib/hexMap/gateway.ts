@@ -22,11 +22,11 @@ export type MapHeat = {
   from: string
   to: string
 }
-// These routes deliberately bypass the public generic analytics proxy: all
-// the gateway applies its membership projection; production routes additionally
-// apply the website's current app policy before exposing identities.
+// These routes bypass the public generic analytics proxy. Public lookups use
+// the gateway membership projection; private self lookup requires fresh website
+// consent first. Production routes also recheck current website policy.
 export async function mapGateway<T>(
-  endpoint: 'hex-lookup' | 'hex-posts' | 'hex-word-heat',
+  endpoint: 'hex-self' | 'hex-lookup' | 'hex-posts' | 'hex-word-heat',
   params: Record<string, string> = {},
 ): Promise<T> {
   const base = clickHouseAnalyticsGatewayBaseUrl(),
@@ -40,7 +40,9 @@ export async function mapGateway<T>(
   const result = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
-    signal: AbortSignal.timeout(endpoint === 'hex-lookup' ? 3000 : 20_000),
+    signal: AbortSignal.timeout(
+      endpoint === 'hex-lookup' || endpoint === 'hex-self' ? 3000 : 20_000,
+    ),
   })
   if (!result.ok) throw new Error('Map backend unavailable')
   return result.json()

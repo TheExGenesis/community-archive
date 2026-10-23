@@ -29,6 +29,7 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
   useEffect(() => {
     void import('./HexMap')
   }, [])
+  const [showDefaultLabels, setShowDefaultLabels] = useState(true)
   const [selfLocation, setSelfLocation] = useState<SelfLocation | null>(null)
   const [selectionTab, setSelectionTab] = useState('Stories')
   const [selected, setSelected] = useState<number[]>([])
@@ -126,8 +127,10 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
           )
         : selfLocation
           ? [selfLocation]
-          : (pins.data?.people ?? []),
-    [active, pins.data, selfLocation],
+          : anchor || showDefaultLabels
+            ? (pins.data?.people ?? [])
+            : [],
+    [active, pins.data, selfLocation, anchor, showDefaultLabels],
   )
   return (
     <section
@@ -158,6 +161,10 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
                       }
                     }}
                   />
+                }
+                showDefaultLabels={showDefaultLabels}
+                onToggleDefaultLabels={() =>
+                  setShowDefaultLabels((shown) => !shown)
                 }
                 coverageLive={!!pins.data}
                 pins={visiblePins}

@@ -6,9 +6,12 @@ type View = 'actual' | 'signed-in' | 'signed-out'
 const PreviewSessionContext = createContext({
   enabled: false,
   view: 'actual' as View,
+  setView: (_view: View) => {},
+  optedIn: false,
+  completeOptIn: () => {},
 })
 
-// Presentation only. Never supplies an identity or changes authentication.
+// Client simulation only. Never supplies a server identity or changes authentication.
 export function PreviewSessionProvider({
   enabled,
   children,
@@ -16,10 +19,26 @@ export function PreviewSessionProvider({
   enabled: boolean
   children: ReactNode
 }) {
-  const [view, setView] = useState<View>('actual')
+  const [view, setCurrentView] = useState<View>('actual')
+  const [optedIn, setOptedIn] = useState(false)
+  const setView = (next: View) => {
+    setOptedIn(false)
+    setCurrentView(next)
+  }
   return (
     <PreviewSessionContext.Provider
-      value={{ enabled, view: enabled ? view : 'actual' }}
+      value={{
+        enabled,
+        view: enabled ? view : 'actual',
+        setView,
+        optedIn: enabled && optedIn,
+        completeOptIn: () => {
+          if (enabled) {
+            setCurrentView('signed-in')
+            setOptedIn(true)
+          }
+        },
+      }}
     >
       {children}
       {enabled && (
@@ -41,7 +60,7 @@ export function PreviewSessionProvider({
             </select>
           </label>
           <p className="mt-1 text-muted-foreground">
-            UI only · actual permissions stay unchanged
+            Simulation only · no login or consent saved
           </p>
         </aside>
       )}

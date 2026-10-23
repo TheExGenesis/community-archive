@@ -23,7 +23,8 @@ export type MapHeat = {
   to: string
 }
 // These routes deliberately bypass the public generic analytics proxy: all
-// identity-bearing responses must pass the website's current app policy first.
+// the gateway applies its membership projection; production routes additionally
+// apply the website's current app policy before exposing identities.
 export async function mapGateway<T>(
   endpoint: 'hex-lookup' | 'hex-posts' | 'hex-word-heat',
   params: Record<string, string> = {},

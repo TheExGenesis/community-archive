@@ -168,6 +168,8 @@ function getApiRateLimitPolicy(
   if (
     method === 'GET' &&
     [
+      '/api/hex-map/lookup',
+      '/api/hex-map/me',
       '/api/tweet-search',
       '/api/user-directory',
       '/api/strands',

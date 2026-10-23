@@ -1,7 +1,6 @@
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import { NextRequest, NextResponse } from 'next/server'
-import { mapGateway, type MapLookup } from '@/lib/hexMap/gateway'
-import { getAppPolicy } from '@/lib/community-apps/data'
+import { readMapLookup } from '@/lib/hexMap/lookup'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { sampleFeaturedArchives } from '@/lib/featuredArchives'
 export const dynamic = 'force-dynamic'
@@ -31,21 +30,9 @@ export async function GET(request: NextRequest) {
         : sampleFeaturedArchives()
             .slice(0, 6)
             .map((p) => p.username)
-    const result = await mapGateway<MapLookup>('hex-lookup', {
-      names: names.join(','),
-      cells,
-    })
-    // The selection header shows six avatars; avoid eight sequential policy
-    // batches for hundreds of identities it never renders. Counts stay complete.
-    const candidates = cells ? result.people.slice(0, 24) : result.people
-    const policy = await getAppPolicy(candidates.map((p) => p.username))
-    const people = candidates.filter(
-      (p) =>
-        policy.members.has(p.username.toLowerCase()) &&
-        !policy.blocked.has(p.username.toLowerCase()) &&
-        !policy.blockedIds.has(p.account_id),
-    )
-    if (cells && people.length) {
+    const result = await readMapLookup({ names: names.join(','), cells })
+    const people = result.people
+    if (cells && people.length && process.env.VERCEL_ENV !== 'preview') {
       const { data, error } = await createServerServiceRoleClient()
         .from('user_directory')
         .select('account_id,avatar_media_url')

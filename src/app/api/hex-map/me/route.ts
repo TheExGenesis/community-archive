@@ -8,7 +8,7 @@ import {
 } from '@/lib/twitterIdentity'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getAppPolicy } from '@/lib/community-apps/data'
-import { mapGateway, type MapLookup } from '@/lib/hexMap/gateway'
+import { readMapLookup } from '@/lib/hexMap/lookup'
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import snapshot from '@/lib/hexMap/snapshot.json'
 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (!user)
       return reply(401, {
         status: 'sign_in',
-        error: 'Sign in with X to find yourself on the map.',
+        error: 'Opt in with Twitter to find yourself on the map.',
       })
     const username = getTwitterUsername(user)
     const accountId = getTwitterProviderId(user)
@@ -38,10 +38,10 @@ export async function GET(request: NextRequest) {
         error: 'Sign in with a verified X account to find yourself.',
       })
     const requested = request.nextUrl.searchParams.get('name')?.trim()
-    if (requested && normalizeTwitterUsername(requested) !== username)
-      return reply(403, {
-        error: `You are signed in as @${username}. Use that account to find yourself.`,
-      })
+    const target = requested ? normalizeTwitterUsername(requested) : username
+    if (!target || !/^\w{1,15}$/.test(target))
+      return reply(400, { error: 'Enter a valid X username.' })
+    const isSelf = target === username
 
     // Recognize existing manual consent as well as OAuth-linked records. The
     // stable provider ID prevents a recycled handle from granting consent.
@@ -97,17 +97,16 @@ export async function GET(request: NextRequest) {
       reply(404, {
         status: 'not_mapped',
         username,
-        error:
-          'Your account is not available on this map yet. New opt-ins can take time to appear.',
+        error: isSelf
+          ? 'Your account is not available on this map yet. New opt-ins can take time to appear.'
+          : 'This username is not available on the map.',
       })
-    if (!policy.members.has(username)) return unavailable()
-    const result = await mapGateway<MapLookup>('hex-lookup', {
-      names: username,
-    })
+    const result = await readMapLookup({ names: target })
     if (result.version !== MAP_VERSION) throw new Error('Map version mismatch')
     const person = result.people.find(
       (p) =>
-        p.account_id === accountId && p.username.toLowerCase() === username,
+        (!isSelf || p.account_id === accountId) &&
+        p.username.toLowerCase() === target,
     )
     if (
       !person ||
@@ -117,7 +116,8 @@ export async function GET(request: NextRequest) {
       return unavailable()
     return reply(200, {
       status: 'located',
-      person: { username, cell: person.cell },
+      person: { username: person.username, cell: person.cell },
+      isSelf,
     })
   } catch {
     return reply(503, {

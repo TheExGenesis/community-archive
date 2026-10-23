@@ -658,6 +658,18 @@
   border-bottom: 0;
 }
 
+.defaultLabelsControl {
+  margin-top: 6px;
+  pointer-events: auto;
+}
+.defaultLabelsControl button {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
 /* Mobile controls occupy their own rows, never the map's gesture surface. */
 .mobileMapControls,
 .mobileSelection {

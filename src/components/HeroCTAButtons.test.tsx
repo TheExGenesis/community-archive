@@ -1,128 +1,167 @@
-import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import HeroCTAButtons from './HeroCTAButtons'
-import type { SessionAccount } from '@/hooks/useAuthAndArchive'
+import { CommunityOptInProvider } from './CommunityOptIn'
+import { PreviewSessionProvider } from './PreviewSession'
+import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 
-const mockReplace = jest.fn()
-const mockRefresh = jest.fn()
-const mockUnsubscribe = jest.fn()
-const mockSingle = jest.fn()
-const mockFetch = jest.fn()
-const originalFetch = global.fetch
-
-const mockSupabase = {
-  auth: {
-    getSession: jest.fn(),
-    onAuthStateChange: jest.fn(() => ({
-      data: { subscription: { unsubscribe: mockUnsubscribe } },
-    })),
-    signInWithOAuth: jest.fn(),
-  },
-  from: jest.fn(() => ({
-    select: jest.fn(() => ({
-      eq: jest.fn(() => ({ single: mockSingle })),
-    })),
-  })),
-}
-
+const replace = jest.fn(),
+  refresh = jest.fn()
+const getSession = jest.fn(),
+  signInWithOAuth = jest.fn()
+const unsubscribe = jest.fn()
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: mockReplace, refresh: mockRefresh }),
-  useSearchParams: () => new URLSearchParams(window.location.search),
+  useRouter: () => ({ replace, refresh }),
 }))
-
-jest.mock('@/hooks/useAuthAndArchive', () => ({
-  useAuthAndArchive: () => ({
-    userMetadata: {
-      user_name: 'exampleuser',
-      provider_id: '123',
-      avatar_url: null,
-    } satisfies SessionAccount,
+jest.mock('@/utils/supabase', () => ({
+  createBrowserClient: () => ({
+    auth: {
+      getSession,
+      signInWithOAuth,
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe } } }),
+    },
   }),
 }))
-
-jest.mock('@/utils/supabase', () => ({
-  createBrowserClient: () => mockSupabase,
-}))
-
-describe('HeroCTAButtons', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-    window.history.replaceState({}, '', '/?action=optin')
-    mockSupabase.auth.getSession.mockResolvedValue({
-      data: { session: { user: { id: 'auth-user-123' } } },
-    })
-    mockSingle.mockResolvedValue({
-      data: null,
-      error: { code: 'PGRST116' },
-    })
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ success: true }), { status: 200 }),
-    )
-    global.fetch = mockFetch
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
+const fetchMock = jest.fn()
+const user = {
+  id: 'verified-session',
+  app_metadata: { provider_id: '123', user_name: 'exampleuser' },
+}
+const renderFlow = (preview = false) =>
+  render(
+    <PreviewSessionProvider enabled={preview}>
+      <CommunityOptInProvider>
+        <HeroCTAButtons />
+      </CommunityOptInProvider>
+    </PreviewSessionProvider>,
+  )
+beforeEach(() => {
+  jest.clearAllMocks()
+  sessionStorage.clear()
+  window.history.replaceState({}, '', '/')
+  getSession.mockResolvedValue({ data: { session: null } })
+  signInWithOAuth.mockResolvedValue({ error: null })
+  fetchMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true }),
   })
-
-  afterAll(() => {
-    global.fetch = originalFetch
-  })
-
-  it('completes a pending opt-in when the user returns from OAuth', async () => {
-    render(<HeroCTAButtons />)
-
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/opt-in', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  global.fetch = fetchMock
+})
+it('discloses consent before OAuth and saves pending intent only after confirmation', async () => {
+  renderFlow()
+  fireEvent.click(screen.getByRole('button', { name: 'Opt in' }))
+  expect(await screen.findByRole('dialog')).toHaveTextContent(
+    'Opt in to the Community Archive to find yourself on the map!',
+  )
+  expect(screen.getByRole('link', { name: 'Data Policy' })).toHaveAttribute(
+    'href',
+    '/data-policy',
+  )
+  expect(signInWithOAuth).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Opt In' }))
+  await waitFor(() =>
+    expect(signInWithOAuth).toHaveBeenCalledWith({
+      provider: 'twitter',
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback?next=%2F%3Faction%3Doptin`,
+      },
+    }),
+  )
+  expect(sessionStorage.getItem('community-archive-opt-in')).toBeTruthy()
+  expect(fetchMock).not.toHaveBeenCalled()
+})
+it('completes consent after OAuth once and thanks the user without a second prompt', async () => {
+  window.history.replaceState({}, '', '/?action=optin&findme=1')
+  sessionStorage.setItem(
+    'community-archive-opt-in',
+    JSON.stringify({ at: Date.now() }),
+  )
+  getSession.mockResolvedValue({ data: { session: { user } } })
+  renderFlow()
+  await screen.findByText('Thanks for opting in to the Community Archive!')
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/opt-in',
+    expect.objectContaining({
       body: JSON.stringify({
         username: 'exampleuser',
         optedIn: true,
         termsVersion: 'v1.0',
       }),
-    })
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/')
-      expect(mockRefresh).toHaveBeenCalledTimes(1)
-    })
+    }),
+  )
+  expect(sessionStorage.getItem('community-archive-opt-in')).toBeNull()
+  expect(replace).toHaveBeenCalledWith('/?findme=1')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+it.each([null, { at: Date.now() - 31 * 60 * 1000 }])(
+  'does not save consent from a return URL with absent or expired intent: %p',
+  async (intent) => {
+    window.history.replaceState({}, '', '/?action=optin')
+    if (intent)
+      sessionStorage.setItem('community-archive-opt-in', JSON.stringify(intent))
+    getSession.mockResolvedValue({ data: { session: { user } } })
+    renderFlow()
+    await screen.findByRole('button', { name: 'Opt in' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  },
+)
+it('simulates the whole shared login and consent without OAuth or a consent write', async () => {
+  function AccountState() {
+    const { userMetadata } = useAuthAndArchive()
+    return (
+      <p>
+        {userMetadata ? 'Account menu: signed in' : 'Account menu: signed out'}
+      </p>
+    )
+  }
+  render(
+    <PreviewSessionProvider enabled>
+      <CommunityOptInProvider>
+        <HeroCTAButtons />
+        <AccountState />
+      </CommunityOptInProvider>
+    </PreviewSessionProvider>,
+  )
+  fireEvent.change(screen.getByRole('combobox'), {
+    target: { value: 'signed-out' },
   })
-
-  it('does not opt in automatically without the OAuth return action', async () => {
-    window.history.replaceState({}, '', '/')
-
-    render(<HeroCTAButtons />)
-
-    await waitFor(() => {
-      expect(mockSupabase.auth.getSession).toHaveBeenCalledTimes(1)
-      expect(mockSingle).toHaveBeenCalledTimes(1)
-    })
-    expect(mockFetch).not.toHaveBeenCalled()
+  expect(screen.getByText('Account menu: signed out')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Opt in' }))
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Opt In' }),
+  )
+  await screen.findByText('Thanks for opting in to the Community Archive!')
+  expect(screen.getByText('Account menu: signed in')).toBeVisible()
+  expect(signInWithOAuth).not.toHaveBeenCalled()
+  expect(fetchMock).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByRole('combobox'), {
+    target: { value: 'signed-out' },
   })
-
-  it('shows a retry action when the automatic opt-in is rate limited', async () => {
-    mockFetch
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: 'Too Many Requests' }), {
-          status: 429,
-          headers: { 'Retry-After': '60' },
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ success: true }), { status: 200 }),
-      )
-
-    render(<HeroCTAButtons />)
-
-    expect(
-      await screen.findByText(
-        'Too many requests. Please wait 1 minute and try again.',
-      ),
-    ).toBeInTheDocument()
-    expect(mockFetch).toHaveBeenCalledTimes(1)
-    expect(mockReplace).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: /retry opt in/i }))
-
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'))
+  expect(
+    screen.queryByText('Thanks for opting in to the Community Archive!'),
+  ).not.toBeInTheDocument()
+  expect(screen.getByText('Account menu: signed out')).toBeVisible()
+})
+it('reports a failed consent write without thanking the user', async () => {
+  getSession.mockResolvedValue({ data: { session: { user } } })
+  fetchMock.mockResolvedValue({
+    ok: false,
+    status: 500,
+    headers: new Headers(),
+    json: async () => ({ error: 'Consent unavailable' }),
   })
+  renderFlow()
+  fireEvent.click(screen.getByRole('button', { name: 'Opt in' }))
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Opt In' }),
+  )
+  await waitFor(() =>
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent(
+      'Consent unavailable',
+    ),
+  )
+  expect(
+    screen.queryByText('Thanks for opting in to the Community Archive!'),
+  ).not.toBeInTheDocument()
 })

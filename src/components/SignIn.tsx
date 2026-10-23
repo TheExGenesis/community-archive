@@ -4,7 +4,8 @@ import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { devLog } from '@/lib/devLog'
 import { createBrowserClient } from '@/utils/supabase'
-import { useSearchParams } from 'next/navigation'
+import { usePreviewSession } from '@/components/PreviewSession'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { safeAuthRedirect } from '@/lib/authRedirect'
 
@@ -20,6 +21,8 @@ const STAGING_USERS = [
 ] as const
 
 export default function SignIn({ fullPage = false }: { fullPage?: boolean }) {
+  const preview = usePreviewSession()
+  const router = useRouter()
   const { localPreview } = useNavigationAudience()
   const searchParams = useSearchParams()
   const redirectTo = safeAuthRedirect(searchParams.get('redirect'))
@@ -46,6 +49,11 @@ export default function SignIn({ fullPage = false }: { fullPage?: boolean }) {
     useState<(typeof STAGING_USERS)[number]>(initialUser)
 
   const signIn = async () => {
+    if (preview.enabled) {
+      preview.setView('signed-in')
+      router.push(redirectTo || '/')
+      return
+    }
     const supabase = createBrowserClient()
     devLog('sign in', {
       userMetadata,

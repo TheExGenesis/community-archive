@@ -1,11 +1,10 @@
 'use client'
-import Link from 'next/link'
 import { usePreviewSession } from '@/components/PreviewSession'
 import type { MapLookup } from '@/lib/hexMap/gateway'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { createBrowserClient } from '@/utils/supabase'
-import { updateOptIn } from '@/lib/optInApi'
+import { OptInDisclosure, useCommunityOptIn } from '@/components/CommunityOptIn'
 import { mapUrl } from '@/lib/hexMap/version'
 import styles from './hero.module.css'
 
@@ -14,6 +13,7 @@ type Result = {
   status?: 'sign_in' | 'opt_in' | 'not_mapped' | 'located'
   username?: string
   error?: string
+  isSelf?: boolean
   person?: SelfLocation
 }
 
@@ -22,7 +22,9 @@ export default function WhereAmI({
 }: {
   onLocated: (person: SelfLocation | null) => void
 }) {
-  const { enabled: preview } = usePreviewSession()
+  const { enabled: previewEnabled, view, optedIn } = usePreviewSession()
+  const optIn = useCommunityOptIn()
+  const [canSearch, setCanSearch] = useState(false)
   const [name, setName] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [busy, setBusy] = useState(false)
@@ -44,12 +46,22 @@ export default function WhereAmI({
 
   const locate = useCallback(
     async (query = '') => {
-      const handle = query.trim().replace(/^@/, '')
-      if (preview && !/^\w{1,15}$/.test(handle)) {
+      const simulated = previewEnabled && view !== 'actual'
+      if (simulated && !optedIn) {
         cancel()
         setBusy(false)
         callback.current(null)
-        setResult({ error: 'Enter a username to find on the map.' })
+        setResult(
+          view === 'signed-out'
+            ? {
+                status: 'sign_in',
+                error: 'Opt in with Twitter to find yourself on the map.',
+              }
+            : {
+                status: 'opt_in',
+                username: 'preview_user',
+              },
+        )
         return
       }
       pending.current?.abort()
@@ -62,30 +74,30 @@ export default function WhereAmI({
       try {
         const response = await fetch(
           mapUrl(
-            `${preview ? 'lookup' : 'me'}?name=${encodeURIComponent(preview ? handle : query)}`,
+            `${simulated ? 'lookup' : 'me'}?name=${encodeURIComponent(simulated ? query.trim().replace(/^@/, '') || 'exgenesis' : query)}`,
           ),
           { signal: controller.signal, cache: 'no-store' },
         )
         const payload = await response.json()
-        const person =
-          preview && response.ok
-            ? (payload as MapLookup).people.find(
-                (p) => p.username.toLowerCase() === handle.toLowerCase(),
-              )
-            : undefined
+        const person = simulated ? (payload as MapLookup).people?.[0] : null
         const data: Result =
-          preview && response.ok
+          simulated && response.ok
             ? person
               ? {
                   status: 'located',
                   person: { username: person.username, cell: person.cell },
+                  isSelf: false,
                 }
-              : { error: 'This username is not available on the map.' }
+              : {
+                  status: 'not_mapped',
+                  error: 'This username is not available on the map.',
+                }
             : payload
         if (request !== generation.current) return
         if (response.ok && data.status === 'located' && data.person) {
           callback.current(data.person)
           setName(`@${data.person.username}`)
+          setCanSearch(true)
         }
         setResult(data)
       } catch {
@@ -97,8 +109,14 @@ export default function WhereAmI({
         if (request === generation.current) setBusy(false)
       }
     },
-    [preview, cancel],
+    [previewEnabled, view, optedIn, cancel],
   )
+
+  useEffect(() => {
+    if (!previewEnabled) return
+    clear()
+    setCanSearch(false)
+  }, [previewEnabled, view, clear])
 
   useEffect(() => {
     let account: string | null | undefined
@@ -111,11 +129,13 @@ export default function WhereAmI({
         (account !== undefined && account !== next)
       ) {
         clear()
+        setCanSearch(false)
         setName('')
       }
       account = next
     })
-    if (new URLSearchParams(window.location.search).get('findme') === '1')
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('findme') === '1' && params.get('action') !== 'optin')
       void locate()
     return () => {
       subscription.unsubscribe()
@@ -123,37 +143,18 @@ export default function WhereAmI({
     }
   }, [clear, locate, cancel])
 
-  const optIn = async () => {
-    if (!result?.username || busy) return
-    const request = ++generation.current
-    setBusy(true)
-    try {
-      await updateOptIn({
-        username: result.username,
-        optedIn: true,
-        termsVersion: 'v1.0',
-      })
-      if (request === generation.current) await locate()
-    } catch (error) {
-      if (request === generation.current) {
-        setResult({
-          ...result,
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Could not update consent. Please try again.',
-        })
-        setBusy(false)
-      }
-    }
-  }
+  useEffect(() => {
+    if (optIn.completed) void locate(name)
+    // Run once when the shared opt-in completes, retaining the searched name.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optIn.completed])
 
   return (
     <div className={styles.finder}>
       <form
         role="search"
         aria-label={
-          preview ? 'Find a username on the map' : 'Find yourself on the map'
+          canSearch ? 'Find a username on the map' : 'Find yourself on the map'
         }
         className={styles.finderForm}
         onSubmit={(event) => {
@@ -162,8 +163,8 @@ export default function WhereAmI({
         }}
       >
         <input
-          aria-label={preview ? 'Find username' : 'Where am I?'}
-          placeholder={preview ? 'Find any username…' : 'Where am I?'}
+          aria-label={canSearch ? 'Find username' : 'Where am I?'}
+          placeholder={canSearch ? 'Find any username…' : 'Where am I?'}
           value={name}
           maxLength={16}
           autoComplete="off"
@@ -174,6 +175,11 @@ export default function WhereAmI({
           <Search size={17} aria-hidden="true" />
         </button>
       </form>
+      {previewEnabled && view !== 'actual' && (
+        <p className="text-xs text-muted-foreground">
+          Simulation · no login or consent saved
+        </p>
+      )}
       {(busy || result) && (
         <div className={styles.finderMessage}>
           <button
@@ -185,46 +191,33 @@ export default function WhereAmI({
             <X size={14} aria-hidden="true" />
           </button>
           <div role="status" aria-live="polite">
-            {busy
-              ? 'Finding your place…'
+            {busy || optIn.busy
+              ? result?.status === 'sign_in'
+                ? 'Opening Twitter…'
+                : 'Finding your place…'
               : result?.status === 'located'
-                ? preview
+                ? result.isSelf === false
                   ? `@${result.person?.username} is here.`
                   : `You are here, @${result.person?.username}.`
-                : result?.error}
+                : result?.status === 'sign_in' || result?.status === 'opt_in'
+                  ? 'Opt in to the Community Archive to find yourself on the map!'
+                  : result?.error}
           </div>
-          {!busy && result?.status === 'sign_in' && (
-            <Link
-              href="/login?redirect=%2F%3Ffindme%3D1"
-              className={styles.finderAction}
-            >
-              Sign in with X
-            </Link>
-          )}
-          {!busy && result?.status === 'opt_in' && (
-            <>
-              <p>
-                Opting in lets Community Archive collect and share your public
-                tweets. They may persist after deletion from X. By opting in,
-                you agree to our{' '}
-                <Link
-                  href="/data-policy"
-                  target="_blank"
-                  rel="noopener noreferrer"
+          {!busy &&
+            !optIn.busy &&
+            (result?.status === 'sign_in' || result?.status === 'opt_in') && (
+              <>
+                <OptInDisclosure />
+                {optIn.error && <p role="alert">{optIn.error}</p>}
+                <button
+                  type="button"
+                  onClick={() => void optIn.confirm(true)}
+                  className={styles.finderAction}
                 >
-                  Data Policy
-                </Link>
-                .
-              </p>
-              <button
-                type="button"
-                className={styles.finderAction}
-                onClick={() => void optIn()}
-              >
-                Opt in and find me
-              </button>
-            </>
-          )}
+                  Opt In
+                </button>
+              </>
+            )}
         </div>
       )}
     </div>

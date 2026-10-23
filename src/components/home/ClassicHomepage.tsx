@@ -107,21 +107,8 @@ export default async function ClassicHomepage({
               </div>
             }
             signedOut={
-              <div
-                className={`${styles.actions} !mt-7 flex justify-center gap-4 md:!mt-8`}
-              >
-                <Link
-                  className="rounded-lg bg-brand px-6 py-2 text-white"
-                  href="/login?redirect=%2F%3Faction%3Doptin"
-                >
-                  Opt in
-                </Link>
-                <Link
-                  className="rounded-lg border px-6 py-2"
-                  href="#upload-archive"
-                >
-                  Upload archive
-                </Link>
+              <div className={`${styles.actions} !mt-7 md:!mt-8`}>
+                <DynamicHeroCTAButtons />
               </div>
             }
           />

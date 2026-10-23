@@ -16,6 +16,7 @@ import {
   placeLabels,
   safeTerm,
   selectionOutline,
+  selectedArchiveColor,
   transform,
   type MapLabel,
 } from '@/lib/hexMap/geometry'
@@ -51,7 +52,7 @@ export default memo(function HexMap({
   scrubber,
   coverageLive,
   finder,
-  selfLocation,
+  selfLocations,
 }: {
   snapshot: HexSnapshot
   selected: number[]
@@ -70,7 +71,7 @@ export default memo(function HexMap({
   scrubber: ReactNode
   coverageLive: boolean
   finder?: ReactNode
-  selfLocation?: { username: string; cell: number } | null
+  selfLocations?: { username: string; cell: number }[]
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ width: 800, height: 650 })
@@ -85,14 +86,17 @@ export default memo(function HexMap({
   const showDetails = camera.camera.zoom >= 1.5
   // Keep the first hex for double-clicks even after its single click zooms.
   const clickedCell = useRef<number | null>(null)
-  const lastSelfLocation = useRef(selfLocation)
+  const lastSelfLocations = useRef(selfLocations)
   useEffect(() => {
-    if (selfLocation && lastSelfLocation.current !== selfLocation) {
-      const cell = snapshot.cells[selfLocation.cell]
-      if (cell) camera.focus(cell.x, -cell.y)
+    if (selfLocations?.length && lastSelfLocations.current !== selfLocations) {
+      const cells = selfLocations.flatMap((p) =>
+        snapshot.cells[p.cell] ? [snapshot.cells[p.cell]] : [],
+      )
+      if (cells.length === 1) camera.focus(cells[0].x, -cells[0].y)
+      else if (cells.length) camera.fit(cells.map((c) => ({ x: c.x, y: -c.y })))
     }
-    lastSelfLocation.current = selfLocation
-  }, [selfLocation, snapshot, camera])
+    lastSelfLocations.current = selfLocations
+  }, [selfLocations, snapshot, camera])
   const lastAnchor = useRef('')
   useEffect(() => {
     const pin = pins.find(
@@ -202,9 +206,13 @@ export default memo(function HexMap({
           )
           fill =
             focus.size && focused && !heat
-              ? mix(color, '#593315', strength * 0.45)
+              ? selectedArchiveColor(color, strength)
               : mix('#f3d8ad', '#b54a0c', strength)
-        } else fill = mix(fill, dark ? '#18181b' : '#f4f4f5', 0.65)
+        } else
+          fill =
+            focus.size && focused && !heat
+              ? selectedArchiveColor(color, null)
+              : mix(fill, dark ? '#18181b' : '#f4f4f5', 0.65)
       }
       ctx.globalAlpha = focused ? 1 : 0.22
       ctx.fillStyle = fill
@@ -496,7 +504,11 @@ export default memo(function HexMap({
               highlighted:
                 p.username.toLowerCase() ===
                   tweetHover?.username.toLowerCase() ||
-                p.username.toLowerCase() === anchor.toLowerCase(),
+                p.username.toLowerCase() === anchor.toLowerCase() ||
+                !!selfLocations?.some(
+                  (person) =>
+                    person.username.toLowerCase() === p.username.toLowerCase(),
+                ),
             },
           ]
         : []
@@ -513,6 +525,7 @@ export default memo(function HexMap({
     )
   }, [
     pins,
+    selfLocations,
     tweetHover,
     anchor,
     snapshot,

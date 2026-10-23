@@ -2,6 +2,7 @@ import { MAP_VERSION } from '@/lib/hexMap/version'
 import { NextRequest, NextResponse } from 'next/server'
 import { readMapLookup } from '@/lib/hexMap/lookup'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { parseMapUsernames } from '@/lib/hexMap/usernames'
 import { sampleFeaturedArchives } from '@/lib/featuredArchives'
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
@@ -13,18 +14,15 @@ export async function GET(request: NextRequest) {
     )
   const anchor = request.nextUrl.searchParams.get('name') || '',
     cells = request.nextUrl.searchParams.get('cells') || ''
-  if (
-    (anchor && !/^\w{1,15}$/.test(anchor)) ||
-    cells.length > 8000 ||
-    !/^\d*(,\d+)*$/.test(cells)
-  )
+  const requestedNames = anchor ? parseMapUsernames(anchor) : []
+  if (!requestedNames || cells.length > 8000 || !/^\d*(,\d+)*$/.test(cells))
     return NextResponse.json(
       { error: 'Invalid map lookup' },
       { status: 400, headers },
     )
   try {
     const names = anchor
-      ? [anchor]
+      ? requestedNames
       : cells
         ? []
         : sampleFeaturedArchives()

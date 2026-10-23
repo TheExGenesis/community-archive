@@ -30,7 +30,8 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
     void import('./HexMap')
   }, [])
   const [showDefaultLabels, setShowDefaultLabels] = useState(true)
-  const [selfLocation, setSelfLocation] = useState<SelfLocation | null>(null)
+  const [selfLocations, setSelfLocations] = useState<SelfLocation[]>([])
+  const [labelsCleared, setLabelsCleared] = useState(false)
   const [selectionTab, setSelectionTab] = useState('Stories')
   const [selected, setSelected] = useState<number[]>([])
   const [hover, setHover] = useState<MapStory | null>(null)
@@ -50,7 +51,10 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
     retry: false,
   })
   const { query: expression, setQuery: setExpression } = useArchiveSearch()
-  useEffect(() => setSelfLocation(null), [expression])
+  useEffect(() => {
+    setSelfLocations([])
+    if (expression) setLabelsCleared(false)
+  }, [expression])
   const [debouncedExpression, setDebouncedExpression] = useState('')
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedExpression(expression), 450)
@@ -119,18 +123,27 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
   const active = open ?? hover
   const visiblePins = useMemo(
     () =>
-      active
-        ? active.people.flatMap((p) =>
-            p.cell === undefined
-              ? []
-              : [{ username: p.username, cell: p.cell }],
-          )
-        : selfLocation
-          ? [selfLocation]
-          : anchor || showDefaultLabels
-            ? (pins.data?.people ?? [])
-            : [],
-    [active, pins.data, selfLocation, anchor, showDefaultLabels],
+      labelsCleared
+        ? []
+        : active
+          ? active.people.flatMap((p) =>
+              p.cell === undefined
+                ? []
+                : [{ username: p.username, cell: p.cell }],
+            )
+          : selfLocations.length
+            ? selfLocations
+            : anchor || showDefaultLabels
+              ? (pins.data?.people ?? [])
+              : [],
+    [
+      active,
+      pins.data,
+      selfLocations,
+      anchor,
+      showDefaultLabels,
+      labelsCleared,
+    ],
   )
   return (
     <section
@@ -146,34 +159,38 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
               <SectionReady section="homepage_hex_map" />
               <HexMap
                 snapshot={currentSnapshot!}
-                selfLocation={selfLocation}
+                selfLocations={selfLocations}
                 finder={
                   <WhereAmI
-                    onLocated={(person) => {
-                      setSelfLocation(person)
-                      if (person) {
+                    onLocated={(people) => {
+                      setSelfLocations(people)
+                      if (people.length) {
+                        setLabelsCleared(false)
+                        const cells = Array.from(
+                          new Set(people.map((p) => p.cell)),
+                        )
                         setSelectionTab('Stories')
-                        setSelected([person.cell])
+                        setSelected(cells)
                         setOpen(null)
                         setHover(null)
                         setTweetHover(undefined)
-                        preloadSelection([person.cell], 'Stories')
+                        preloadSelection(cells, 'Stories')
                       }
                     }}
-                  >
-                    <button
-                      type="button"
-                      className={styles.defaultLabelsControl}
-                      aria-pressed={!showDefaultLabels}
-                      onClick={() => setShowDefaultLabels((shown) => !shown)}
-                    >
-                      {showDefaultLabels ? 'Clear usernames' : 'Show usernames'}
-                    </button>
-                  </WhereAmI>
+                    onClear={() => {
+                      setShowDefaultLabels(false)
+                      setLabelsCleared(true)
+                      setTweetHover(undefined)
+                      if (anchor) {
+                        setExpression('')
+                        setDebouncedExpression('')
+                      }
+                    }}
+                  />
                 }
                 coverageLive={!!pins.data}
                 pins={visiblePins}
-                anchor={selfLocation?.username ?? anchor}
+                anchor={labelsCleared ? '' : anchor}
                 heat={term && heat.data ? values : undefined}
                 heatTerm={term}
                 heatStatus={
@@ -224,7 +241,6 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
                 selected={selected}
                 onSelectionIntent={onSelectionIntent}
                 onSelect={(cells) => {
-                  setSelfLocation(null)
                   onSelectionIntent(null)
                   setSelectionTab('Stories')
                   preloadSelection(cells, 'Stories')
@@ -235,7 +251,7 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
                 }}
                 storyCells={active?.cells ?? emptyCells}
                 origin={active?.origin}
-                tweetHover={tweetHover}
+                tweetHover={labelsCleared ? undefined : tweetHover}
               />
             </>
           ) : (
@@ -266,11 +282,15 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
           onClear={() => setSelected([])}
           open={open}
           onOpen={(story) => {
+            if (story) setLabelsCleared(false)
             setOpen(story)
             setTweetHover(undefined)
             setHover(null)
           }}
-          onHover={setHover}
+          onHover={(story) => {
+            if (story) setLabelsCleared(false)
+            setHover(story)
+          }}
           onTweetHover={(cell, username) =>
             setTweetHover(
               cell !== undefined && username ? { cell, username } : undefined,

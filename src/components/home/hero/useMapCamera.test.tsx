@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import useMapCamera from './useMapCamera'
+import { transform } from '@/lib/hexMap/geometry'
 
 const selected = jest.fn()
 const bounds = { x: 0, y: 0, width: 100, height: 100 }
@@ -22,6 +23,16 @@ function MapSurface() {
       <output data-testid="zoom">{camera.camera.zoom}</output>
       <button onClick={() => camera.zoomAt(100)}>Maximum zoom</button>
       <button onClick={() => camera.focus(20, 30, 3)}>Focus community</button>
+      <button
+        onClick={() =>
+          camera.fit([
+            { x: 10, y: 20 },
+            { x: 90, y: 80 },
+          ])
+        }
+      >
+        Fit usernames
+      </button>
       <button onClick={() => camera.reset()}>Reset view</button>
     </div>
   )
@@ -197,5 +208,29 @@ it('skips focus animation when reduced motion is requested', () => {
     expect(screen.getByTestId('zoom')).toHaveTextContent('3')
   } finally {
     window.matchMedia = previous
+  }
+})
+
+it('fits separated username locations together even after zooming in', () => {
+  render(<MapSurface />)
+  fireEvent.click(screen.getByRole('button', { name: 'Maximum zoom' }))
+  act(() => jest.advanceTimersByTime(20))
+  fireEvent.click(screen.getByRole('button', { name: 'Fit usernames' }))
+  act(() => jest.advanceTimersByTime(240))
+  const [x, y] = screen
+    .getByTestId('position')
+    .textContent!.split(',')
+    .map(Number)
+  const zoom = Number(screen.getByTestId('zoom').textContent)
+  const t = transform(bounds, 800, 600, { x, y, zoom })
+  expect(zoom).toBeLessThan(8)
+  for (const point of [
+    { x: 10, y: 20 },
+    { x: 90, y: 80 },
+  ]) {
+    expect(point.x * t.scale + t.x).toBeGreaterThanOrEqual(60)
+    expect(point.x * t.scale + t.x).toBeLessThanOrEqual(740)
+    expect(point.y * t.scale + t.y).toBeGreaterThanOrEqual(60)
+    expect(point.y * t.scale + t.y).toBeLessThanOrEqual(540)
   }
 })

@@ -212,3 +212,58 @@ it('rejects incompatible geometry on either side of the lookup', async () => {
   jest.mocked(mapGateway).mockResolvedValue({ version: 'old', people: [] })
   expect((await GET(request())).status).toBe(503)
 })
+
+it('looks up a normalized batch once and reports policy-excluded targets as missing', async () => {
+  const res = await GET(request('&name=%40ME_ONE,someone,me_one,absent'))
+  expect(res.status).toBe(200)
+  expect(await res.json()).toEqual({
+    status: 'located',
+    people: [{ username: 'me_one', cell: 4 }],
+    missing: ['someone', 'absent'],
+    isSelf: false,
+  })
+  expect(mapGateway).toHaveBeenCalledWith('hex-lookup', {
+    names: 'me_one,someone,absent',
+  })
+})
+it('returns all mapped members in a batch', async () => {
+  jest
+    .mocked(getAppPolicy)
+    .mockResolvedValue({
+      members: new Set(['me_one', 'someone']),
+      blocked: new Set(),
+      blockedIds: new Set(),
+    })
+  const res = await GET(request('&name=me_one,someone'))
+  expect(await res.json()).toEqual({
+    status: 'located',
+    people: [
+      { username: 'me_one', cell: 4 },
+      { username: 'someone', cell: 5 },
+    ],
+    missing: [],
+    isSelf: false,
+  })
+})
+it('requires consent and verified self identity for batch lookups too', async () => {
+  range.mockResolvedValueOnce({ data: [], error: null })
+  expect((await GET(request('&name=me_one,someone'))).status).toBe(403)
+  expect(mapGateway).not.toHaveBeenCalled()
+  jest
+    .mocked(mapGateway)
+    .mockResolvedValue({
+      version: MAP_VERSION,
+      people: [{ account_id: '999', username: 'me_one', cell: 4 }],
+    })
+  expect((await GET(request('&name=me_one,absent'))).status).toBe(404)
+})
+it('rejects invalid and oversized batches before lookup', async () => {
+  for (const names of [
+    'one,bad!',
+    Array.from({ length: 21 }, (_, i) => `user${i}`).join(','),
+  ])
+    expect(
+      (await GET(request(`&name=${encodeURIComponent(names)}`))).status,
+    ).toBe(400)
+  expect(mapGateway).not.toHaveBeenCalled()
+})

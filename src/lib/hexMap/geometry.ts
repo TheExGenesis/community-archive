@@ -159,3 +159,10 @@ export function placeLabels(
     return true
   })
 }
+
+// Selected coverage always uses luminance in the same direction in both themes.
+export function selectedArchiveColor(color: string, strength: number | null) {
+  return strength === null
+    ? mix(color, '#18181b', 0.65)
+    : mix(color, '#ffffff', 0.15 + strength * 0.35)
+}

@@ -83,9 +83,7 @@ it('simulates one consent action, plots a public member, and resets on sign-out'
     target: { value: 'exgenesis' },
   })
   submit()
-  fireEvent.click(
-    await screen.findByRole('button', { name: 'Opt In' }),
-  )
+  fireEvent.click(await screen.findByRole('button', { name: 'Opt In' }))
   await screen.findByText('@exgenesis is here.')
   expect(
     screen.getByText('Thanks for opting in to the Community Archive!'),
@@ -94,15 +92,17 @@ it('simulates one consent action, plots a public member, and resets on sign-out'
     expect.stringContaining('/lookup?name=exgenesis'),
     expect.anything(),
   )
-  expect(onLocated).toHaveBeenLastCalledWith({
-    username: 'exgenesis',
-    cell: 1414,
-  })
+  expect(onLocated).toHaveBeenLastCalledWith([
+    {
+      username: 'exgenesis',
+      cell: 1414,
+    },
+  ])
   expect(signInWithOAuth).not.toHaveBeenCalled()
   fireEvent.change(screen.getByRole('combobox'), {
     target: { value: 'signed-out' },
   })
-  expect(onLocated).toHaveBeenLastCalledWith(null)
+  expect(onLocated).toHaveBeenLastCalledWith([])
   submit()
   await screen.findByRole('button', { name: 'Opt In' })
 })
@@ -121,8 +121,8 @@ it('lets an opted-in visitor locate another member', async () => {
   })
   submit()
   await screen.findByText('@someone is here.')
-  expect(onLocated).toHaveBeenLastCalledWith({ username: 'someone', cell: 5 })
-  expect(screen.getByRole('textbox', { name: 'Find username' })).toBeVisible()
+  expect(onLocated).toHaveBeenLastCalledWith([{ username: 'someone', cell: 5 }])
+  expect(screen.getByRole('textbox', { name: 'Find usernames' })).toBeVisible()
 })
 it('does not plot a late response after sign-out', async () => {
   let resolve!: (value: unknown) => void
@@ -140,7 +140,80 @@ it('does not plot a late response after sign-out', async () => {
       response(200, { status: 'located', person: { username: 'me', cell: 4 } }),
     ),
   )
-  expect(onLocated).not.toHaveBeenCalledWith(
-    expect.objectContaining({ cell: 4 }),
+  expect(onLocated).toHaveBeenLastCalledWith([])
+})
+
+it('plots multiple names, retains partial matches, and clears without a restore action', async () => {
+  fetchMock.mockResolvedValue(
+    response(200, {
+      status: 'located',
+      people: [
+        { username: 'one', cell: 4 },
+        { username: 'two', cell: 5 },
+      ],
+      missing: ['absent'],
+      isSelf: false,
+    }),
   )
+  const onLocated = jest.fn(),
+    onClear = jest.fn()
+  render(<WhereAmI onLocated={onLocated} onClear={onClear} />)
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: '@One, two, @ONE, absent' },
+  })
+  submit()
+  await screen.findByText('@one, @two are here.')
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.stringContaining('/me?name=one%2Ctwo%2Cabsent'),
+    expect.anything(),
+  )
+  expect(onLocated).toHaveBeenLastCalledWith([
+    { username: 'one', cell: 4 },
+    { username: 'two', cell: 5 },
+  ])
+  expect(screen.getByText('Not found on the map: @absent.')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Clear usernames' }))
+  expect(onLocated).toHaveBeenLastCalledWith([])
+  expect(onClear).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('textbox')).toHaveValue('')
+  expect(screen.queryByText('@one, @two are here.')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: /Show usernames/ }),
+  ).not.toBeInTheDocument()
+})
+it('cancels a pending search when usernames are cleared', async () => {
+  let resolve!: (value: unknown) => void
+  fetchMock.mockReturnValue(
+    new Promise((done) => {
+      resolve = done
+    }),
+  )
+  const onLocated = jest.fn()
+  render(<WhereAmI onLocated={onLocated} />)
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'one, two' },
+  })
+  submit()
+  fireEvent.click(screen.getByRole('button', { name: 'Clear usernames' }))
+  expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)
+  await act(async () =>
+    resolve(
+      response(200, {
+        status: 'located',
+        people: [{ username: 'one', cell: 4 }],
+      }),
+    ),
+  )
+  expect(onLocated).toHaveBeenLastCalledWith([])
+  expect(screen.getByRole('textbox')).toHaveValue('')
+  expect(screen.queryByText('@one is here.')).not.toBeInTheDocument()
+})
+it('rejects invalid lists before requesting a lookup', () => {
+  render(<WhereAmI onLocated={jest.fn()} />)
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'one, bad!' },
+  })
+  submit()
+  expect(fetchMock).not.toHaveBeenCalled()
+  expect(screen.getByText(/Enter up to 20 valid/)).toBeVisible()
 })

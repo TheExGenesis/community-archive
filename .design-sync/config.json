@@ -1,0 +1,271 @@
+{
+  "projectId": "fbedc0fb-9a5a-4de0-82b7-8455539dbca9",
+  "shape": "package",
+  "pkg": "community-archive",
+  "globalName": "CommunityArchiveUI",
+  "srcDir": "src/components/ui",
+  "tsconfig": "tsconfig.json",
+  "buildCmd": "pnpm exec tailwindcss -c .design-sync/tailwind.config.js -i .design-sync/tailwind.input.css -o .design-sync/.cache/ds.css",
+  "cssEntry": ".design-sync/.cache/ds.css",
+  "entry": "./src/components/ui/index.ts",
+  "guidelinesGlob": [],
+  "libOverrides": {
+    "source-kit.mjs": "exclude app widgets (area-chart.tsx) from src/components/ui and group primitives by source file"
+  },
+  "componentSrcMap": {
+    "DialogPortal": null,
+    "DialogOverlay": null,
+    "SheetPortal": null,
+    "SheetOverlay": null,
+    "DropdownMenuPortal": null,
+    "NavigationMenuIndicator": null,
+    "NavigationMenuViewport": null,
+    "SelectScrollUpButton": null,
+    "SelectScrollDownButton": null,
+    "ChartStyle": null
+  },
+  "extraEntries": [
+    "./.design-sync/icons.ts"
+  ],
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "DialogClose": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "DialogContent": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "DialogDescription": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "DialogFooter": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "DialogHeader": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "DialogTitle": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "DialogTrigger": {
+      "cardMode": "single",
+      "viewport": "720x420"
+    },
+    "Sheet": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SheetClose": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SheetContent": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SheetDescription": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SheetFooter": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SheetHeader": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SheetTitle": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "SheetTrigger": {
+      "cardMode": "single",
+      "viewport": "720x480"
+    },
+    "DropdownMenu": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuCheckboxItem": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuContent": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuGroup": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuItem": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuLabel": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuRadioGroup": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuRadioItem": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuSeparator": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuShortcut": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuSub": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuSubContent": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuSubTrigger": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "DropdownMenuTrigger": {
+      "cardMode": "single",
+      "viewport": "560x380"
+    },
+    "Popover": {
+      "cardMode": "single",
+      "viewport": "480x260"
+    },
+    "PopoverContent": {
+      "cardMode": "single",
+      "viewport": "480x260"
+    },
+    "PopoverTrigger": {
+      "cardMode": "single",
+      "viewport": "480x260"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "480x260"
+    },
+    "TooltipContent": {
+      "cardMode": "single",
+      "viewport": "480x260"
+    },
+    "TooltipProvider": {
+      "cardMode": "single",
+      "viewport": "480x260"
+    },
+    "TooltipTrigger": {
+      "cardMode": "single",
+      "viewport": "480x260"
+    },
+    "SelectContent": {
+      "cardMode": "single",
+      "viewport": "480x340"
+    },
+    "SelectGroup": {
+      "cardMode": "single",
+      "viewport": "480x340"
+    },
+    "SelectItem": {
+      "cardMode": "single",
+      "viewport": "480x340"
+    },
+    "SelectLabel": {
+      "cardMode": "single",
+      "viewport": "480x340"
+    },
+    "SelectSeparator": {
+      "cardMode": "single",
+      "viewport": "480x340"
+    },
+    "NavigationMenuContent": {
+      "cardMode": "single",
+      "viewport": "640x360"
+    },
+    "Card": {
+      "cardMode": "column"
+    },
+    "Carousel": {
+      "cardMode": "column"
+    },
+    "ChartContainer": {
+      "cardMode": "column"
+    },
+    "ChartLegend": {
+      "cardMode": "column"
+    },
+    "ChartTooltip": {
+      "cardMode": "column"
+    },
+    "Table": {
+      "cardMode": "column"
+    },
+    "Skeleton": {
+      "cardMode": "column"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "Switch": {
+      "cardMode": "column"
+    },
+    "Textarea": {
+      "cardMode": "column"
+    },
+    "ScrollArea": {
+      "cardMode": "column"
+    },
+    "NavigationMenu": {
+      "cardMode": "column"
+    },
+    "Tabs": {
+      "cardMode": "column"
+    },
+    "Alert": {
+      "cardMode": "column"
+    },
+    "Badge": {
+      "cardMode": "column"
+    },
+    "Button": {
+      "cardMode": "column"
+    },
+    "Calendar": {
+      "cardMode": "column"
+    },
+    "Checkbox": {
+      "cardMode": "column"
+    },
+    "Label": {
+      "cardMode": "column"
+    },
+    "Select": {
+      "cardMode": "column"
+    },
+    "RadioGroup": {
+      "cardMode": "column"
+    },
+    "Progress": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

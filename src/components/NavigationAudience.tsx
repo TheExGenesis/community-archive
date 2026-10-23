@@ -1,5 +1,6 @@
 'use client'
 
+import { usePreviewSession } from '@/components/PreviewSession'
 import Link from 'next/link'
 import { Shield } from 'lucide-react'
 import { createContext, useContext, useEffect, useState } from 'react'
@@ -79,4 +80,10 @@ export function AdminNavigationLink() {
   )
 }
 
-export const useNavigationAudience = () => useContext(NavigationAudienceContext)
+export const useNavigationAudience = () => {
+  const audience = useContext(NavigationAudienceContext)
+  const preview = usePreviewSession()
+  return preview.enabled && preview.view !== 'actual'
+    ? { isMember: preview.optedIn, isAdmin: false, localPreview: null }
+    : audience
+}

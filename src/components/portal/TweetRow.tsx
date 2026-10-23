@@ -157,16 +157,30 @@ function TweetImages({
   compact,
   compactGrid = false,
   constrainMedia = false,
+  previewOnly = false,
   label,
 }: {
   media: PortalMedia[] | undefined
   compact: boolean
   compactGrid?: boolean
   constrainMedia?: boolean
+  previewOnly?: boolean
   label: string
 }) {
   const images = imageMedia(media)
   if (images.length === 0) return null
+  if (previewOnly)
+    return (
+      <div className="mt-2">
+        <TweetMediaItem
+          item={images[0]}
+          alt={`${label} 1`}
+          sizes="(max-width: 640px) 100vw, 400px"
+          className="aspect-video w-full overflow-hidden rounded border border-border"
+          imageClassName="h-full w-full object-cover"
+        />
+      </div>
+    )
 
   if (compact && !compactGrid && !constrainMedia) {
     return (
@@ -329,7 +343,7 @@ function QuotedTweet({
 export interface TweetCardProps {
   tweet: PortalTweet
   highlightQuery?: string
-  variant?: 'default' | 'editorial'
+  variant?: 'default' | 'editorial' | 'map'
   animate?: boolean
   compact?: boolean
   collapsible?: boolean
@@ -431,6 +445,24 @@ export function TweetRow({
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
   const isEditorial = variant === 'editorial'
+  const isMap = variant === 'map'
+  const mapText = useRef<HTMLDivElement>(null)
+  const [mapTextOverflows, setMapTextOverflows] = useState(false)
+  useEffect(() => {
+    const element = mapText.current
+    if (!isMap || noClamp || isExpanded || !element) return
+    const measure = () =>
+      setMapTextOverflows(element.scrollHeight > element.clientHeight + 1)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [isMap, noClamp, isExpanded, tweet.text])
+  const canExpand =
+    isPreview ||
+    (isMap && !noClamp && mapTextOverflows) ||
+    (collapsible && !noClamp && tweet.text.length > 280)
   const isClickable = clickable ?? isFeatured
   const captureAction = (
     action:
@@ -451,19 +483,21 @@ export function TweetRow({
       is_featured: isFeatured,
     })
   }
-  const rowClassName = isEditorial
-    ? isFeatured
-      ? `relative flex min-w-0 gap-[18px] ${animate ? 'portal-slide-in' : ''}`
-      : `flex gap-[18px] border-t border-zinc-200 py-6 dark:border-[#26262a] ${
-          animate ? 'portal-slide-in' : ''
-        }`
-    : isFeatured
-      ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
-          animate ? 'portal-slide-in' : ''
-        }`
-      : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
-          animate ? 'portal-slide-in' : ''
-        }`
+  const rowClassName = isMap
+    ? 'flex min-w-0 gap-1.5 px-2 py-2.5 transition-colors hover:bg-zinc-50 dark:hover:bg-[#1f1f23]'
+    : isEditorial
+      ? isFeatured
+        ? `relative flex min-w-0 gap-[18px] ${animate ? 'portal-slide-in' : ''}`
+        : `flex gap-[18px] border-t border-zinc-200 py-6 dark:border-[#26262a] ${
+            animate ? 'portal-slide-in' : ''
+          }`
+      : isFeatured
+        ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
+            animate ? 'portal-slide-in' : ''
+          }`
+        : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
+            animate ? 'portal-slide-in' : ''
+          }`
 
   const activateCard = () => {
     captureAction('open')
@@ -485,6 +519,7 @@ export function TweetRow({
 
   const tweetContent = (
     <div
+      ref={mapText}
       className={`${
         isEditorial ? 'mt-2.5' : 'mt-0.5'
       } whitespace-pre-wrap break-words text-zinc-700 dark:text-[#d9d9de] ${
@@ -498,20 +533,22 @@ export function TweetRow({
               ? 'text-[14.5px] leading-relaxed'
               : 'text-[14px] leading-relaxed'
       } ${
-        noClamp || isPreview
+        noClamp || isPreview || (isMap && isExpanded)
           ? ''
-          : inlineMore
-            ? // Two lines, and room kept at the end of the second for Read
-              // more: a spacer floats down to the last line and the
-              // placeholder below it takes the button's width.
-              "max-h-[2lh] w-full overflow-hidden before:float-right before:h-[calc(100%-1lh)] before:content-['']"
-            : compact
-              ? canExpand && isExpanded
-                ? ''
-                : 'line-clamp-2'
-              : canExpand && !isExpanded
-                ? 'line-clamp-5'
-                : ''
+          : isMap
+            ? 'line-clamp-3'
+            : inlineMore
+              ? // Two lines, and room kept at the end of the second for Read
+                // more: a spacer floats down to the last line and the
+                // placeholder below it takes the button's width.
+                "max-h-[2lh] w-full overflow-hidden before:float-right before:h-[calc(100%-1lh)] before:content-['']"
+              : compact
+                ? canExpand && isExpanded
+                  ? ''
+                  : 'line-clamp-2'
+                : canExpand && !isExpanded
+                  ? 'line-clamp-5'
+                  : ''
       }`}
     >
       {inlineMore && (
@@ -557,7 +594,29 @@ export function TweetRow({
     </button>
   ) : null
 
-  const byline = stacked ? (
+  const byline = isMap ? (
+    <div className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-[11px] text-muted-foreground">
+      <Link
+        href={profileHref}
+        className="min-w-0 flex-1 truncate font-semibold text-foreground"
+      >
+        @{tweet.username}
+      </Link>
+      <span className="shrink-0" suppressHydrationWarning>
+        {shortDate(tweet.createdAt)}
+      </span>
+      {showEngagement && (
+        <span className="shrink-0">
+          <TweetLikeButton
+            tweetId={tweet.id}
+            xLikeCount={tweet.likes}
+            onToggle={captureAction}
+            format={formatCount}
+          />
+        </span>
+      )}
+    </div>
+  ) : stacked ? (
     <div className="min-w-0 leading-tight">
       <Link
         {...linkTarget}
@@ -638,6 +697,7 @@ export function TweetRow({
         <TweetImages
           media={tweet.media}
           compact={compact}
+          previewOnly={isMap}
           constrainMedia={constrainMedia}
           label="Tweet image"
         />
@@ -748,7 +808,7 @@ export function TweetRow({
         </Link>
       )}
       {details}
-      {compact && showEngagement && (
+      {compact && showEngagement && !isMap && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           <TweetLikeButton
             tweetId={tweet.id}

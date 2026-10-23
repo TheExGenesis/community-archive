@@ -3,7 +3,10 @@
 import Link from 'next/link'
 import { Fragment, type MouseEvent } from 'react'
 import { formatNumber } from '@/lib/formatNumber'
-import type { ChapterSection } from '@/lib/metaTwitter/chapterSections'
+import {
+  sectionHeading,
+  type ChapterSection,
+} from '@/lib/metaTwitter/chapterSections'
 
 export interface NavChapter {
   year: number
@@ -113,17 +116,17 @@ export function ArchiveNav({
               } ${
                 active
                   ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  : 'text-foreground hover:bg-muted'
               }`}
             >
-              <span>{chapter.year}</span>
+              <span className="font-bold">{chapter.year}</span>
               <span className="ml-2 text-xs text-muted-foreground">
                 {formatNumber(chapter.count)}
               </span>
             </Link>
             {sections.length > 0 && (
-              <div className="hidden whitespace-nowrap px-3 py-2 text-sm font-semibold text-muted-foreground lg:mt-1 lg:flex lg:justify-between">
-                <span>{chapter.year}</span>
+              <div className="hidden whitespace-nowrap px-3 py-2 text-sm font-semibold text-foreground lg:mt-1 lg:flex lg:justify-between">
+                <span className="font-bold">{chapter.year}</span>
                 <span className="ml-2 text-xs text-muted-foreground">
                   {formatNumber(chapter.count)}
                 </span>
@@ -131,6 +134,7 @@ export function ArchiveNav({
             )}
             {sections.map((section) => {
               const sectionActive = active && activeSectionSlug === section.slug
+              const heading = sectionHeading(section)
               return (
                 <Link
                   key={section.slug}
@@ -150,15 +154,15 @@ export function ArchiveNav({
                   onMouseEnter={() => onIntent?.(chapter.year)}
                   onFocus={() => onIntent?.(chapter.year)}
                   aria-current={sectionActive ? 'page' : undefined}
-                  // Titles like "other" repeat across chapters.
-                  aria-label={`${section.title}, ${chapter.year}`}
+                  // Headings like "other" repeat across chapters.
+                  aria-label={`${heading}, ${chapter.year}`}
                   className={`hidden rounded-lg px-3 py-1.5 text-[13px] leading-snug lg:mt-0.5 lg:line-clamp-2 lg:block ${
                     sectionActive
                       ? 'bg-muted font-semibold text-foreground'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 >
-                  {section.title}
+                  {heading}
                 </Link>
               )
             })}

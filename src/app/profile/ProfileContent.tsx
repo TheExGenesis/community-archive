@@ -1,5 +1,7 @@
 'use client'
 
+import { CollectionPreferenceControl } from '@/components/CollectionPreferenceControl'
+import { collectionPreferenceAvailable } from '@/lib/collectionPreference'
 import { getOwnLatestTweets } from '@/app/settings/tweet-actions'
 import { useRef, useState } from 'react'
 import { User } from '@supabase/supabase-js'
@@ -29,11 +31,16 @@ import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDistanceToNow } from 'date-fns'
-import { deleteArchive, deleteSingleArchive } from '@/lib/db_insert'
-import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+import { deleteArchive } from '@/lib/db_insert'
+import {
+  ArchiveUploadDeleteError,
+  deleteArchiveUpload,
+} from '@/lib/archiveUploadApi'
+import { getAccountIdentity } from '@/lib/twitterIdentity'
 import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { updateOptIn } from '@/lib/optInApi'
+import { deleteOwnArchiveFiles } from '@/lib/archiveStorageApi'
 import { updateDownloadArchiveVisibility } from '@/app/user/[account_id]/actions'
 
 interface ProfileContentProps {
@@ -60,7 +67,6 @@ export default function ProfileContent({
   initialTweets,
 }: ProfileContentProps) {
   const router = useRouter()
-  const { userMetadata } = useAuthAndArchive()
   const preferenceMutationInFlight = useRef(false)
   const [isPreferenceSaving, setIsPreferenceSaving] = useState(false)
   const [optInStatus, setOptInStatus] = useState(
@@ -102,12 +108,10 @@ export default function ProfileContent({
   const [optOutReason, setOptOutReason] = useState('')
   const supabase = createBrowserClient()
 
-  const twitterUsername =
-    userMetadata?.user_name ||
-    user.user_metadata?.user_name ||
-    user.user_metadata?.preferred_username ||
-    user.user_metadata?.username ||
-    user.app_metadata?.user_name
+  // From the server-verified user's Twitter/X identity or app_metadata, never
+  // the client-writable user_metadata. Lowercase, like the storage folders.
+  const { providerId: ownAccountId, username: twitterUsername } =
+    getAccountIdentity(user)
 
   const beginPreferenceMutation = () => {
     if (preferenceMutationInFlight.current) return false
@@ -136,7 +140,7 @@ export default function ProfileContent({
       }
 
       await updateOptIn({
-        username: twitterUsername.toLowerCase(),
+        username: twitterUsername,
         optedIn: checked,
         termsVersion: 'v1.0',
       })
@@ -194,7 +198,7 @@ export default function ProfileContent({
       const { error: logError } = await supabase
         .from('user_action_log')
         .insert({
-          account_id: userMetadata?.provider_id ?? null,
+          account_id: ownAccountId,
           user_id: user.id,
           action_type,
           // Cast through unknown — Record<string, unknown> is structurally compatible
@@ -217,7 +221,7 @@ export default function ProfileContent({
     }
 
     await updateOptIn({
-      username: twitterUsername.toLowerCase(),
+      username: twitterUsername,
       optedIn: false,
       termsVersion: 'v1.0',
       explicitOptOut: checked,
@@ -284,7 +288,7 @@ export default function ProfileContent({
   // Confirmed from the opt-out modal: persist the hard opt-out before deletion
   // so a partial deletion failure can never leave scraping enabled.
   const confirmOptOutAndDelete = async () => {
-    if (!userMetadata?.provider_id) {
+    if (!ownAccountId) {
       setError('Unable to identify user account')
       return
     }
@@ -302,8 +306,7 @@ export default function ProfileContent({
 
       // persistOptOut() is serviced by the privileged API; the database policy
       // trigger has already synchronously replaced authored rows with tombstones.
-      if (twitterUsername)
-        await deleteStorageFiles(twitterUsername.toLowerCase())
+      await deleteOwnArchiveFiles()
 
       setShowOptOutDialog(false)
       setSuccess('Data deleted and added to explicit opt-out list')
@@ -323,25 +326,6 @@ export default function ProfileContent({
     }
   }
 
-  const deleteStorageFiles = async (username: string) => {
-    const { data: fileList, error: listError } = await supabase.storage
-      .from('archives')
-      .list(username)
-
-    if (listError) throw listError
-
-    if (fileList && fileList.length > 0) {
-      const filesToDelete = fileList.map(
-        (file: { name: string }) => `${username}/${file.name}`,
-      )
-      const { error: deleteError } = await supabase.storage
-        .from('archives')
-        .remove(filesToDelete)
-
-      if (deleteError) throw deleteError
-    }
-  }
-
   const handleDeleteArchive = async (archiveId: number) => {
     if (
       !confirm(
@@ -351,7 +335,7 @@ export default function ProfileContent({
       return
     }
 
-    if (!userMetadata?.provider_id) {
+    if (!ownAccountId) {
       setError('Unable to identify user account')
       return
     }
@@ -361,7 +345,9 @@ export default function ProfileContent({
     setSuccess(null)
 
     try {
-      await deleteSingleArchive(supabase, userMetadata.provider_id, archiveId)
+      // The server derives the owner from the session and also removes the
+      // upload's raw archive file.
+      await deleteArchiveUpload(archiveId)
 
       setSuccess('Archive deleted successfully')
       capturePostHogEvent('archive_deleted')
@@ -369,13 +355,16 @@ export default function ProfileContent({
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to delete archive')
+      if (err instanceof ArchiveUploadDeleteError && err.archiveDeleted) {
+        router.refresh()
+      }
     } finally {
       setDeletingArchive(null)
     }
   }
 
   const handleDeleteAllArchives = async () => {
-    if (!userMetadata?.provider_id) {
+    if (!ownAccountId) {
       setError('Unable to identify user account')
       return
     }
@@ -385,8 +374,8 @@ export default function ProfileContent({
     setSuccess(null)
 
     try {
-      await deleteArchive(supabase, userMetadata.provider_id)
-      await deleteStorageFiles(userMetadata.provider_id)
+      await deleteArchive(supabase, ownAccountId)
+      await deleteOwnArchiveFiles()
 
       setShowDeleteAllDialog(false)
       setSuccess('All data deleted successfully')
@@ -508,20 +497,33 @@ export default function ProfileContent({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="opt-in">Opt-in to Tweet Streaming</Label>
-                  <div className="text-sm text-muted-foreground">
-                    Allow your public tweets to be automatically archived
-                  </div>
-                </div>
-                <Switch
-                  id="opt-in"
-                  checked={optInStatus && !explicitOptOut}
-                  onCheckedChange={handleOptInToggle}
+              {collectionPreferenceAvailable && (
+                <CollectionPreferenceControl
                   disabled={isPreferenceSaving || explicitOptOut}
                 />
-              </div>
+              )}
+              {(!collectionPreferenceAvailable || archives.length === 0) && (
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="opt-in">
+                      {collectionPreferenceAvailable
+                        ? 'Join without uploading an archive'
+                        : 'Opt-in to Tweet Streaming'}
+                    </Label>
+                    <div className="text-sm text-muted-foreground">
+                      {collectionPreferenceAvailable
+                        ? 'Join the archive community. Automatic collection follows the setting above.'
+                        : 'Allow your public tweets to be automatically archived'}
+                    </div>
+                  </div>
+                  <Switch
+                    id="opt-in"
+                    checked={optInStatus && !explicitOptOut}
+                    onCheckedChange={handleOptInToggle}
+                    disabled={isPreferenceSaving || explicitOptOut}
+                  />
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -552,15 +554,17 @@ export default function ProfileContent({
                 </Alert>
               )}
 
-              {optInStatus && !explicitOptOut && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription>
-                    You have opted in to tweet streaming. Your public tweets may
-                    be archived for historical and research purposes.
-                  </AlertDescription>
-                </Alert>
-              )}
+              {!collectionPreferenceAvailable &&
+                optInStatus &&
+                !explicitOptOut && (
+                  <Alert>
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription>
+                      You have opted in to tweet streaming. Your public tweets
+                      may be archived for historical and research purposes.
+                    </AlertDescription>
+                  </Alert>
+                )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -22,6 +22,24 @@ const request = (
   )
 
 describe('API middleware rate limits', () => {
+  it.each([
+    ['US', 20, '203.0.113.90'],
+    ['SG', 5, '203.0.113.91'],
+  ])(
+    'keeps map search usable after background traffic, with the %s quota',
+    async (country, quota, ip) => {
+      for (let i = 0; i < quota; i++)
+        await request('/api/hex-map/posts', ip, 'GET', country)
+      expect(
+        (await request('/api/hex-map/posts', ip, 'GET', country)).status,
+      ).toBe(429)
+      for (const path of ['/api/hex-map/lookup', '/api/hex-map/me']) {
+        for (let i = 0; i < quota; i++)
+          expect((await request(path, ip, 'GET', country)).status).toBe(200)
+        expect((await request(path, ip, 'GET', country)).status).toBe(429)
+      }
+    },
+  )
   it('gives companion reads one bounded budget separate from website background traffic', async () => {
     const ip = '203.0.113.80'
     for (let index = 0; index < 20; index++) {
@@ -203,5 +221,23 @@ describe('API middleware rate limits', () => {
     await expect(request('/api/search', ip)).resolves.toMatchObject({
       status: 200,
     })
+  })
+
+  it('lets the gateway reach the key verifier with a server user agent and its own budget', async () => {
+    const ip = '203.0.113.90'
+    const gatewayRequest = (pathname: string) =>
+      middleware(
+        new NextRequest(`https://www.community-archive.org${pathname}`, {
+          method: 'POST',
+          headers: { 'user-agent': 'Bun/1.3.11', 'x-forwarded-for': ip },
+        }),
+      )
+    for (let index = 0; index < 100; index++) {
+      expect(
+        (await gatewayRequest('/api/internal/public-api/keys/verify')).status,
+      ).toBe(200)
+    }
+    // Other API routes keep the browser user-agent requirement.
+    expect((await gatewayRequest('/api/settings/api-keys')).status).toBe(403)
   })
 })

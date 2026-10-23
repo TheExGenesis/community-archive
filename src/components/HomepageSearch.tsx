@@ -16,7 +16,13 @@ import {
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
 
-export default function HomepageSearch() {
+export default function HomepageSearch({
+  compact = false,
+  onPreview,
+}: {
+  compact?: boolean
+  onPreview?: (query: string) => void
+}) {
   const router = useRouter()
   const [query, setQuery] = useState('')
 
@@ -55,17 +61,28 @@ export default function HomepageSearch() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className={compact ? 'w-full' : 'mx-auto w-full max-w-3xl'}>
       <form
         onSubmit={handleSubmit}
-        className="relative rounded-[50px] border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
+        className={
+          compact
+            ? 'relative rounded-xl border border-border bg-card text-left'
+            : 'relative rounded-[50px] border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2'
+        }
       >
         <UserSearchInput
           value={query}
-          onValueChange={setQuery}
+          onValueChange={(value) => {
+            setQuery(value)
+            onPreview?.(value)
+          }}
           placeholder="Search tweets, people, ideas"
           aria-label="Search Community Archive"
-          className={`h-14 rounded-[50px] border-0 bg-transparent pl-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg ${available && query.trim() ? 'pr-32' : 'pr-16'}`}
+          className={
+            compact
+              ? 'h-9 rounded-xl border-0 bg-transparent pl-3 pr-10 text-xs shadow-none'
+              : `h-14 rounded-[50px] border-0 bg-transparent pl-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg ${available && query.trim() ? 'pr-32' : 'pr-16'}`
+          }
           autoComplete="off"
           aria-keyshortcuts="Control+Enter Meta+Enter"
           onKeyDownCapture={(event) => {
@@ -74,7 +91,7 @@ export default function HomepageSearch() {
             ask()
           }}
         />
-        {available && query.trim() && (
+        {!compact && available && query.trim() && (
           <AskSignInPopover
             open={explaining}
             onOpenChange={setExplaining}
@@ -88,26 +105,32 @@ export default function HomepageSearch() {
         <Button
           type="submit"
           size="icon"
-          className="absolute right-2.5 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full bg-brand text-brand-foreground shadow-sm hover:bg-brand/90 focus-visible:ring-brand sm:right-3"
+          className={
+            compact
+              ? 'absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 rounded-lg bg-brand text-brand-foreground'
+              : 'absolute right-2.5 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full bg-brand text-brand-foreground shadow-sm hover:bg-brand/90 focus-visible:ring-brand sm:right-3'
+          }
           aria-label="Search archive"
         >
           <Search className="h-5 w-5" />
         </Button>
       </form>
 
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[13px] text-muted-foreground sm:text-sm">
-        <span>Try:</span>
-        {exampleSearches.map((example) => (
-          <button
-            key={example}
-            type="button"
-            onClick={() => search(example)}
-            className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand"
-          >
-            {example}
-          </button>
-        ))}
-      </div>
+      {!compact && (
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[13px] text-muted-foreground sm:text-sm">
+          <span>Try:</span>
+          {exampleSearches.map((example) => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => search(example)}
+              className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand"
+            >
+              {example}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -58,6 +58,89 @@ The audit records before/after status, candidate counts, successful responses,
 provider failures and unfilled reasons. A data/provider failure makes the
 command exit nonzero. The raw candidate pool remains outside the repository.
 
+## Theme labels (draft)
+
+A section's quoted title describes the one tweet it came from, not the whole
+section. A section can now also carry a `label`: 1-4 plain words naming what
+every tweet in it shares, such as "speech coaching". The label is the heading
+in the navigation and the workspace. The title stays the verbatim quote from
+the tweet that leads the section, shown under the heading in muted italic
+curly quotes, and it still derives the slug. The catch-all keeps the title
+`other` and has no label.
+
+The prompt asks for `{"sections": [{"label", "title", "tweet_ids"}]}`. The
+label must describe every post in its section. A post goes in a section only
+when a reader would agree it is about the label; otherwise it is left for
+`other`. The title is taken from the post that best represents the label.
+`parseYearSections` drops a section with no usable label, just as it drops
+one with an invalid title. A label is rejected when it:
+
+- is not a string, or is empty after trimming quotes and trailing periods;
+- has more than 4 words or 32 characters;
+- has a link or `@handle`;
+- is made only of vague words (`thoughts`, `life`, `misc`, `random`,
+  `musings`, `reflections`, `updates`, `observations`, `society`, `culture`,
+  `other`, filler words and so on), so "random thoughts" and "society and
+  culture" fail and "thoughts on soup" passes;
+- copies a label from the prompt's example (`sinkholes`, `soup`);
+- repeats an earlier label in the same year.
+
+The prompt asks for a label of 1-3 words naming one subject, written as a
+natural noun phrase a person would say rather than nouns jammed together. A
+label must never contain "and" or "&": posts that span two subjects belong in
+two sections, or the off-subject posts stay unassigned. A label that would fit
+almost any post from the account is too broad. This rule is prompt-only. The
+validator still accepts "and" labels up to 4 words, and the model often
+ignores the rule.
+
+The prompt also tells the model to count each section's posts before
+answering, since any section below the minimum is thrown away, so it should
+return fewer sections rather than small ones.
+
+The prompt asks for 2-10 word titles; the parser's hard cap is 16 words,
+because the label is the heading and the quote is only a subtitle. A title
+over 10 words is cut back to its longest leading clause of 2-10 words, ending
+at punctuation, so "The Story of Fractal, or How I Built a Campus For My
+Friends" becomes "The Story of Fractal". A prefix of a verbatim quote is
+still verbatim. With no such clause, a title of up to 16 words stays whole.
+Past 16, it is cut to a leading clause under the cap or drops its section.
+
+### Small years
+
+A banger pool of fewer than 10 posts gets one grouping attempt at temperature
+0, then goes to the top-liked fallback pool. Larger banger pools keep three
+attempts, at 0, 0.7 and 0.7. A handful of posts rarely holds two themes of
+three at a higher temperature, so retrying there only adds calls. The
+fallback pool keeps its three attempts per minimum.
+
+None of the generated years has labels yet, and the curated sections have
+none unless someone adds them by hand. A section without a label uses its
+quote as the heading and shows no second line, which is the old behavior.
+
+### Regeneration plan
+
+Rerun the generator for the years to be labeled, one account or year at a
+time:
+
+```sh
+pnpm script scripts/generate-profile-sections.ts \
+  --force --only Prigoose --years 2025 --digest /private/path/digest.md
+```
+
+`--force` with `--years` now regenerates only the years named; the account's
+other years stay in the file. Curated years stay frozen even with `--force`.
+Slugs derive from the title, so if the model labels the same grouping and
+picks the same quote, `?section=` links keep working. A new grouping or a new
+quote changes the slugs. Old links then fall back to the year view: an unknown
+slug resolves to no active section in `ProfileArchive` and the chapter is shown
+whole. A forced year that comes back with no defensible split is written empty,
+which removes its sections. Review the diff and restore those years from git
+before committing.
+
+Cost: the 2026-09-08 backfill audited 569 years. At about $0.0007 per
+DeepSeek call, a full pass with retries comes to well under $1. The
+small-year rule saves two calls on each year with fewer than 10 bangers.
+
 ## Rendering
 
 The generated configuration stores supplemental IDs for representatives that
@@ -90,7 +173,8 @@ pnpm build
 
 The extraction test checks UTC year boundaries, ranking, exclusions, the cap,
 and checksum rejection. Generation tests cover primary-first behavior, retries,
-three-before-two fallback, title/ID validation and genuinely thin pools.
+three-before-two fallback, title/ID validation, the 16-word title cap and
+`fitTitle`, the small-year single attempt and genuinely thin pools.
 Rendering tests cover zero-banger navigation, hydration, pagination,
 deduplication, author/year checks and visible gateway failures. Inspect sample
 groups against their source text before committing a backfill, and compare all

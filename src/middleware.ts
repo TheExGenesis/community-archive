@@ -115,6 +115,10 @@ const IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_DEFAULT = 5
 const IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_SG = 3
 const IN_MEMORY_MAX_AUTH_CALLBACK_DEFAULT = 30
 const IN_MEMORY_MAX_AUTH_CALLBACK_SG = 10
+// The query gateway resolves public API keys from one server address and
+// caches each answer for up to two minutes, so its lookups get their own
+// larger bucket. The route itself requires a server-to-server bearer secret.
+const IN_MEMORY_MAX_PUBLIC_API_VERIFIER = 600
 const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 let lastCleanup = Date.now()
@@ -164,6 +168,8 @@ function getApiRateLimitPolicy(
   if (
     method === 'GET' &&
     [
+      '/api/hex-map/lookup',
+      '/api/hex-map/me',
       '/api/tweet-search',
       '/api/user-directory',
       '/api/strands',
@@ -200,6 +206,16 @@ function getApiRateLimitPolicy(
       maxRequests: isSG
         ? IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_SG
         : IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_DEFAULT,
+    }
+  }
+
+  if (
+    pathname === '/api/internal/public-api/keys/verify' &&
+    method === 'POST'
+  ) {
+    return {
+      bucket: 'api:public-api-verifier',
+      maxRequests: IN_MEMORY_MAX_PUBLIC_API_VERIFIER,
     }
   }
 
@@ -385,11 +401,13 @@ export async function middleware(request: NextRequest) {
   // require the CRON_SECRET bearer token (Vercel's cron caller sends a short
   // non-browser UA), and one-click unsubscribe POSTs come from mailbox
   // provider servers holding a per-subscription token. The Bulletin preview
-  // source requires its own bearer secret and is called from another server.
+  // source and the public API key verifier require their own bearer secrets
+  // and are called from other servers.
   const machineAuthRoute =
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
-    pathname === '/api/bulletin/preview-board'
+    pathname === '/api/bulletin/preview-board' ||
+    pathname === '/api/internal/public-api/keys/verify'
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (

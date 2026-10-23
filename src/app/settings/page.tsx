@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { requireAuth } from '@/lib/auth-utils'
 import { getPublicProfileSettings } from '@/lib/profileCuration'
 import { createServerAdminClient, createServerClient } from '@/utils/supabase'
@@ -114,6 +115,21 @@ export default async function SettingsPage() {
             ownLimit={askLimits.own}
           />
         )}
+
+        <section className="mb-8 flex flex-col gap-3 rounded-lg border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">API keys</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Read the archive from your own scripts and apps.
+            </p>
+          </div>
+          <Link
+            href="/settings/api-keys"
+            className="inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-accent"
+          >
+            Manage API keys
+          </Link>
+        </section>
         <ProfileContent
           user={user}
           accountId={twitterAccountId}

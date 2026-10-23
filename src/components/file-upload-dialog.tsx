@@ -27,6 +27,11 @@ import { ArchiveStats, FileUploadDialogProps, UploadOptions } from '@/lib/types'
 import { uploadArchive } from '@/lib/upload-archive/uploadArchive'
 import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
 import { applyOptionsToArchive } from '@/lib/upload-archive/applyOptionsToArchive'
+import {
+  collectionPreferenceAvailable,
+  loadCollectionPreference,
+  saveCollectionPreference,
+} from '@/lib/collectionPreference'
 import { capturePostHogEvent } from '@/lib/posthog'
 
 interface FileUploadDialogState {
@@ -57,6 +62,37 @@ export function FileUploadDialog({
   onClose,
   archive,
 }: FileUploadDialogProps) {
+  const [collectionEnabled, setCollectionEnabled] = useState(false)
+  const [collectionLoaded, setCollectionLoaded] = useState(
+    !collectionPreferenceAvailable,
+  )
+  const [collectionError, setCollectionError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!collectionPreferenceAvailable || !isOpen) return
+    let active = true
+    setCollectionLoaded(false)
+    setCollectionError(null)
+    loadCollectionPreference()
+      .then((preference) => {
+        if (!active) return
+        if (preference.accountId !== archive.account[0].account.accountId) {
+          throw new Error(
+            'The archive must belong to your signed-in X account.',
+          )
+        }
+        setCollectionEnabled(preference.uploadEnabled)
+        setCollectionLoaded(true)
+      })
+      .catch(() => {
+        if (active)
+          setCollectionError(
+            'Could not load collection settings. Close this dialog and try again.',
+          )
+      })
+    return () => {
+      active = false
+    }
+  }, [isOpen, archive])
   const [state, setState] = useState<FileUploadDialogState>(initialState)
   const [archiveStats, setArchiveStats] = useState<ArchiveStats>(() =>
     calculateArchiveStats(archive),
@@ -94,6 +130,7 @@ export function FileUploadDialog({
     }
 
   const handleUpload = async () => {
+    if (!collectionLoaded) return
     setState((prev) => ({ ...prev, uploadStatus: 'uploading', error: null }))
     const options: UploadOptions = {
       keepPrivate: false,
@@ -114,6 +151,12 @@ export function FileUploadDialog({
     })
 
     try {
+      if (collectionPreferenceAvailable) {
+        await saveCollectionPreference(
+          archive.account[0].account.accountId,
+          collectionEnabled,
+        )
+      }
       const filteredStats = calculateArchiveStats(archiveWithOptions)
       await uploadArchive(
         supabase,
@@ -232,6 +275,39 @@ export function FileUploadDialog({
               </div>
             )}
 
+            {collectionPreferenceAvailable && (
+              <div className="space-y-2">
+                <Label htmlFor="upload-collection">
+                  Collection after this upload
+                </Label>
+                <select
+                  id="upload-collection"
+                  className="w-full rounded border bg-background p-2"
+                  disabled={!collectionLoaded}
+                  value={collectionEnabled ? 'ongoing' : 'archive-only'}
+                  onChange={(event) =>
+                    setCollectionEnabled(event.target.value === 'ongoing')
+                  }
+                >
+                  <option value="archive-only">Archive only</option>
+                  <option value="ongoing">Archive + ongoing collection</option>
+                </select>
+                <p className="text-sm text-muted-foreground">
+                  Archive only keeps your upload public without collecting more
+                  tweets through our crawler or browser extension. Deleting
+                  tweets on X does not delete them here. You can change this in
+                  Settings.
+                </p>
+                {!collectionLoaded && !collectionError && (
+                  <p role="status">Loading collection settings…</p>
+                )}
+                {collectionError && (
+                  <p role="alert" className="text-sm text-red-600">
+                    {collectionError}
+                  </p>
+                )}
+              </div>
+            )}
             {/* Advanced Options */}
             <div className="mt-6">
               <Button
@@ -395,7 +471,9 @@ export function FileUploadDialog({
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button onClick={handleUpload}>Upload</Button>
+              <Button onClick={handleUpload} disabled={!collectionLoaded}>
+                Upload
+              </Button>
             </>
           )}
           {state.uploadStatus === 'uploading' && (

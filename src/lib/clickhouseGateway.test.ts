@@ -23,6 +23,16 @@ describe('ClickHouse analytics gateway requests', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('never exposes the private self-location endpoint through the public proxy', () => {
+    expect(() =>
+      analyticsGatewayRequestUrl(
+        ['hex-self'],
+        new URLSearchParams('account_id=123'),
+        'https://stream.example/analytics',
+      ),
+    ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
+
   test('allows the parameterless corpus-count endpoint', () => {
     const target = analyticsGatewayRequestUrl(
       ['corpus-count'],

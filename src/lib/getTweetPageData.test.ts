@@ -154,6 +154,86 @@ describe('getTweetPageData', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
+  test.each([false, true])(
+    'returns the permalink while quotes are pending (ClickHouse-only: %s)',
+    async (clickhouseOnly) => {
+      clickHouseEnabledMock.mockReturnValue(true)
+      const tweet = {
+        ...mainTweet,
+        reply_to_username: undefined,
+        quote_tweet_id: null,
+        retweeted_tweet_id: null,
+        media: [],
+        urls: [],
+      } satisfies TweetData
+      fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
+        tweet,
+        threadTree: null,
+      })
+      let resolveQuotes!: (value: {
+        tweets: TweetData[]
+        totalCount: number
+      }) => void
+      fetchClickHouseQuotePostsMock.mockReturnValue(
+        new Promise((resolve) => {
+          resolveQuotes = resolve
+        }),
+      )
+
+      // This await would hang if optional quotes moved back onto the hot path.
+      const page = await getTweetPageData(tweet.tweet_id, {
+        clickhouseOnly,
+        deferQuotePosts: true,
+      })
+      expect(page.tweet).toBe(tweet)
+      expect(page.quotePosts).toBeDefined()
+      expect(createServerClientMock).not.toHaveBeenCalled()
+      const quotes = {
+        tweets: [{ ...tweet, tweet_id: 'quote-1' }],
+        totalCount: 17,
+      }
+      resolveQuotes(quotes)
+      await expect(page.quotePosts).resolves.toEqual(quotes)
+    },
+  )
+
+  test('isolates a deferred quote failure from a strict permalink', async () => {
+    const tweet = {
+      ...mainTweet,
+      reply_to_username: undefined,
+      quote_tweet_id: null,
+      retweeted_tweet_id: null,
+      media: [],
+      urls: [],
+    } satisfies TweetData
+    fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
+      tweet,
+      threadTree: null,
+    })
+    let rejectQuotes!: (error: Error) => void
+    fetchClickHouseQuotePostsMock.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectQuotes = reject
+      }),
+    )
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const page = await getTweetPageData(tweet.tweet_id, {
+        clickhouseOnly: true,
+        deferQuotePosts: true,
+      })
+      rejectQuotes(new Error('quotes unavailable'))
+      await expect(page.quotePosts).resolves.toEqual({
+        tweets: [],
+        totalCount: 0,
+      })
+      expect(page.tweet).toBe(tweet)
+      expect(createServerClientMock).not.toHaveBeenCalled()
+    } finally {
+      log.mockRestore()
+    }
+  })
+
   test('keeps the ClickHouse permalink available when quote posts fail', async () => {
     const tweet = {
       tweet_id: '2085473085399150817',
@@ -238,8 +318,11 @@ describe('getTweetPageData', () => {
       error: null,
     })
 
-    const result = await getTweetPageData('original-1')
+    const result = await getTweetPageData('original-1', {
+      deferQuotePosts: true,
+    })
 
+    expect(result.quotePosts).toBeUndefined()
     expect(result.quotingTweetCount).toBe(17)
     expect(result.quotingTweets).toEqual([
       expect.objectContaining({
@@ -271,7 +354,9 @@ describe('getTweetPageData', () => {
       error: null,
     })
 
-    const result = await getTweetPageData('original-1')
+    const result = await getTweetPageData('original-1', {
+      deferQuotePosts: true,
+    })
 
     expect(result.quotingTweets).toEqual([])
     expect(result.quotingTweetCount).toBe(0)

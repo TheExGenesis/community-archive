@@ -1,5 +1,10 @@
 # API guide
 
+> **The Supabase REST API described here is retired on 19 November 2026.**
+> Use the keyed [Community Archive API v1](https://analytics.community-archive.org/v1/openapi.json)
+> instead; the [migration guide](api-v1-migration.md) maps every call. This
+> page stays for integrations that have not moved yet.
+
 There are three currently supported ways to access Community Archive data:
 
 1. Download the consent-safe bulk Parquet package.

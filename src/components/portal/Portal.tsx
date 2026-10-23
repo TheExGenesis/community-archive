@@ -196,7 +196,7 @@ function ArchiveMetric({
 }: {
   value: string
   label: string
-  note: string
+  note?: string
   noteClass?: string
   live?: boolean
   divider?: boolean
@@ -221,7 +221,9 @@ function ArchiveMetric({
       >
         {label}
       </span>
-      <span className={`text-[12px] ${noteClass ?? MUTED}`}>{note}</span>
+      {note && (
+        <span className={`text-[12px] ${noteClass ?? MUTED}`}>{note}</span>
+      )}
     </span>
   )
 }
@@ -262,7 +264,9 @@ export function ArchiveOverview({
           note={
             failures.liveAnalytics
               ? 'Tweet totals are temporarily unavailable.'
-              : `+${stats.streamedLast24Hours.toLocaleString('en-US')} in the last 24h`
+              : stats.addedLast24Hours === null
+                ? undefined
+                : `+${stats.addedLast24Hours.toLocaleString('en-US')} in the last 24h`
           }
           noteClass={
             failures.liveAnalytics
@@ -691,6 +695,34 @@ export function PortalNotes({
             <div className={`text-[12px] ${FAINT}`}>{a.meta}</div>
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+export function HomepageHighlightsLayout({
+  digest,
+  trends,
+  research,
+}: Record<'digest' | 'trends' | 'research', ReactNode>) {
+  return (
+    <div className="mx-auto max-w-6xl space-y-6 px-5 py-6 sm:px-7">
+      <div id="daily-digest" className="scroll-mt-20">
+        {digest}
+      </div>
+      <div className="grid items-start gap-6 md:grid-cols-2">
+        {trends}
+        <div className="space-y-6">
+          {research}
+          <UtilityLink
+            href={ARCHIVE_EXPORT_URL}
+            destination="data_export"
+            title="Daily data export"
+            note="Tweets and profiles in Parquet"
+            action="Download"
+            icon={<FaDatabase className="h-[17px] w-[17px]" />}
+          />
+        </div>
       </div>
     </div>
   )

@@ -11,6 +11,8 @@ import {
 } from '@/lib/metaTwitter/profilePagination'
 import {
   chapterSectionTweets,
+  sectionHeading,
+  sectionQuote,
   type ChapterSection,
   type SectionsByYear,
 } from '@/lib/metaTwitter/chapterSections'
@@ -277,10 +279,11 @@ export function ProfileArchive({
   }, [activeFeed, activeYear, loadFeedPage, loadNextPage, sort])
 
   const contextTitle = activeSection
-    ? activeSection.title
+    ? sectionHeading(activeSection)
     : activeYear
       ? `Best of ${activeYear}`
       : `Best of ${displayName}`
+  const contextQuote = activeSection ? sectionQuote(activeSection) : null
 
   const returnTo = archiveChapterHref(
     basePath,
@@ -304,6 +307,7 @@ export function ProfileArchive({
         key={`${activeKey}:${activeFeed ? 'ready' : 'loading'}`}
         avatarUrl={avatarUrl}
         contextTitle={contextTitle}
+        contextQuote={contextQuote}
         tweets={sectionTweets}
         bangersAvailable={activeFeed?.available !== false}
         bangersLoading={activeFeedLoading || (!activeFeed && !activeFeedFailed)}

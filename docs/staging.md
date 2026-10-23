@@ -58,6 +58,29 @@ Scope these overrides to the portal PR/staging branch. Keep
 all writes remain isolated. `PORTAL_READ_SUPABASE_ANON_KEY` is server-only and
 must be the public anonymous key, never the production service-role key.
 
+### Reviewing real members on the homepage map
+
+The homepage lookup reads the existing authenticated analytical gateway directly.
+The gateway's `hexMembers` applies its freshness-checked production membership
+projection, including explicit opt-outs, before returning any identities. Preview
+lookups use those filtered public results without rechecking them against the
+unrelated staging directory. Production retains its additional live Supabase
+policy check. No production website proxy, firewall bypass, or new secret is needed.
+
+Authentication and consent writes still use staging. Development and Vercel
+previews share a simulated session across the hero, account menu, navigation,
+and map. Sign-in and Opt In actions update that shared UI state without OAuth
+or a saved login. The homepage and map both show the Data Policy disclosure
+before a single Opt In confirmation. Preview confirmation simulates both login
+and consent, shows the thank-you message, and enables public map lookups.
+Choose Signed out in the preview controls or account menu to reset.
+
+Production uses the same disclosure before Twitter OAuth. A short-lived,
+per-tab consent intent lets the homepage complete the authenticated opt-in on
+return without asking again. A return URL alone never saves consent. The
+thank-you message appears only after the consent API succeeds. Server
+permissions always require real authentication and consent.
+
 ### Reviewing production Bulletin items in a protected PR preview
 
 The Bulletin uses private Jev metadata and live production consent checks, so

@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useNearViewport } from '@/hooks/useNearViewport'
-import { PiArrowSquareOut, PiArticle } from 'react-icons/pi'
+import { PiArrowSquareOut, PiArticle, PiPlayFill } from 'react-icons/pi'
 import type { TweetLinkPreview } from '@/lib/linkPreviewTypes'
 
 // Share only in-flight reads, not policy-sensitive results across later visits.
@@ -64,18 +64,36 @@ export function TweetLinkPreviews({
           target="_blank"
           rel="noopener noreferrer"
           onClick={(event) => event.stopPropagation()}
-          className={`group flex overflow-hidden rounded-[6px] border border-zinc-200 bg-zinc-50 transition-colors hover:border-zinc-300 dark:border-[#303036] dark:bg-[#202023] dark:hover:border-[#45454d] ${compact ? 'min-h-16' : 'min-h-20'}`}
+          className={`group flex ${preview.isVideo && !compact ? 'flex-col' : ''} overflow-hidden rounded-[6px] border border-zinc-200 bg-zinc-50 transition-colors hover:border-zinc-300 dark:border-[#303036] dark:bg-[#202023] dark:hover:border-[#45454d] ${compact ? 'min-h-16' : 'min-h-20'}`}
         >
           {preview.imageUrl && !compact ? (
-            <div className="relative w-28 flex-none bg-muted sm:w-36">
+            <div
+              className={
+                preview.isVideo
+                  ? 'relative aspect-video w-full bg-black'
+                  : 'relative w-28 flex-none bg-muted sm:w-36'
+              }
+            >
               <Image
                 src={`/api/link-preview/image?hash=${preview.urlHash}`}
                 alt=""
                 fill
                 unoptimized
-                sizes="144px"
-                className="object-cover"
+                sizes={
+                  preview.isVideo ? '(max-width: 640px) 100vw, 640px' : '144px'
+                }
+                className={preview.isVideo ? 'object-contain' : 'object-cover'}
               />
+              {preview.isVideo ? (
+                <span
+                  className="absolute inset-0 flex items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <span className="rounded-full bg-black/70 p-4 text-white">
+                    <PiPlayFill className="h-7 w-7" />
+                  </span>
+                </span>
+              ) : null}
             </div>
           ) : null}
           <div className="min-w-0 flex-1 p-2.5">

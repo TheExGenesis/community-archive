@@ -3,6 +3,7 @@ import { createServerAdminClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { buildAuthErrorUrl } from '@/lib/authCallback'
 import { safeAuthRedirect } from '@/lib/authRedirect'
+import { getTwitterProviderId, getTwitterUsername } from '@/lib/twitterIdentity'
 
 // Validate host against allowed domains - prevents open redirect attacks
 function isAllowedHost(host: string): boolean {
@@ -81,24 +82,29 @@ export async function GET(request: Request) {
     }
 
     if (!error && data.user) {
-      // Move provider_id to app_metadata and ensure username is lowercase
-      const providerId = data.user.user_metadata.provider_id
-      const rawUsername = data.user.user_metadata.user_name
-      const username =
-        typeof rawUsername === 'string' ? rawUsername.toLowerCase() : null
+      // RLS, storage policies and the archive RPCs trust app_metadata, so copy
+      // the account from the Twitter/X identity Supabase Auth just verified,
+      // never from user_metadata, which the client can rewrite. The
+      // sync_user_meta_data trigger derives the same values from
+      // auth.identities on every update (migration 20261016192016); this
+      // write covers stacks where that trigger is not yet installed.
+      const providerId = getTwitterProviderId(data.user)
+      const username = getTwitterUsername(data.user)
 
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        data.user.id,
-        {
-          app_metadata: {
-            ...(providerId ? { provider_id: providerId } : {}),
-            ...(username ? { user_name: username } : {}),
+      if (providerId) {
+        const { error: updateError } = await supabase.auth.admin.updateUserById(
+          data.user.id,
+          {
+            app_metadata: {
+              provider_id: providerId,
+              ...(username ? { user_name: username } : {}),
+            },
           },
-        },
-      )
+        )
 
-      if (updateError) {
-        console.error('Failed to update app_metadata:', updateError)
+        if (updateError) {
+          console.error('Failed to update app_metadata:', updateError)
+        }
       }
 
       const forwardedHost = request.headers.get('x-forwarded-host')

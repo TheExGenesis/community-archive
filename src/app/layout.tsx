@@ -1,3 +1,8 @@
+import { CommunityOptInProvider } from '@/components/CommunityOptIn'
+import {
+  PreviewSessionProvider,
+  PreviewAccount,
+} from '@/components/PreviewSession'
 import { Petrona, Manrope } from 'next/font/google'
 import ThemeProvider from '@/providers/ThemeProvider'
 import NextTopLoader from 'nextjs-toploader'
@@ -10,6 +15,7 @@ import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
 import dynamic from 'next/dynamic'
 import HeaderSearch from '@/components/HeaderSearch'
+import { ArchiveSearchProvider } from '@/components/ArchiveSearchProvider'
 import MobileMenu from '@/components/MobileMenu'
 import Footer from '@/components/Footer'
 import HashScrollHandler from '@/components/HashScrollHandler'
@@ -78,67 +84,83 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <ReactQueryProvider>
-              <HashScrollHandler />
-              <NavigationAudienceProvider>
-                <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
-                  <div className="flex h-14 items-center justify-between px-4 sm:px-6 xl:px-8">
-                    <div className="flex min-w-0 items-center gap-3 lg:gap-2 xl:gap-3">
-                      <MobileNavigation entries={getMobileNav()} />
-                      <PostHogLink
-                        href="/"
-                        eventName="navigation_item_clicked"
-                        eventProperties={{
-                          destination: 'home',
-                          surface: 'brand',
-                          already_active: false,
-                        }}
-                        className="flex flex-shrink-0 items-center space-x-2"
-                      >
-                        <Image
-                          src="/images/logo.png"
-                          alt="Community Archive logo"
-                          width={28}
-                          height={28}
-                          className="h-7 w-7 flex-shrink-0"
-                          priority
-                        />
-                        <span
-                          className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
-                          style={{
-                            fontFamily:
-                              'var(--font-petrona), Georgia, "Times New Roman", serif',
-                          }}
-                        >
-                          Community Archive
-                        </span>
-                      </PostHogLink>
-                      <HeaderNavigation
-                        entries={getPrimaryNav()}
-                        label="Main"
-                      />
+              <ArchiveSearchProvider>
+                <PreviewSessionProvider
+                  enabled={
+                    process.env.VERCEL_ENV === 'preview' ||
+                    (!process.env.VERCEL_ENV &&
+                      process.env.NODE_ENV === 'development')
+                  }
+                >
+                  <CommunityOptInProvider>
+                    <HashScrollHandler />
+                    <NavigationAudienceProvider>
+                      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
+                        <div className="flex h-14 items-center justify-between px-4 sm:px-6 xl:px-8">
+                          <div className="flex min-w-0 items-center gap-3 lg:gap-2 xl:gap-3">
+                            <MobileNavigation entries={getMobileNav()} />
+                            <PostHogLink
+                              href="/"
+                              eventName="navigation_item_clicked"
+                              eventProperties={{
+                                destination: 'home',
+                                surface: 'brand',
+                                already_active: false,
+                              }}
+                              className="flex flex-shrink-0 items-center space-x-2"
+                            >
+                              <Image
+                                src="/images/logo.png"
+                                alt="Community Archive logo"
+                                width={28}
+                                height={28}
+                                className="h-7 w-7 flex-shrink-0"
+                                priority
+                              />
+                              <span
+                                className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
+                                style={{
+                                  fontFamily:
+                                    'var(--font-petrona), Georgia, "Times New Roman", serif',
+                                }}
+                              >
+                                Community Archive
+                              </span>
+                            </PostHogLink>
+                            <HeaderNavigation
+                              entries={getPrimaryNav()}
+                              label="Main"
+                            />
+                          </div>
+                          <div className="flex flex-shrink-0 items-center space-x-2 2xl:space-x-3">
+                            <HeaderNavigation
+                              entries={getUtilityNav()}
+                              label="Utility"
+                            />
+                            <HeaderSearch />
+                            <div className="text-sm">
+                              <PreviewAccount>
+                                <DynamicSignIn />
+                              </PreviewAccount>
+                            </div>
+                            <ThemeToggle side="bottom" />
+                            <AdminNavigationLink />
+                            <MobileMenu />
+                          </div>
+                        </div>
+                      </header>
+                    </NavigationAudienceProvider>
+                    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+                      {children}
+                      <Analytics />
+                      <Footer />
                     </div>
-                    <div className="flex flex-shrink-0 items-center space-x-2 2xl:space-x-3">
-                      <HeaderNavigation
-                        entries={getUtilityNav()}
-                        label="Utility"
-                      />
-                      <HeaderSearch />
-                      <div className="text-sm">
-                        <DynamicSignIn />
-                      </div>
-                      <ThemeToggle side="bottom" />
-                      <AdminNavigationLink />
-                      <MobileMenu />
+                    <div className="hidden min-[980px]:block">
+                      <ReactQueryDevtools initialIsOpen={false} />
                     </div>
-                  </div>
-                </header>
-              </NavigationAudienceProvider>
-              <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
-                {children}
-                <Analytics />
-                <Footer />
-              </div>
-              <ReactQueryDevtools initialIsOpen={false} />
+                  </CommunityOptInProvider>
+                </PreviewSessionProvider>
+              </ArchiveSearchProvider>
             </ReactQueryProvider>
           </ThemeProvider>
         </PostHogProvider>

@@ -123,6 +123,9 @@ SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 # delivery-state migration and ClickHouse tombstone columns are verified.
 ARCHIVE_CLICKHOUSE_SINK_ENABLED=false
 ARCHIVE_CLICKHOUSE_RETRY_BATCH=5
+# Likes/follows delivery and deletion purges (see "ClickHouse likes and follows").
+ARCHIVE_CLICKHOUSE_GRAPH_ENABLED=false
+ARCHIVE_CLICKHOUSE_GRAPH_PURGE_BATCH=20
 CLICKHOUSE_URL=http://clickhouse-host:8123
 CLICKHOUSE_DATABASE=community_archive
 CLICKHOUSE_USER=archive_ingestor
@@ -214,6 +217,56 @@ never to reconstruct allowed content.
 This rollout applies only to uploads processed after the delivery-state
 migration. Do not seed the delivery table from completed uploads; historical
 tombstoning and replay require separate approval.
+
+### ClickHouse likes and follows
+
+`ARCHIVE_CLICKHOUSE_GRAPH_ENABLED=true` adds the archive's like.js,
+follower.js and following.js to the same delivery, as one row per edge and
+upload in `account_likes` and `account_follows`. Liked tweets are written as
+content-free `liked_tweet_versions` tombstones, mirroring the PostgreSQL
+`liked_tweets` upsert. Edges are written only while the owner is unblocked and
+the upload is still a completed upload of that account, read under the owner's
+policy lock; a delayed retry of a deleted upload therefore writes no edges.
+
+`delete_user_archive`, `delete_single_archive` and `tombstone_policy_account`
+queue a content-free request in `private.archive_clickhouse_graph_purge` in the
+same transaction as their PostgreSQL delete, without waiting for any lock.
+Each run drains due requests: it reads the account's uploads and block state in
+a short transaction holding the owner's policy lock (ordering it after any
+delivery in progress), releases the lock, physically deletes the matching
+ClickHouse rows, verifies that none remain, and only then marks the request
+and any identical earlier-queued requests completed:
+
+- a single-archive delete removes that upload's rows only, so edges a retained
+  upload also contains stay visible (PostgreSQL drops them because it keeps one
+  upload per edge);
+- deleting every archive removes all the account's rows except those from an
+  upload created after the deletion;
+- an opt-out removes every row for the account and tombstones liked-tweet text
+  it authored.
+
+Plans are computed from PostgreSQL state when the request runs (remaining
+uploads, current block state, and the upload-ID sequence high-water mark), so
+replaying an old request is always safe: a re-upload after the deletion, or
+after an opt-in, keeps its rows. Monitoring reads the backlog through
+`private.community_archive_monitoring_graph_purge()`.
+
+The flag fails closed: when enabled, a missing likes/follows schema makes the
+whole ClickHouse sink unavailable for that run, so no delivery is marked done
+without its edges. Requests accumulate while the flag is off and drain once it
+is on. Turning it off after enabling it leaves a gap for uploads processed in
+between; close it with the control-panel backfill's `--min-upload-id`.
+
+To compare ClickHouse with the raw archives, run inside the worker image. Skip
+the entrypoint so the read-only check does not hold the worker's run lock:
+
+```bash
+docker compose run --rm --no-deps --entrypoint "" process-archive \
+  npm run verify:archive-graph -- --sample 5
+```
+
+It downloads each selected account's retained archives and prints counts only
+(`--account-ids a,b` selects accounts explicitly).
 
 Repeat with an account present only in `tes.blocked_scraping_users`. Also verify
 an allowed outer tweet keeps its quote/retweet relationship to a blocked target

@@ -100,20 +100,23 @@ interface TweetPageResult {
   threadTree: ConversationTree | null
   quotingTweets: TweetData[]
   quotingTweetCount: number
+  quotePosts?: Promise<ClickHouseQuotePostsData>
 }
 
 /**
- * Load portal permalink records and incoming quote posts from the same
- * ClickHouse snapshot when enabled. The Supabase RPC remains the complete
- * tweet/thread fallback for environments without ClickHouse reads.
+ * Load permalink records and incoming quotes from ClickHouse when enabled.
+ * With deferQuotePosts, callers await optional quotes in a separate streaming
+ * boundary. The Supabase RPC remains the complete tweet/thread fallback and
+ * includes its initial quotes in the same response.
  */
 export async function getTweetPageData(
   tweetId: string,
-  options: { clickhouseOnly?: boolean } = {},
+  options: { clickhouseOnly?: boolean; deferQuotePosts?: boolean } = {},
 ): Promise<TweetPageResult> {
   const clickHousePage = await fetchClickHousePage(
     tweetId,
     options.clickhouseOnly,
+    options.deferQuotePosts,
   )
   if (clickHousePage) return clickHousePage
   if (options.clickhouseOnly)
@@ -221,26 +224,31 @@ export async function getTweetPageData(
 async function fetchClickHousePage(
   tweetId: string,
   strict = false,
+  deferQuotePosts = false,
 ): Promise<TweetPageResult | null> {
   if (!strict && !isClickHouseReadsEnabled()) return null
 
   try {
-    const [page, quotePosts] = await Promise.all([
+    // Start both reads together, but keep optional quotes off the permalink's
+    // critical path. Handle rejection immediately even if the thread is missing.
+    const quotePosts = fetchClickHouseQuotePosts(tweetId).catch((error) => {
+      if (strict && !deferQuotePosts) throw error
+      console.error('ClickHouse quote posts failed:', {
+        tweetId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return { tweets: [], totalCount: 0 } satisfies ClickHouseQuotePostsData
+    })
+    const [page, initialQuotes] = await Promise.all([
       fetchClickHouseTweetThreadPageData(tweetId),
-      fetchClickHouseQuotePosts(tweetId).catch((error) => {
-        if (strict) throw error
-        console.error('ClickHouse quote posts failed:', {
-          tweetId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        return { tweets: [], totalCount: 0 } satisfies ClickHouseQuotePostsData
-      }),
+      deferQuotePosts ? null : quotePosts,
     ])
     if (!page) return null
     return {
       ...page,
-      quotingTweets: quotePosts.tweets,
-      quotingTweetCount: quotePosts.totalCount,
+      quotingTweets: initialQuotes?.tweets ?? [],
+      quotingTweetCount: initialQuotes?.totalCount ?? 0,
+      ...(deferQuotePosts ? { quotePosts } : {}),
     }
   } catch (error) {
     if (strict) throw error

@@ -43,10 +43,10 @@ export function PreviewSessionProvider({
       {children}
       {enabled && (
         <aside
-          className="fixed bottom-3 left-3 z-50 rounded-lg border bg-background p-2 text-xs shadow-md"
+          className="relative mx-3 my-3 w-fit max-w-[calc(100%-1.5rem)] rounded-lg border bg-background p-2 text-xs shadow-md min-[980px]:fixed min-[980px]:bottom-3 min-[980px]:left-3 min-[980px]:z-50 min-[980px]:m-0"
           aria-label="Development preview controls"
         >
-          <label className="flex items-center gap-2">
+          <label className="flex flex-wrap items-center gap-2">
             Preview view
             <select
               aria-label="Preview sign-in state"

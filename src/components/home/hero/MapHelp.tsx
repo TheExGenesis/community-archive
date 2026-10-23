@@ -34,7 +34,8 @@ export default function MapHelp() {
             <dt>Move around</dt>
             <dd>
               Hold Cmd or Ctrl and scroll to zoom; drag to pan. On touch
-              screens, pinch to zoom. Use + / − to zoom or ↺ to reset the view.
+              screens, scroll the page with one finger; use two fingers to pan
+              and pinch to zoom. Use + / − to zoom or ↺ to reset the view.
             </dd>
           </div>
           <div>

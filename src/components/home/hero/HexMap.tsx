@@ -78,7 +78,7 @@ export default memo(function HexMap({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ width: 800, height: 650 })
-  const [layer, setLayer] = useState<'week' | 'archived'>('week')
+  const [showArchived, setShowArchived] = useState(false)
   const [hovered, setHovered] = useState<number | null>(null)
   const [keyboardCell, setKeyboardCell] = useState(0)
   const [fontsReady, setFontsReady] = useState(0)
@@ -87,17 +87,8 @@ export default memo(function HexMap({
   const geo = useMemo(() => geometry(snapshot), [snapshot])
   const camera = useMapCamera(geo.bounds, size.width, size.height)
   const showDetails = camera.camera.zoom >= 1.5
-  const pendingClick = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cancelPendingClick = () => {
-    if (pendingClick.current !== null) clearTimeout(pendingClick.current)
-    pendingClick.current = null
-  }
-  useEffect(
-    () => () => {
-      if (pendingClick.current !== null) clearTimeout(pendingClick.current)
-    },
-    [],
-  )
+  // Keep the first hex for double-clicks even after its single click zooms.
+  const clickedCell = useRef<number | null>(null)
   const lastSelfLocation = useRef(selfLocation)
   useEffect(() => {
     if (selfLocation && lastSelfLocation.current !== selfLocation) {
@@ -170,7 +161,7 @@ export default memo(function HexMap({
     }
   }, [camera.ref])
 
-  // Rasterize only when layer inputs or the zoom detail threshold change,
+  // Rasterize only when layer inputs change,
   // never for individual pan/zoom frames, label layout, or tweet hover.
   useEffect(() => {
     const buffer = bufferRef.current ?? document.createElement('canvas')
@@ -201,31 +192,24 @@ export default memo(function HexMap({
         '#888888'
       const focused = !focus.size || focus.has(c.region)
       let fill = color
-      if (layer === 'week' && !heat) {
-        if (showDetails) {
-          fill = mix(
-            fill,
-            dark ? '#18181b' : '#ffffff',
-            Math.max(0, 0.4 - Math.log1p(c.activity) * 0.18),
+      if (showArchived || heat) {
+        if (heat ? heat.get(id) : c.archived) {
+          const strength = Math.min(
+            1,
+            Math.log1p(
+              ((heat
+                ? (heat.get(id) ?? 0)
+                : c.archived / Math.max(1, c.accounts)) /
+                p98) *
+                20,
+            ) / Math.log(21),
           )
-          if (c.archived === 0) fill = mix(fill, '#303038', 0.15)
-        }
-      } else if (heat ? heat.get(id) : c.archived) {
-        const strength = Math.min(
-          1,
-          Math.log1p(
-            ((heat
-              ? (heat.get(id) ?? 0)
-              : c.archived / Math.max(1, c.accounts)) /
-              p98) *
-              20,
-          ) / Math.log(21),
-        )
-        fill =
-          focus.size && focused && !heat
-            ? mix(color, '#593315', strength * 0.45)
-            : mix('#f3d8ad', '#b54a0c', strength)
-      } else fill = mix(fill, dark ? '#18181b' : '#f4f4f5', 0.65)
+          fill =
+            focus.size && focused && !heat
+              ? mix(color, '#593315', strength * 0.45)
+              : mix('#f3d8ad', '#b54a0c', strength)
+        } else fill = mix(fill, dark ? '#18181b' : '#f4f4f5', 0.65)
+      }
       ctx.globalAlpha = focused ? 1 : 0.22
       ctx.fillStyle = fill
       polygon(ctx, geo.vertices[id])
@@ -252,7 +236,7 @@ export default memo(function HexMap({
     }
     setBase(buffer)
     setBaseRevision((n) => n + 1)
-  }, [geo, snapshot, layer, focus, dark, heat, showDetails])
+  }, [geo, snapshot, showArchived, focus, dark, heat])
 
   useEffect(() => {
     void baseRevision
@@ -468,7 +452,6 @@ export default memo(function HexMap({
   }, [hovered, snapshot, onSelectionIntent])
 
   const selectRegion = (regionId: number, additive = false) => {
-    cancelPendingClick()
     const region = snapshot.regions.find((r) => r.id === regionId)!
     const ids = snapshot.cells.flatMap((cell, id) =>
       cell.region === regionId ? [id] : [],
@@ -486,7 +469,6 @@ export default memo(function HexMap({
   }
   const selectCell = (id: number, additive = false, individual = false) => {
     if (!individual) return selectRegion(snapshot.cells[id].region, additive)
-    cancelPendingClick()
     onSelect(additive ? Array.from(new Set([...selected, id])) : [id])
   }
   const atPointer = (e: React.MouseEvent) => {
@@ -549,178 +531,262 @@ export default memo(function HexMap({
   const cell = hovered === null ? null : snapshot.cells[hovered]
   const region = cell && snapshot.regions.find((r) => r.id === cell.region)
   return (
-    <div className={styles.mapShell}>
-      {finder}
-      <div
-        ref={camera.ref}
-        className={styles.mapViewport}
-        {...camera.handlers}
-        onPointerDown={(e) => {
-          cancelPendingClick()
-          onSelectionIntent(null)
-          camera.handlers.onPointerDown(e)
-        }}
-        onMouseMove={(e) => {
-          if (!e.buttons) setHovered(atPointer(e))
-        }}
-        onMouseLeave={() => setHovered(null)}
-        onClick={(e) => {
-          if (camera.moved.current || e.detail > 1) return
-          const id = atPointer(e)
-          const additive = e.shiftKey
-          // Let a double-click pick its original hex before moving the camera.
-          cancelPendingClick()
-          pendingClick.current = setTimeout(() => {
-            pendingClick.current = null
+    <>
+      <div className={styles.mapShell}>
+        {finder}
+        <div
+          ref={camera.ref}
+          className={styles.mapSurface}
+          {...camera.handlers}
+          onPointerDown={(e) => {
+            onSelectionIntent(null)
+            camera.handlers.onPointerDown(e)
+          }}
+          onPointerMove={(e) => {
+            camera.handlers.onPointerMove(e)
+            if (e.pointerType === 'mouse' && !e.buttons)
+              setHovered(atPointer(e))
+            else setHovered(null)
+          }}
+          onMouseLeave={() => setHovered(null)}
+          onClick={(e) => {
+            if ((e.target as Element).closest('button')) return
+            if (
+              camera.moved.current ||
+              (!camera.touchInput.current && e.detail > 1)
+            )
+              return
+            const id = atPointer(e)
+            const additive = e.shiftKey
+            if (camera.touchInput.current) {
+              if (id !== null) selectCell(id)
+              return
+            }
+            clickedCell.current = id
             id === null ? onSelect([]) : selectCell(id, additive)
-          }, 300)
-        }}
-        onDoubleClick={(e) => {
-          e.preventDefault()
-          cancelPendingClick()
-          const id = atPointer(e)
-          if (id !== null) selectCell(id, e.shiftKey, true)
-        }}
-        onKeyDown={(e) => {
-          cancelPendingClick()
-          if (e.key === 'Escape') onSelect([])
-          if (e.key === '+' || e.key === '=') camera.zoomAt(1.5)
-          if (e.key === '-') camera.zoomAt(1 / 1.5)
-          if (e.key === 'Home') camera.reset()
-          if (e.key.startsWith('Arrow')) {
+          }}
+          onDoubleClick={(e) => {
             e.preventDefault()
-            const next =
-              (keyboardCell +
-                (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) +
-                snapshot.cells.length) %
-              snapshot.cells.length
-            setKeyboardCell(next)
-            setHovered(next)
-          }
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            selectCell(keyboardCell, false, e.shiftKey)
-          }
-        }}
-        tabIndex={0}
-        role="group"
-        aria-label="Community map. Arrow keys explore cells; Enter selects a community; Shift Enter selects one hexagon; Escape clears; plus and minus zoom."
-      >
-        <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
-      </div>
-      <div className={styles.labels}>
-        {labels.map((l, i) =>
-          l.kind === 'country' ? (
-            <button
-              key={`r${l.region}`}
-              type="button"
-              className={styles.country}
-              data-details={showDetails}
-              style={{
-                left: l.x,
-                top: l.y,
-                opacity: focus.size && !focus.has(l.region) ? 0.28 : 1,
-              }}
-              onMouseEnter={() =>
-                onSelectionIntent(
-                  snapshot.cells.flatMap((c, id) =>
-                    c.region === l.region ? [id] : [],
-                  ),
-                )
-              }
-              onMouseLeave={() => onSelectionIntent(null)}
-              onFocus={() =>
-                onSelectionIntent(
-                  snapshot.cells.flatMap((c, id) =>
-                    c.region === l.region ? [id] : [],
-                  ),
-                )
-              }
-              onBlur={() => onSelectionIntent(null)}
-              onClick={(e) => selectRegion(l.region, e.shiftKey)}
+            if (
+              camera.touchInput.current ||
+              camera.moved.current ||
+              (e.target as Element).closest('button')
+            )
+              return
+            const id = clickedCell.current
+            if (id !== null) selectCell(id, e.shiftKey, true)
+          }}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            if (e.key === 'Escape') onSelect([])
+            if (e.key === '+' || e.key === '=') camera.zoomAt(1.5)
+            if (e.key === '-') camera.zoomAt(1 / 1.5)
+            if (e.key === 'Home') camera.reset()
+            if (e.key.startsWith('Arrow')) {
+              e.preventDefault()
+              const next =
+                (keyboardCell +
+                  (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) +
+                  snapshot.cells.length) %
+                snapshot.cells.length
+              setKeyboardCell(next)
+              setHovered(next)
+            }
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              selectCell(keyboardCell, false, e.shiftKey)
+            }
+          }}
+          tabIndex={0}
+          role="group"
+          aria-label="Community map. Arrow keys explore cells; Enter selects a community; Shift Enter selects one hexagon; Escape clears; plus and minus zoom."
+        >
+          <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
+          <div className={styles.labels}>
+            {labels.map((l, i) =>
+              l.kind === 'country' ? (
+                <button
+                  key={`r${l.region}`}
+                  type="button"
+                  className={styles.country}
+                  data-details={showDetails}
+                  style={{
+                    left: l.x,
+                    top: l.y,
+                    opacity: focus.size && !focus.has(l.region) ? 0.28 : 1,
+                  }}
+                  onMouseEnter={() =>
+                    onSelectionIntent(
+                      snapshot.cells.flatMap((c, id) =>
+                        c.region === l.region ? [id] : [],
+                      ),
+                    )
+                  }
+                  onMouseLeave={() => onSelectionIntent(null)}
+                  onFocus={() =>
+                    onSelectionIntent(
+                      snapshot.cells.flatMap((c, id) =>
+                        c.region === l.region ? [id] : [],
+                      ),
+                    )
+                  }
+                  onBlur={() => onSelectionIntent(null)}
+                  onClick={(e) => {
+                    if (e.detail === 0 || !camera.moved.current)
+                      selectRegion(l.region, e.shiftKey)
+                  }}
+                >
+                  {l.text}
+                </button>
+              ) : (
+                <span
+                  key={`${l.kind}${i}`}
+                  className={
+                    l.kind === 'cluster' ? styles.cluster : styles.word
+                  }
+                  style={{
+                    left: l.x,
+                    top: l.y,
+                    fontSize: l.size,
+                    color: mix(
+                      snapshot.regions.find((r) => r.id === l.region)?.[
+                        dark ? 'colorDark' : 'color'
+                      ] ?? '#888888',
+                      '#18181b',
+                      0.6,
+                    ),
+                    opacity: focus.size && !focus.has(l.region) ? 0.2 : 0.8,
+                  }}
+                >
+                  {l.text}
+                </span>
+              ),
+            )}
+          </div>
+          <div className={styles.callouts}>
+            <svg
+              className={styles.calloutLines}
+              width={size.width}
+              height={size.height}
+              aria-hidden="true"
             >
-              {l.text}
+              {callouts.map((p) => (
+                <g
+                  key={p.username}
+                  opacity={
+                    focus.size && !focus.has(p.region) && !p.highlighted
+                      ? 0.35
+                      : 1
+                  }
+                >
+                  <path
+                    d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
+                    className={styles.calloutLineHalo}
+                  />
+                  <path
+                    d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
+                    className={styles.calloutLine}
+                  />
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={2.5}
+                    fill="#3f3f46"
+                    stroke="white"
+                    strokeWidth={1}
+                  />
+                </g>
+              ))}
+            </svg>
+            {callouts.map((p) => (
+              <span
+                key={p.username}
+                className={styles.userCallout}
+                data-highlighted={p.highlighted}
+                style={{
+                  left: p.box.x,
+                  top: p.box.y,
+                  width: p.box.width,
+                  height: p.box.height,
+                  opacity:
+                    focus.size && !focus.has(p.region) && !p.highlighted
+                      ? 0.35
+                      : 1,
+                }}
+              >
+                @{p.username}
+              </span>
+            ))}
+          </div>
+        </div>
+        {scrubber}
+        <div className={styles.mobileMapControls} aria-label="Map controls">
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={() => camera.zoomAt(1.5)}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={() => camera.zoomAt(1 / 1.5)}
+          >
+            −
+          </button>
+          <button type="button" onClick={() => camera.reset()}>
+            Reset view
+          </button>
+          {!!selected.length && (
+            <button type="button" onClick={() => onSelect([])}>
+              Clear selection
             </button>
-          ) : (
-            <span
-              key={`${l.kind}${i}`}
-              className={l.kind === 'cluster' ? styles.cluster : styles.word}
-              style={{
-                left: l.x,
-                top: l.y,
-                fontSize: l.size,
-                opacity: focus.size && !focus.has(l.region) ? 0.2 : 0.8,
-              }}
-            >
-              {l.text}
-            </span>
-          ),
+          )}
+        </div>
+        {!!selected.length && (
+          <p className={styles.mobileSelection} role="status">
+            {selectedRegions.size === 1
+              ? snapshot.regions.find((region) =>
+                  selectedRegions.has(region.id),
+                )?.name
+              : `${selected.length} selected cells`}{' '}
+            · Stories below
+          </p>
+        )}
+        <span className={styles.hint}>
+          <span className={styles.desktopHint}>
+            Cmd/Ctrl + scroll to zoom · Click a cluster to select · Double-click
+            a hex to select
+          </span>
+          <span className={styles.touchHint}>
+            Scroll with one finger. Move and zoom with two.
+          </span>
+        </span>
+        {cell && (
+          <div className={styles.tooltip} role="status">
+            <strong>{region?.name}</strong>
+            <br />
+            {cell.accounts.toLocaleString()} accounts · {cell.archived} archived
+            <br />
+            {cell.terms.filter(safeTerm).slice(0, 2).join(' · ')}
+            {pins
+              .filter((p) => p.cell === hovered)
+              .map((p) => (
+                <div key={p.username}>@{p.username}</div>
+              ))}
+          </div>
         )}
       </div>
-      <div className={styles.callouts}>
-        <svg
-          className={styles.calloutLines}
-          width={size.width}
-          height={size.height}
-          aria-hidden="true"
-        >
-          {callouts.map((p) => (
-            <g
-              key={p.username}
-              opacity={
-                focus.size && !focus.has(p.region) && !p.highlighted ? 0.35 : 1
-              }
-            >
-              <path
-                d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
-                className={styles.calloutLineHalo}
-              />
-              <path
-                d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
-                className={styles.calloutLine}
-              />
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={2.5}
-                fill="#3f3f46"
-                stroke="white"
-                strokeWidth={1}
-              />
-            </g>
-          ))}
-        </svg>
-        {callouts.map((p) => (
-          <span
-            key={p.username}
-            className={styles.userCallout}
-            data-highlighted={p.highlighted}
-            style={{
-              left: p.box.x,
-              top: p.box.y,
-              width: p.box.width,
-              height: p.box.height,
-              opacity:
-                focus.size && !focus.has(p.region) && !p.highlighted ? 0.35 : 1,
-            }}
-          >
-            @{p.username}
-          </span>
-        ))}
-      </div>
       <div className={styles.layers}>
-        <div className={styles.segmented}>
-          {(['week', 'archived'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={layer === value}
-              onClick={() => setLayer(value)}
-            >
-              {value === 'week' ? 'Activity' : 'Archived'}
-            </button>
-          ))}
-        </div>
+        <label className={styles.archivedToggle}>
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(event) => setShowArchived(event.target.checked)}
+          />
+          Show archived
+        </label>
         <div className={styles.defaultLabelsControl}>
           <button
             type="button"
@@ -732,7 +798,7 @@ export default memo(function HexMap({
               : 'Show default usernames'}
           </button>
         </div>
-        {(heatTerm || layer === 'archived') && (
+        {(heatTerm || showArchived) && (
           <p>
             {heatTerm
               ? `“${heatTerm}” · share of member posts each month`
@@ -758,30 +824,6 @@ export default memo(function HexMap({
           </p>
         )}
       </div>
-      {scrubber}
-      <span className={styles.hint}>
-        <span className={styles.desktopHint}>
-          Cmd/Ctrl + scroll to zoom · Click a cluster to select · Double-click a
-          hex to select
-        </span>
-        <span className={styles.touchHint}>
-          Pinch to zoom · Scroll to explore below
-        </span>
-      </span>
-      {cell && (
-        <div className={styles.tooltip} role="status">
-          <strong>{region?.name}</strong>
-          <br />
-          {cell.accounts.toLocaleString()} accounts · {cell.archived} archived
-          <br />
-          {cell.terms.filter(safeTerm).slice(0, 2).join(' · ')}
-          {pins
-            .filter((p) => p.cell === hovered)
-            .map((p) => (
-              <div key={p.username}>@{p.username}</div>
-            ))}
-        </div>
-      )}
-    </div>
+    </>
   )
 })

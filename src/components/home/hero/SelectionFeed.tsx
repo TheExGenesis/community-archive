@@ -20,6 +20,7 @@ import type { HexSnapshot } from '@/lib/hexMap/types'
 import type { MapStory, StoryPage, MapPostPage } from '@/lib/hexMap/stories'
 import StoryCard from './StoryCard'
 import styles from './hero.module.css'
+import useMobileMapLayout from './useMobileMapLayout'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
 function More({
   next,
@@ -34,6 +35,7 @@ function More({
   error: boolean
   load: () => void
 }) {
+  const mobile = useMobileMapLayout()
   const ref = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!ref.current || !next || loading || error || paused) return
@@ -41,11 +43,14 @@ function More({
       (e) => {
         if (e[0].isIntersecting) load()
       },
-      { root: ref.current.closest('aside'), rootMargin: '800px' },
+      {
+        root: mobile ? null : ref.current.closest('aside'),
+        rootMargin: '800px',
+      },
     )
     obs.observe(ref.current)
     return () => obs.disconnect()
-  }, [next, loading, error, paused, load])
+  }, [next, loading, error, paused, load, mobile])
   return next ? (
     <button className={styles.load} ref={ref} disabled={loading} onClick={load}>
       {loading ? 'Loading…' : error ? 'Retry loading more' : 'Load more'}

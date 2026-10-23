@@ -61,11 +61,15 @@
     margin-right: 4px;
   }
   .people :global(.flex-wrap) {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
   }
   .people a {
-    flex-shrink: 0;
+    width: 100%;
+    min-width: 0;
+  }
+  .people a:nth-child(n + 4) {
+    display: none;
   }
 }

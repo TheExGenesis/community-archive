@@ -155,7 +155,9 @@ export default function RootLayout({
                       <Analytics />
                       <Footer />
                     </div>
-                    <ReactQueryDevtools initialIsOpen={false} />
+                    <div className="hidden min-[980px]:block">
+                      <ReactQueryDevtools initialIsOpen={false} />
+                    </div>
                   </CommunityOptInProvider>
                 </PreviewSessionProvider>
               </ArchiveSearchProvider>

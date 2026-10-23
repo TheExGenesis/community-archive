@@ -77,6 +77,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_collection_preferences: {
+        Row: {
+          account_id: string
+          enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          enabled: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_search_runs: {
         Row: {
           account_id: string
@@ -1125,12 +1143,6 @@ export type Database = {
           user_id?: string | null
           username?: string
         }
-        Relationships: []
-      }
-      account_collection_preferences: {
-        Row: { account_id: string; enabled: boolean; updated_at: string }
-        Insert: { account_id: string; enabled: boolean; updated_at?: string }
-        Update: { account_id?: string; enabled?: boolean; updated_at?: string }
         Relationships: []
       }
       profile_curation: {

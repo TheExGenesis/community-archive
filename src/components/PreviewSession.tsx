@@ -7,6 +7,8 @@ const PreviewSessionContext = createContext({
   enabled: false,
   view: 'actual' as View,
   setView: (_view: View) => {},
+  optedIn: false,
+  completeOptIn: () => {},
 })
 
 // Client simulation only. Never supplies a server identity or changes authentication.
@@ -17,10 +19,26 @@ export function PreviewSessionProvider({
   enabled: boolean
   children: ReactNode
 }) {
-  const [view, setView] = useState<View>('actual')
+  const [view, setCurrentView] = useState<View>('actual')
+  const [optedIn, setOptedIn] = useState(false)
+  const setView = (next: View) => {
+    setOptedIn(false)
+    setCurrentView(next)
+  }
   return (
     <PreviewSessionContext.Provider
-      value={{ enabled, view: enabled ? view : 'actual', setView }}
+      value={{
+        enabled,
+        view: enabled ? view : 'actual',
+        setView,
+        optedIn: enabled && optedIn,
+        completeOptIn: () => {
+          if (enabled) {
+            setCurrentView('signed-in')
+            setOptedIn(true)
+          }
+        },
+      }}
     >
       {children}
       {enabled && (

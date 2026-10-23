@@ -1,3 +1,4 @@
+import { usePreviewSession } from '@/components/PreviewSession'
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { createBrowserClient } from '@/utils/supabase'
@@ -24,6 +25,7 @@ export const toSessionAccount = (user: User | null): SessionAccount | null => {
 }
 
 export function useAuthAndArchive() {
+  const preview = usePreviewSession()
   const [userMetadata, setUserMetadata] = useState<SessionAccount | null>(null)
   const [isArchiveUploaded, setIsArchiveUploaded] = useState(false)
 
@@ -82,5 +84,13 @@ export function useAuthAndArchive() {
     checkArchiveUpload()
   }, [userMetadata])
 
+  if (preview.enabled && preview.view !== 'actual')
+    return {
+      userMetadata:
+        preview.view === 'signed-in'
+          ? { user_name: 'preview_user', provider_id: null, avatar_url: null }
+          : null,
+      isArchiveUploaded: false,
+    }
   return { userMetadata, isArchiveUploaded }
 }

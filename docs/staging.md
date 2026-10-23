@@ -67,13 +67,19 @@ lookups use those filtered public results without rechecking them against the
 unrelated staging directory. Production retains its additional live Supabase
 policy check. No production website proxy, firewall bypass, or new secret is needed.
 
-Authentication and consent writes still use staging. In development and Vercel
-previews, the map's Opt In action simulates signing in instead of opening Twitter
-OAuth. The separate consent button simulates consent locally, then searches public
-map members through the existing lookup API. Nothing is saved and no server
-permissions are granted. The preview controls reset the simulation; choose Signed
-out to test the prompt again. Actual session mode uses the authenticated finder
-until Opt In is clicked. Production keeps real Twitter OAuth and consent checks.
+Authentication and consent writes still use staging. Development and Vercel
+previews share a simulated session across the hero, account menu, navigation,
+and map. Sign-in and Opt In actions update that shared UI state without OAuth
+or a saved login. The homepage and map both show the Data Policy disclosure
+before a single Opt In confirmation. Preview confirmation simulates both login
+and consent, shows the thank-you message, and enables public map lookups.
+Choose Signed out in the preview controls or account menu to reset.
+
+Production uses the same disclosure before Twitter OAuth. A short-lived,
+per-tab consent intent lets the homepage complete the authenticated opt-in on
+return without asking again. A return URL alone never saves consent. The
+thank-you message appears only after the consent API succeeds. Server
+permissions always require real authentication and consent.
 
 ### Reviewing production Bulletin items in a protected PR preview
 

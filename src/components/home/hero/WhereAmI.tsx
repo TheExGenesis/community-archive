@@ -1,11 +1,10 @@
 'use client'
-import Link from 'next/link'
 import { usePreviewSession } from '@/components/PreviewSession'
 import type { MapLookup } from '@/lib/hexMap/gateway'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { createBrowserClient } from '@/utils/supabase'
-import { updateOptIn } from '@/lib/optInApi'
+import { OptInDisclosure, useCommunityOptIn } from '@/components/CommunityOptIn'
 import { mapUrl } from '@/lib/hexMap/version'
 import styles from './hero.module.css'
 
@@ -23,8 +22,8 @@ export default function WhereAmI({
 }: {
   onLocated: (person: SelfLocation | null) => void
 }) {
-  const { enabled: previewEnabled, view, setView } = usePreviewSession()
-  const simulatedConsent = useRef(false)
+  const { enabled: previewEnabled, view, optedIn } = usePreviewSession()
+  const optIn = useCommunityOptIn()
   const [canSearch, setCanSearch] = useState(false)
   const [name, setName] = useState('')
   const [result, setResult] = useState<Result | null>(null)
@@ -48,7 +47,7 @@ export default function WhereAmI({
   const locate = useCallback(
     async (query = '') => {
       const simulated = previewEnabled && view !== 'actual'
-      if (simulated && (view === 'signed-out' || !simulatedConsent.current)) {
+      if (simulated && !optedIn) {
         cancel()
         setBusy(false)
         callback.current(null)
@@ -61,7 +60,6 @@ export default function WhereAmI({
             : {
                 status: 'opt_in',
                 username: 'preview_user',
-                error: 'Signed in (simulation). Opt in to continue.',
               },
         )
         return
@@ -111,20 +109,13 @@ export default function WhereAmI({
         if (request === generation.current) setBusy(false)
       }
     },
-    [previewEnabled, view, cancel],
+    [previewEnabled, view, optedIn, cancel],
   )
 
   useEffect(() => {
     if (!previewEnabled) return
     clear()
     setCanSearch(false)
-    simulatedConsent.current = false
-    if (view === 'signed-in')
-      setResult({
-        status: 'opt_in',
-        username: 'preview_user',
-        error: 'Signed in (simulation). Opt in to continue.',
-      })
   }, [previewEnabled, view, clear])
 
   useEffect(() => {
@@ -143,7 +134,8 @@ export default function WhereAmI({
       }
       account = next
     })
-    if (new URLSearchParams(window.location.search).get('findme') === '1')
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('findme') === '1' && params.get('action') !== 'optin')
       void locate()
     return () => {
       subscription.unsubscribe()
@@ -151,63 +143,11 @@ export default function WhereAmI({
     }
   }, [clear, locate, cancel])
 
-  const authenticate = async () => {
-    if (busy) return
-    if (previewEnabled) {
-      setView('signed-in')
-      return
-    }
-    const request = ++generation.current
-    setBusy(true)
-    try {
-      const { error } = await createBrowserClient().auth.signInWithOAuth({
-        provider: 'twitter',
-        options: {
-          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent('/?findme=1')}`,
-        },
-      })
-      if (error) throw error
-    } catch {
-      if (request === generation.current) {
-        setResult({
-          status: 'sign_in',
-          error: 'Could not connect to Twitter. Please try again.',
-        })
-        setBusy(false)
-      }
-    }
-  }
-
-  const optIn = async () => {
-    if (!result?.username || busy) return
-    if (previewEnabled && view === 'signed-in') {
-      simulatedConsent.current = true
-      setCanSearch(true)
-      await locate(name)
-      return
-    }
-    const request = ++generation.current
-    setBusy(true)
-    try {
-      await updateOptIn({
-        username: result.username,
-        optedIn: true,
-        termsVersion: 'v1.0',
-      })
-      if (request === generation.current) await locate(name)
-    } catch (error) {
-      if (request === generation.current) {
-        setResult({
-          ...result,
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Could not update consent. Please try again.',
-        })
-        setBusy(false)
-      }
-    }
-  }
+  useEffect(() => {
+    if (optIn.completed) void locate(name)
+    // Run once when the shared opt-in completes, retaining the searched name.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optIn.completed])
 
   return (
     <div className={styles.finder}>
@@ -251,7 +191,7 @@ export default function WhereAmI({
             <X size={14} aria-hidden="true" />
           </button>
           <div role="status" aria-live="polite">
-            {busy
+            {busy || optIn.busy
               ? result?.status === 'sign_in'
                 ? 'Opening Twitter…'
                 : 'Finding your place…'
@@ -259,41 +199,25 @@ export default function WhereAmI({
                 ? result.isSelf === false
                   ? `@${result.person?.username} is here.`
                   : `You are here, @${result.person?.username}.`
-                : result?.error}
+                : result?.status === 'sign_in' || result?.status === 'opt_in'
+                  ? 'Opt in to the Community Archive to find yourself on the map.'
+                  : result?.error}
           </div>
-          {!busy && result?.status === 'sign_in' && (
-            <button
-              type="button"
-              onClick={() => void authenticate()}
-              className={styles.finderAction}
-            >
-              Opt In
-            </button>
-          )}
-          {!busy && result?.status === 'opt_in' && (
-            <>
-              <p>
-                Opting in lets Community Archive collect and share your public
-                tweets. They may persist after deletion from X. By opting in,
-                you agree to our{' '}
-                <Link
-                  href="/data-policy"
-                  target="_blank"
-                  rel="noopener noreferrer"
+          {!busy &&
+            !optIn.busy &&
+            (result?.status === 'sign_in' || result?.status === 'opt_in') && (
+              <>
+                <OptInDisclosure />
+                {optIn.error && <p role="alert">{optIn.error}</p>}
+                <button
+                  type="button"
+                  onClick={() => void optIn.confirm(true)}
+                  className={styles.finderAction}
                 >
-                  Data Policy
-                </Link>
-                .
-              </p>
-              <button
-                type="button"
-                className={styles.finderAction}
-                onClick={() => void optIn()}
-              >
-                Opt in and find me
-              </button>
-            </>
-          )}
+                  Opt In
+                </button>
+              </>
+            )}
         </div>
       )}
     </div>

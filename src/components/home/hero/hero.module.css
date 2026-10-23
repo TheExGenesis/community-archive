@@ -115,6 +115,7 @@
   background: transparent;
   border: 0;
   cursor: pointer;
+  touch-action: manipulation;
   padding: 2px;
 }
 .country[data-details='true'] {
@@ -127,8 +128,9 @@
 .cluster {
   font-style: italic;
 }
+.cluster,
 .word {
-  color: #ffffff;
+  -webkit-text-stroke: 0;
 }
 .layers {
   margin-top: 8px;

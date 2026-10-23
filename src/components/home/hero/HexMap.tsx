@@ -83,17 +83,8 @@ export default memo(function HexMap({
   const geo = useMemo(() => geometry(snapshot), [snapshot])
   const camera = useMapCamera(geo.bounds, size.width, size.height)
   const showDetails = camera.camera.zoom >= 1.5
-  const pendingClick = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cancelPendingClick = () => {
-    if (pendingClick.current !== null) clearTimeout(pendingClick.current)
-    pendingClick.current = null
-  }
-  useEffect(
-    () => () => {
-      if (pendingClick.current !== null) clearTimeout(pendingClick.current)
-    },
-    [],
-  )
+  // Keep the first hex for double-clicks even after its single click zooms.
+  const clickedCell = useRef<number | null>(null)
   const lastSelfLocation = useRef(selfLocation)
   useEffect(() => {
     if (selfLocation && lastSelfLocation.current !== selfLocation) {
@@ -457,7 +448,6 @@ export default memo(function HexMap({
   }, [hovered, snapshot, onSelectionIntent])
 
   const selectRegion = (regionId: number, additive = false) => {
-    cancelPendingClick()
     const region = snapshot.regions.find((r) => r.id === regionId)!
     const ids = snapshot.cells.flatMap((cell, id) =>
       cell.region === regionId ? [id] : [],
@@ -475,7 +465,6 @@ export default memo(function HexMap({
   }
   const selectCell = (id: number, additive = false, individual = false) => {
     if (!individual) return selectRegion(snapshot.cells[id].region, additive)
-    cancelPendingClick()
     onSelect(additive ? Array.from(new Set([...selected, id])) : [id])
   }
   const atPointer = (e: React.MouseEvent) => {
@@ -544,7 +533,6 @@ export default memo(function HexMap({
           className={styles.mapSurface}
           {...camera.handlers}
           onPointerDown={(e) => {
-            cancelPendingClick()
             onSelectionIntent(null)
             camera.handlers.onPointerDown(e)
           }}
@@ -568,12 +556,8 @@ export default memo(function HexMap({
               if (id !== null) selectCell(id)
               return
             }
-            // Let a double-click pick its original hex before moving the camera.
-            cancelPendingClick()
-            pendingClick.current = setTimeout(() => {
-              pendingClick.current = null
-              id === null ? onSelect([]) : selectCell(id, additive)
-            }, 300)
+            clickedCell.current = id
+            id === null ? onSelect([]) : selectCell(id, additive)
           }}
           onDoubleClick={(e) => {
             e.preventDefault()
@@ -583,13 +567,11 @@ export default memo(function HexMap({
               (e.target as Element).closest('button')
             )
               return
-            cancelPendingClick()
-            const id = atPointer(e)
+            const id = clickedCell.current
             if (id !== null) selectCell(id, e.shiftKey, true)
           }}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return
-            cancelPendingClick()
             if (e.key === 'Escape') onSelect([])
             if (e.key === '+' || e.key === '=') camera.zoomAt(1.5)
             if (e.key === '-') camera.zoomAt(1 / 1.5)
@@ -660,6 +642,13 @@ export default memo(function HexMap({
                     left: l.x,
                     top: l.y,
                     fontSize: l.size,
+                    color: mix(
+                      snapshot.regions.find((r) => r.id === l.region)?.[
+                        dark ? 'colorDark' : 'color'
+                      ] ?? '#888888',
+                      '#18181b',
+                      0.6,
+                    ),
                     opacity: focus.size && !focus.has(l.region) ? 0.2 : 0.8,
                   }}
                 >

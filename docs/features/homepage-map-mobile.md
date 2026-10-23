@@ -6,6 +6,9 @@ zoom/reset buttons, and selection summary occupy rows outside the map canvas.
 The “Show archived” checkbox sits below the map on every screen size. Default
 community colors stay flat at every zoom level; archive coverage shading is
 opt-in. Explicit keyword heat searches retain their separate heat layer.
+Individual hex terms and cluster phrases use darker region colors without an outline.
+Country and map-cell clicks select immediately; desktop double-click still selects
+the original individual hex even after the first click zooms.
 The featured-account row shows three accounts without horizontal scrolling on phones.
 The development preview selector sits after page content; query devtools do
 not float over the mobile page.

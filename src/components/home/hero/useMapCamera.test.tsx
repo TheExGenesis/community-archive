@@ -21,6 +21,8 @@ function MapSurface() {
       <span data-testid="label">Community label</span>
       <output data-testid="zoom">{camera.camera.zoom}</output>
       <button onClick={() => camera.zoomAt(100)}>Maximum zoom</button>
+      <button onClick={() => camera.focus(20, 30, 3)}>Focus community</button>
+      <button onClick={() => camera.reset()}>Reset view</button>
     </div>
   )
 }
@@ -157,4 +159,17 @@ it('does not take over a page scroll when a second finger arrives late', () => {
     ]).defaultPrevented,
   ).toBe(false)
   expect(screen.getByTestId('position')).toHaveTextContent('0,0')
+})
+
+it('focuses immediately and discards a pending gesture frame', () => {
+  render(<MapSurface />)
+  fireEvent.click(screen.getByRole('button', { name: 'Maximum zoom' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Focus community' }))
+  expect(screen.getByTestId('position')).toHaveTextContent('-30,-20')
+  expect(screen.getByTestId('zoom')).toHaveTextContent('8')
+  fireEvent.click(screen.getByRole('button', { name: 'Reset view' }))
+  expect(screen.getByTestId('zoom')).toHaveTextContent('1')
+  act(() => jest.advanceTimersByTime(20))
+  expect(screen.getByTestId('position')).toHaveTextContent('0,0')
+  expect(screen.getByTestId('zoom')).toHaveTextContent('1')
 })

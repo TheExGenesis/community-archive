@@ -36,6 +36,14 @@ export default function useMapCamera(
         setCamera(cameraRef.current)
       })
   }, [])
+  // Discrete selections commit with their highlight, rather than waiting for
+  // the next gesture frame and rendering the old camera first.
+  const commit = (next: Camera) => {
+    cancelAnimationFrame(frame.current)
+    frame.current = 0
+    cameraRef.current = next
+    setCamera(next)
+  }
   useEffect(() => () => cancelAnimationFrame(frame.current), [])
   const zoomAt = useCallback(
     (factor: number, x = width / 2, y = height / 2) => {
@@ -167,9 +175,9 @@ export default function useMapCamera(
     moved,
     touchInput,
     zoomAt,
-    reset: () => update(initialCamera),
+    reset: () => commit(initialCamera),
     focus: (x: number, y: number, minimumZoom = 2) =>
-      update({
+      commit({
         zoom: Math.min(8, Math.max(minimumZoom, cameraRef.current.zoom)),
         x: x - bounds.x - bounds.width / 2,
         y: y - bounds.y - bounds.height / 2,

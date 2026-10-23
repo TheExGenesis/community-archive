@@ -24,6 +24,28 @@ export async function GET(request: NextRequest) {
       { status: 400, headers },
     )
   try {
+    // Preview auth uses staging, but the map contains production members. Read
+    // the public production endpoint so its current consent policy is applied
+    // without granting the preview production credentials or write access.
+    if (process.env.VERCEL_ENV === 'preview') {
+      const url = new URL(
+        'https://www.community-archive.org/api/hex-map/lookup',
+      )
+      url.search = new URLSearchParams({
+        name: anchor,
+        cells,
+        version: MAP_VERSION,
+      }).toString()
+      const response = await fetch(url, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!response.ok) throw new Error('Production map lookup unavailable')
+      const result = (await response.json()) as MapLookup
+      if (result.version !== MAP_VERSION || !Array.isArray(result.people))
+        throw new Error('Production map version mismatch')
+      return NextResponse.json(result, { headers })
+    }
     const names = anchor
       ? [anchor]
       : cells

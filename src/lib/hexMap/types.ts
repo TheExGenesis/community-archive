@@ -16,6 +16,7 @@ export interface HexRegion {
   x: number
   y: number
   color: string
+  colorDark?: string
   terms: string[]
 }
 

@@ -102,13 +102,16 @@
   transform: translate(-50%, -50%);
   white-space: nowrap;
   font-family: var(--font-manrope), sans-serif;
-  text-shadow: 0 1px 2px hsl(var(--background) / 0.8);
+  color: #ffffff;
+  -webkit-text-stroke: 2px #18181b;
+  paint-order: stroke fill;
+  text-shadow: none;
 }
 .country {
   pointer-events: auto;
   font-size: 12px;
-  font-weight: 500;
-  color: hsl(var(--foreground));
+  font-weight: 600;
+  color: #ffffff;
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -119,13 +122,13 @@
 }
 .country:hover {
   text-decoration: underline;
-  color: hsl(var(--brand-deep));
+  color: #ffffff;
 }
 .cluster {
   font-style: italic;
 }
 .word {
-  color: hsl(var(--foreground));
+  color: #ffffff;
 }
 .layers {
   position: absolute;

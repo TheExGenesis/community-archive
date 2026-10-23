@@ -17,7 +17,6 @@ import {
   type SemanticSearchInput,
 } from './semantic'
 import type { AgentTweet, ScoredTweet } from './types'
-import { isPolicyBlockedAccount } from './policy'
 
 // Plain implementations of the agent's tools. The workflow wraps each one in a
 // 'use step' function; scripts call them directly. The second argument carries
@@ -73,6 +72,11 @@ async function withheldUnlessAllowed<
   T extends { accountId: string; username: string },
 >(user: T | null): Promise<T | null> {
   if (!user) return null
+  // Loaded at call time: the policy module reaches the Supabase client (and
+  // through it next/server and CommonJS node-fetch), which the Workflow
+  // sandbox bundle cannot evaluate at its top level. Steps run in Node, where
+  // this import is fine.
+  const { isPolicyBlockedAccount } = await import('./policy')
   const blocked = await isPolicyBlockedAccount(
     user.accountId,
     user.username,

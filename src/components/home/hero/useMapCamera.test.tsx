@@ -1,12 +1,23 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import useMapCamera from './useMapCamera'
 
+const selected = jest.fn()
 const bounds = { x: 0, y: 0, width: 100, height: 100 }
 function MapSurface() {
   const camera = useMapCamera(bounds, 800, 600)
   return (
-    <div data-testid="surface">
-      <div ref={camera.ref} />
+    <div data-testid="surface" ref={camera.ref} {...camera.handlers}>
+      <output data-testid="position">
+        {camera.camera.x},{camera.camera.y}
+      </output>
+      <button
+        data-testid="selection"
+        onClick={() => {
+          if (!camera.moved.current) selected()
+        }}
+      >
+        Select
+      </button>
       <span data-testid="label">Community label</span>
       <output data-testid="zoom">{camera.camera.zoom}</output>
       <button onClick={() => camera.zoomAt(100)}>Maximum zoom</button>
@@ -57,3 +68,93 @@ it.each([{ ctrlKey: true }, { metaKey: true }])(
     expect(Number(screen.getByTestId('zoom').textContent)).toBeGreaterThan(1)
   },
 )
+
+function touch(type: string, points: [number, number][]) {
+  const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'touches', {
+    value: points.map(([clientX, clientY], identifier) => ({
+      identifier,
+      clientX,
+      clientY,
+    })),
+  })
+  fireEvent(screen.getByTestId('label'), event)
+  act(() => jest.advanceTimersByTime(20))
+  return event
+}
+
+it('leaves one-finger scrolling native and rejects the resulting click', () => {
+  selected.mockClear()
+  render(<MapSurface />)
+  expect(touch('touchstart', [[200, 300]]).defaultPrevented).toBe(false)
+  expect(touch('touchmove', [[200, 200]]).defaultPrevented).toBe(false)
+  touch('touchend', [])
+  fireEvent.click(screen.getByTestId('selection'))
+  expect(selected).not.toHaveBeenCalled()
+  expect(screen.getByTestId('position')).toHaveTextContent('0,0')
+  // A fresh deliberate tap is still selectable.
+  touch('touchstart', [[200, 200]])
+  touch('touchend', [])
+  fireEvent.click(screen.getByTestId('selection'))
+  expect(selected).toHaveBeenCalledTimes(1)
+})
+
+it('pans with a constant two-finger distance, then zooms around their midpoint', () => {
+  render(<MapSurface />)
+  expect(
+    touch('touchstart', [
+      [300, 300],
+      [500, 300],
+    ]).defaultPrevented,
+  ).toBe(true)
+  expect(
+    touch('touchmove', [
+      [360, 330],
+      [560, 330],
+    ]).defaultPrevented,
+  ).toBe(true)
+  expect(screen.getByTestId('zoom')).toHaveTextContent('1')
+  expect(screen.getByTestId('position')).toHaveTextContent('-10,-5')
+  touch('touchmove', [
+    [260, 330],
+    [660, 330],
+  ])
+  expect(screen.getByTestId('zoom')).toHaveTextContent('2')
+  expect(screen.getByTestId('position')).toHaveTextContent('-5,-2.5')
+})
+
+it('suppresses selection throughout a multi-touch gesture and recovers after cancellation', () => {
+  selected.mockClear()
+  render(<MapSurface />)
+  touch('touchstart', [
+    [200, 200],
+    [400, 200],
+  ])
+  touch('touchend', [[200, 200]])
+  touch('touchmove', [[240, 240]])
+  touch('touchcancel', [])
+  fireEvent.click(screen.getByTestId('selection'))
+  expect(selected).not.toHaveBeenCalled()
+  expect(screen.getByTestId('position')).toHaveTextContent('0,0')
+  touch('touchstart', [[200, 200]])
+  expect(touch('touchmove', [[200, 150]]).defaultPrevented).toBe(false)
+})
+
+it('does not take over a page scroll when a second finger arrives late', () => {
+  render(<MapSurface />)
+  touch('touchstart', [[200, 200]])
+  touch('touchmove', [[200, 100]])
+  expect(
+    touch('touchstart', [
+      [200, 100],
+      [400, 100],
+    ]).defaultPrevented,
+  ).toBe(false)
+  expect(
+    touch('touchmove', [
+      [220, 80],
+      [420, 80],
+    ]).defaultPrevented,
+  ).toBe(false)
+  expect(screen.getByTestId('position')).toHaveTextContent('0,0')
+})

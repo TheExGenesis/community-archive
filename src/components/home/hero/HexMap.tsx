@@ -547,21 +547,32 @@ export default memo(function HexMap({
       {finder}
       <div
         ref={camera.ref}
-        className={styles.mapViewport}
+        className={styles.mapSurface}
         {...camera.handlers}
         onPointerDown={(e) => {
           cancelPendingClick()
           onSelectionIntent(null)
           camera.handlers.onPointerDown(e)
         }}
-        onMouseMove={(e) => {
-          if (!e.buttons) setHovered(atPointer(e))
+        onPointerMove={(e) => {
+          camera.handlers.onPointerMove(e)
+          if (e.pointerType === 'mouse' && !e.buttons) setHovered(atPointer(e))
+          else setHovered(null)
         }}
         onMouseLeave={() => setHovered(null)}
         onClick={(e) => {
-          if (camera.moved.current || e.detail > 1) return
+          if ((e.target as Element).closest('button')) return
+          if (
+            camera.moved.current ||
+            (!camera.touchInput.current && e.detail > 1)
+          )
+            return
           const id = atPointer(e)
           const additive = e.shiftKey
+          if (camera.touchInput.current) {
+            if (id !== null) selectCell(id)
+            return
+          }
           // Let a double-click pick its original hex before moving the camera.
           cancelPendingClick()
           pendingClick.current = setTimeout(() => {
@@ -571,11 +582,18 @@ export default memo(function HexMap({
         }}
         onDoubleClick={(e) => {
           e.preventDefault()
+          if (
+            camera.touchInput.current ||
+            camera.moved.current ||
+            (e.target as Element).closest('button')
+          )
+            return
           cancelPendingClick()
           const id = atPointer(e)
           if (id !== null) selectCell(id, e.shiftKey, true)
         }}
         onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return
           cancelPendingClick()
           if (e.key === 'Escape') onSelect([])
           if (e.key === '+' || e.key === '=') camera.zoomAt(1.5)
@@ -601,106 +619,113 @@ export default memo(function HexMap({
         aria-label="Community map. Arrow keys explore cells; Enter selects a community; Shift Enter selects one hexagon; Escape clears; plus and minus zoom."
       >
         <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
-      </div>
-      <div className={styles.labels}>
-        {labels.map((l, i) =>
-          l.kind === 'country' ? (
-            <button
-              key={`r${l.region}`}
-              type="button"
-              className={styles.country}
-              data-details={showDetails}
-              style={{
-                left: l.x,
-                top: l.y,
-                opacity: focus.size && !focus.has(l.region) ? 0.28 : 1,
-              }}
-              onMouseEnter={() =>
-                onSelectionIntent(
-                  snapshot.cells.flatMap((c, id) =>
-                    c.region === l.region ? [id] : [],
-                  ),
-                )
-              }
-              onMouseLeave={() => onSelectionIntent(null)}
-              onFocus={() =>
-                onSelectionIntent(
-                  snapshot.cells.flatMap((c, id) =>
-                    c.region === l.region ? [id] : [],
-                  ),
-                )
-              }
-              onBlur={() => onSelectionIntent(null)}
-              onClick={(e) => selectRegion(l.region, e.shiftKey)}
-            >
-              {l.text}
-            </button>
-          ) : (
-            <span
-              key={`${l.kind}${i}`}
-              className={l.kind === 'cluster' ? styles.cluster : styles.word}
-              style={{
-                left: l.x,
-                top: l.y,
-                fontSize: l.size,
-                opacity: focus.size && !focus.has(l.region) ? 0.2 : 0.8,
-              }}
-            >
-              {l.text}
-            </span>
-          ),
-        )}
-      </div>
-      <div className={styles.callouts}>
-        <svg
-          className={styles.calloutLines}
-          width={size.width}
-          height={size.height}
-          aria-hidden="true"
-        >
-          {callouts.map((p) => (
-            <g
-              key={p.username}
-              opacity={
-                focus.size && !focus.has(p.region) && !p.highlighted ? 0.35 : 1
-              }
-            >
-              <path
-                d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
-                className={styles.calloutLineHalo}
-              />
-              <path
-                d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
-                className={styles.calloutLine}
-              />
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={2.5}
-                fill="#3f3f46"
-                stroke="white"
-                strokeWidth={1}
-              />
-            </g>
-          ))}
-        </svg>
-        {callouts.map((p) => (
-          <span
-            key={p.username}
-            className={styles.userCallout}
-            data-highlighted={p.highlighted}
-            style={{
-              left: p.box.x,
-              top: p.box.y,
-              width: p.box.width,
-              height: p.box.height,
-              opacity:
-                focus.size && !focus.has(p.region) && !p.highlighted ? 0.35 : 1,
-            }}
+        <div className={styles.labels}>
+          {labels.map((l, i) =>
+            l.kind === 'country' ? (
+              <button
+                key={`r${l.region}`}
+                type="button"
+                className={styles.country}
+                data-details={showDetails}
+                style={{
+                  left: l.x,
+                  top: l.y,
+                  opacity: focus.size && !focus.has(l.region) ? 0.28 : 1,
+                }}
+                onMouseEnter={() =>
+                  onSelectionIntent(
+                    snapshot.cells.flatMap((c, id) =>
+                      c.region === l.region ? [id] : [],
+                    ),
+                  )
+                }
+                onMouseLeave={() => onSelectionIntent(null)}
+                onFocus={() =>
+                  onSelectionIntent(
+                    snapshot.cells.flatMap((c, id) =>
+                      c.region === l.region ? [id] : [],
+                    ),
+                  )
+                }
+                onBlur={() => onSelectionIntent(null)}
+                onClick={(e) => {
+                  if (e.detail === 0 || !camera.moved.current)
+                    selectRegion(l.region, e.shiftKey)
+                }}
+              >
+                {l.text}
+              </button>
+            ) : (
+              <span
+                key={`${l.kind}${i}`}
+                className={l.kind === 'cluster' ? styles.cluster : styles.word}
+                style={{
+                  left: l.x,
+                  top: l.y,
+                  fontSize: l.size,
+                  opacity: focus.size && !focus.has(l.region) ? 0.2 : 0.8,
+                }}
+              >
+                {l.text}
+              </span>
+            ),
+          )}
+        </div>
+        <div className={styles.callouts}>
+          <svg
+            className={styles.calloutLines}
+            width={size.width}
+            height={size.height}
+            aria-hidden="true"
           >
-            @{p.username}
-          </span>
-        ))}
+            {callouts.map((p) => (
+              <g
+                key={p.username}
+                opacity={
+                  focus.size && !focus.has(p.region) && !p.highlighted
+                    ? 0.35
+                    : 1
+                }
+              >
+                <path
+                  d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
+                  className={styles.calloutLineHalo}
+                />
+                <path
+                  d={`M${p.x},${p.y} L${p.pointer.x},${p.pointer.y}`}
+                  className={styles.calloutLine}
+                />
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={2.5}
+                  fill="#3f3f46"
+                  stroke="white"
+                  strokeWidth={1}
+                />
+              </g>
+            ))}
+          </svg>
+          {callouts.map((p) => (
+            <span
+              key={p.username}
+              className={styles.userCallout}
+              data-highlighted={p.highlighted}
+              style={{
+                left: p.box.x,
+                top: p.box.y,
+                width: p.box.width,
+                height: p.box.height,
+                opacity:
+                  focus.size && !focus.has(p.region) && !p.highlighted
+                    ? 0.35
+                    : 1,
+              }}
+            >
+              @{p.username}
+            </span>
+          ))}
+        </div>
       </div>
       <div className={styles.layers}>
         <div className={styles.segmented}>
@@ -742,13 +767,46 @@ export default memo(function HexMap({
         )}
       </div>
       {scrubber}
+      <div className={styles.mobileMapControls} aria-label="Map controls">
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => camera.zoomAt(1.5)}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => camera.zoomAt(1 / 1.5)}
+        >
+          −
+        </button>
+        <button type="button" onClick={() => camera.reset()}>
+          Reset view
+        </button>
+        {!!selected.length && (
+          <button type="button" onClick={() => onSelect([])}>
+            Clear selection
+          </button>
+        )}
+      </div>
+      {!!selected.length && (
+        <p className={styles.mobileSelection} role="status">
+          {selectedRegions.size === 1
+            ? snapshot.regions.find((region) => selectedRegions.has(region.id))
+                ?.name
+            : `${selected.length} selected cells`}{' '}
+          · Stories below
+        </p>
+      )}
       <span className={styles.hint}>
         <span className={styles.desktopHint}>
           Cmd/Ctrl + scroll to zoom · Click a cluster to select · Double-click a
           hex to select
         </span>
         <span className={styles.touchHint}>
-          Pinch to zoom · Scroll to explore below
+          Scroll with one finger. Move and zoom with two.
         </span>
       </span>
       {cell && (

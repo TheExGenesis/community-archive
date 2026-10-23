@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useMapFeed, prefetchMapFeed, selectionFeedPath } from './useMapFeed'
 import styles from './hero.module.css'
+import useMobileMapLayout from './useMobileMapLayout'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
 
 const longDate = (value: string) =>
@@ -54,6 +55,7 @@ export default function StoryPanel({
   onHover: (story: MapStory | null) => void
   onTweetHover: (cell?: number, username?: string) => void
 }) {
+  const mobile = useMobileMapLayout()
   const panel = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLButtonElement>(null)
   const header = useRef<HTMLDivElement>(null)
@@ -102,8 +104,8 @@ export default function StoryPanel({
     enabled: !!open,
   })
   useEffect(() => {
-    panel.current?.scrollTo?.(0, 0)
-  }, [selectionTab, open?.id, selected])
+    if (!mobile) panel.current?.scrollTo?.(0, 0)
+  }, [selectionTab, open?.id, selected, mobile])
   const {
     hasNextPage,
     isFetchingNextPage,
@@ -119,7 +121,7 @@ export default function StoryPanel({
       (entries) => {
         if (entries[0].isIntersecting) void fetchNextPage()
       },
-      { root: panel.current, rootMargin: '800px' },
+      { root: mobile ? null : panel.current, rootMargin: '800px' },
     )
     observer.observe(button)
     return () => observer.disconnect()
@@ -131,6 +133,7 @@ export default function StoryPanel({
     pages,
     open,
     selected.length,
+    mobile,
   ])
   const active =
     snapshot && selected.length

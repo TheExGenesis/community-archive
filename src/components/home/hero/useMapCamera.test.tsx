@@ -161,15 +161,41 @@ it('does not take over a page scroll when a second finger arrives late', () => {
   expect(screen.getByTestId('position')).toHaveTextContent('0,0')
 })
 
-it('focuses immediately and discards a pending gesture frame', () => {
+it('eases focus over 200ms and lets reset interrupt it', () => {
   render(<MapSurface />)
-  fireEvent.click(screen.getByRole('button', { name: 'Maximum zoom' }))
   fireEvent.click(screen.getByRole('button', { name: 'Focus community' }))
+  act(() => jest.advanceTimersByTime(32))
+  expect(Number(screen.getByTestId('zoom').textContent)).toBeGreaterThan(1)
+  expect(Number(screen.getByTestId('zoom').textContent)).toBeLessThan(3)
+  act(() => jest.advanceTimersByTime(200))
   expect(screen.getByTestId('position')).toHaveTextContent('-30,-20')
-  expect(screen.getByTestId('zoom')).toHaveTextContent('8')
+  expect(screen.getByTestId('zoom')).toHaveTextContent('3')
+  fireEvent.click(screen.getByRole('button', { name: 'Focus community' }))
   fireEvent.click(screen.getByRole('button', { name: 'Reset view' }))
-  expect(screen.getByTestId('zoom')).toHaveTextContent('1')
-  act(() => jest.advanceTimersByTime(20))
+  act(() => jest.advanceTimersByTime(240))
   expect(screen.getByTestId('position')).toHaveTextContent('0,0')
   expect(screen.getByTestId('zoom')).toHaveTextContent('1')
+})
+
+it('lets a zoom gesture interrupt focus without later snapping back', () => {
+  render(<MapSurface />)
+  fireEvent.click(screen.getByRole('button', { name: 'Focus community' }))
+  act(() => jest.advanceTimersByTime(32))
+  wheel(-50)
+  const zoom = screen.getByTestId('zoom').textContent
+  act(() => jest.advanceTimersByTime(240))
+  expect(screen.getByTestId('zoom').textContent).toBe(zoom)
+})
+
+it('skips focus animation when reduced motion is requested', () => {
+  const previous = window.matchMedia
+  window.matchMedia = jest.fn().mockReturnValue({ matches: true })
+  try {
+    render(<MapSurface />)
+    fireEvent.click(screen.getByRole('button', { name: 'Focus community' }))
+    expect(screen.getByTestId('position')).toHaveTextContent('-30,-20')
+    expect(screen.getByTestId('zoom')).toHaveTextContent('3')
+  } finally {
+    window.matchMedia = previous
+  }
 })

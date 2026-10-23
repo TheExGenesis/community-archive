@@ -28,7 +28,9 @@ export default function useMapCamera(
   const moved = useRef(false)
   const touchInput = useRef(false)
   const frame = useRef(0)
+  const animation = useRef(0)
   const update = useCallback((next: Camera) => {
+    cancelAnimationFrame(animation.current)
     cameraRef.current = next
     if (!frame.current)
       frame.current = requestAnimationFrame(() => {
@@ -36,15 +38,43 @@ export default function useMapCamera(
         setCamera(cameraRef.current)
       })
   }, [])
-  // Discrete selections commit with their highlight, rather than waiting for
-  // the next gesture frame and rendering the old camera first.
+  // Reset and reduced-motion focus commit immediately.
   const commit = (next: Camera) => {
+    cancelAnimationFrame(animation.current)
     cancelAnimationFrame(frame.current)
     frame.current = 0
     cameraRef.current = next
     setCamera(next)
   }
-  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+  const focusCamera = (next: Camera) => {
+    const from = cameraRef.current
+    commit(from)
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      commit(next)
+      return
+    }
+    const start = performance.now()
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - start) / 200)
+      const ease = 1 - Math.pow(1 - progress, 3)
+      const current = {
+        x: from.x + (next.x - from.x) * ease,
+        y: from.y + (next.y - from.y) * ease,
+        zoom: from.zoom + (next.zoom - from.zoom) * ease,
+      }
+      cameraRef.current = current
+      setCamera(current)
+      animation.current = progress < 1 ? requestAnimationFrame(step) : 0
+    }
+    animation.current = requestAnimationFrame(step)
+  }
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(frame.current)
+      cancelAnimationFrame(animation.current)
+    },
+    [],
+  )
   const zoomAt = useCallback(
     (factor: number, x = width / 2, y = height / 2) => {
       const old = cameraRef.current
@@ -80,6 +110,7 @@ export default function useMapCamera(
     let multiTouch = false
     let pageScroll = false
     const touchStart = (e: TouchEvent) => {
+      cancelAnimationFrame(animation.current)
       touchInput.current = true
       if (!previous.length) {
         moved.current = false
@@ -177,7 +208,7 @@ export default function useMapCamera(
     zoomAt,
     reset: () => commit(initialCamera),
     focus: (x: number, y: number, minimumZoom = 2) =>
-      commit({
+      focusCamera({
         zoom: Math.min(8, Math.max(minimumZoom, cameraRef.current.zoom)),
         x: x - bounds.x - bounds.width / 2,
         y: y - bounds.y - bounds.height / 2,
@@ -185,6 +216,7 @@ export default function useMapCamera(
     handlers: {
       onPointerDown: (e: React.PointerEvent) => {
         if (e.pointerType === 'touch' || e.button !== 0) return
+        cancelAnimationFrame(animation.current)
         touchInput.current = false
         moved.current = false
         pointer.current = { id: e.pointerId, x: e.clientX, y: e.clientY }

@@ -175,9 +175,6 @@ export default function SelectionPeople({
               </Avatar>
             ))}
           </span>
-          <span className="ml-2 text-xs underline underline-offset-2">
-            View members
-          </span>
         </button>
       </DialogTrigger>
       <DialogContent className="grid max-h-[80dvh] w-[calc(100%-2rem)] grid-rows-[auto_minmax(0,1fr)] gap-3 p-4 sm:p-6">

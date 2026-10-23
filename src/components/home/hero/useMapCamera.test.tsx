@@ -51,11 +51,17 @@ function wheel(deltaY: number, modifiers: WheelEventInit = { ctrlKey: true }) {
 beforeEach(() => jest.useFakeTimers())
 afterEach(() => jest.useRealTimers())
 
-it('keeps repeated zoom-out gestures from scrolling the page at minimum zoom', () => {
-  render(<MapSurface />)
-  for (let i = 0; i < 3; i++) expect(wheel(150).defaultPrevented).toBe(true)
-  expect(screen.getByTestId('zoom')).toHaveTextContent('1')
-})
+it.each([{ ctrlKey: true }, { metaKey: true }])(
+  'zooms out to 0.5× and keeps gestures on the map at the minimum (%j)',
+  (modifiers) => {
+    render(<MapSurface />)
+    for (let i = 0; i < 3; i++)
+      expect(wheel(150, modifiers).defaultPrevented).toBe(true)
+    expect(screen.getByTestId('zoom').textContent).toBe('0.5')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset view' }))
+    expect(screen.getByTestId('zoom').textContent).toBe('1')
+  },
+)
 it('keeps zoom-in gestures on the map at maximum zoom and still permits zooming back out', () => {
   render(<MapSurface />)
   fireEvent.click(screen.getByRole('button', { name: 'Maximum zoom' }))
@@ -134,6 +140,25 @@ it('pans with a constant two-finger distance, then zooms around their midpoint',
   ])
   expect(screen.getByTestId('zoom')).toHaveTextContent('2')
   expect(screen.getByTestId('position')).toHaveTextContent('-5,-2.5')
+})
+
+it('pinches out to 0.5× and clamps further shrinking around the same midpoint', () => {
+  render(<MapSurface />)
+  touch('touchstart', [
+    [200, 300],
+    [600, 300],
+  ])
+  touch('touchmove', [
+    [300, 300],
+    [500, 300],
+  ])
+  expect(screen.getByTestId('zoom').textContent).toBe('0.5')
+  touch('touchmove', [
+    [350, 300],
+    [450, 300],
+  ])
+  expect(screen.getByTestId('zoom').textContent).toBe('0.5')
+  expect(screen.getByTestId('position').textContent).toBe('0,0')
 })
 
 it('suppresses selection throughout a multi-touch gesture and recovers after cancellation', () => {

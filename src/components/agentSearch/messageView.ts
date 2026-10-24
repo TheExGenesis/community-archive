@@ -533,31 +533,55 @@ function commandWords(segment: string): string[] {
   return kept
 }
 
-const ARCHIVE_COMMANDS = new Set([
-  'search',
-  'semantic',
-  'people',
-  'score',
-  'thread',
-  'quotes',
-  'show',
-  'tweets',
-])
+/** The archive commands (workspace/commands.ts) and the icon each shows. */
+const ARCHIVE_COMMANDS: Record<string, StepKind> = {
+  search: 'search',
+  semantic: 'semantic',
+  people: 'people',
+  timeline: 'people',
+  score: 'score',
+  thread: 'thread',
+  quotes: 'quotes',
+  expand: 'thread',
+  show: 'show',
+  tweets: 'tweets',
+}
 
-/** The first archive command in a shell command line, with its words. */
+const isArchiveCommand = (name: string | undefined): name is string =>
+  Boolean(name && Object.hasOwn(ARCHIVE_COMMANDS, name))
+
+/**
+ * The first archive command in a shell command line, with its words. Under
+ * par, it is the first line par runs, and `alongside` counts the others.
+ */
 function firstArchiveCommand(
   command: string,
-): { name: string; rest: string[] } | null {
+): { name: string; rest: string[]; alongside: number } | null {
   for (const segment of command.split(/;|&&|\|\||\|/)) {
     const [name, ...rest] = commandWords(segment.trim())
-    if (name && ARCHIVE_COMMANDS.has(name)) return { name, rest }
+    if (isArchiveCommand(name)) return { name, rest, alongside: 0 }
+    if (name === 'par' && rest[0]) {
+      // par 'template {}' word... or par 'line' 'line'...
+      const lines = rest[0].includes('{}')
+        ? rest.slice(1).map((word) => rest[0].replaceAll('{}', word))
+        : rest
+      const [inner, ...innerRest] = commandWords(lines[0] ?? '')
+      if (isArchiveCommand(inner)) {
+        return {
+          name: inner,
+          rest: innerRest,
+          alongside: Math.max(0, lines.length - 1),
+        }
+      }
+    }
   }
   return null
 }
 
 /** What a shell command did, for its icon: its first archive command. */
 export function commandKind(command: string): StepKind {
-  return (firstArchiveCommand(command)?.name as StepKind | undefined) ?? 'files'
+  const found = firstArchiveCommand(command)
+  return found ? ARCHIVE_COMMANDS[found.name] : 'files'
 }
 
 /**
@@ -566,31 +590,40 @@ export function commandKind(command: string): StepKind {
  */
 export function describeCommand(command: string): string {
   const found = firstArchiveCommand(command)
-  if (found) {
-    const { name, rest } = found
-    const text = rest.join(' ').trim()
-    switch (name) {
-      case 'search':
-        return text ? `Searching ${quote(text)}` : 'Searching'
-      case 'semantic':
-        return text
-          ? `Searching by meaning ${quote(text)}`
-          : 'Searching by meaning'
-      case 'people':
-        return text ? `Looking up ${quote(text)}` : 'Looking up people'
-      case 'score':
-        return rest[1]
-          ? `Checking tweets against ${quote(criterionText({ criterion: rest.slice(1).join(' ') }))}`
-          : 'Checking tweets against your question'
-      case 'thread':
-        return 'Reading thread'
-      case 'quotes':
-        return 'Reading quotes'
-      case 'show':
-        return 'Reading a tweet in full'
-      case 'tweets':
-        return 'Collecting tweets'
-    }
+  if (!found) return 'Looking through the results'
+  const text = describeArchiveCommand(found.name, found.rest)
+  return found.alongside ? `${text}, and ${found.alongside} more at once` : text
+}
+
+function describeArchiveCommand(name: string, rest: string[]): string {
+  const text = rest.join(' ').trim()
+  switch (name) {
+    case 'search':
+      return text ? `Searching ${quote(text)}` : 'Searching'
+    case 'semantic':
+      return text
+        ? `Searching by meaning ${quote(text)}`
+        : 'Searching by meaning'
+    case 'people':
+      return text ? `Looking up ${quote(text)}` : 'Looking up people'
+    case 'score':
+      return rest[1]
+        ? `Checking tweets against ${quote(criterionText({ criterion: rest.slice(1).join(' ') }))}`
+        : 'Checking tweets against your question'
+    case 'thread':
+      return 'Reading thread'
+    case 'quotes':
+      return 'Reading quotes'
+    case 'show':
+      return 'Reading a tweet in full'
+    case 'tweets':
+      return 'Collecting tweets'
+    case 'timeline':
+      return text
+        ? `Reading ${text.replace(/^@?/, '@')}'s tweets`
+        : 'Reading tweets'
+    case 'expand':
+      return 'Reading the conversations around the best matches'
   }
   return 'Looking through the results'
 }
@@ -641,8 +674,11 @@ export function archiveSearchHref(search: {
 }
 
 // The workspace `search` command's options (workspace/commands.ts). --limit
-// only caps how many come back and --all matches every word, as the search
-// page does; --any (an OR list) has no equivalent there.
+// only caps how many come back; --any (an OR list) has no equivalent on the
+// search page. The command matches several words in any order unless it
+// passes --phrase (--all is the old name for that default), while the search
+// page reads several words as a phrase, so only --phrase or a single word
+// links to the same search.
 const SEARCH_VALUE_FLAGS = new Set([
   'any',
   'from',
@@ -663,6 +699,7 @@ export function bashSearchHref(command: string): string | null {
     const terms: string[] = []
     const flags: Record<string, string> = {}
     let expressible = true
+    let phrase = false
     for (let i = 1; i < words.length; i++) {
       const word = words[i]
       if (word === '>' || word === '>>') break
@@ -672,6 +709,10 @@ export function bashSearchHref(command: string): string | null {
       }
       const [name, inline] = word.slice(2).split(/=(.*)/s, 2)
       if (name === 'all') continue
+      if (name === 'phrase') {
+        phrase = true
+        continue
+      }
       if (!SEARCH_VALUE_FLAGS.has(name) || name === 'any') {
         expressible = false
         break
@@ -683,9 +724,12 @@ export function bashSearchHref(command: string): string | null {
       }
       flags[name] = value
     }
+    const query = terms.join(' ').trim()
+    // Every word in any order has no equivalent on the page.
+    if (!phrase && query.split(/\s+/).length > 1) expressible = false
     if (!expressible) continue
     const href = archiveSearchHref({
-      query: terms.join(' '),
+      query,
       fromUser: flags.from,
       replyToUser: flags['reply-to'],
       since: flags.since,

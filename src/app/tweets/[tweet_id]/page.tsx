@@ -21,7 +21,7 @@ import { Link2, MessagesSquare, Sparkles } from 'lucide-react'
 
 // ISR: serve from CDN cache, revalidate at most once per hour
 export const revalidate = 3600
-// The first visit keeps streaming while its summary generates.
+// The first signed-in visit keeps streaming while its summary generates.
 export const maxDuration = 30
 
 type PageProps = {
@@ -181,8 +181,8 @@ function SummaryHeading({
   )
 }
 
-// Only rendered for a first visit by a person; everyone after reads the
-// stored summary without waiting.
+// Only rendered for a first visit by a signed-in user; everyone after reads
+// the stored summary without waiting.
 async function GeneratedSummaryHeading({
   subject,
 }: {

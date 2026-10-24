@@ -1,18 +1,30 @@
 import 'server-only'
 import { cache } from 'react'
-import { headers } from 'next/headers'
-import { isCrawlerAgent, isLinkPreviewAgent } from '@/lib/crawlers'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@/utils/supabase'
 import { getTweetPageData } from '@/lib/getTweetPageData'
 import { buildTweetPageSubject } from './subject'
-import { getStoredTweetPageSummary, getTweetPageSummary } from './store'
+import { getStoredTweetPageSummary } from './store'
+
+async function isSignedIn() {
+  try {
+    const supabase = createServerClient(await cookies())
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    return Boolean(user)
+  } catch {
+    return false
+  }
+}
 
 /**
  * Permalink data plus its subject and any summary that can be shown without
  * waiting. Metadata, the page body, and the share image all read through
- * this, so one request loads once. A first visit by a person gets the page
- * at once with `summaryPending` set, and the body streams the summary in.
- * Unfurlers only read the head, so they wait for generation instead.
- * Crawlers get stored summaries but never trigger a paid generation.
+ * this, so one request loads once. Only a signed-in visitor triggers a paid
+ * generation: they get the page at once with `summaryPending` set, and the
+ * body streams the summary in. Everyone else, including crawlers and
+ * unfurlers, sees stored summaries only.
  */
 export const loadTweetPage = cache(
   async (tweetId: string, clickhouseOnly = false) => {
@@ -26,18 +38,6 @@ export const loadTweetPage = cache(
     const stored = await getStoredTweetPageSummary(subject)
     if (stored !== 'missing')
       return { ...page, summary: stored, summaryPending: false }
-
-    const userAgent = headers().get('user-agent')
-    if (isLinkPreviewAgent(userAgent))
-      return {
-        ...page,
-        summary: await getTweetPageSummary(subject, true),
-        summaryPending: false,
-      }
-    return {
-      ...page,
-      summary: null,
-      summaryPending: !isCrawlerAgent(userAgent),
-    }
+    return { ...page, summary: null, summaryPending: await isSignedIn() }
   },
 )

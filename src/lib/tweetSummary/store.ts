@@ -46,9 +46,9 @@ type SummaryDatabase = {
   }
 }
 
-// The first visit streams in while this runs and unfurlers wait on it (both
-// attempts share this budget), so keep it inside the page's maxDuration; a
-// timeout shows the neutral fallback this time and retries on the next visit.
+// The first signed-in visit streams in while this runs (both attempts share
+// this budget), so keep it inside the page's maxDuration; a timeout shows the
+// neutral fallback this time and retries on the next signed-in visit.
 const GENERATION_BUDGET_MS = 15_000
 
 function summaryClient(): SupabaseClient<SummaryDatabase> | null {
@@ -223,8 +223,8 @@ async function lookUpSummary(
 
 /**
  * Generated title and description for a permalink page, or null when the
- * content is not substantive enough or generation is unavailable. Crawlers
- * (`allowGeneration: false`) only see summaries that already exist.
+ * content is not substantive enough or generation is unavailable. Callers
+ * without `allowGeneration` only see summaries that already exist.
  */
 export const getTweetPageSummary = cache(
   async (

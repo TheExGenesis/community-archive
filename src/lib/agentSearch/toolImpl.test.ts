@@ -207,4 +207,89 @@ describe('searchPages', () => {
     expect(result.tweets.map((t) => t.id)).toEqual(ids(150).slice(100))
     expect(result.nextOffset).toBeNull()
   })
+
+  // Like the gateway: `rows` matches in offset order, deleted ones left out
+  // of a page, and nextOffset is offset + limit while any row is left.
+  function serveRows(rows: number, deleted: (row: number) => boolean) {
+    ;(searchTweets as jest.Mock).mockImplementation(
+      async ({ offset = 0, limit = 25 }) => {
+        const tweets = []
+        for (let row = offset; row < Math.min(offset + limit, rows); row++)
+          if (!deleted(row)) tweets.push(tweet(String(row + 1)))
+        return {
+          tweets,
+          nextOffset: offset + limit < rows ? offset + limit : null,
+        }
+      },
+    )
+  }
+  const offsetsAsked = () =>
+    (searchTweets as jest.Mock).mock.calls.map(([input]) => [
+      input.offset,
+      input.limit,
+    ])
+  const kept = (rows: number, deleted: (row: number) => boolean) =>
+    ids(rows).filter((_, row) => !deleted(row))
+
+  test('a short page is not the end; it pages on to the count asked for', async () => {
+    const gap = (row: number) => row >= 100 && row < 140
+    serveRows(300, gap)
+    const result = await searchPages({ query: 'x' }, 250, {})
+    expect(result.tweets.map((t) => t.id)).toEqual(kept(300, gap).slice(0, 250))
+    expect(result.nextOffset).toBe(290)
+    expect(offsetsAsked()).toEqual([
+      [0, 100],
+      [100, 100],
+      [200, 50],
+      [250, 40],
+    ])
+  })
+
+  test('an empty first page with more after it is not the end', async () => {
+    const firstHundred = (row: number) => row < 100
+    serveRows(150, firstHundred)
+    const result = await searchPages({ query: 'x' }, 1000, {})
+    expect(result.tweets.map((t) => t.id)).toEqual(kept(150, firstHundred))
+    expect(result.nextOffset).toBeNull()
+  })
+
+  test('stops on a null nextOffset, keeping nothing from later pages of the wave', async () => {
+    // The page at 200 ends the search; pages already asked for after it
+    // (here still answering) are past the end.
+    ;(searchTweets as jest.Mock).mockImplementation(
+      async ({ offset = 0, limit = 25 }) => ({
+        tweets: ids(limit).map((id) => tweet(`${offset}-${id}`)),
+        nextOffset: offset === 200 ? null : offset + limit,
+      }),
+    )
+    const result = await searchPages({ query: 'x' }, 1000, {})
+    expect(result.tweets).toHaveLength(300)
+    expect(result.tweets[299].id).toBe('200-100')
+    expect(result.nextOffset).toBeNull()
+    expect(offsetsAsked().map(([offset]) => offset)).toEqual([
+      0, 100, 200, 300, 400,
+    ])
+  })
+
+  test('never asks past the gateway offset limit, nor twice for one offset', async () => {
+    serveRows(100_000, () => true)
+    const result = await searchPages({ query: 'x' }, 1000, {})
+    expect(result.tweets).toEqual([])
+    expect(result.nextOffset).toBe(5100)
+    expect(Math.max(...offsetsAsked().map(([offset]) => offset))).toBe(5000)
+    expect(await searchPages({ query: 'x' }, 1000, {}, 5100)).toEqual({
+      tweets: [],
+      nextOffset: null,
+    })
+    ;(searchTweets as jest.Mock).mockReset()
+    ;(searchTweets as jest.Mock).mockImplementation(async ({ offset }) => ({
+      tweets: [],
+      nextOffset: offset,
+    }))
+    expect(await searchPages({ query: 'x' }, 1000, {})).toEqual({
+      tweets: [],
+      nextOffset: null,
+    })
+    expect(searchTweets).toHaveBeenCalledTimes(1)
+  })
 })

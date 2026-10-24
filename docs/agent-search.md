@@ -137,13 +137,22 @@ Inside a command, archive calls run in turn unless they are independent:
 `search` asks for its first page alone and the rest four at a time, `--any`
 searches its terms together, id lookups go 100 ids per call with four calls in
 flight, and `par` runs whole command lines together. just-bash itself runs
-`&`, `;` and loops one command after another.
+`&`, `;` and loops one command after another. Deleted tweets are left out of
+a page, so a short or empty page does not end a search; a null `nextOffset`
+does, and no page past offset 5,000 is asked for.
 
 `timeline` reads the API v1 route `GET /accounts/{account}/tweets` (200 per
-page, keyset cursor). Locally the gateway stand-in serves it at
-`<CLICKHOUSE_SEARCH_API_URL>/v1`. Which production route and key the agent
-should use is not settled: the keyed public API allows 60 requests a minute and
-two in flight per account, which a run can exceed.
+page, keyset cursor). It follows `next_cursor` through short and empty pages
+until the cursor is null or it has `--limit` tweets, and stops early, saying
+so, on a cursor it already followed or after `ceil(limit / 200) + 10` pages. A
+`429` or `503` is retried after `Retry-After` (at most 10 s, 1 s when absent),
+up to three attempts, never past the run's deadline or after Stop. A `422`
+(too broad for the API's query budget) prints the tweets already read, marked
+partial, and tells the agent to narrow with `--since`/`--until`. Locally the
+gateway stand-in serves it at `<CLICKHOUSE_SEARCH_API_URL>/v1`. Which
+production route and key the agent should use is not settled: the keyed
+public API allows 60 requests a minute and two in flight per account, which a
+run can exceed.
 
 The prompt steers semantic search to paraphrased ideas, surveys and
 investigative questions, and keyword search to names, handles, exact phrases

@@ -120,6 +120,134 @@ describe('API v1 timeline', () => {
       getAccountTweets({ account: 'nobody' }),
     ).rejects.toBeInstanceOf(ApiV1Error)
   })
+
+  /** A response with an optional Retry-After header. */
+  const reply = (status: number, body: unknown, retryAfter?: string) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === 'retry-after' ? (retryAfter ?? null) : null,
+    },
+    json: async () => body,
+  })
+  const page = { data: [v1Row], next_cursor: null }
+  const limited = (code: string) => ({
+    error: { code, message: code },
+    request_id: 'r',
+  })
+
+  describe('on 429 and 503', () => {
+    afterEach(() => jest.useRealTimers())
+
+    test('waits Retry-After, at most 10 s and 1 s when missing, then retries', async () => {
+      jest.useFakeTimers()
+      fetchMock
+        .mockResolvedValueOnce(reply(429, limited('rate_limited'), '2'))
+        .mockResolvedValueOnce(reply(503, limited('unavailable'), '600'))
+        .mockResolvedValueOnce(reply(200, page))
+      const result = getAccountTweets({ account: 'x' })
+      await jest.advanceTimersByTimeAsync(1_999)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      await jest.advanceTimersByTimeAsync(1)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      // 600 s is cut to 10 s.
+      await jest.advanceTimersByTimeAsync(9_999)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      await jest.advanceTimersByTimeAsync(1)
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+      expect((await result).tweets[0].id).toBe('11')
+
+      fetchMock.mockReset()
+      fetchMock
+        .mockResolvedValueOnce(reply(429, limited('rate_limited')))
+        .mockResolvedValueOnce(reply(200, page))
+      const unhinted = getAccountTweets({ account: 'x' })
+      await jest.advanceTimersByTimeAsync(999)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      await jest.advanceTimersByTimeAsync(1)
+      await expect(unhinted).resolves.toMatchObject({ nextCursor: null })
+    })
+
+    test('gives up after three attempts with the last status and code', async () => {
+      fetchMock.mockResolvedValue(reply(503, limited('unavailable'), '0'))
+      await expect(getAccountTweets({ account: 'x' })).rejects.toEqual(
+        expect.objectContaining({ status: 503, code: 'unavailable' }),
+      )
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+
+    test('does not wait or retry past the run deadline', async () => {
+      fetchMock.mockResolvedValue(reply(429, limited('rate_limited'), '8'))
+      const started = Date.now()
+      await expect(
+        getAccountTweets({ account: 'x' }, { deadlineAt: Date.now() + 5_000 }),
+      ).rejects.toEqual(expect.objectContaining({ status: 429 }))
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(Date.now() - started).toBeLessThan(1_000)
+    })
+
+    test('a stopped run ends the wait and the call', async () => {
+      fetchMock.mockResolvedValue(reply(429, limited('rate_limited'), '8'))
+      const run = new AbortController()
+      const started = Date.now()
+      const waiting = getAccountTweets(
+        { account: 'x' },
+        {
+          abortSignal: run.signal,
+        },
+      )
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      run.abort(new Error('stopped'))
+      await expect(waiting).rejects.toThrow('stopped')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(Date.now() - started).toBeLessThan(1_000)
+
+      // A request in flight is aborted too.
+      const inFlight = new AbortController()
+      fetchMock.mockImplementation(
+        (_url: string, init: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) =>
+            init.signal.addEventListener('abort', () =>
+              reject(init.signal.reason),
+            ),
+          ),
+      )
+      const pending = getAccountTweets(
+        { account: 'x' },
+        {
+          abortSignal: inFlight.signal,
+        },
+      )
+      inFlight.abort(new Error('stopped mid-call'))
+      await expect(pending).rejects.toThrow('stopped mid-call')
+    })
+
+    test("lets go of the run's signal after each attempt", async () => {
+      fetchMock
+        .mockResolvedValueOnce(reply(503, limited('unavailable'), '0'))
+        .mockResolvedValueOnce(reply(200, page))
+      const run = new AbortController()
+      const added = jest.spyOn(run.signal, 'addEventListener')
+      const removed = jest.spyOn(run.signal, 'removeEventListener')
+      await getAccountTweets({ account: 'x' }, { abortSignal: run.signal })
+      const abortListeners = (spy: jest.SpyInstance) =>
+        spy.mock.calls.filter(([type]) => type === 'abort').length
+      // Two attempts and the wait between them.
+      expect(abortListeners(added)).toBe(3)
+      expect(abortListeners(removed)).toBe(3)
+    })
+  })
+
+  test('a 422 is not retried and keeps its code', async () => {
+    fetchMock.mockResolvedValue(
+      reply(422, limited('query_budget_exceeded'), '1'),
+    )
+    await expect(getAccountTweets({ account: 'x' })).rejects.toEqual(
+      expect.objectContaining({ status: 422, code: 'query_budget_exceeded' }),
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('getTweetsByIdsBatched', () => {

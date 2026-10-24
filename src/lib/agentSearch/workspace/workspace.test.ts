@@ -413,7 +413,7 @@ describe('timeline', () => {
 
   test('takes the oldest first, drops replies, keeps retweets and caps the count', async () => {
     ;(getAccountTweets as jest.Mock).mockResolvedValue({
-      tweets: [tweet('1')],
+      tweets: Array.from({ length: 50 }, (_, i) => tweet(String(i + 1))),
       nextCursor: 'more',
     })
     const result = await run(
@@ -436,6 +436,76 @@ describe('timeline', () => {
     const result = await run('timeline @nobody_here')
     expect(result.exitCode).toBe(1)
     expect(result.stderr).toContain('no such member')
+  })
+
+  test('an empty or short page with a cursor is not the end', async () => {
+    // The API leaves deleted tweets out of a page.
+    const pages: Record<
+      string,
+      { tweets: unknown[]; nextCursor: string | null }
+    > = {
+      start: { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' },
+      c1: { tweets: [], nextCursor: 'c2' },
+      c2: { tweets: [tweet('3')], nextCursor: null },
+    }
+    ;(getAccountTweets as jest.Mock).mockImplementation(
+      async ({ cursor }) => pages[cursor ?? 'start'],
+    )
+    const result = await run('timeline @alice > a.jsonl')
+    expect(result.exitCode).toBe(0)
+    expect(result.files).toEqual({ 'a.jsonl': ['1', '2', '3'] })
+    expect(getAccountTweets).toHaveBeenCalledTimes(3)
+    expect(result.stderr).not.toContain('more')
+  })
+
+  test('stops on a cursor it already followed, or after a bounded number of pages', async () => {
+    ;(getAccountTweets as jest.Mock).mockResolvedValue({
+      tweets: [tweet('1')],
+      nextCursor: 'same',
+    })
+    const stuck = await run('timeline @alice')
+    expect(stuck.exitCode).toBe(0)
+    expect(getAccountTweets).toHaveBeenCalledTimes(2)
+    expect(stuck.stderr).toContain('same page cursor twice; more may exist')
+
+    jest.clearAllMocks()
+    let n = 0
+    ;(getAccountTweets as jest.Mock).mockImplementation(async () => ({
+      tweets: [],
+      nextCursor: `c${++n}`,
+    }))
+    const endless = await run('timeline @alice --limit 300')
+    // ceil(300 / 200) + 10 pages.
+    expect(getAccountTweets).toHaveBeenCalledTimes(12)
+    expect(endless.stderr).toContain('stopped after 12 pages; more may exist')
+  })
+
+  test('a request too broad for the query budget prints the pages read, marked partial', async () => {
+    ;(getAccountTweets as jest.Mock).mockImplementation(async ({ cursor }) => {
+      if (cursor) {
+        throw new ApiV1Error(
+          422,
+          'query_budget_exceeded',
+          'The request is too broad',
+        )
+      }
+      return { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' }
+    })
+    const result = await run('timeline @alice > a.jsonl')
+    expect(result.exitCode).toBe(1)
+    expect(result.files).toEqual({ 'a.jsonl': ['1', '2'] })
+    expect(result.stderr).toContain(
+      "timeline @alice: too broad for the API's query budget; narrow it with --since/--until · partial results: 2 tweets",
+    )
+    expect(result.summary).toBe("Read @alice's tweets · 2 tweets, partial")
+    ;(getAccountTweets as jest.Mock).mockRejectedValue(
+      new ApiV1Error(422, 'query_budget_exceeded', 'The request is too broad'),
+    )
+    const none = await run('timeline @alice')
+    expect(none.exitCode).toBe(1)
+    expect(none.stdout).toBe('')
+    expect(none.stderr).toContain('narrow it with --since/--until')
+    expect(none.stderr).not.toContain('partial')
   })
 })
 

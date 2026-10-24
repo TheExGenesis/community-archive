@@ -51,8 +51,11 @@ const MAX_OFFSET = 5000
 
 /**
  * Up to `want` search results from `from` on. The first page goes alone,
- * since most searches fit in one and a short page ends the search; the rest
- * run a few at a time. `nextOffset` is null when the gateway has no more.
+ * since most searches fit in one; the rest run a few at a time. A short or
+ * empty page is not the end (the gateway leaves out deleted tweets); a null
+ * `nextOffset` is, and stays null in the result. A non-null one means more
+ * exist, even past the gateway's highest offset, where a later call from it
+ * returns nothing.
  */
 export async function searchPages(
   input: Omit<SearchTweetsInput, 'limit' | 'offset'>,
@@ -60,32 +63,41 @@ export async function searchPages(
   limits: RunLimits,
   from = 0,
 ): Promise<{ tweets: AgentTweet[]; nextOffset: number | null }> {
-  const page = (offset: number) =>
-    searchTweets(
-      { ...input, limit: Math.min(PAGE, from + want - offset), offset },
-      limits,
-    )
-  const first = await page(from)
-  const tweets = [...first.tweets]
-  let nextOffset = first.tweets.length ? first.nextOffset : null
-  while (nextOffset !== null && tweets.length < want) {
-    const offsets: number[] = []
-    for (
-      let offset = nextOffset;
-      offsets.length < PAGE_CONCURRENCY &&
-      offset < from + want &&
-      offset <= MAX_OFFSET;
-      offset += PAGE
-    )
-      offsets.push(offset)
-    if (!offsets.length) break
-    const pages = await Promise.all(offsets.map(page))
-    for (const result of pages) {
-      tweets.push(...result.tweets)
-      nextOffset = result.tweets.length ? result.nextOffset : null
-      // A short or last page ends the search; later pages are past the end.
-      if (nextOffset === null || result.tweets.length < PAGE) break
+  if (from > MAX_OFFSET) return { tweets: [], nextOffset: null }
+  const tweets: AgentTweet[] = []
+  let nextOffset: number | null = from
+  let waveSize = 1
+  while (
+    nextOffset !== null &&
+    nextOffset <= MAX_OFFSET &&
+    tweets.length < want
+  ) {
+    // Each page asks for what is still wanted, up to PAGE, and starts where
+    // the one before it ends, as the gateway's nextOffset does.
+    const wave: Array<{ offset: number; limit: number }> = []
+    let offset = nextOffset
+    let left = want - tweets.length
+    while (wave.length < waveSize && left > 0 && offset <= MAX_OFFSET) {
+      const limit = Math.min(PAGE, left)
+      wave.push({ offset, limit })
+      offset += limit
+      left -= limit
     }
+    const results = await Promise.all(
+      wave.map(({ offset, limit }) =>
+        searchTweets({ ...input, offset, limit }, limits),
+      ),
+    )
+    for (let i = 0; i < results.length; i++) {
+      tweets.push(...results[i].tweets)
+      nextOffset = results[i].nextOffset
+      // An offset that does not move forward would repeat this page.
+      if (nextOffset !== null && nextOffset <= wave[i].offset) nextOffset = null
+      // A later page counts only if it starts where this one says the next
+      // begins; after a null nextOffset it is past the end.
+      if (nextOffset === null || nextOffset !== wave[i + 1]?.offset) break
+    }
+    waveSize = PAGE_CONCURRENCY
   }
   return { tweets: tweets.slice(0, want), nextOffset }
 }

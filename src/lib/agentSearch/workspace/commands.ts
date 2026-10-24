@@ -75,6 +75,8 @@ const MAX_IDS_PER_COMMAND = MAX_COLLECT
 const TIMELINE_PAGE = 200
 const TIMELINE_DEFAULT = 200
 const MAX_TIMELINE = 3000
+/** Pages timeline may read beyond those the limit needs, for short pages. */
+const TIMELINE_SPARE_PAGES = 10
 /** par: the most command lines it takes, and how many run at once. */
 const MAX_PAR = 30
 const PAR_CONCURRENCY = 6
@@ -394,9 +396,15 @@ async function timeline(
 
   state.calls += 1
   const tweets: AgentTweet[] = []
-  let cursor: string | null | undefined
+  // A short or empty page is not the end (the API leaves out deleted
+  // tweets); a null cursor is. A cursor already followed, or more pages than
+  // the limit could need, stops an API that would otherwise page forever.
+  const maxPages = Math.ceil(limit / TIMELINE_PAGE) + TIMELINE_SPARE_PAGES
+  const followed = new Set<string>()
+  let cursor: string | null = null
+  let cutShort: string | null = null
   try {
-    do {
+    for (let pages = 1; ; pages++) {
       const page = await getAccountTweets(
         {
           account: name,
@@ -412,14 +420,39 @@ async function timeline(
         state.limits,
       )
       tweets.push(...page.tweets)
-      cursor = page.tweets.length ? page.nextCursor : null
-    } while (cursor && tweets.length < limit)
+      cursor = page.nextCursor
+      if (!cursor || tweets.length >= limit) break
+      if (followed.has(cursor)) {
+        cutShort = 'stopped: the API sent the same page cursor twice'
+        break
+      }
+      if (pages >= maxPages) {
+        cutShort = `stopped after ${maxPages} pages`
+        break
+      }
+      followed.add(cursor)
+    }
   } catch (error) {
     if (error instanceof ApiV1Error && error.status === 404) {
       state.summaries.push(`No member ${name}`)
       return {
         stdout: '',
         stderr: `timeline ${name}: no such member in the archive (try people)\n`,
+        exitCode: 1,
+      }
+    }
+    if (error instanceof ApiV1Error && error.status === 422) {
+      // The pages read before the refusal are still printed, marked partial.
+      remember(state, tweets)
+      state.summaries.push(
+        `Read ${name}'s tweets · ${tweets.length ? `${plural(tweets.length, 'tweet')}, partial` : 'too broad'}`,
+      )
+      return {
+        stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
+        stderr:
+          `timeline ${name}: too broad for the API's query budget; narrow it with --since/--until` +
+          (tweets.length ? ` · partial results: ${describe(tweets)}` : '') +
+          '\n',
         exitCode: 1,
       }
     }
@@ -433,9 +466,11 @@ async function timeline(
     stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
     stderr:
       `timeline ${name}: ${describe(tweets)}` +
-      (cursor
-        ? ` · more exist (raise --limit, max ${MAX_TIMELINE}, or use --since/--until)`
-        : '') +
+      (cutShort
+        ? ` · ${cutShort}; more may exist (narrow it with --since/--until)`
+        : cursor
+          ? ` · more exist (raise --limit, max ${MAX_TIMELINE}, or use --since/--until)`
+          : '') +
       '\n',
     exitCode: 0,
   }

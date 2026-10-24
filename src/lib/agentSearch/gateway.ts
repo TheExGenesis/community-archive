@@ -3,7 +3,7 @@ import {
   fetchAnalyticsGatewayJson,
 } from '@/lib/clickhouseGateway'
 import type { PortalMedia, PortalQuotedTweet } from '@/lib/portal/types'
-import { callTimeoutMs, type RunLimits } from './deadline'
+import { callTimeoutMs, deadlinePassed, type RunLimits } from './deadline'
 import { traced } from './trace'
 import type { AgentTweet } from './types'
 
@@ -489,6 +489,64 @@ export class ApiV1Error extends Error {
   }
 }
 
+/** Attempts at one API v1 request when it answers 429 or 503. */
+const V1_ATTEMPTS = 3
+/** The wait before a retry: Retry-After, at most 10 s, else 1 s. */
+const V1_MAX_RETRY_WAIT_MS = 10_000
+const V1_DEFAULT_RETRY_WAIT_MS = 1_000
+
+function retryWaitMs(retryAfter: string | null | undefined): number {
+  const value = retryAfter?.trim() ?? ''
+  // Seconds only; an HTTP date counts as missing.
+  if (!/^\d+(\.\d+)?$/.test(value)) return V1_DEFAULT_RETRY_WAIT_MS
+  return Math.min(Number(value) * 1000, V1_MAX_RETRY_WAIT_MS)
+}
+
+/**
+ * Aborts when either signal does, as in semantic.ts. `release` removes its
+ * listeners, since the run's signal outlives many calls.
+ */
+function either(a: AbortSignal, b: AbortSignal) {
+  const controller = new AbortController()
+  const releases: Array<() => void> = []
+  for (const signal of [a, b]) {
+    if (signal.aborted) controller.abort(signal.reason)
+    else {
+      const onAbort = () => controller.abort(signal.reason)
+      signal.addEventListener('abort', onAbort, { once: true })
+      releases.push(() => signal.removeEventListener('abort', onAbort))
+    }
+  }
+  return {
+    signal: controller.signal,
+    release: () => releases.forEach((release) => release()),
+  }
+}
+
+/** Waits `ms`, or rejects as soon as `signal` aborts. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(signal?.reason)
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * One API v1 read. A 429 or 503 is retried after Retry-After, up to three
+ * attempts, but never waits or retries past the run's deadline or after the
+ * run is stopped; any other failure throws an ApiV1Error at once.
+ */
 async function apiV1Json<T>(
   label: string,
   path: string,
@@ -501,25 +559,50 @@ async function apiV1Json<T>(
     process.env.COMMUNITY_ARCHIVE_API_KEY?.trim() ||
     process.env.CLICKHOUSE_ANALYTICS_API_TOKEN
   if (!token) throw new Error('No key for the Community Archive API v1')
-  const timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
+  const attempt = async (timeoutMs: number) => {
+    const timeout = AbortSignal.timeout(timeoutMs)
+    const stop = limits.abortSignal
+      ? either(timeout, limits.abortSignal)
+      : undefined
+    try {
+      const response = await fetch(`${base}${path}?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: stop?.signal ?? timeout,
+        cache: 'no-store',
+      })
+      const body = (await response.json().catch(() => null)) as
+        | (T & { error?: { code?: string; message?: string } })
+        | null
+      return { response, body }
+    } finally {
+      stop?.release()
+    }
+  }
+  // Throws before the span when the run has no time left, like gatewayJson.
+  let timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
+  // One gateway span covers every attempt and the waits between them, so
+  // time spent rate-limited counts as archive time, not the shell's.
   return traced(limits, 'gateway', label, async () => {
-    const response = await fetch(`${base}${path}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-      cache: 'no-store',
-    })
-    const body = (await response.json().catch(() => null)) as
-      | (T & { error?: { code?: string; message?: string } })
-      | null
-    if (!response.ok || !body) {
-      throw new ApiV1Error(
+    for (let attempts = 1; ; attempts++) {
+      const { response, body } = await attempt(timeoutMs)
+      if (response.ok && body) return body
+      const error = new ApiV1Error(
         response.status,
         body?.error?.code ?? 'upstream_unavailable',
         body?.error?.message ??
           `Community Archive API failed (${response.status})`,
       )
+      if (
+        (response.status !== 429 && response.status !== 503) ||
+        attempts >= V1_ATTEMPTS
+      ) {
+        throw error
+      }
+      const waitMs = retryWaitMs(response.headers.get('Retry-After'))
+      if (deadlinePassed(limits, Date.now() + waitMs)) throw error
+      await pause(waitMs, limits.abortSignal)
+      timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
     }
-    return body
   })
 }
 

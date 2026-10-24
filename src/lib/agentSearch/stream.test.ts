@@ -177,6 +177,40 @@ describe('a run stream that closes early', () => {
     expect(out).toEqual([1])
   })
 
+  test('closes when the agent wrote its finish, while the run is still recording', async () => {
+    // WorkflowAgent writes finish and closes; the workflow's record step
+    // runs after, so the status still says running.
+    const ended = jest.fn(async () => false)
+    const finished = new ReadableStream<{ type: string }>({
+      start(controller) {
+        controller.enqueue({ type: 'text-delta' })
+        controller.enqueue({ type: 'finish' })
+        controller.close()
+      },
+    })
+    const out: string[] = []
+    const reader = closeWhenRunEnds(finished, ended).getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      out.push(value.type)
+    }
+    expect(out).toEqual(['text-delta', 'finish'])
+    expect(ended).not.toHaveBeenCalled()
+  })
+
+  test('a step boundary is not the agent finishing', async () => {
+    const stepped = new ReadableStream<{ type: string }>({
+      start(controller) {
+        controller.enqueue({ type: 'finish-step' })
+        controller.close()
+      },
+    })
+    const reader = closeWhenRunEnds(stepped, async () => false).getReader()
+    expect((await reader.read()).value).toEqual({ type: 'finish-step' })
+    await expect(reader.read()).rejects.toThrow(/still going/)
+  })
+
   test('a close seen while the run is going fails even when the run ends right after', async () => {
     // The chunks written after the close are only on the replay.
     let calls = 0

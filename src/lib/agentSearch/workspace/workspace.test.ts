@@ -349,9 +349,9 @@ describe('search with several words', () => {
     expect(out.stderr).toContain('search “singapore”: 4 tweets')
   })
 
-  test('--any searches every term with the same mode, sort and reply filter', async () => {
+  test('--or searches every alternative with the same mode, sort and reply filter', async () => {
     const out = await run(
-      'search "community archive" --any "ca dot org",tpot --phrase --sort likes --reply-to @visakanv --from bob',
+      'search "community archive" --or "ca dot org",tpot --phrase --sort likes --reply-to @visakanv --from bob',
     )
     expect(out.exitCode).toBe(0)
     const calls = asked()
@@ -369,15 +369,75 @@ describe('search with several words', () => {
       })
     }
     expect(out.stderr).toContain(
-      'search “community archive” or “ca dot org” or “tpot” (each as a phrase) from @bob replying to @visakanv: 4 tweets',
+      'search “community archive” or “ca dot org” or “tpot” (each as a phrase), any of them matching from @bob replying to @visakanv: 4 tweets',
     )
 
     jest.clearAllMocks()
-    const words = await run('search ca --any "community archive"')
+    const words = await run('search ca --or "community archive"')
     expect(asked().map((input) => input.mode)).toEqual(['all', 'all'])
     expect(words.stderr).toContain(
-      'search “ca” or “community archive” (all words of each):',
+      'search “ca” or “community archive” (all words of each), any of them matching:',
     )
+  })
+
+  test('--with keeps the words and adds one of the others, one search per pair', async () => {
+    const out = await run(
+      'search "community archive" --with creepy,"opt out" --since 2025-01-01',
+    )
+    expect(out.exitCode).toBe(0)
+    const calls = asked()
+    expect(calls.map((input) => input.query).sort()).toEqual([
+      'community archive creepy',
+      'community archive opt out',
+    ])
+    for (const input of calls) {
+      expect(input).toMatchObject({ mode: 'all', since: '2025-01-01' })
+    }
+    expect(out.stderr).toContain(
+      'search all of “community archive” and one of “creepy”, “opt out”:',
+    )
+    expect(out.summary).toContain(
+      'Searched “community archive” with “creepy” or “opt out”',
+    )
+
+    // One --with word is one search, of the words and that word together.
+    jest.clearAllMocks()
+    await run('search notion --with slow')
+    expect(asked().map((input) => input.query)).toEqual(['notion slow'])
+
+    // --or and --with together: every alternative with every word.
+    jest.clearAllMocks()
+    await run('search notion --or @NotionHQ --with slow,offline')
+    expect(
+      asked()
+        .map((input) => input.query)
+        .sort(),
+    ).toEqual([
+      '@NotionHQ offline',
+      '@NotionHQ slow',
+      'notion offline',
+      'notion slow',
+    ])
+  })
+
+  test('--any is gone, and the error says which flag to use', async () => {
+    const out = await run('search "community archive" --any creepy,privacy')
+    expect(out.exitCode).toBe(2)
+    expect(out.stderr).toContain('there is no --any')
+    expect(out.stderr).toContain('--or a,b')
+    expect(out.stderr).toContain('--with a,b')
+    expect(asked()).toEqual([])
+  })
+
+  test('--with refuses a phrase and too many searches', async () => {
+    const phrase = await run(
+      'search "community archive" --phrase --with creepy',
+    )
+    expect(phrase.exitCode).toBe(2)
+    expect(phrase.stderr).toContain('cannot keep a phrase')
+    const many = await run('search a --or b,c,d --with e,f,g')
+    expect(many.exitCode).toBe(2)
+    expect(many.stderr).toContain('at most 9')
   })
 })
 

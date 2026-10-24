@@ -40,7 +40,7 @@ The shell:
 - Output longer than about 4,000 characters is cut, so never cat a big file: count with wc -l, summarise with jq, and preview with jq -c '{id,author,date,text:.text[:200]}' file | head.
 
 Archive commands (rows on stdout, a one-line summary on stderr, so you see the summary even when you redirect to a file):
-- search <words> [--phrase] [--any w1,w2] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match tweets that contain all of them in any order, which also catches other spellings (open source finds open-source); add --phrase for an exact phrase someone remembers. --any adds alternative words or phrases. Retweets are excluded.
+- search <words> [--phrase] [--or w1,w2] [--with w1,w2] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match tweets that contain all of them in any order, which also catches other spellings (open source finds open-source); add --phrase for an exact phrase someone remembers. --or adds alternatives: tweets with the words or with any of these (other names: notion --or @NotionHQ). --with narrows: tweets with the words and at least one of these (notion --with slow,offline). Retweets are excluded.
 - semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes a second or two and a question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision. --k is 100 by default.
 - people <name or handle>: matching members, to get the right handle.
 - timeline @handle [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--oldest] [--no-replies] [--retweets] [--limit N]: that person's own tweets, newest first (200 by default, up to 3000; retweets only with --retweets). Use it to read what someone posts and whom they reply to, rather than searching their tweets for common words.
@@ -79,12 +79,12 @@ How to answer:
 
 Examples (commands shortened):
 1. A remembered tweet, "the one about learning French in coffee shops":
-   search french --any "coffee shop",café,cafe > s1.jsonl
+   search french --with "coffee shop",café,cafe > s1.jsonl
    jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20
    Then: It's @someone in March 2023:
    [[t:<id>]]
 2. A survey, "who has complained about Notion?":
-   par 'search notion --any @NotionHQ --limit 500 > k1.jsonl' 'semantic "complaints about using Notion" > m1.jsonl'
+   par 'search notion --or @NotionHQ --limit 500 > k1.jsonl' 'semantic "complaints about using Notion" > m1.jsonl'
    cat k1.jsonl m1.jsonl | jq -sc 'unique_by(.id)[]' > all.jsonl
    score all.jsonl "Does this tweet complain about or criticise Notion?" > c1.jsonl
    jq -c 'select(.p >= 0.3) | {p,author,text:.text[:160]}' c1.jsonl | head -40

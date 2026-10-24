@@ -674,12 +674,15 @@ export function archiveSearchHref(search: {
 }
 
 // The workspace `search` command's options (workspace/commands.ts). --limit
-// only caps how many come back; --any (an OR list) has no equivalent on the
-// search page. The command matches several words in any order unless it
+// only caps how many come back; --or and --with (and --any, their old form in
+// stored runs) make several searches, which the search page has no way to
+// express. The command matches several words in any order unless it
 // passes --phrase (--all is the old name for that default), while the search
 // page reads several words as a phrase, so only --phrase or a single word
 // links to the same search.
 const SEARCH_VALUE_FLAGS = new Set([
+  'or',
+  'with',
   'any',
   'from',
   'reply-to',
@@ -688,6 +691,8 @@ const SEARCH_VALUE_FLAGS = new Set([
   'sort',
   'limit',
 ])
+
+const MULTI_SEARCH_FLAGS = new Set(['or', 'with', 'any'])
 
 /** The first `search` in a shell command the search page can express. */
 export function bashSearchHref(command: string): string | null {
@@ -713,7 +718,7 @@ export function bashSearchHref(command: string): string | null {
         phrase = true
         continue
       }
-      if (!SEARCH_VALUE_FLAGS.has(name) || name === 'any') {
+      if (!SEARCH_VALUE_FLAGS.has(name) || MULTI_SEARCH_FLAGS.has(name)) {
         expressible = false
         break
       }

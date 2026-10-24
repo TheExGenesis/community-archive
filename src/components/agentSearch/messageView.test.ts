@@ -1184,6 +1184,8 @@ describe('opening a step in archive search', () => {
       '/search?q=community+archive',
     )
     expect(bashSearchHref('search archive --phrase')).toBe('/search?q=archive')
+    expect(bashSearchHref('search notion --or @NotionHQ')).toBeNull()
+    expect(bashSearchHref('search notion --with slow,offline')).toBeNull()
   })
 
   test('a malformed date gives no link rather than a wrong one', () => {

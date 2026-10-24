@@ -87,7 +87,7 @@ work on files under `/work`, and archive commands are added
 
 | Command                                                                                                           | Does                                                                                           |
 | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `search <words> [--any w1,w2] [--phrase] [--from @h] [--reply-to @h] [--since D] [--until D] [--sort …] [--limit N]` | Keyword search; several words match every word in any order unless `--phrase` asks for the exact phrase (`--all`, the old opt-in, is still accepted); `--any` searches each alternative the same way, with the same filters and sort; JSONL tweets to stdout (50 by default, up to 1,000) |
+| `search <words> [--or w1,w2] [--with w1,w2] [--phrase] [--from @h] [--reply-to @h] [--since D] [--until D] [--sort …] [--limit N]` | Keyword search; several words match every word in any order unless `--phrase` asks for the exact phrase (`--all`, the old opt-in, is still accepted); `--or` adds alternatives (the words or any of these) and `--with` narrows (the words and at least one of these, one every-word search per pair), each with the same filters and sort; `--any`, which read as the second but meant the first, now fails with a message naming both; JSONL tweets to stdout (50 by default, up to 1,000) |
 | `semantic "<idea>" [--from @h] [--k N] [--threshold 0-1]`                                                         | Meaning search (below), 100 results by default; rows carry `distance`                                                  |
 | `people <name or handle>`                                                                                         | Members and accounts matching a name                                                           |
 | `timeline @handle [--since D] [--until D] [--oldest] [--no-replies] [--retweets] [--limit N]`                     | That person's own tweets by date, newest first (200 by default, up to 3,000; no retweets unless asked), from API v1 |
@@ -135,7 +135,7 @@ case-sensitively, so `semantic.ts` sends the member directory's spelling. A
 failed semantic call does not count as the archive being down.
 
 Inside a command, archive calls run in turn unless they are independent:
-`search` asks for its first page alone and the rest four at a time, `--any`
+`search` asks for its first page alone and the rest four at a time, `--or` and `--with`
 searches its terms together, id lookups go 100 ids per call with four calls in
 flight, and `par` runs whole command lines together. just-bash itself runs
 `&`, `;` and loops one command after another. Deleted tweets are left out of

@@ -73,6 +73,8 @@ export function createCommandState(
 }
 
 const SEARCH_DEFAULT = 50
+/** search: the most separate searches --or and --with may add up to. */
+const MAX_SEARCH_TERMS = 9
 const MAX_IDS_PER_COMMAND = MAX_COLLECT
 /** timeline: tweets per API page, the default, and the most one command reads. */
 const TIMELINE_PAGE = 200
@@ -255,7 +257,7 @@ function archiveCommand(state: CommandState, name: string, run: Handler) {
 
 export const USAGE: Record<string, string> = {
   search:
-    'usage: search <words> [--any w1,w2] [--phrase] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]',
+    'usage: search <words> [--or w1,w2] [--with w1,w2] [--phrase] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]',
   semantic:
     'usage: semantic "<what the tweets say, in plain words>" [--from @handle] [--k N] [--threshold 0-1]',
   people: 'usage: people <name or handle>',
@@ -279,19 +281,23 @@ const SEARCH_SORTS: readonly SearchSort[] = [
 ]
 
 /**
- * What a search looked for, saying how several words matched:
- * `all of “a b”`, `“a b” as a phrase`, or for --any terms
- * `“a” or “b c” (all words of each)`.
+ * How a search matched, for the model's stderr line: `all of “a b”`,
+ * `“a b” as a phrase`, alternatives joined by "or" (any of them matches),
+ * and --with words joined by "and one of" (the words and at least one).
  */
-function searchedFor(terms: string[], mode: SearchMode) {
-  const quoted = terms.map(quote).join(' or ')
-  if (mode === 'all' && !terms.some((term) => /\s/.test(term))) return quoted
-  if (terms.length === 1) {
-    return mode === 'phrase' ? `${quoted} as a phrase` : `all of ${quoted}`
+function searchedFor(bases: string[], withTerms: string[], mode: SearchMode) {
+  const quoted = bases.map(quote).join(' or ')
+  const multiword = bases.some((term) => /\s/.test(term))
+  const head =
+    mode === 'phrase'
+      ? `${quoted} ${bases.length > 1 ? '(each as a phrase)' : 'as a phrase'}`
+      : multiword
+        ? `${bases.length > 1 ? `${quoted} (all words of each)` : `all of ${quoted}`}`
+        : quoted
+  if (!withTerms.length) {
+    return bases.length > 1 ? `${head}, any of them matching` : head
   }
-  return mode === 'phrase'
-    ? `${quoted} (each as a phrase)`
-    : `${quoted} (all words of each)`
+  return `${head} and one of ${withTerms.map(quote).join(', ')}`
 }
 
 async function search(
@@ -300,9 +306,26 @@ async function search(
 ): Promise<CommandResult> {
   const { positional, flags } = parseCommandArgs(
     args,
-    ['any', 'from', 'reply-to', 'since', 'until', 'sort', 'limit'],
+    [
+      'or',
+      'with',
+      'any',
+      'from',
+      'reply-to',
+      'since',
+      'until',
+      'sort',
+      'limit',
+    ],
     ['phrase', 'all'],
   )
+  // --any read as "and any of these" but meant "or"; it is gone, and the
+  // error names the two flags that say what they do.
+  if (flags.any !== undefined) {
+    throw new UsageError(
+      'there is no --any: use --or a,b for tweets with the words or any of these, or --with a,b for tweets with the words and at least one of these',
+    )
+  }
   const query = positional.join(' ').trim()
   if (!query) throw new UsageError('give the words to search for')
   const sort = flags.sort as SearchSort | undefined
@@ -320,22 +343,36 @@ async function search(
   const replyToUser = handleFlag(flags['reply-to'])
   const since = dateFlag(flags.since, 'since')
   const until = dateFlag(flags.until, 'until')
-  const alternatives =
-    typeof flags.any === 'string'
-      ? flags.any
+  const list = (value: string | true | undefined) =>
+    typeof value === 'string'
+      ? value
           .split(',')
           .map((term) => term.trim())
           .filter(Boolean)
       : []
+  // --or: the words or any of these. --with: the words and at least one of
+  // these, searched as one every-word query per pair.
+  const bases = Array.from(new Set([query, ...list(flags.or)]))
+  const withTerms = Array.from(new Set(list(flags.with)))
+  if (withTerms.length && flags.phrase) {
+    throw new UsageError(
+      '--with adds words to match, so it cannot keep a phrase: drop --phrase, or search the phrase without --with',
+    )
+  }
+  const terms = withTerms.length
+    ? bases.flatMap((base) => withTerms.map((word) => `${base} ${word}`))
+    : bases
+  if (terms.length > MAX_SEARCH_TERMS) {
+    throw new UsageError(
+      `that is ${terms.length} searches; --or and --with together allow at most ${MAX_SEARCH_TERMS}`,
+    )
+  }
   const filters = { mode, fromUser, replyToUser, since, until, sort }
 
   state.calls += 1
   let tweets: AgentTweet[] = []
   let more = false
-  const terms = alternatives.length
-    ? Array.from(new Set([query, ...alternatives])).slice(0, 9)
-    : [query]
-  if (alternatives.length) {
+  if (terms.length > 1) {
     // Every term is searched in the same mode, with the same filters and
     // sort. With --sort likes the merged rows interleave each term's sorted
     // list, so they are not in like order overall.
@@ -348,7 +385,12 @@ async function search(
     tweets = Array.from(collected.values())
     more = capped
   } else {
-    const result = await searchPages({ ...filters, query }, limit, state.limits)
+    // One search: the words alone, or the words plus a single --with word.
+    const result = await searchPages(
+      { ...filters, query: terms[0] },
+      limit,
+      state.limits,
+    )
     tweets = result.tweets
     more = result.nextOffset !== null
   }
@@ -359,12 +401,15 @@ async function search(
     replyToUser ? `replying to @${replyToUser}` : null,
   ]
   const words = (head: string) => [head, ...who].filter(Boolean).join(' ')
+  const withText = withTerms.length
+    ? ` with ${withTerms.map(quote).join(' or ')}`
+    : ''
   state.summaries.push(
-    `Searched ${words([query, ...alternatives].map(quote).join(' or '))} · ${plural(tweets.length, 'tweet')}`,
+    `Searched ${words(bases.map(quote).join(' or ') + withText)} · ${plural(tweets.length, 'tweet')}`,
   )
   return {
     stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
-    stderr: `search ${words(searchedFor(terms, mode))}: ${describe(tweets)}${more ? ` · more exist (raise --limit, max ${MAX_COLLECT})` : ''}\n`,
+    stderr: `search ${words(searchedFor(bases, withTerms, mode))}: ${describe(tweets)}${more ? ` · more exist (raise --limit, max ${MAX_COLLECT})` : ''}\n`,
     exitCode: 0,
   }
 }

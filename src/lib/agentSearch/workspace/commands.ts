@@ -2,6 +2,7 @@ import { decodeBytesToUtf8, defineCommand } from 'just-bash'
 import { ScoringError } from '../classifier'
 import type { RunLimits } from '../deadline'
 import { getTweetDetails, getTweetsByIds, searchTweets } from '../gateway'
+import { inPhase } from '../trace'
 import {
   BORDERLINE_THRESHOLD,
   KEEP_THRESHOLD,
@@ -180,15 +181,17 @@ function archiveCommand(state: CommandState, name: string, run: Handler) {
   return defineCommand(name, async (args, ctx) => {
     const callsBefore = state.calls
     try {
-      return await run(args, {
-        stdin: ctx.stdin as unknown as Uint8Array,
-        readFile: (path) =>
-          ctx.fs.readFile(
-            path.startsWith('/')
-              ? path
-              : `${ctx.cwd.replace(/\/$/, '')}/${path}`,
-          ),
-      })
+      return await inPhase(state.limits, name, () =>
+        run(args, {
+          stdin: ctx.stdin as unknown as Uint8Array,
+          readFile: (path) =>
+            ctx.fs.readFile(
+              path.startsWith('/')
+                ? path
+                : `${ctx.cwd.replace(/\/$/, '')}/${path}`,
+            ),
+        }),
+      )
     } catch (error) {
       if (error instanceof UsageError) {
         return {

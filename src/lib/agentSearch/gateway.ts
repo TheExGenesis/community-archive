@@ -4,6 +4,7 @@ import {
 } from '@/lib/clickhouseGateway'
 import type { PortalMedia, PortalQuotedTweet } from '@/lib/portal/types'
 import { callTimeoutMs, type RunLimits } from './deadline'
+import { traced } from './trace'
 import type { AgentTweet } from './types'
 
 // Tool backends. Every read goes through the ClickHouse gateway, which applies
@@ -13,6 +14,18 @@ import type { AgentTweet } from './types'
 
 const GATEWAY_TIMEOUT_MS = 20_000
 const ID = /^\d{1,20}$/
+
+/** A gateway read, timed on the run's trace when it carries one. */
+function gatewayJson<T>(
+  limits: RunLimits,
+  path: string[],
+  params: URLSearchParams,
+  options: Parameters<typeof fetchAnalyticsGatewayJson>[2],
+): Promise<T> {
+  return traced(limits, 'gateway', path[0], () =>
+    fetchAnalyticsGatewayJson<T>(path, params, options),
+  )
+}
 
 interface GatewayMedia {
   mediaUrl: string
@@ -127,9 +140,9 @@ export async function searchTweets(
   if (input.since) params.set('since', input.since)
   if (input.until) params.set('until', input.until)
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort)
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data: { tweets: GatewayTweet[]; nextOffset: number | null }
-  }>(['search'], params, {
+  }>(limits, ['search'], params, {
     baseUrl: clickHouseSearchGatewayBaseUrl(),
     timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
   })
@@ -148,9 +161,9 @@ export async function getTweetThread(
   limits: RunLimits = {},
 ): Promise<{ tweet: AgentTweet; conversation: AgentTweet[] } | null> {
   if (!ID.test(tweetId)) throw new Error('Invalid tweet id')
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data?: { tweet: GatewayTweet; conversationTweets: GatewayTweet[] }
-  }>(
+  }>(limits, 
     ['tweet', tweetId, 'thread'],
     new URLSearchParams({ limit: String(limit) }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -172,7 +185,7 @@ export async function getQuotePosts(
   limits: RunLimits = {},
 ): Promise<{ tweets: AgentTweet[]; total: number }> {
   if (!ID.test(tweetId)) throw new Error('Invalid tweet id')
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data: Array<{
       tweetId: string
       accountId: string
@@ -186,7 +199,7 @@ export async function getQuotePosts(
       media?: GatewayMedia[]
     }>
     query: { total: string | number }
-  }>(
+  }>(limits, 
     ['quote-posts', tweetId],
     new URLSearchParams({
       limit: String(Math.min(Math.max(limit, 1), 100)),
@@ -230,7 +243,7 @@ export async function getTweetsByIds(
     100,
   )
   if (valid.length === 0) return []
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data: Array<{
       tweet_id: string
       account_id: string
@@ -242,7 +255,7 @@ export async function getTweetsByIds(
       avatar_url?: string | null
       is_tombstone?: boolean
     }>
-  }>(
+  }>(limits, 
     ['bulletin-sources'],
     new URLSearchParams({ ids: valid.join(','), enrich: 'true' }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -291,12 +304,12 @@ export async function getUser(
 ): Promise<AgentUser | null> {
   const clean = identifier.trim().replace(/^@/, '')
   if (!/^[A-Za-z0-9_]{1,80}$/.test(clean)) return null
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data?: {
       account?: Record<string, unknown>
       topTweets?: Array<Record<string, unknown>>
     }
-  }>(
+  }>(limits, 
     ['user', clean],
     new URLSearchParams({ limit: '5', include_interactions: 'false' }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -329,7 +342,7 @@ export async function findMembers(
 ): Promise<
   Array<{ accountId: string | null; username: string; displayName: string }>
 > {
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data: {
       users: Array<{
         accountId: string | null
@@ -337,7 +350,7 @@ export async function findMembers(
         displayName: string
       }>
     }
-  }>(
+  }>(limits, 
     ['member-directory'],
     new URLSearchParams({
       limit: String(limit),
@@ -368,9 +381,9 @@ export async function getTweetDetails(
   for (let i = 0; i < valid.length; i += 8) {
     const batch = await Promise.all(
       valid.slice(i, i + 8).map(async (id) => {
-        const response = await fetchAnalyticsGatewayJson<{
+        const response = await gatewayJson<{
           data?: { tweet: GatewayTweet; quotedTweet: GatewayTweet | null }
-        }>(['tweet', id], new URLSearchParams(), {
+        }>(limits, ['tweet', id], new URLSearchParams(), {
           timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
         }).catch((error: { status?: number }) => {
           if (error?.status === 404) return { data: undefined }

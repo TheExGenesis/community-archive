@@ -346,6 +346,14 @@ export). Then:
 Visit `/search/ask?as=member`: in development the member preview cookie acts as
 an eligible viewer with account `dev`. It is ignored outside development.
 
+The local store also keeps two timing logs beside each run:
+`<id>.calls.jsonl` (each planner call: host, tokens, total time, time to the
+first output and to the first text or tool call) and `<id>.commands.jsonl`
+(each shell command: its gateway, semantic and scorer calls with their summed
+and in-flight time, and the archive commands they ran under, from
+`trace.ts`). `node scripts/agent-search/timing.mjs --latest 1 --steps` turns
+them into a time budget for the run.
+
 ## Evaluation
 
 `scripts/agent-search/` holds a 30-question set across six kinds of question

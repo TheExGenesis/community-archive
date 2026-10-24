@@ -26,7 +26,7 @@ import { buildRunParts } from '@/lib/agentSearch/history'
 import { agentSearchModel } from '@/lib/agentSearch/model'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 import type { AgentSearchRun } from '@/lib/agentSearch/types'
-import { withRecordedCost } from '@/lib/agentSearch/usage'
+import { logCommandTiming, withRecordedCost } from '@/lib/agentSearch/usage'
 import {
   collectAndScoreImpl,
   findPeopleImpl,
@@ -136,7 +136,7 @@ async function bashStep(
   deadlineAt: number,
 ) {
   'use step'
-  return withRecordedCost(runId, () =>
+  const output = await withRecordedCost(runId, () =>
     runBashCommand({
       command: input.command,
       manifest,
@@ -144,6 +144,8 @@ async function bashStep(
       limits: { deadlineAt },
     }),
   )
+  await logCommandTiming(runId, input.command, output)
+  return output
 }
 bashStep.maxRetries = 0
 

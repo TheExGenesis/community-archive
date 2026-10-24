@@ -1,5 +1,6 @@
 import { callTimeoutMs, type RunLimits } from './deadline'
 import { findMembers, getTweetsByIds } from './gateway'
+import { traced } from './trace'
 import type { AgentTweet } from './types'
 
 // Semantic search over the archive through the project's own embeddings API
@@ -100,19 +101,24 @@ export async function semanticSearch(
   const signal = limits.abortSignal
     ? either(timeout, limits.abortSignal)
     : timeout
-  const response = await fetchImpl(semanticSearchUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
-    body: JSON.stringify(body),
-    signal,
+  const payload = await traced(limits, 'semantic', 'search', async () => {
+    const response = await fetchImpl(semanticSearchUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+    if (!response.ok) {
+      throw new Error(`Semantic search failed: HTTP ${response.status}`)
+    }
+    return (await response.json()) as {
+      success?: unknown
+      results?: Array<{ key?: unknown; distance?: unknown }>
+    }
   })
-  if (!response.ok) {
-    throw new Error(`Semantic search failed: HTTP ${response.status}`)
-  }
-  const payload = (await response.json()) as {
-    success?: unknown
-    results?: Array<{ key?: unknown; distance?: unknown }>
-  }
   if (payload.success === false || !Array.isArray(payload.results)) {
     throw new Error('Semantic search returned an invalid payload')
   }

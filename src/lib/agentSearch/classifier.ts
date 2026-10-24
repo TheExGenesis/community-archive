@@ -13,6 +13,7 @@ import {
   estimateModelCostUsd,
   scorerPriceEnv,
 } from './model'
+import { traced } from './trace'
 
 // Scores how well each tweet answers a criterion, as P(yes). The default is
 // OpenAI's Decisions API (a predicate question per tweet, which returns the
@@ -348,21 +349,23 @@ export async function scoreTweets(
   if (unique.length === 0)
     return { scores: new Map(), scorer: agentSearchScorer(), costUsd: 0 }
   const scorer = agentSearchScorer()
-  if (scorer === 'decisions')
-    return scoreWithDecisions(
-      criterion,
-      unique,
-      process.env.OPENAI_API_KEY!,
-      limits,
-    )
-  if (scorer === 'jev')
-    return scoreWithJev(
-      criterion,
-      unique,
-      process.env.OPENROUTER_API_KEY!,
-      limits,
-    )
-  return scoreWithLlm(criterion, unique, limits)
+  return traced(limits, 'scorer', scorer, () => {
+    if (scorer === 'decisions')
+      return scoreWithDecisions(
+        criterion,
+        unique,
+        process.env.OPENAI_API_KEY!,
+        limits,
+      )
+    if (scorer === 'jev')
+      return scoreWithJev(
+        criterion,
+        unique,
+        process.env.OPENROUTER_API_KEY!,
+        limits,
+      )
+    return scoreWithLlm(criterion, unique, limits)
+  })
 }
 
 /**

@@ -340,6 +340,21 @@ describe('the archive command names', () => {
     expect(second.stdout.trim()).toBe('@bob')
   })
 
+  test('reports where the command spent its time', async () => {
+    ;(getTweetDetails as jest.Mock).mockResolvedValue([tweet('3')])
+    const result = await run('show 3; echo done')
+    expect(result.timing).toMatchObject({
+      phases: { show: expect.any(Number) },
+      execMs: expect.any(Number),
+      pageMs: expect.any(Number),
+    })
+    expect(result.timing!.spans.map((span) => span.slice(0, 3))).toContainEqual(
+      ['phase', 'shell', 'show'],
+    )
+    // The page never receives it.
+    expect(streamedBashOutput(result, new Set()).timing).toBeUndefined()
+  })
+
   test('show prints one tweet in full', async () => {
     ;(getTweetDetails as jest.Mock).mockResolvedValue([tweet('3')])
     const result = await run('show 3')

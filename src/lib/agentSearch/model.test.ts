@@ -185,6 +185,25 @@ describe('EnvLanguageModel usage recording', () => {
     )
   })
 
+  test('times a streamed call to its first output and its first action', async () => {
+    providerStreaming([
+      { type: 'stream-start', warnings: [] },
+      { type: 'reasoning-delta', delta: 'thinking' },
+      { type: 'tool-input-start', id: 'c1', toolName: 'bash' },
+      {
+        type: 'finish',
+        usage: { inputTokens: { total: 10 }, outputTokens: { total: 5 } },
+        finishReason: 'tool-calls',
+      },
+    ])
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1')
+    await drain((await model.doStream({})).stream)
+    const detail = mockRecordModelUsage.mock.calls[0][3]
+    expect(Date.parse(detail.startedAt)).not.toBeNaN()
+    expect(detail.firstOutputMs).toEqual(expect.any(Number))
+    expect(detail.firstActionMs).toBeGreaterThanOrEqual(detail.firstOutputMs)
+  })
+
   test('reads who served an OpenRouter call and what it cost, then drops the raw chunks', async () => {
     process.env.OPENROUTER_API_KEY = 'test-key'
     const doStream = jest.fn().mockResolvedValue({

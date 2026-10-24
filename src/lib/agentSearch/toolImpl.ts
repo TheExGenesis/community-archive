@@ -258,11 +258,16 @@ export async function scoreWithParents(
  * limit, so the first term cannot use it all. Shares left unused by terms
  * that run out pass to terms that still have pages. `capped` is true when
  * matching posts were left unfetched.
+ *
+ * Every term is searched with the same filters, mode and sort. The merged
+ * result interleaves the terms' lists, so with `sort: 'likes'` each term's
+ * part is in like order but the whole is not: the top of every term's list
+ * comes first.
  */
 export async function collectAcrossTerms(
   terms: string[],
   max: number,
-  filters: { since?: string; until?: string; fromUser?: string },
+  filters: Omit<SearchTweetsInput, 'query' | 'limit' | 'offset'>,
   limits: RunLimits,
 ) {
   const collected = new Map<string, AgentTweet>()

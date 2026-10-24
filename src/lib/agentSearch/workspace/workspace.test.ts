@@ -308,6 +308,77 @@ describe('the bash workspace', () => {
   })
 })
 
+describe('search with several words', () => {
+  const asked = () =>
+    (searchTweets as jest.Mock).mock.calls.map(([input]) => input)
+
+  test('matches every word by default, and says so', async () => {
+    const out = await run('search community archive > s1.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(asked()).toEqual([
+      expect.objectContaining({ query: 'community archive', mode: 'all' }),
+    ])
+    expect(out.stderr).toContain('search all of “community archive”: 4 tweets')
+    // The page's line is unchanged.
+    expect(out.summary).toBe('Searched “community archive” · 4 tweets')
+  })
+
+  test('--phrase asks for the exact phrase', async () => {
+    const out = await run('search "community archive" --phrase')
+    expect(out.exitCode).toBe(0)
+    expect(asked()).toEqual([
+      expect.objectContaining({ query: 'community archive', mode: 'phrase' }),
+    ])
+    expect(out.stderr).toContain(
+      'search “community archive” as a phrase: 4 tweets',
+    )
+  })
+
+  test('--all, the old default-changing flag, still parses and matches every word', async () => {
+    const out = await run('search community archive --all')
+    expect(out.exitCode).toBe(0)
+    expect(asked()[0]).toMatchObject({ mode: 'all' })
+    expect(out.stderr).toContain('search all of “community archive”')
+  })
+
+  test('one word reads as before', async () => {
+    const out = await run('search singapore')
+    expect(asked()[0]).toMatchObject({ query: 'singapore', mode: 'all' })
+    expect(out.stderr).toContain('search “singapore”: 4 tweets')
+  })
+
+  test('--any searches every term with the same mode, sort and reply filter', async () => {
+    const out = await run(
+      'search "community archive" --any "ca dot org",tpot --phrase --sort likes --reply-to @visakanv --from bob',
+    )
+    expect(out.exitCode).toBe(0)
+    const calls = asked()
+    expect(calls.map((input) => input.query).sort()).toEqual([
+      'ca dot org',
+      'community archive',
+      'tpot',
+    ])
+    for (const input of calls) {
+      expect(input).toMatchObject({
+        mode: 'phrase',
+        sort: 'likes',
+        replyToUser: 'visakanv',
+        fromUser: 'bob',
+      })
+    }
+    expect(out.stderr).toContain(
+      'search “community archive” or “ca dot org” or “tpot” (each as a phrase) from @bob replying to @visakanv: 4 tweets',
+    )
+
+    jest.clearAllMocks()
+    const words = await run('search ca --any "community archive"')
+    expect(asked().map((input) => input.mode)).toEqual(['all', 'all'])
+    expect(words.stderr).toContain(
+      'search “ca” or “community archive” (all words of each):',
+    )
+  })
+})
+
 describe('the tweet ids a command printed', () => {
   test('come from rows, bare lines, and lines of fields an id leads', () => {
     const stdout = [

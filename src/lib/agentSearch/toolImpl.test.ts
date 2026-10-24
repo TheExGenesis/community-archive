@@ -29,6 +29,7 @@ jest.mock('./gateway', () => ({
 import { isPolicyBlockedAccount } from './policy'
 import { findMembers, getUser, searchTweets } from './gateway'
 import {
+  collectAcrossTerms,
   collectAndScoreImpl,
   findPeopleImpl,
   searchPages,
@@ -106,6 +107,29 @@ test('a term that runs out passes its share to the others', async () => {
   expect(result.collected).toBe(6)
   expect(result.kept.map((t) => t.id)).toContain('10')
   expect(result.capped).toBe(true)
+})
+
+test('collectAcrossTerms searches every term with the same filters', async () => {
+  serve({ a: range('1', 3), 'b c': range('2', 3) })
+  const filters = {
+    mode: 'phrase' as const,
+    sort: 'likes' as const,
+    replyToUser: 'visakanv',
+    fromUser: 'bob',
+    since: '2024-01-01',
+    until: '2024-12-31',
+  }
+  const { collected, capped } = await collectAcrossTerms(
+    ['a', 'b c'],
+    10,
+    filters,
+    {},
+  )
+  expect(collected.size).toBe(6)
+  expect(capped).toBe(false)
+  const calls = (searchTweets as jest.Mock).mock.calls.map(([input]) => input)
+  expect(calls.map((input) => input.query).sort()).toEqual(['a', 'b c'])
+  for (const input of calls) expect(input).toMatchObject(filters)
 })
 
 test('collect is not capped when every term is exhausted', async () => {

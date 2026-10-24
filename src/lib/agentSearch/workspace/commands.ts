@@ -6,6 +6,8 @@ import {
   getAccountTweets,
   getTweetDetails,
   getTweetsByIdsBatched,
+  type SearchMode,
+  type SearchSort,
 } from '../gateway'
 import { inPhase } from '../trace'
 import {
@@ -225,7 +227,7 @@ function archiveCommand(state: CommandState, name: string, run: Handler) {
 
 export const USAGE: Record<string, string> = {
   search:
-    'usage: search <words> [--any w1,w2] [--all] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]',
+    'usage: search <words> [--any w1,w2] [--phrase] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]',
   semantic:
     'usage: semantic "<what the tweets say, in plain words>" [--from @handle] [--k N] [--threshold 0-1]',
   people: 'usage: people <name or handle>',
@@ -240,6 +242,29 @@ export const USAGE: Record<string, string> = {
   show: 'usage: show <tweet id>',
 }
 
+const SEARCH_SORTS: readonly SearchSort[] = [
+  'newest',
+  'oldest',
+  'likes',
+  'reposts',
+]
+
+/**
+ * What a search looked for, saying how several words matched:
+ * `all of “a b”`, `“a b” as a phrase`, or for --any terms
+ * `“a” or “b c” (all words of each)`.
+ */
+function searchedFor(terms: string[], mode: SearchMode) {
+  const quoted = terms.map(quote).join(' or ')
+  if (mode === 'all' && !terms.some((term) => /\s/.test(term))) return quoted
+  if (terms.length === 1) {
+    return mode === 'phrase' ? `${quoted} as a phrase` : `all of ${quoted}`
+  }
+  return mode === 'phrase'
+    ? `${quoted} (each as a phrase)`
+    : `${quoted} (all words of each)`
+}
+
 async function search(
   state: CommandState,
   args: string[],
@@ -247,17 +272,20 @@ async function search(
   const { positional, flags } = parseCommandArgs(
     args,
     ['any', 'from', 'reply-to', 'since', 'until', 'sort', 'limit'],
-    ['all'],
+    ['phrase', 'all'],
   )
   const query = positional.join(' ').trim()
   if (!query) throw new UsageError('give the words to search for')
-  const sort = flags.sort
-  if (
-    sort !== undefined &&
-    !['newest', 'oldest', 'likes', 'reposts'].includes(String(sort))
-  ) {
+  const sort = flags.sort as SearchSort | undefined
+  if (sort !== undefined && !SEARCH_SORTS.includes(sort)) {
     throw new UsageError('--sort must be newest, oldest, likes or reposts')
   }
+  // Several words match every word, in any order, unless --phrase asks for
+  // the exact phrase. --all asked for every word when the phrase was the
+  // default; it is accepted, and changes nothing, so older prompts and
+  // stored runs still parse. The typed search_tweets tool keeps the
+  // gateway's own default.
+  const mode: SearchMode = flags.phrase ? 'phrase' : 'all'
   const limit = intFlag(flags.limit, 'limit', SEARCH_DEFAULT, MAX_COLLECT)
   const fromUser = handleFlag(flags.from)
   const replyToUser = handleFlag(flags['reply-to'])
@@ -270,51 +298,44 @@ async function search(
           .map((term) => term.trim())
           .filter(Boolean)
       : []
+  const filters = { mode, fromUser, replyToUser, since, until, sort }
 
   state.calls += 1
   let tweets: AgentTweet[] = []
   let more = false
+  const terms = alternatives.length
+    ? Array.from(new Set([query, ...alternatives])).slice(0, 9)
+    : [query]
   if (alternatives.length) {
-    const terms = Array.from(new Set([query, ...alternatives])).slice(0, 9)
+    // Every term is searched in the same mode, with the same filters and
+    // sort. With --sort likes the merged rows interleave each term's sorted
+    // list, so they are not in like order overall.
     const { collected, capped } = await collectAcrossTerms(
       terms,
       limit,
-      { since, until, fromUser },
+      filters,
       state.limits,
     )
     tweets = Array.from(collected.values())
     more = capped
   } else {
-    const result = await searchPages(
-      {
-        query,
-        mode: flags.all ? 'all' : undefined,
-        fromUser,
-        replyToUser,
-        since,
-        until,
-        sort: sort as 'newest' | 'oldest' | 'likes' | 'reposts' | undefined,
-      },
-      limit,
-      state.limits,
-    )
+    const result = await searchPages({ ...filters, query }, limit, state.limits)
     tweets = result.tweets
     more = result.nextOffset !== null
   }
   remember(state, tweets)
-  const what = [
-    alternatives.length
-      ? [query, ...alternatives].map(quote).join(' or ')
-      : quote(query),
+  // The page's line names the words; the model's also says how they matched.
+  const who = [
     fromUser ? `from @${fromUser}` : null,
     replyToUser ? `replying to @${replyToUser}` : null,
   ]
-    .filter(Boolean)
-    .join(' ')
-  state.summaries.push(`Searched ${what} · ${plural(tweets.length, 'tweet')}`)
+  const words = (head: string) => [head, ...who].filter(Boolean).join(' ')
+  state.summaries.push(
+    `Searched ${words([query, ...alternatives].map(quote).join(' or '))} · ${plural(tweets.length, 'tweet')}`,
+  )
   return {
     stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
-    stderr: `search ${what}: ${describe(tweets)}${more ? ` · more exist (raise --limit, max ${MAX_COLLECT})` : ''}\n`,
+    stderr: `search ${words(searchedFor(terms, mode))}: ${describe(tweets)}${more ? ` · more exist (raise --limit, max ${MAX_COLLECT})` : ''}\n`,
     exitCode: 0,
   }
 }

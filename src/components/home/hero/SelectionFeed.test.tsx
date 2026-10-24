@@ -54,13 +54,11 @@ const scrollTo = jest.fn()
 const observe = jest.fn()
 const originalResizeObserver = window.ResizeObserver
 beforeAll(() => {
-  window.matchMedia = jest
-    .fn()
-    .mockImplementation(() => ({
-      matches: mobile,
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-    }))
+  window.matchMedia = jest.fn().mockImplementation(() => ({
+    matches: mobile,
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  }))
   window.IntersectionObserver = jest
     .fn()
     .mockImplementation(() => ({ observe, disconnect: jest.fn() }))
@@ -141,13 +139,13 @@ const snapshot = {
   cells: [{ accounts: 10, archived: 2, region: 1 }],
   regions: [{ id: 1, name: 'Test community', terms: [] }],
 } as unknown as HexSnapshot
-function Panel() {
+function Panel({ selected = [0] }: { selected?: number[] }) {
   const [tab, setTab] = useState('Stories')
   return (
     <StoryPanel
       snapshot={snapshot}
       coverageLive
-      selected={[0]}
+      selected={selected}
       selectionTab={tab}
       onSelectionTab={setTab}
       onClear={noop}
@@ -158,6 +156,75 @@ function Panel() {
     />
   )
 }
+
+it('limits mobile browse to the latest digest day, including cached desktop history', () => {
+  const edition = (date: string, ids: string[]) => ({
+    date,
+    headline: `Digest for ${date}`,
+    stories: ids.map((id) => ({ id })),
+  })
+  result = {
+    ...base,
+    data: {
+      pages: [
+        {
+          ...empty,
+          editions: [
+            edition('2026-10-23', ['today-first', 'today-second']),
+            edition('2026-10-22', ['yesterday']),
+          ],
+        },
+        { ...empty, editions: [edition('2026-10-21', ['older'])] },
+      ],
+    },
+  }
+  mobile = true
+  const { rerender } = render(<Panel selected={[]} />)
+  expect(screen.getByText('today-first')).toBeInTheDocument()
+  expect(screen.getByText('today-second')).toBeInTheDocument()
+  expect(screen.queryByText('yesterday')).not.toBeInTheDocument()
+  expect(screen.queryByText('older')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Load more' }),
+  ).not.toBeInTheDocument()
+  expect(observe).not.toHaveBeenCalled()
+  expect(load).not.toHaveBeenCalled()
+
+  mobile = false
+  rerender(<Panel selected={[]} />)
+  expect(screen.getByText('yesterday')).toBeInTheDocument()
+  expect(screen.getByText('older')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(load).toHaveBeenCalledTimes(1)
+
+  mobile = true
+  rerender(<Panel selected={[]} />)
+  expect(screen.queryByText('yesterday')).not.toBeInTheDocument()
+  expect(screen.queryByText('older')).not.toBeInTheDocument()
+})
+
+it('keeps the latest available digest on mobile when publication is delayed', () => {
+  mobile = true
+  result = {
+    ...base,
+    data: {
+      pages: [
+        {
+          ...empty,
+          editions: [
+            {
+              date: '2026-10-20',
+              headline: 'Latest available edition',
+              stories: [{ id: 'latest-available-story' }],
+            },
+          ],
+        },
+      ],
+    },
+  }
+  render(<Panel selected={[]} />)
+  expect(screen.getByText('latest-available-story')).toBeInTheDocument()
+})
 it('defaults an empty digest to Best but lets the user return to Digest', () => {
   render(<Panel />)
   expect(screen.getAllByRole('tab').map((el) => el.textContent)).toEqual([

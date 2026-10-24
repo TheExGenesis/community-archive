@@ -109,7 +109,13 @@ export default function StoryPanel({
   } = query
   useEffect(() => {
     const button = sentinel.current
-    if (!button || !hasNextPage || isFetchingNextPage || isFetchNextPageError)
+    if (
+      mobile ||
+      !button ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      isFetchNextPageError
+    )
       return
     const observer = new IntersectionObserver(
       (entries) => {
@@ -138,6 +144,14 @@ export default function StoryPanel({
         (id) => snapshot.regions.find((r) => r.id === id)!,
       )
     : []
+  // The homepage flows into the rest of the page on mobile. Keep browse to
+  // the latest edition even if desktop history is already in the query cache.
+  const browsePages = mobile
+    ? pages?.pages.slice(0, 1).map((page) => ({
+        ...page,
+        editions: page.editions.slice(0, 1),
+      }))
+    : pages?.pages
 
   return (
     <aside
@@ -329,7 +343,7 @@ export default function StoryPanel({
                 <button onClick={() => query.refetch()}>Try again</button>
               </div>
             ) : (
-              query.data?.pages.map((page, i) => (
+              browsePages?.map((page, i) => (
                 <div key={i} className={styles.editionPage}>
                   {page.editions.map((edition) => (
                     <section className={styles.edition} key={edition.date}>
@@ -363,7 +377,7 @@ export default function StoryPanel({
               !query.data.pages.some(
                 (p) => p.editions.length || p.stories.length,
               ) && <p className={styles.message}>No published stories yet.</p>}
-            {query.hasNextPage && (
+            {!mobile && query.hasNextPage && (
               <button
                 ref={sentinel}
                 className={styles.load}

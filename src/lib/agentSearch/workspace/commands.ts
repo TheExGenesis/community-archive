@@ -1,7 +1,12 @@
 import { decodeBytesToUtf8, defineCommand } from 'just-bash'
 import { ScoringError } from '../classifier'
 import type { RunLimits } from '../deadline'
-import { getTweetDetails, getTweetsByIds, searchTweets } from '../gateway'
+import {
+  ApiV1Error,
+  getAccountTweets,
+  getTweetDetails,
+  getTweetsByIdsBatched,
+} from '../gateway'
 import { inPhase } from '../trace'
 import {
   BORDERLINE_THRESHOLD,
@@ -12,6 +17,7 @@ import {
   getQuotePostsImpl,
   getThreadImpl,
   scoreWithParents,
+  searchPages,
 } from '../toolImpl'
 import {
   MAX_SEMANTIC_CALLS_PER_RUN,
@@ -64,8 +70,14 @@ export function createCommandState(
 }
 
 const SEARCH_DEFAULT = 50
-const PAGE = 100
 const MAX_IDS_PER_COMMAND = MAX_COLLECT
+/** timeline: tweets per API page, the default, and the most one command reads. */
+const TIMELINE_PAGE = 200
+const TIMELINE_DEFAULT = 200
+const MAX_TIMELINE = 3000
+/** par: the most command lines it takes, and how many run at once. */
+const MAX_PAR = 30
+const PAR_CONCURRENCY = 6
 
 /** Fetches tweets by id through the gateway, using what this run has seen. */
 export async function fetchTweets(
@@ -73,9 +85,9 @@ export async function fetchTweets(
   ids: string[],
 ): Promise<AgentTweet[]> {
   const missing = ids.filter((id) => !state.cache.has(id))
-  for (let i = 0; i < missing.length; i += 100) {
-    const batch = await getTweetsByIds(missing.slice(i, i + 100), state.limits)
-    for (const tweet of batch) state.cache.set(tweet.id, tweet)
+  if (missing.length) {
+    const found = await getTweetsByIdsBatched(missing, state.limits)
+    for (const tweet of found) state.cache.set(tweet.id, tweet)
   }
   return ids
     .map((id) => state.cache.get(id))
@@ -215,6 +227,9 @@ export const USAGE: Record<string, string> = {
   semantic:
     'usage: semantic "<what the tweets say, in plain words>" [--from @handle] [--k N] [--threshold 0-1]',
   people: 'usage: people <name or handle>',
+  timeline:
+    'usage: timeline @handle [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--oldest] [--no-replies] [--retweets] [--limit N]',
+  par: "usage: par '<command with {}>' word... | par '<command>' '<command>'...",
   score:
     'usage: score <file> "<yes/no question about one tweet>" [--no-parent]',
   thread: 'usage: thread <tweet id>',
@@ -268,28 +283,21 @@ async function search(
     tweets = Array.from(collected.values())
     more = capped
   } else {
-    let offset: number | null = 0
-    while (offset !== null && tweets.length < limit) {
-      const page: { tweets: AgentTweet[]; nextOffset: number | null } =
-        await searchTweets(
-          {
-            query,
-            mode: flags.all ? 'all' : undefined,
-            fromUser,
-            replyToUser,
-            since,
-            until,
-            sort: sort as 'newest' | 'oldest' | 'likes' | 'reposts' | undefined,
-            limit: Math.min(PAGE, limit - tweets.length),
-            offset,
-          },
-          state.limits,
-        )
-      tweets.push(...page.tweets)
-      offset = page.tweets.length ? page.nextOffset : null
-    }
-    more = offset !== null
-    tweets = tweets.slice(0, limit)
+    const result = await searchPages(
+      {
+        query,
+        mode: flags.all ? 'all' : undefined,
+        fromUser,
+        replyToUser,
+        since,
+        until,
+        sort: sort as 'newest' | 'oldest' | 'likes' | 'reposts' | undefined,
+      },
+      limit,
+      state.limits,
+    )
+    tweets = result.tweets
+    more = result.nextOffset !== null
   }
   remember(state, tweets)
   const what = [
@@ -363,6 +371,80 @@ async function semantic(
       ` · ${state.semanticRemaining} semantic ${state.semanticRemaining === 1 ? 'search' : 'searches'} left\n`,
     exitCode: 0,
   }
+}
+
+const HANDLE_ARG = /^@?[A-Za-z0-9_]{1,50}$/
+
+/** One person's own tweets, newest first, through the API's timeline. */
+async function timeline(
+  state: CommandState,
+  args: string[],
+): Promise<CommandResult> {
+  const { positional, flags } = parseCommandArgs(
+    args,
+    ['since', 'until', 'limit'],
+    ['oldest', 'no-replies', 'retweets'],
+  )
+  const handle = positional.join('').trim()
+  if (!HANDLE_ARG.test(handle)) throw new UsageError('give one @handle')
+  const limit = intFlag(flags.limit, 'limit', TIMELINE_DEFAULT, MAX_TIMELINE)
+  const since = dateFlag(flags.since, 'since')
+  const until = dateFlag(flags.until, 'until')
+  const name = `@${handle.replace(/^@/, '')}`
+
+  state.calls += 1
+  const tweets: AgentTweet[] = []
+  let cursor: string | null | undefined
+  try {
+    do {
+      const page = await getAccountTweets(
+        {
+          account: name,
+          order: flags.oldest ? 'asc' : 'desc',
+          since,
+          // --until is inclusive, like search; the API's is exclusive.
+          until: until && nextDay(until),
+          excludeReplies: Boolean(flags['no-replies']),
+          excludeRetweets: !flags.retweets,
+          limit: Math.min(TIMELINE_PAGE, limit - tweets.length),
+          ...(cursor ? { cursor } : {}),
+        },
+        state.limits,
+      )
+      tweets.push(...page.tweets)
+      cursor = page.tweets.length ? page.nextCursor : null
+    } while (cursor && tweets.length < limit)
+  } catch (error) {
+    if (error instanceof ApiV1Error && error.status === 404) {
+      state.summaries.push(`No member ${name}`)
+      return {
+        stdout: '',
+        stderr: `timeline ${name}: no such member in the archive (try people)\n`,
+        exitCode: 1,
+      }
+    }
+    throw error
+  }
+  remember(state, tweets)
+  state.summaries.push(
+    `Read ${name}'s tweets · ${plural(tweets.length, 'tweet')}`,
+  )
+  return {
+    stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
+    stderr:
+      `timeline ${name}: ${describe(tweets)}` +
+      (cursor
+        ? ` · more exist (raise --limit, max ${MAX_TIMELINE}, or use --since/--until)`
+        : '') +
+      '\n',
+    exitCode: 0,
+  }
+}
+
+function nextDay(date: string) {
+  const next = new Date(`${date}T00:00:00Z`)
+  next.setUTCDate(next.getUTCDate() + 1)
+  return next.toISOString().slice(0, 10)
 }
 
 async function people(
@@ -571,9 +653,53 @@ async function show(
   return { stdout: `${lines.join('\n')}\n`, stderr: '', exitCode: 0 }
 }
 
+/**
+ * Runs several command lines at once (a for loop runs them in turn): either
+ * one template with {} filled by each word, or each argument as its own line.
+ * Output comes back in argument order; the exit code is the highest.
+ */
+const par = defineCommand('par', async (args, ctx) => {
+  const usage = (message: string) => ({
+    stdout: '',
+    stderr: `par: ${message}\n${USAGE.par}\n`,
+    exitCode: 2,
+  })
+  if (!ctx.exec) return usage('cannot run commands here')
+  const [first, ...rest] = args
+  if (!first) return usage('give the commands to run')
+  const lines = first.includes('{}')
+    ? rest.map((word) => first.replaceAll('{}', word))
+    : args
+  if (!lines.length) return usage('give the words to fill {} with')
+  if (lines.length > MAX_PAR) return usage(`at most ${MAX_PAR} commands`)
+  const results = new Array<{
+    stdout: string
+    stderr: string
+    exitCode: number
+  }>(lines.length)
+  let next = 0
+  const exec = ctx.exec
+  const worker = async () => {
+    while (next < lines.length) {
+      const index = next++
+      results[index] = await exec(lines[index], { cwd: ctx.cwd })
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(PAR_CONCURRENCY, lines.length) }, worker),
+  )
+  return {
+    stdout: results.map((r) => r.stdout).join(''),
+    stderr: results.map((r) => r.stderr).join(''),
+    exitCode: Math.max(0, ...results.map((r) => r.exitCode)),
+  }
+})
+
 /** The archive commands for one shell execution. */
 export function archiveCommands(state: CommandState) {
   return [
+    par,
+    archiveCommand(state, 'timeline', (args) => timeline(state, args)),
     archiveCommand(state, 'search', (args) => search(state, args)),
     archiveCommand(state, 'semantic', (args) => semantic(state, args)),
     archiveCommand(state, 'people', (args) => people(state, args)),

@@ -25,8 +25,10 @@ export const DECISIONS_MODEL = 'gpt-6-luna'
 // Input tokens only; no output or cache charges (Decisions guide, 2026-10-08).
 const DECISIONS_USD_PER_MTOK = 0.1
 // One request per tweet. Measured on 300 posts: 16 at a time 9.1 s, 48 at a
-// time 2.8 s, 100 at a time 1.7 s, no 429s (limits: 5,000 RPM, 2M TPM).
-const DECISIONS_CONCURRENCY = 48
+// time 2.8 s, 100 at a time 1.7 s, no 429s (limits: 5,000 RPM, 2M TPM). A
+// 1,000-post score is 1,000 requests, well inside a minute's limit; 429s are
+// retried with backoff.
+const DECISIONS_CONCURRENCY = 100
 const DECISIONS_ATTEMPTS = 3
 export const JEV_MODEL = 'typesafe/jev-1.13'
 const JEV_BATCH = 50

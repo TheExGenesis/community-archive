@@ -43,8 +43,10 @@ Archive commands (rows on stdout, a one-line summary on stderr, so you see the s
 - search <words> [--any w1,w2] [--all] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match as an exact phrase unless you add --all; --any adds alternative words or phrases. Retweets are excluded.
 - semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes a second or two and a question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision.
 - people <name or handle>: matching members, to get the right handle.
+- timeline @handle [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--oldest] [--no-replies] [--retweets] [--limit N]: that person's own tweets, newest first (200 by default, up to 3000; retweets only with --retweets). Use it to read what someone posts and whom they reply to, rather than searching their tweets for common words.
 - score <file> "<yes/no question about one tweet>": asks the question of every tweet in the file (a reply is read with its parent) and prints the rows with p, the probability of yes, highest first. p ≥ 0.5 means yes. Use it when a search returns more tweets than you can read.
 - thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), show <id> (one tweet in full, with what it quotes).
+- par runs archive commands at the same time, while a for loop runs them one after another. par 'search "{}" --limit 100 > s_{}.jsonl' privacy consent scraping fills {} with each word; par 'timeline @a > a.jsonl' 'timeline @b > b.jsonl' runs each line. Output comes back in the order given.
 - Also: jq, grep, sort, uniq, head, tail, wc, cut, awk, sed, mkdir.
 
 How to work:
@@ -541,8 +543,7 @@ export function createAgentSearchTools(
         }),
     }),
     semantic_search: tool({
-      description:
-        `Search tweets by meaning, for ideas people express in different words. Limited to ${MAX_SEMANTIC_CALLS_PER_RUN} per question; use search_tweets for names, handles, exact phrases and dates.`,
+      description: `Search tweets by meaning, for ideas people express in different words. Limited to ${MAX_SEMANTIC_CALLS_PER_RUN} per question; use search_tweets for names, handles, exact phrases and dates.`,
       inputSchema: z.object({
         query: z.string().min(3).max(300),
         fromUser: z.string().max(40).optional(),

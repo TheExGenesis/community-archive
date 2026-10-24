@@ -51,7 +51,7 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    searches are too many and too noisy to read, it collects a file of
    candidates (up to 1,000) and scores each one against a yes/no criterion
    (`classifier.ts`). The default scorer is OpenAI's Decisions API (one
-   `predicate` question per post, 48 requests at a time); Jev through
+   `predicate` question per post, 100 requests at a time); Jev through
    OpenRouter and an LLM with structured output are alternatives. Replies are
    scored with their parent's text.
 4. The answer cites single tweets as `[[t:<id>]]` (alone on a line, the tweet
@@ -90,8 +90,10 @@ work on files under `/work`, and archive commands are added
 | `search <words> [--any w1,w2] [--all] [--from @h] [--reply-to @h] [--since D] [--until D] [--sort …] [--limit N]` | Keyword search; JSONL tweets to stdout (50 by default, up to 1,000)                            |
 | `semantic "<idea>" [--from @h] [--k N] [--threshold 0-1]`                                                         | Meaning search (below); rows carry `distance`                                                  |
 | `people <name or handle>`                                                                                         | Members and accounts matching a name                                                           |
+| `timeline @handle [--since D] [--until D] [--oldest] [--no-replies] [--retweets] [--limit N]`                     | That person's own tweets by date, newest first (200 by default, up to 3,000; no retweets unless asked), from API v1 |
 | `score <file> "<yes/no question>" [--no-parent]`                                                                  | Scores every tweet in a file; rows gain `p`, best first                                        |
 | `thread <id>`, `quotes <id>`, `tweets <id…>`, `show <id>`                                                         | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet |
+| `par '<command with {}>' word…` or `par '<command>' '<command>'…`                                                  | Runs up to 30 command lines, 6 at a time, output in the order given (a `for` loop runs them one after another) |
 
 A tweet file is JSONL, one tweet per line: `id`, `author`, `date`, `likes`,
 `reposts`, `replyTo`, `quotes`, `media`, `p` when scored, and `text`. Each
@@ -130,6 +132,18 @@ gateway anyway, keeping the API's order and distance. A username filter
 searches all of that member's tweets, but the API compares the handle
 case-sensitively, so `semantic.ts` sends the member directory's spelling. A
 failed semantic call does not count as the archive being down.
+
+Inside a command, archive calls run in turn unless they are independent:
+`search` asks for its first page alone and the rest four at a time, `--any`
+searches its terms together, id lookups go 100 ids per call with four calls in
+flight, and `par` runs whole command lines together. just-bash itself runs
+`&`, `;` and loops one command after another.
+
+`timeline` reads the API v1 route `GET /accounts/{account}/tweets` (200 per
+page, keyset cursor). Locally the gateway stand-in serves it at
+`<CLICKHOUSE_SEARCH_API_URL>/v1`. Which production route and key the agent
+should use is not settled: the keyed public API allows 60 requests a minute and
+two in flight per account, which a run can exceed.
 
 The prompt steers semantic search to paraphrased ideas, surveys and
 investigative questions, and keyword search to names, handles, exact phrases
@@ -227,6 +241,7 @@ resolved headers, including the API key, into the event log.
 | `AGENT_SEARCH_PROMPT`                                                                                           | `v2-examples`                                    | `v1` (numbered procedure) or `v2` (goal and definition of done, no examples) instead of the default. The route passes it to the run, which keeps it |
 | `AGENT_SEARCH_KEEP_REASONING`                                                                                   | on                                               | `off` stops putting each step's reasoning back on its tool call (the workflow agent drops it between steps; DeepSeek expects it back) |
 | `AGENT_SEARCH_STALL_REMINDER`                                                                                   | on                                               | `off` stops the reminder to take stock after a repeated command or three commands in a row that found nothing new |
+| `COMMUNITY_ARCHIVE_API_V1_URL`, `COMMUNITY_ARCHIVE_API_KEY`                                                     | `/v1` on the gateway host; the gateway token   | Where `timeline` reads API v1, and with which key |
 | `SEMANTIC_SEARCH_URL`                                                                                           | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint                                                                                                                                                          |
 | `OPENROUTER_API_BASE_URL`                                                                                       | `https://openrouter.ai/api/v1`                   | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default                                                                              |
 | `AGENT_SEARCH_SCORER`                                                                                           | unset                                            | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM                                                                   |

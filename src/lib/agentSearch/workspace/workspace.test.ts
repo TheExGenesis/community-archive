@@ -24,6 +24,24 @@ jest.mock('../policy', () => ({
 jest.mock('../gateway', () => ({
   searchTweets: jest.fn(),
   getTweetsByIds: jest.fn(),
+  // Batched lookups go through the mocked single lookup, 100 ids at a time.
+  getTweetsByIdsBatched: jest.fn(async (ids: string[], limits: unknown) => {
+    const { getTweetsByIds } = jest.requireMock('../gateway')
+    const found: unknown[] = []
+    for (let i = 0; i < ids.length; i += 100)
+      found.push(...(await getTweetsByIds(ids.slice(i, i + 100), limits)))
+    return found
+  }),
+  getAccountTweets: jest.fn(),
+  ApiV1Error: class ApiV1Error extends Error {
+    constructor(
+      readonly status: number,
+      readonly code: string,
+      message: string,
+    ) {
+      super(message)
+    }
+  },
   findMembers: jest.fn(async () => [
     { accountId: '1', username: 'visakanv', displayName: 'Visakan' },
   ]),
@@ -37,7 +55,13 @@ jest.mock('../semantic', () => ({
   semanticSearch: jest.fn(),
 }))
 
-import { getTweetDetails, getTweetsByIds, searchTweets } from '../gateway'
+import {
+  ApiV1Error,
+  getAccountTweets,
+  getTweetDetails,
+  getTweetsByIds,
+  searchTweets,
+} from '../gateway'
 import { MAX_SEMANTIC_CALLS_PER_RUN, semanticSearch } from '../semantic'
 import { USAGE } from './commands'
 import { applyChanges, type WorkspaceManifest } from './manifest'
@@ -361,6 +385,94 @@ describe('the archive command names', () => {
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('@alice')
     expect(result.stdout).toContain('tweet 3 about singapore')
+  })
+})
+
+describe('timeline', () => {
+  test("reads one person's tweets page by page, newest first, without retweets", async () => {
+    ;(getAccountTweets as jest.Mock).mockImplementation(async ({ cursor }) =>
+      cursor === 'c1'
+        ? { tweets: [tweet('3')], nextCursor: null }
+        : { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' },
+    )
+    const result = await run('timeline @alice --until 2025-01-31 > a.jsonl')
+    expect(result.exitCode).toBe(0)
+    expect(result.files).toEqual({ 'a.jsonl': ['1', '2', '3'] })
+    expect(result.summary).toBe("Read @alice's tweets · 3 tweets")
+    expect((getAccountTweets as jest.Mock).mock.calls[0][0]).toMatchObject({
+      account: '@alice',
+      order: 'desc',
+      // --until is inclusive; the API's is exclusive.
+      until: '2025-02-01',
+      excludeReplies: false,
+      excludeRetweets: true,
+      limit: 200,
+    })
+    expect((getAccountTweets as jest.Mock).mock.calls[1][0].cursor).toBe('c1')
+  })
+
+  test('takes the oldest first, drops replies, keeps retweets and caps the count', async () => {
+    ;(getAccountTweets as jest.Mock).mockResolvedValue({
+      tweets: [tweet('1')],
+      nextCursor: 'more',
+    })
+    const result = await run(
+      'timeline maskys_ --oldest --no-replies --retweets --limit 50',
+    )
+    expect((getAccountTweets as jest.Mock).mock.calls[0][0]).toMatchObject({
+      account: '@maskys_',
+      order: 'asc',
+      excludeReplies: true,
+      excludeRetweets: false,
+      limit: 50,
+    })
+    expect(result.stderr).toContain('more exist')
+  })
+
+  test('says when the person is not in the archive', async () => {
+    ;(getAccountTweets as jest.Mock).mockRejectedValue(
+      new ApiV1Error(404, 'not_found', 'account not found'),
+    )
+    const result = await run('timeline @nobody_here')
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('no such member')
+  })
+})
+
+describe('par', () => {
+  test('runs archive commands at once and keeps their order', async () => {
+    const inner = (searchTweets as jest.Mock).getMockImplementation()!
+    let inFlight = 0
+    let most = 0
+    ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+      most = Math.max(most, ++inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      inFlight--
+      return inner(input)
+    })
+    const result = await run(
+      `par 'search "{}" > s_{}.jsonl' singapore about; ls`,
+    )
+    expect(result.exitCode).toBe(0)
+    expect(most).toBe(2)
+    expect(Object.keys(result.files).sort()).toEqual([
+      's_about.jsonl',
+      's_singapore.jsonl',
+    ])
+    expect(result.stderr.indexOf('“singapore”')).toBeLessThan(
+      result.stderr.indexOf('“about”'),
+    )
+  })
+
+  test('runs each argument as its own line, and refuses an empty or oversized call', async () => {
+    const both = await run(`par 'echo one' 'echo two'`)
+    expect(both.stdout).toBe('one\ntwo\n')
+    const empty = await run(`par 'search {}'`)
+    expect(empty.exitCode).toBe(2)
+    const words = Array.from({ length: 31 }, (_, i) => `w${i}`).join(' ')
+    const many = await run(`par 'echo {}' ${words}`)
+    expect(many.exitCode).toBe(2)
+    expect(many.stderr).toContain('at most 30')
   })
 })
 

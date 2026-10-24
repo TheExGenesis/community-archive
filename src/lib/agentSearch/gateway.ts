@@ -15,6 +15,10 @@ import type { AgentTweet } from './types'
 const GATEWAY_TIMEOUT_MS = 20_000
 const ID = /^\d{1,20}$/
 
+/** Id lookups are 100 at a time; this many run at once. */
+const ID_BATCH = 100
+const ID_BATCH_CONCURRENCY = 4
+
 /** A gateway read, timed on the run's trace when it carries one. */
 function gatewayJson<T>(
   limits: RunLimits,
@@ -163,7 +167,8 @@ export async function getTweetThread(
   if (!ID.test(tweetId)) throw new Error('Invalid tweet id')
   const response = await gatewayJson<{
     data?: { tweet: GatewayTweet; conversationTweets: GatewayTweet[] }
-  }>(limits, 
+  }>(
+    limits,
     ['tweet', tweetId, 'thread'],
     new URLSearchParams({ limit: String(limit) }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -199,7 +204,8 @@ export async function getQuotePosts(
       media?: GatewayMedia[]
     }>
     query: { total: string | number }
-  }>(limits, 
+  }>(
+    limits,
     ['quote-posts', tweetId],
     new URLSearchParams({
       limit: String(Math.min(Math.max(limit, 1), 100)),
@@ -234,6 +240,30 @@ export async function getQuotePosts(
   }
 }
 
+/**
+ * Looks up any number of tweets by id, 100 per call with a few calls in
+ * flight, and returns what the gateway had, in no particular order.
+ */
+export async function getTweetsByIdsBatched(
+  ids: string[],
+  limits: RunLimits = {},
+): Promise<AgentTweet[]> {
+  const unique = Array.from(new Set(ids))
+  const batches: string[][] = []
+  for (let i = 0; i < unique.length; i += ID_BATCH)
+    batches.push(unique.slice(i, i + ID_BATCH))
+  const found: AgentTweet[] = []
+  for (let i = 0; i < batches.length; i += ID_BATCH_CONCURRENCY) {
+    const pages = await Promise.all(
+      batches
+        .slice(i, i + ID_BATCH_CONCURRENCY)
+        .map((batch) => getTweetsByIds(batch, limits)),
+    )
+    for (const page of pages) found.push(...page)
+  }
+  return found
+}
+
 export async function getTweetsByIds(
   ids: string[],
   limits: RunLimits = {},
@@ -255,7 +285,8 @@ export async function getTweetsByIds(
       avatar_url?: string | null
       is_tombstone?: boolean
     }>
-  }>(limits, 
+  }>(
+    limits,
     ['bulletin-sources'],
     new URLSearchParams({ ids: valid.join(','), enrich: 'true' }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -309,7 +340,8 @@ export async function getUser(
       account?: Record<string, unknown>
       topTweets?: Array<Record<string, unknown>>
     }
-  }>(limits, 
+  }>(
+    limits,
     ['user', clean],
     new URLSearchParams({ limit: '5', include_interactions: 'false' }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -350,7 +382,8 @@ export async function findMembers(
         displayName: string
       }>
     }
-  }>(limits, 
+  }>(
+    limits,
     ['member-directory'],
     new URLSearchParams({
       limit: String(limit),
@@ -399,4 +432,160 @@ export async function getTweetDetails(
     for (const tweet of batch) if (tweet) tweets.push(tweet)
   }
   return tweets
+}
+
+// --- API v1 ---------------------------------------------------------------
+// One account's own tweets come from the public API v1 contract
+// (analytics.community-archive.org/v1/openapi.json). Locally the gateway
+// stand-in serves it at <CLICKHOUSE_SEARCH_API_URL>/v1. Which production
+// route and key the agent should use is not decided yet: the keyed public API
+// allows 60 requests a minute and two in flight per account.
+
+interface V1Tweet {
+  tweet_id: string
+  account_id: string
+  username: string | null
+  account_display_name: string | null
+  avatar_media_url: string | null
+  created_at: string
+  full_text: string
+  favorite_count: number
+  retweet_count: number
+  reply_to_tweet_id: string | null
+  reply_to_username: string | null
+  quoted_tweet_id: string | null
+  media?: Array<{
+    media_url: string
+    media_type: string
+    width: number | null
+    height: number | null
+  }>
+}
+
+/**
+ * The API v1 base: COMMUNITY_ARCHIVE_API_V1_URL, else /v1 on the gateway host
+ * (the search URL, or the analytics URL without its /analytics).
+ */
+export function apiV1BaseUrl(
+  env: Record<string, string | undefined> = process.env,
+) {
+  const explicit = env.COMMUNITY_ARCHIVE_API_V1_URL?.trim()
+  if (explicit) return explicit.replace(/\/$/, '')
+  const host =
+    env.CLICKHOUSE_SEARCH_API_URL?.trim() ||
+    env.CLICKHOUSE_ANALYTICS_API_URL?.trim().replace(/\/analytics\/?$/, '')
+  return host ? `${host.replace(/\/$/, '')}/v1` : undefined
+}
+
+/** An API v1 error, with the HTTP status and the API's error code. */
+export class ApiV1Error extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiV1Error'
+  }
+}
+
+async function apiV1Json<T>(
+  label: string,
+  path: string,
+  params: URLSearchParams,
+  limits: RunLimits,
+): Promise<T> {
+  const base = apiV1BaseUrl()
+  if (!base) throw new Error('CLICKHOUSE_SEARCH_API_URL is not configured')
+  const token =
+    process.env.COMMUNITY_ARCHIVE_API_KEY?.trim() ||
+    process.env.CLICKHOUSE_ANALYTICS_API_TOKEN
+  if (!token) throw new Error('No key for the Community Archive API v1')
+  const timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
+  return traced(limits, 'gateway', label, async () => {
+    const response = await fetch(`${base}${path}?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+      cache: 'no-store',
+    })
+    const body = (await response.json().catch(() => null)) as
+      | (T & { error?: { code?: string; message?: string } })
+      | null
+    if (!response.ok || !body) {
+      throw new ApiV1Error(
+        response.status,
+        body?.error?.code ?? 'upstream_unavailable',
+        body?.error?.message ??
+          `Community Archive API failed (${response.status})`,
+      )
+    }
+    return body
+  })
+}
+
+const fromV1 = (row: V1Tweet): AgentTweet =>
+  toAgentTweet({
+    tweetId: row.tweet_id,
+    accountId: row.account_id,
+    createdAt: row.created_at,
+    fullText: row.full_text,
+    replyToTweetId: row.reply_to_tweet_id,
+    replyToUsername: row.reply_to_username,
+    favoriteCount: row.favorite_count,
+    retweetCount: row.retweet_count,
+    username: row.username,
+    accountDisplayName: row.account_display_name,
+    avatarMediaUrl: row.avatar_media_url,
+    media: (row.media ?? []).map((m) => ({
+      mediaUrl: m.media_url,
+      mediaType: m.media_type,
+      width: m.width,
+      height: m.height,
+    })),
+    quoteTweetId: row.quoted_tweet_id,
+  })
+
+export interface AccountTweetsInput {
+  /** A username (with or without @) or a numeric account id. */
+  account: string
+  order?: 'asc' | 'desc'
+  since?: string
+  until?: string
+  excludeReplies?: boolean
+  excludeRetweets?: boolean
+  /** Up to 200 per page. */
+  limit?: number
+  cursor?: string
+}
+
+/** One page of an account's tweets, ordered by tweet id. */
+export async function getAccountTweets(
+  input: AccountTweetsInput,
+  limits: RunLimits = {},
+): Promise<{ tweets: AgentTweet[]; nextCursor: string | null }> {
+  const params = new URLSearchParams({
+    order: input.order ?? 'desc',
+    limit: String(Math.min(Math.max(input.limit ?? 200, 1), 200)),
+  })
+  if (input.since) params.set('since', input.since)
+  if (input.until) params.set('until', input.until)
+  if (input.excludeReplies) params.set('exclude_replies', 'true')
+  if (input.excludeRetweets) params.set('exclude_retweets', 'true')
+  if (input.cursor) params.set('cursor', input.cursor)
+  const account = input.account.trim().replace(/^@/, '')
+  // A numeric username needs an @ to be read as a username.
+  const segment =
+    /^\d+$/.test(account) && input.account.trim().startsWith('@')
+      ? `@${account}`
+      : account
+  const body = await apiV1Json<{ data: V1Tweet[]; next_cursor: string | null }>(
+    'v1-timeline',
+    `/accounts/${encodeURIComponent(segment)}/tweets`,
+    params,
+    limits,
+  )
+  if (!Array.isArray(body.data)) {
+    throw new Error('Community Archive API returned an invalid timeline')
+  }
+  return { tweets: body.data.map(fromV1), nextCursor: body.next_cursor ?? null }
 }

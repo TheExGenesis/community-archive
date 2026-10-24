@@ -22,7 +22,10 @@ export interface CallSpan {
 export interface CallTrace {
   t0: number
   spans: CallSpan[]
-  /** Open phases, innermost last. Commands in one line run in turn. */
+  /**
+   * Open phases, innermost last. Commands in one line run in turn, except
+   * under par, where a call counts toward the phase that started last.
+   */
   phases: string[]
 }
 
@@ -72,7 +75,8 @@ export async function inPhase<T>(
     try {
       return await task()
     } finally {
-      trace.phases.pop()
+      // Not pop(): under par another phase may have opened since.
+      trace.phases.splice(trace.phases.lastIndexOf(phase), 1)
     }
   })
 }

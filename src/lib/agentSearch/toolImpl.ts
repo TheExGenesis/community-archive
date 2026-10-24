@@ -6,10 +6,12 @@ import {
   getTweetDetails,
   getTweetThread,
   getTweetsByIds,
+  getTweetsByIdsBatched,
   getUser,
   searchTweets,
   type SearchMode,
   type SearchSort,
+  type SearchTweetsInput,
 } from './gateway'
 import {
   SEMANTIC_LIMIT_MESSAGE,
@@ -42,6 +44,51 @@ export const BORDERLINE_THRESHOLD = 0.35
 export const DEFAULT_COLLECT = 300
 export const MAX_COLLECT = 1000
 const PAGE = 100
+/** Search pages after the first run this many at a time. */
+const PAGE_CONCURRENCY = 4
+/** The gateway's highest search offset. */
+const MAX_OFFSET = 5000
+
+/**
+ * Up to `want` search results from `from` on. The first page goes alone,
+ * since most searches fit in one and a short page ends the search; the rest
+ * run a few at a time. `nextOffset` is null when the gateway has no more.
+ */
+export async function searchPages(
+  input: Omit<SearchTweetsInput, 'limit' | 'offset'>,
+  want: number,
+  limits: RunLimits,
+  from = 0,
+): Promise<{ tweets: AgentTweet[]; nextOffset: number | null }> {
+  const page = (offset: number) =>
+    searchTweets(
+      { ...input, limit: Math.min(PAGE, from + want - offset), offset },
+      limits,
+    )
+  const first = await page(from)
+  const tweets = [...first.tweets]
+  let nextOffset = first.tweets.length ? first.nextOffset : null
+  while (nextOffset !== null && tweets.length < want) {
+    const offsets: number[] = []
+    for (
+      let offset = nextOffset;
+      offsets.length < PAGE_CONCURRENCY &&
+      offset < from + want &&
+      offset <= MAX_OFFSET;
+      offset += PAGE
+    )
+      offsets.push(offset)
+    if (!offsets.length) break
+    const pages = await Promise.all(offsets.map(page))
+    for (const result of pages) {
+      tweets.push(...result.tweets)
+      nextOffset = result.tweets.length ? result.nextOffset : null
+      // A short or last page ends the search; later pages are past the end.
+      if (nextOffset === null || result.tweets.length < PAGE) break
+    }
+  }
+  return { tweets: tweets.slice(0, want), nextOffset }
+}
 const MAX_KEPT_RETURNED = 60
 const MAX_BORDERLINE_RETURNED = 20
 
@@ -161,9 +208,8 @@ async function parentTexts(
     ),
   )
   const texts = new Map<string, string>()
-  for (let i = 0; i < parentIds.length; i += 100) {
-    const parents = await getTweetsByIds(parentIds.slice(i, i + 100), limits)
-    for (const parent of parents) texts.set(parent.id, parent.text)
+  for (const parent of await getTweetsByIdsBatched(parentIds, limits)) {
+    texts.set(parent.id, parent.text)
   }
   return texts
 }
@@ -216,23 +262,13 @@ export async function collectAcrossTerms(
     const share = Math.max(1, Math.ceil((max - collected.size) / active.length))
     const results = await Promise.all(
       active.map(async (term) => {
-        const tweets: AgentTweet[] = []
-        let offset = offsets.get(term) ?? null
-        while (offset !== null && tweets.length < share) {
-          const page: { tweets: AgentTweet[]; nextOffset: number | null } =
-            await searchTweets(
-              {
-                ...filters,
-                query: term,
-                limit: Math.min(PAGE, share - tweets.length),
-                offset,
-              },
-              limits,
-            )
-          tweets.push(...page.tweets)
-          offset = page.tweets.length ? page.nextOffset : null
-        }
-        offsets.set(term, offset)
+        const { tweets, nextOffset } = await searchPages(
+          { ...filters, query: term },
+          share,
+          limits,
+          offsets.get(term) ?? 0,
+        )
+        offsets.set(term, nextOffset)
         return tweets
       }),
     )

@@ -1,5 +1,5 @@
 import { callTimeoutMs, type RunLimits } from './deadline'
-import { findMembers, getTweetsByIds } from './gateway'
+import { findMembers, getTweetsByIdsBatched } from './gateway'
 import { traced } from './trace'
 import type { AgentTweet } from './types'
 
@@ -130,13 +130,11 @@ export async function semanticSearch(
     ranked.push({ id, distance: Math.round(distance * 1000) / 1000 })
   }
   const byId = new Map<string, AgentTweet>()
-  for (let i = 0; i < ranked.length; i += 100) {
-    const batch = await getTweetsByIds(
-      ranked.slice(i, i + 100).map((r) => r.id),
-      limits,
-    )
-    for (const tweet of batch) byId.set(tweet.id, tweet)
-  }
+  const found = await getTweetsByIdsBatched(
+    ranked.map((r) => r.id),
+    limits,
+  )
+  for (const tweet of found) byId.set(tweet.id, tweet)
   const tweets = ranked.flatMap(({ id, distance }) => {
     const tweet = byId.get(id)
     return tweet ? [{ ...tweet, distance }] : []

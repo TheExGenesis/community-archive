@@ -11,6 +11,14 @@ jest.mock('./policy', () => ({
 jest.mock('./gateway', () => ({
   searchTweets: jest.fn(),
   getTweetsByIds: jest.fn(async () => []),
+  // Batched lookups go through the mocked single lookup, 100 ids at a time.
+  getTweetsByIdsBatched: jest.fn(async (ids: string[], limits: unknown) => {
+    const { getTweetsByIds } = jest.requireMock('./gateway')
+    const found: unknown[] = []
+    for (let i = 0; i < ids.length; i += 100)
+      found.push(...(await getTweetsByIds(ids.slice(i, i + 100), limits)))
+    return found
+  }),
   findMembers: jest.fn(),
   getQuotePosts: jest.fn(),
   getTweetDetails: jest.fn(),
@@ -23,6 +31,7 @@ import { findMembers, getUser, searchTweets } from './gateway'
 import {
   collectAndScoreImpl,
   findPeopleImpl,
+  searchPages,
   searchTweetsImpl,
 } from './toolImpl'
 
@@ -140,5 +149,62 @@ describe('findPeopleImpl', () => {
       new Error('policy read failed'),
     )
     expect((await findPeopleImpl({ query: 'notamember' })).user).toBeNull()
+  })
+})
+
+describe('searchPages', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1))
+
+  test('one short page is one call', async () => {
+    serve({ x: ids(30) })
+    const result = await searchPages({ query: 'x' }, 1000, {})
+    expect(result.tweets).toHaveLength(30)
+    expect(result.nextOffset).toBeNull()
+    expect(searchTweets).toHaveBeenCalledTimes(1)
+  })
+
+  test('after the first page, the rest go out together and stay in order', async () => {
+    serve({ x: ids(450) })
+    let inFlight = 0
+    let most = 0
+    const inner = (searchTweets as jest.Mock).getMockImplementation()!
+    ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+      most = Math.max(most, ++inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight--
+      return inner(input)
+    })
+    const result = await searchPages({ query: 'x' }, 1000, {})
+    expect(result.tweets.map((t) => t.id)).toEqual(ids(450))
+    expect(result.nextOffset).toBeNull()
+    expect(most).toBeGreaterThan(1)
+    // 0 alone, then 100-400 together; nothing asked past the short page's wave.
+    expect(
+      (searchTweets as jest.Mock).mock.calls.map(([input]) => input.offset),
+    ).toEqual([0, 100, 200, 300, 400])
+  })
+
+  test('stops at the wanted count and says more exist', async () => {
+    serve({ x: ids(2000) })
+    const result = await searchPages({ query: 'x' }, 250, {})
+    expect(result.tweets).toHaveLength(250)
+    expect(result.tweets[249].id).toBe('250')
+    expect(result.nextOffset).toBe(250)
+    const asked = (searchTweets as jest.Mock).mock.calls.map(([input]) => [
+      input.offset,
+      input.limit,
+    ])
+    expect(asked).toEqual([
+      [0, 100],
+      [100, 100],
+      [200, 50],
+    ])
+  })
+
+  test('continues from an offset', async () => {
+    serve({ x: ids(150) })
+    const result = await searchPages({ query: 'x' }, 100, {}, 100)
+    expect(result.tweets.map((t) => t.id)).toEqual(ids(150).slice(100))
+    expect(result.nextOffset).toBeNull()
   })
 })

@@ -54,7 +54,7 @@ How to work:
 1. Work out what the question is about. If it names a person or account, run people first. A project may have its own account (the archive's is @comm_archive).
 2. Search for the words that signal an answer, not only the topic: for films someone liked, try "great movie", "just watched", "recommend" with --from, not "film", which also matches filming. Short queries work better than sentences. Try the forms people write: variants (Greek and Greece, ban and banned), abbreviations, handles, the topic's jargon. If a search finds nothing, rephrase before concluding.
 3. Save results to files (search … > s1.jsonl) and look at them with small outputs. Add --since/--until only when the question asks about a period.
-4. When the answer is a set of tweets spread across the archive (who criticised something, what people think of a topic), gather broadly. First read the most-liked tweets on the topic (search <name> --sort likes) and note the different ways people there talk about it. Then run together with par: keyword searches for the names and the words that signal an answer, and one semantic search for each of those ways, described in the words people used. Combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl), score them with a precise criterion (score takes up to 1000 tweets; split a bigger file and score the parts with par), then expand the strongest hits and score what that adds. Work from select(.p >= 0.5). If search says more exist, narrow the words or dates, or say coverage is partial.
+4. When the answer is a set of tweets spread across the archive (who criticised something, what people think of a topic), gather broadly, then let the answers you find guide the next searches. First, with par, run keyword searches for the names and the words that signal an answer plus one or two semantic searches for the idea; combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl) and score them with a precise criterion (score takes up to 1000 tweets; split a bigger file and score the parts with par). Read a sample of the tweets that scored yes and of those just below 0.5: they show what answers look like here. Write one semantic search for each kind of answer you see, in the words those tweets use, run them together and score what they add. Then expand the strongest hits and score what that adds. Work from select(.p >= 0.5). If search says more exist, narrow the words or dates, or say coverage is partial.
 5. Follow conversations when they matter: thread, quotes.
 6. Stop once more searching stops turning up new tweets. Do not repeat a search. You have about 20 commands in all; leave the last two for writing lists and answering.
 
@@ -84,13 +84,15 @@ Examples (commands shortened):
    Then: It's @someone in March 2023:
    [[t:<id>]]
 2. A survey, "who has complained about Notion?":
-   search notion --any @NotionHQ --sort likes --limit 40 | jq -c '{id,author,likes,text:.text[:160]}'
-   (Say the top tweets are about speed, offline use and price: one semantic search for each.)
-   par 'search notion --any @NotionHQ --limit 500 > k1.jsonl' 'semantic "Notion is too slow to use" > m1.jsonl' 'semantic "Notion does not work offline" > m2.jsonl' 'semantic "Notion got too expensive" > m3.jsonl'
-   cat k1.jsonl m1.jsonl m2.jsonl m3.jsonl | jq -sc 'unique_by(.id)[]' > all.jsonl
+   par 'search notion --any @NotionHQ --limit 500 > k1.jsonl' 'semantic "complaints about using Notion" > m1.jsonl'
+   cat k1.jsonl m1.jsonl | jq -sc 'unique_by(.id)[]' > all.jsonl
    score all.jsonl "Does this tweet complain about or criticise Notion?" > c1.jsonl
-   expand c1.jsonl > e1.jsonl && score e1.jsonl "Does this tweet complain about or criticise Notion?" > c2.jsonl
-   cat c1.jsonl c2.jsonl | jq -c 'select(.p >= 0.5)' > yes.jsonl; jq -r '.author' yes.jsonl | sort | uniq -c | sort -rn | head
+   jq -c 'select(.p >= 0.3) | {p,author,text:.text[:160]}' c1.jsonl | head -40
+   (Say the yes tweets are about speed, offline use and price: one semantic search for each.)
+   par 'semantic "Notion is too slow to use" > m2.jsonl' 'semantic "Notion does not work offline" > m3.jsonl' 'semantic "Notion got too expensive" > m4.jsonl'
+   cat m2.jsonl m3.jsonl m4.jsonl | jq -sc 'unique_by(.id)[]' > more.jsonl && score more.jsonl "Does this tweet complain about or criticise Notion?" > c2.jsonl
+   cat c1.jsonl c2.jsonl | jq -sc 'unique_by(.id)[]' > scored.jsonl && expand scored.jsonl > e1.jsonl && score e1.jsonl "Does this tweet complain about or criticise Notion?" > c3.jsonl
+   cat scored.jsonl c3.jsonl | jq -c 'select(.p >= 0.5)' > yes.jsonl; jq -r '.author' yes.jsonl | sort | uniq -c | sort -rn | head
    mkdir -p lists && jq -c 'select(.text | test("slow"; "i"))' yes.jsonl > lists/slow.jsonl
    Then a short answer with: [[posts: Too slow | lists/slow.jsonl | by author]]
 3. A follow-up, "which of them posted most recently?": yes.jsonl from the last question is still there.
@@ -154,7 +156,7 @@ Aim for the answer the evidence supports best, not the first one that fits. Keep
 - If the question names a person or account, run people first (a project may have its own account; the archive's is @comm_archive).
 - search matches words, so use the words that would signal an answer and the forms people write: variants, abbreviations, handles, jargon. Rephrase before concluding nothing was said.
 - Save results to files (search … > s1.jsonl) and inspect them with small outputs. Add --since/--until only when the question asks about a period.
-- For an answer that is a set of tweets across the archive, gather broadly. First read the most-liked tweets on the topic (search <name> --sort likes) and note the different ways people there talk about it. Then run together with par: keyword searches for the names and the words that signal an answer, and one semantic search for each of those ways, described in the words people used. Combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl), score them with a precise criterion (score takes up to 1000 tweets; split a bigger file and score the parts with par), then expand the strongest hits and score what that adds. Work from select(.p >= 0.5), and say when coverage is partial.
+- For an answer that is a set of tweets across the archive, gather broadly, then let the answers you find guide the next searches. First, with par, run keyword searches for the names and the words that signal an answer plus one or two semantic searches for the idea; combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl) and score them with a precise criterion (score takes up to 1000 tweets; split a bigger file and score the parts with par). Read a sample of the tweets that scored yes and of those just below 0.5: they show what answers look like here. Write one semantic search for each kind of answer you see, in the words those tweets use, run them together and score what they add. Then expand the strongest hits and score what that adds. Work from select(.p >= 0.5), and say when coverage is partial.
 
 `
 

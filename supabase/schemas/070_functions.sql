@@ -4230,6 +4230,125 @@ $$;
 REVOKE ALL ON FUNCTION public.ca_tweet_like_summary(text[], text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ca_tweet_like_summary(text[], text) TO service_role;
 
+-- Adds one model call's or one paid tool's tokens and cost to an agent search
+-- run as the spend happens, so the global daily cap counts runs in progress
+-- and a stopped run keeps what it spent. Increments only: concurrent steps of
+-- one run cannot overwrite each other's spend.
+CREATE OR REPLACE FUNCTION public.agent_search_add_usage(
+  p_run_id text,
+  p_input_tokens integer,
+  p_output_tokens integer,
+  p_cost_usd numeric
+)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+BEGIN
+  IF p_run_id IS NULL
+    OR coalesce(p_input_tokens, 0) < 0
+    OR coalesce(p_output_tokens, 0) < 0
+    OR coalesce(p_cost_usd, 0) < 0
+  THEN
+    RAISE EXCEPTION 'Invalid agent search usage' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.agent_search_runs
+  SET input_tokens = input_tokens + coalesce(p_input_tokens, 0),
+      output_tokens = output_tokens + coalesce(p_output_tokens, 0),
+      cost_usd = cost_usd + coalesce(p_cost_usd, 0)
+  WHERE id = p_run_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Agent search run % not found', p_run_id USING ERRCODE = 'P0002';
+  END IF;
+END
+$$;
+REVOKE ALL ON FUNCTION public.agent_search_add_usage(text, integer, integer, numeric) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agent_search_add_usage(text, integer, integer, numeric) TO service_role;
+
+-- Admits one agent search question: in one transaction, under one lock, it
+-- checks that nobody else owns the conversation, the member's daily and
+-- monthly counts and running run, and the global daily spend, then inserts
+-- the run as running. Returns 'ok' or the reason it refused. Two requests can
+-- never both take the last slot, and the run row exists before any paid work
+-- starts. A house question counts against the member's house questions; an
+-- own-key question counts against all of their questions, under the higher
+-- limits the caller passes for it. cost_usd holds house spend only.
+CREATE OR REPLACE FUNCTION public.agent_search_admit(
+  p_run_id text,
+  p_account_id text,
+  p_conversation_id text,
+  p_question text,
+  p_model text,
+  p_daily_limit integer,
+  p_global_daily_usd numeric,
+  p_stale_after_seconds integer,
+  p_key_source text,
+  p_monthly_limit integer
+)
+RETURNS text LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+DECLARE
+  day_start timestamptz := date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';
+  month_start timestamptz := date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';
+BEGIN
+  IF p_run_id IS NULL OR p_account_id IS NULL OR p_conversation_id IS NULL
+    OR p_question IS NULL OR p_model IS NULL
+    OR p_daily_limit IS NULL OR p_daily_limit < 0
+    OR p_global_daily_usd IS NULL OR p_global_daily_usd < 0
+    OR p_stale_after_seconds IS NULL OR p_stale_after_seconds < 0
+    OR p_key_source IS NULL OR p_key_source NOT IN ('house', 'own')
+    OR p_monthly_limit IS NULL OR p_monthly_limit < 0
+  THEN
+    RAISE EXCEPTION 'Invalid agent search admission' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtext('public.agent_search_admit'));
+
+  IF EXISTS (
+    SELECT 1 FROM public.agent_search_runs
+    WHERE conversation_id = p_conversation_id AND account_id <> p_account_id
+  ) THEN
+    RETURN 'not_found';
+  END IF;
+
+  IF (
+    SELECT count(*) FROM public.agent_search_runs
+    WHERE account_id = p_account_id
+      AND started_at >= day_start
+      AND (p_key_source = 'own' OR key_source = 'house')
+  ) >= p_daily_limit THEN
+    RETURN 'daily_limit';
+  END IF;
+
+  IF (
+    SELECT count(*) FROM public.agent_search_runs
+    WHERE account_id = p_account_id
+      AND started_at >= month_start
+      AND (p_key_source = 'own' OR key_source = 'house')
+  ) >= p_monthly_limit THEN
+    RETURN 'monthly_limit';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.agent_search_runs
+    WHERE account_id = p_account_id
+      AND status = 'running'
+      AND started_at > now() - make_interval(secs => p_stale_after_seconds)
+  ) THEN
+    RETURN 'run_in_progress';
+  END IF;
+
+  IF (
+    SELECT coalesce(sum(cost_usd), 0) FROM public.agent_search_runs
+    WHERE started_at >= day_start
+  ) >= p_global_daily_usd THEN
+    RETURN 'global_budget';
+  END IF;
+
+  INSERT INTO public.agent_search_runs (id, account_id, conversation_id, question, status, model, key_source)
+  VALUES (p_run_id, p_account_id, p_conversation_id, p_question, 'running', p_model, p_key_source);
+  RETURN 'ok';
+END
+$$;
+REVOKE ALL ON FUNCTION public.agent_search_admit(text, text, text, text, text, integer, numeric, integer, text, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agent_search_admit(text, text, text, text, text, integer, numeric, integer, text, integer) TO service_role;
+
 -- Public API keys. Callers are website server routes using the service role
 -- after verifying the session; these functions enforce ownership and caps.
 CREATE FUNCTION public.create_public_api_key(owner_user_id uuid, owner_account_id text, new_key_id text, new_key_sha256 text, key_label text)

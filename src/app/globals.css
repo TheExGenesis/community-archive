@@ -166,3 +166,11 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
   }
 }
+
+/* No browser clear button (×) in search fields: other text fields have
+   none, and it drew in the system accent colour. */
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}

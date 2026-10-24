@@ -8,6 +8,10 @@ import {
   maskSubscriptionEmail,
 } from '@/lib/digest/emailSubscriptions'
 import ProfileContent from '../profile/ProfileContent'
+import { agentSearchDailyLimits } from '@/lib/agentSearch/budget'
+import { getAgentSearchAccess } from '@/lib/agentSearch/eligibility'
+import { ownKeysEnabled } from '@/lib/agentSearch/openRouterKey'
+import { AskArchiveSettings } from './AskArchiveSettings'
 import {
   DigestEmailSettings,
   type DigestEmailStatus,
@@ -47,14 +51,19 @@ export default async function SettingsPage() {
         .maybeSingle()
     : admin.from('optin').select('*').eq('user_id', user.id).maybeSingle()
 
-  const [optInResponse, archivesResponse, settings, digestSubscription] =
-    await Promise.all([
-      optInQuery,
-      twitterAccountId
-        ? supabase
-            .from('archive_upload')
-            .select(
-              `
+  const [
+    optInResponse,
+    archivesResponse,
+    settings,
+    digestSubscription,
+    askAccess,
+  ] = await Promise.all([
+    optInQuery,
+    twitterAccountId
+      ? supabase
+          .from('archive_upload')
+          .select(
+            `
             id,
             account_id,
             upload_phase,
@@ -68,17 +77,20 @@ export default async function SettingsPage() {
               profile:all_profile(avatar_media_url)
             )
           `,
-            )
-            .eq('account_id', twitterAccountId)
-            .order('created_at', { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
-      twitterAccountId
-        ? getPublicProfileSettings(twitterAccountId)
-        : Promise.resolve({ downloadArchiveVisible: true }),
-      twitterAccountId
-        ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
-        : Promise.resolve(null),
-    ])
+          )
+          .eq('account_id', twitterAccountId)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    twitterAccountId
+      ? getPublicProfileSettings(twitterAccountId)
+      : Promise.resolve({ downloadArchiveVisible: true }),
+    twitterAccountId
+      ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
+      : Promise.resolve(null),
+    // Only members who may ask see Ask the archive's setting.
+    ownKeysEnabled() ? getAgentSearchAccess() : Promise.resolve(null),
+  ])
+  const askLimits = askAccess?.ok ? agentSearchDailyLimits() : null
 
   const digestEmailStatus: DigestEmailStatus = !digestSubscription
     ? 'none'
@@ -97,6 +109,13 @@ export default async function SettingsPage() {
               : null
           }
         />
+        {askLimits && (
+          <AskArchiveSettings
+            houseLimit={askLimits.house}
+            ownLimit={askLimits.own}
+          />
+        )}
+
         <section className="mb-8 flex flex-col gap-3 rounded-lg border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">API keys</h2>

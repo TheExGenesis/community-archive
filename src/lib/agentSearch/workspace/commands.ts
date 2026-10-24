@@ -23,6 +23,7 @@ import {
 } from '../toolImpl'
 import {
   MAX_SEMANTIC_CALLS_PER_RUN,
+  SEMANTIC_DEFAULT_K,
   SEMANTIC_DEFAULT_THRESHOLD,
   SEMANTIC_LIMIT_MESSAGE,
   semanticSearch,
@@ -400,7 +401,7 @@ async function semantic(
     {
       query,
       fromUser,
-      k: intFlag(flags.k, 'k', SEARCH_DEFAULT, MAX_COLLECT),
+      k: intFlag(flags.k, 'k', SEMANTIC_DEFAULT_K, MAX_COLLECT),
       threshold,
     },
     state.limits,

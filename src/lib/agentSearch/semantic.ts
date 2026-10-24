@@ -18,7 +18,7 @@ const USER_AGENT =
 // or under concurrent load (2026-10-14); allow for a slow one, within the
 // run's deadline.
 const SEMANTIC_TIMEOUT_MS = 20_000
-export const SEMANTIC_DEFAULT_K = 50
+export const SEMANTIC_DEFAULT_K = 100
 const MAX_K = 1000
 export const SEMANTIC_DEFAULT_THRESHOLD = 0.65
 /** Semantic searches one question may run. */

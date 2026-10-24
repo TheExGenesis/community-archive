@@ -58,7 +58,9 @@ jest.mock('../semantic', () => ({
 import {
   ApiV1Error,
   getAccountTweets,
+  getQuotePosts,
   getTweetDetails,
+  getTweetThread,
   getTweetsByIds,
   searchTweets,
 } from '../gateway'
@@ -577,6 +579,221 @@ describe('timeline', () => {
     expect(none.stdout).toBe('')
     expect(none.stderr).toContain('narrow it with --since/--until')
     expect(none.stderr).not.toContain('partial')
+  })
+})
+
+describe('expand', () => {
+  // Seed X's thread is X itself (the tweet the gateway returns with its
+  // conversation) and replies X0, X1; its quote posts are X5.
+  const conversations: Record<string, { thread: string[]; quotes: string[] }> =
+    {}
+  const conversationOf = (id: string) =>
+    conversations[id] ?? { thread: [`${id}0`, `${id}1`], quotes: [`${id}5`] }
+
+  /** A scored file, as score leaves it in the manifest. */
+  const scoredFile = (rows: Array<[string, number?]>): WorkspaceManifest => {
+    for (const [id] of rows) if (!archive.has(id)) archive.set(id, tweet(id))
+    return {
+      'c1.jsonl': {
+        kind: 'tweets',
+        rows: rows.map(([id, p]) => (p === undefined ? { id } : { id, p })),
+      },
+    }
+  }
+
+  beforeEach(() => {
+    for (const key of Object.keys(conversations)) delete conversations[key]
+    ;(getTweetThread as jest.Mock).mockImplementation(async (id: string) => ({
+      tweet: tweet(id),
+      conversation: conversationOf(id).thread.map((reply) => tweet(reply)),
+    }))
+    ;(getQuotePosts as jest.Mock).mockImplementation(async (id: string) => {
+      const quotes = conversationOf(id).quotes.map((q) => tweet(q, 'carol'))
+      return { tweets: quotes, total: quotes.length }
+    })
+  })
+
+  const threadIds = () =>
+    (getTweetThread as jest.Mock).mock.calls.map((call) => call[0])
+
+  test('expands the highest-p tweets, best first, up to --seeds', async () => {
+    const manifest = scoredFile([
+      ['1', 0.75],
+      ['2', 0.95],
+      ['3', 0.5],
+      ['4', 0.85],
+      ['5', 0.9],
+    ])
+    const out = await run('expand c1.jsonl --seeds 2 > e1.jsonl', manifest)
+    expect(out.exitCode).toBe(0)
+    expect(threadIds()).toEqual(['2', '5'])
+    expect((getQuotePosts as jest.Mock).mock.calls.map((c) => c[0])).toEqual([
+      '2',
+      '5',
+    ])
+    // Seed order, then each call's order: thread before quotes.
+    expect(out.files).toEqual({
+      'e1.jsonl': ['20', '21', '25', '50', '51', '55'],
+    })
+    // Rows carry no p, and the tweets reach the page from the cache.
+    const e1 = out.workspace['e1.jsonl']
+    expect(e1?.kind === 'tweets' && e1.rows.some((row) => 'p' in row)).toBe(
+      false,
+    )
+    expect(out.tweets.map((t) => t.id)).toEqual([
+      '20',
+      '21',
+      '25',
+      '50',
+      '51',
+      '55',
+    ])
+    expect(out.stderr).toBe(
+      'expand c1.jsonl: 2 seeds · 6 new tweets · 2 authors · 2025-01-02 to 2025-01-08\n',
+    )
+    expect(out.summary).toBe("Expanded 2 tweets' conversations · 6 tweets")
+
+    // By default, every tweet at or above 0.7, at most 15 of them.
+    jest.clearAllMocks()
+    await run('expand c1.jsonl', manifest)
+    expect(threadIds()).toEqual(['2', '5', '4', '1'])
+    jest.clearAllMocks()
+    await run('expand c1.jsonl --min-p 0.5 --seeds 99', manifest)
+    expect(threadIds()).toEqual(['2', '5', '4', '1', '3'])
+  })
+
+  test('leaves out tweets already in the file and the seeds, and prints each tweet once', async () => {
+    conversations['1'] = { thread: ['2', '4', '9'], quotes: ['1', '10'] }
+    conversations['4'] = { thread: ['1', '9', '11'], quotes: ['10', '12'] }
+    const out = await run(
+      'expand c1.jsonl',
+      scoredFile([
+        ['1', 0.9],
+        ['2', 0.2],
+        ['4', 0.8],
+      ]),
+    )
+    expect(
+      out.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line).id),
+    ).toEqual(['9', '10', '11', '12'])
+    expect(out.stderr).toContain('2 seeds · 4 new tweets')
+  })
+
+  test('--limit caps the tweets printed, and stderr says so', async () => {
+    const out = await run(
+      'expand c1.jsonl --limit 4',
+      scoredFile([
+        ['1', 0.9],
+        ['2', 0.8],
+      ]),
+    )
+    expect(
+      out.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line).id),
+    ).toEqual(['10', '11', '15', '20'])
+    expect(out.stderr).toContain(
+      '2 seeds · 4 new tweets · 2 authors · 2025-01-02 to 2025-01-07 · capped at 4 of 6 (raise --limit, max 1000)',
+    )
+  })
+
+  test('a file without scores is a usage mistake', async () => {
+    const out = await run('expand c1.jsonl', scoredFile([['1'], ['2']]))
+    expect(out.exitCode).toBe(2)
+    expect(out.stderr).toContain(
+      'c1.jsonl has no p values; score it first (score c1.jsonl',
+    )
+    expect(out.stderr).toContain(USAGE.expand)
+    expect(getTweetThread).not.toHaveBeenCalled()
+  })
+
+  test('a file with no tweet at or above --min-p prints nothing and succeeds', async () => {
+    const out = await run(
+      'expand c1.jsonl --min-p 0.95',
+      scoredFile([
+        ['1', 0.9],
+        ['2', 0.4],
+      ]),
+    )
+    expect(out.exitCode).toBe(0)
+    expect(out.stdout).toBe('')
+    expect(out.stderr).toContain('no tweet has p ≥ 0.95; nothing to expand')
+    expect(getTweetThread).not.toHaveBeenCalled()
+    expect(getQuotePosts).not.toHaveBeenCalled()
+  })
+
+  test('a failing seed is counted; every call failing reads as the archive down', async () => {
+    const manifest = scoredFile([
+      ['1', 0.9],
+      ['2', 0.8],
+    ])
+    ;(getTweetThread as jest.Mock).mockImplementation(async (id: string) => {
+      if (id === '1') throw new Error('fetch failed')
+      return { tweet: tweet(id), conversation: [tweet('20')] }
+    })
+    const some = await run('expand c1.jsonl', manifest)
+    expect(some.exitCode).toBe(0)
+    // Seed 1's quotes still count.
+    expect(
+      some.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line).id),
+    ).toEqual(['15', '20', '25'])
+    expect(some.stderr).toContain('· 1 of 2 seeds failed')
+    ;(getTweetThread as jest.Mock).mockRejectedValue(new Error('fetch failed'))
+    ;(getQuotePosts as jest.Mock).mockRejectedValue(new Error('fetch failed'))
+    // The file was rebuilt through the gateway, so the archive answered once.
+    const rebuilt = await run('expand c1.jsonl', manifest)
+    expect(rebuilt.exitCode).toBe(1)
+    expect(rebuilt.stderr).toBe('expand: fetch failed\n')
+    // Written in the same command, no call answered.
+    await expect(
+      run(`echo '{"id":"1","p":0.9}' > c2.jsonl; expand c2.jsonl`),
+    ).rejects.toBeInstanceOf(WorkspaceUnavailableError)
+    // Nor did the file's rebuild.
+    ;(getTweetsByIds as jest.Mock).mockRejectedValue(new Error('fetch failed'))
+    await expect(run('expand c1.jsonl', manifest)).rejects.toBeInstanceOf(
+      WorkspaceUnavailableError,
+    )
+  })
+
+  test('expands at most four seeds at a time', async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => String(i + 1))
+    const manifest = scoredFile(ids.map((id) => [id, 0.9]))
+    const pending = new Map<string, number>()
+    let mostSeeds = 0
+    let mostCalls = 0
+    let calls = 0
+    const slow =
+      <T>(inner: (id: string) => Promise<T>) =>
+      async (id: string) => {
+        pending.set(id, (pending.get(id) ?? 0) + 1)
+        calls += 1
+        mostSeeds = Math.max(mostSeeds, pending.size)
+        mostCalls = Math.max(mostCalls, calls)
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        calls -= 1
+        const left = pending.get(id)! - 1
+        if (left) pending.set(id, left)
+        else pending.delete(id)
+        return inner(id)
+      }
+    ;(getTweetThread as jest.Mock).mockImplementation(
+      slow((getTweetThread as jest.Mock).getMockImplementation()!),
+    )
+    ;(getQuotePosts as jest.Mock).mockImplementation(
+      slow((getQuotePosts as jest.Mock).getMockImplementation()!),
+    )
+    const out = await run('expand c1.jsonl --seeds 10', manifest)
+    expect(out.exitCode).toBe(0)
+    expect(getTweetThread).toHaveBeenCalledTimes(10)
+    expect(mostSeeds).toBe(4)
+    expect(mostCalls).toBe(8)
   })
 })
 

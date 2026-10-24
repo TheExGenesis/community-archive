@@ -92,6 +92,7 @@ work on files under `/work`, and archive commands are added
 | `people <name or handle>`                                                                                         | Members and accounts matching a name                                                           |
 | `timeline @handle [--since D] [--until D] [--oldest] [--no-replies] [--retweets] [--limit N]`                     | That person's own tweets by date, newest first (200 by default, up to 3,000; no retweets unless asked), from API v1 |
 | `score <file> "<yes/no question>" [--no-parent]`                                                                  | Scores every tweet in a file; rows gain `p`, best first                                        |
+| `expand <file> [--min-p P] [--seeds N] [--limit N]`                                                               | The threads and quote posts around a scored file's best tweets (`p` ≥ 0.7, 15 by default, up to 40, four at a time); prints the tweets not already in the file (300 by default, up to 1,000), to score next |
 | `thread <id>`, `quotes <id>`, `tweets <id…>`, `show <id>`                                                         | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet |
 | `par '<command with {}>' word…` or `par '<command>' '<command>'…`                                                  | Runs up to 30 command lines, 6 at a time, output in the order given (a `for` loop runs them one after another) |
 

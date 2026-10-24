@@ -82,6 +82,13 @@ const TIMELINE_SPARE_PAGES = 10
 /** par: the most command lines it takes, and how many run at once. */
 const MAX_PAR = 30
 const PAR_CONCURRENCY = 6
+/** expand: a seed's lowest p, the seeds it takes, and the tweets it prints. */
+const EXPAND_MIN_P = 0.7
+const EXPAND_SEEDS = 15
+const MAX_EXPAND_SEEDS = 40
+const EXPAND_DEFAULT = 300
+/** Seeds expanded at once, each with two gateway calls in flight. */
+const EXPAND_CONCURRENCY = 4
 
 /** Fetches tweets by id through the gateway, using what this run has seen. */
 export async function fetchTweets(
@@ -100,6 +107,26 @@ export async function fetchTweets(
 
 function remember(state: CommandState, tweets: AgentTweet[]) {
   for (const tweet of tweets) state.cache.set(tweet.id, tweet)
+}
+
+/** Runs `run` on every item, `concurrency` at a time, results in item order. */
+async function inPool<T, R>(
+  items: T[],
+  concurrency: number,
+  run: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await run(items[index])
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  )
+  return results
 }
 
 const quote = (value: string) => `“${value}”`
@@ -172,10 +199,10 @@ function span(tweets: AgentTweet[]) {
 }
 
 /** `200 tweets · 31 authors · 2019-03-02 to 2026-09-30`. */
-function describe(tweets: AgentTweet[]) {
+function describe(tweets: AgentTweet[], noun = 'tweet') {
   const authors = new Set(tweets.map((tweet) => tweet.username)).size
   return [
-    plural(tweets.length, 'tweet'),
+    plural(tweets.length, noun),
     tweets.length ? plural(authors, 'author') : null,
     span(tweets) || null,
   ]
@@ -238,6 +265,7 @@ export const USAGE: Record<string, string> = {
     'usage: score <file> "<yes/no question about one tweet>" [--no-parent]',
   thread: 'usage: thread <tweet id>',
   quotes: 'usage: quotes <tweet id> [--limit N]',
+  expand: 'usage: expand <scored file> [--min-p P] [--seeds N] [--limit N]',
   tweets: 'usage: tweets <tweet id>... (or ids on stdin)',
   show: 'usage: show <tweet id>',
 }
@@ -536,16 +564,23 @@ async function people(
   }
 }
 
-async function readIds(
+async function readRows(
   path: string,
   readFile: (path: string) => Promise<string>,
-): Promise<string[]> {
+) {
   const content = await readFile(path).catch(() => {
     throw new UsageError(`no such file: ${path}`)
   })
   const rows = parseRowFile(content)
   if (!rows) throw new UsageError(`${path} is not a tweet file`)
-  return uniqueIds(rows)
+  return rows
+}
+
+async function readIds(
+  path: string,
+  readFile: (path: string) => Promise<string>,
+): Promise<string[]> {
+  return uniqueIds(await readRows(path, readFile))
 }
 
 async function score(
@@ -653,6 +688,123 @@ async function quotes(
   }
 }
 
+/**
+ * The conversations around a scored file's strongest tweets: for each seed
+ * (p ≥ --min-p, highest first), its thread and the tweets quoting it. A reply
+ * or quote often carries a topic without naming it, so these are what the
+ * agent scores next. Prints only tweets the file does not hold (the seeds are
+ * in it), each once, in seed order and then the order each call returned.
+ */
+async function expand(
+  state: CommandState,
+  args: string[],
+  readFile: (path: string) => Promise<string>,
+): Promise<CommandResult> {
+  const { positional, flags } = parseCommandArgs(args, [
+    'min-p',
+    'seeds',
+    'limit',
+  ])
+  const [path] = positional
+  if (!path || positional.length > 1) {
+    throw new UsageError('give one scored tweet file')
+  }
+  const rawMinP = flags['min-p']
+  const minP =
+    rawMinP === undefined
+      ? EXPAND_MIN_P
+      : typeof rawMinP === 'string' && rawMinP.trim()
+        ? Number(rawMinP)
+        : NaN
+  if (!Number.isFinite(minP) || minP < 0 || minP > 1) {
+    throw new UsageError('--min-p must be between 0 and 1')
+  }
+  const maxSeeds = intFlag(flags.seeds, 'seeds', EXPAND_SEEDS, MAX_EXPAND_SEEDS)
+  const limit = intFlag(flags.limit, 'limit', EXPAND_DEFAULT, MAX_COLLECT)
+
+  const rows = await readRows(path, readFile)
+  const inFile = new Set(rows.map((row) => row.id))
+  const scores = new Map<string, number>()
+  for (const { id, row } of rows) {
+    const p = row?.p
+    if (typeof p === 'number' && Number.isFinite(p) && !scores.has(id)) {
+      scores.set(id, p)
+    }
+  }
+  if (!scores.size) {
+    throw new UsageError(
+      `${path} has no p values; score it first (score ${path} "<yes/no question>")`,
+    )
+  }
+  const seeds = Array.from(scores)
+    .filter(([, p]) => p >= minP)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, maxSeeds)
+    .map(([id]) => id)
+  if (!seeds.length) {
+    state.summaries.push(`Nothing to expand · no tweet has p ≥ ${minP}`)
+    return {
+      stdout: '',
+      stderr: `expand ${path}: no tweet has p ≥ ${minP}; nothing to expand (lower --min-p)\n`,
+      exitCode: 0,
+    }
+  }
+
+  state.calls += 1
+  const results = await inPool(seeds, EXPAND_CONCURRENCY, (tweetId) =>
+    Promise.allSettled([
+      getThreadImpl({ tweetId }, state.limits).then((thread) =>
+        'notFound' in thread ? [] : [thread.tweet, ...thread.conversation],
+      ),
+      getQuotePostsImpl({ tweetId }, state.limits).then(
+        (result) => result.tweets,
+      ),
+    ]),
+  )
+  const found = new Map<string, AgentTweet>()
+  let failedSeeds = 0
+  let answered = 0
+  let firstError: unknown = null
+  for (const calls of results) {
+    if (calls.some((call) => call.status === 'rejected')) failedSeeds += 1
+    for (const call of calls) {
+      if (call.status === 'rejected') {
+        firstError ??= call.reason
+        continue
+      }
+      answered += 1
+      for (const tweet of call.value) {
+        if (!tweet || inFile.has(tweet.id) || found.has(tweet.id)) continue
+        found.set(tweet.id, tweet)
+      }
+    }
+  }
+  // Every call failed: the command fails, and the shell command reads as the
+  // archive being down unless another archive call in it answered (rebuilding
+  // the file from the workspace is one). A few failed seeds are only counted.
+  if (!answered) throw firstError
+
+  const tweets = Array.from(found.values()).slice(0, limit)
+  remember(state, tweets)
+  state.summaries.push(
+    `Expanded ${seeds.length === 1 ? "1 tweet's conversation" : `${plural(seeds.length, 'tweet')}' conversations`} · ${plural(tweets.length, 'tweet')}`,
+  )
+  return {
+    stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
+    stderr:
+      `expand ${path}: ${plural(seeds.length, 'seed')} · ${describe(tweets, 'new tweet')}` +
+      (found.size > limit
+        ? ` · capped at ${limit} of ${found.size}` +
+          (limit < MAX_COLLECT ? ` (raise --limit, max ${MAX_COLLECT})` : '')
+        : '') +
+      (failedSeeds
+        ? ` · ${failedSeeds} of ${plural(seeds.length, 'seed')} failed`
+        : '') +
+      '\n',
+    exitCode: 0,
+  }
+}
+
 async function tweetsById(
   state: CommandState,
   args: string[],
@@ -728,21 +880,9 @@ const par = defineCommand('par', async (args, ctx) => {
     : args
   if (!lines.length) return usage('give the words to fill {} with')
   if (lines.length > MAX_PAR) return usage(`at most ${MAX_PAR} commands`)
-  const results = new Array<{
-    stdout: string
-    stderr: string
-    exitCode: number
-  }>(lines.length)
-  let next = 0
   const exec = ctx.exec
-  const worker = async () => {
-    while (next < lines.length) {
-      const index = next++
-      results[index] = await exec(lines[index], { cwd: ctx.cwd })
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(PAR_CONCURRENCY, lines.length) }, worker),
+  const results = await inPool(lines, PAR_CONCURRENCY, (line) =>
+    exec(line, { cwd: ctx.cwd }),
   )
   return {
     stdout: results.map((r) => r.stdout).join(''),
@@ -764,6 +904,9 @@ export function archiveCommands(state: CommandState) {
     ),
     archiveCommand(state, 'thread', (args) => thread(state, args)),
     archiveCommand(state, 'quotes', (args) => quotes(state, args)),
+    archiveCommand(state, 'expand', (args, ctx) =>
+      expand(state, args, ctx.readFile),
+    ),
     archiveCommand(state, 'tweets', (args, ctx) =>
       tweetsById(state, args, ctx.stdin),
     ),

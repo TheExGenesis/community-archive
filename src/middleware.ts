@@ -604,6 +604,8 @@ export async function middleware(request: NextRequest) {
   let response: NextResponse
 
   const loginRequired = requiresLogin(pathname)
+  const guestPreview =
+    pathname === '/search' || /^\/user\/[^/]+\/?$/.test(pathname)
   let authenticated = false
 
   // Chunked Supabase sessions use -auth-token.0, -auth-token.1, etc.
@@ -629,7 +631,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (loginRequired) {
-    if (!authenticated) {
+    if (!authenticated && !guestPreview) {
       const returnUrl = request.nextUrl.clone()
       returnUrl.searchParams.delete('_rsc')
       const denied = pathname.startsWith('/api/')

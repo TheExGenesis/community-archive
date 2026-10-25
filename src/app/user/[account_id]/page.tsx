@@ -1,4 +1,5 @@
-import { requireBrowsingUser } from '@/lib/browsingAuth'
+import { getBrowsingUser } from '@/lib/browsingAuth'
+import GuestProfile from '@/components/metaTwitter/GuestProfile'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
@@ -52,7 +53,6 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  await requireBrowsingUser(`/user/${encodeURIComponent(params.account_id)}`)
   const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) return { title: 'User not found' }
   const { accountId, profile } = resolved
@@ -153,8 +153,10 @@ async function ProfileArchivedAt({ accountId }: { accountId: string }) {
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
-  await requireBrowsingUser(`/user/${encodeURIComponent(params.account_id)}`)
-  const resolved = await resolveProfileCore(params.account_id)
+  const [viewer, resolved] = await Promise.all([
+    getBrowsingUser(),
+    resolveProfileCore(params.account_id),
+  ])
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
@@ -185,6 +187,22 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     const canonicalQuery = canonicalParams.toString()
     redirect(
       `${canonicalProfilePath}${canonicalQuery ? `?${canonicalQuery}` : ''}`,
+    )
+  }
+
+  if (!viewer) {
+    const returnParams = new URLSearchParams()
+    if (candidateYear) returnParams.set('chapter', String(candidateYear))
+    if (candidateSection) returnParams.set('section', candidateSection)
+    const query = returnParams.toString()
+    return (
+      <GuestProfile
+        displayName={profile.account_display_name}
+        username={profile.username}
+        bio={profile.bio}
+        avatarUrl={profile.avatar_media_url}
+        returnTo={`${canonicalProfilePath}${query ? `?${query}` : ''}`}
+      />
     )
   }
 

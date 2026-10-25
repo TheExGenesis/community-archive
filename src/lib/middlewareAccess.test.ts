@@ -40,9 +40,6 @@ beforeEach(() => {
 })
 
 test.each([
-  '/search?q=open+source&fromUser=alice',
-  '/user/alice?chapter=2025',
-  '/user/42',
   '/user-dir?search=alice',
   '/profile',
   '/user/alice/opengraph-image',
@@ -52,6 +49,19 @@ test.each([
   const destination = new URL(response.headers.get('location')!)
   expect(destination.pathname).toBe('/login')
   expect(destination.searchParams.get('redirect')).toBe(path)
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
+  expect(response.headers.get('x-robots-tag')).toBe('noindex')
+  expect(createMiddlewareClient).not.toHaveBeenCalled()
+})
+
+test.each([
+  '/search',
+  '/search?q=open+source&fromUser=alice',
+  '/user/alice?chapter=2025',
+  '/user/42',
+])('allows a private guest preview at %s', async (path) => {
+  const response = await request(path)
+  expect(response.headers.get('x-middleware-next')).toBe('1')
   expect(response.headers.get('cache-control')).toBe('private, no-store')
   expect(response.headers.get('x-robots-tag')).toBe('noindex')
   expect(createMiddlewareClient).not.toHaveBeenCalled()
@@ -91,15 +101,15 @@ test.each<{ cookie?: string; headers?: Record<string, string> }>([
 ])(
   'does not bypass authentication for crawlers, client transitions, or preview state: %j',
   async (options) => {
-    expect((await request('/user/alice', options)).status).toBe(307)
+    expect((await request('/api/profile/42/bangers', options)).status).toBe(401)
   },
 )
 
 test('removes the internal RSC marker from the login destination', async () => {
-  const response = await request('/search?q=hello&_rsc=internal')
+  const response = await request('/user-dir?search=hello&_rsc=internal')
   expect(
     new URL(response.headers.get('location')!).searchParams.get('redirect'),
-  ).toBe('/search?q=hello')
+  ).toBe('/user-dir?search=hello')
 })
 
 test.each([
@@ -132,7 +142,7 @@ test.each(['missing', 'error', 'throws'])(
     if (mode === 'throws')
       getUser.mockRejectedValue(new Error('Auth unavailable'))
     expect(
-      (await request('/search', { cookie: 'sb-test-auth-token=forged' }))
+      (await request('/profile', { cookie: 'sb-test-auth-token=forged' }))
         .status,
     ).toBe(307)
     expect(
@@ -157,7 +167,7 @@ test.each([true, false])(
       )
       return { data: { user: signedIn ? { id: 'viewer' } : null }, error: null }
     })
-    const response = await request('/search', {
+    const response = await request('/profile', {
       cookie: 'sb-test-auth-token.0=expired',
     })
     expect(response.status).toBe(signedIn ? 200 : 307)

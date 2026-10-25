@@ -10,35 +10,84 @@ import { getLatestDigestPreview } from '@/lib/digest/data'
 import { formatNumber } from '@/lib/formatNumber'
 import type { HomepageData } from '@/lib/portal/data'
 import { measureServerRead } from '@/lib/performance/server'
-import { getRecentMemberCount } from '@/lib/portal/recentMembers'
 
 export async function HomepageGrowth({
   data,
 }: {
   data: HomepageData['globalStats']
 }) {
-  const [stats, members] = await Promise.all([
-    data,
-    getRecentMemberCount().catch(() => null),
-  ])
-  const tweets = stats.failed ? null : stats.data.addedLast24Hours
-  if (members === null && tweets === null) return null
+  const stats = await data
+  if (stats.failed) {
+    return (
+      <p className="mt-4 text-center text-sm text-muted-foreground">
+        Archive counts are temporarily unavailable.
+      </p>
+    )
+  }
+  const {
+    totalTweets,
+    memberCount,
+    membersAddedLastHour,
+    membersAddedLast24Hours,
+    membershipSnapshotAt,
+    addedLast24Hours,
+  } = stats.data
+  const count = (value: number) => value.toLocaleString('en-US')
   return (
-    <p className="mt-4 text-center text-sm text-muted-foreground">
-      Added in the last 24 hours:{' '}
-      {members !== null && (
-        <strong className="font-medium text-foreground">
-          {members.toLocaleString()} {members === 1 ? 'member' : 'members'}
-        </strong>
+    <div className="mt-4 space-y-1 text-center text-sm text-muted-foreground">
+      <p>
+        <strong className="font-medium tabular-nums text-foreground">
+          {count(totalTweets)}
+        </strong>{' '}
+        public tweets
+        {' · '}
+        <strong className="font-medium tabular-nums text-foreground">
+          {count(memberCount)}
+        </strong>{' '}
+        community members
+      </p>
+      <p>
+        Members added:{' '}
+        <strong className="font-medium tabular-nums text-foreground">
+          {membersAddedLastHour == null
+            ? 'Unavailable'
+            : count(membersAddedLastHour)}
+        </strong>{' '}
+        in the last hour
+        {' · '}
+        <strong className="font-medium tabular-nums text-foreground">
+          {membersAddedLast24Hours == null
+            ? 'Unavailable'
+            : count(membersAddedLast24Hours)}
+        </strong>{' '}
+        in the last 24 hours
+      </p>
+      {addedLast24Hours !== null && (
+        <p>
+          Added in the last 24 hours:{' '}
+          <strong className="font-medium tabular-nums text-foreground">
+            {count(addedLast24Hours)}{' '}
+            {addedLast24Hours === 1 ? 'tweet' : 'tweets'}
+          </strong>
+          .
+        </p>
       )}
-      {members !== null && tweets !== null && ' and '}
-      {tweets !== null && (
-        <strong className="font-medium text-foreground">
-          {tweets.toLocaleString()} {tweets === 1 ? 'tweet' : 'tweets'}
-        </strong>
+      {membershipSnapshotAt && (
+        <p className="text-xs">
+          Membership as of{' '}
+          <time dateTime={membershipSnapshotAt}>
+            {new Date(membershipSnapshotAt).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZone: 'UTC',
+            })}{' '}
+            UTC
+          </time>
+        </p>
       )}
-      .
-    </p>
+    </div>
   )
 }
 
@@ -139,7 +188,16 @@ export function HomepagePortal({
           <Suspense fallback={<SectionLoading label="daily digest" />}>
             <HomepageDigest />
           </Suspense>
-          <Suspense fallback={null}>
+          <Suspense
+            fallback={
+              <p
+                role="status"
+                className="mt-4 text-center text-sm text-muted-foreground"
+              >
+                Loading archive counts…
+              </p>
+            }
+          >
             <HomepageGrowth data={data.globalStats} />
           </Suspense>
         </>

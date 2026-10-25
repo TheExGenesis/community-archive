@@ -415,6 +415,8 @@ describe('portal reads', () => {
           data: {
             totalTweets: '15334092',
             memberAccounts: '658',
+            membersAddedLastHour: '0',
+            membersAddedLast24Hours: '136',
             sourceUpdatedAt: '2026-08-13 18:34:09.903',
             collectedAt: '2026-08-13 18:34:20.907',
             membershipSnapshotAt: '2026-08-13 18:34:00.000',
@@ -431,6 +433,9 @@ describe('portal reads', () => {
     await expect(fetchPortalGlobalStats()).resolves.toEqual({
       totalTweets: 15_334_092,
       memberCount: 658,
+      membersAddedLastHour: 0,
+      membersAddedLast24Hours: 136,
+      membershipSnapshotAt: '2026-08-13T18:34:00.000Z',
       addedLast24Hours: 399_270,
       generatedAt: '2026-08-13T18:34:20.907Z',
     })
@@ -461,6 +466,9 @@ describe('portal reads', () => {
       )
       await expect(fetchPortalGlobalStats()).resolves.toMatchObject({
         addedLast24Hours: null,
+        membersAddedLastHour: null,
+        membersAddedLast24Hours: null,
+        membershipSnapshotAt: null,
       })
     }
   })

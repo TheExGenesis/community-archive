@@ -52,6 +52,9 @@ interface PortalCorpusRange {
 interface PortalGlobalStats {
   totalTweets: number
   memberCount: number
+  membersAddedLastHour?: number | null
+  membersAddedLast24Hours?: number | null
+  membershipSnapshotAt?: string | null
   addedLast24Hours: number | null
   generatedAt: string
 }
@@ -63,6 +66,8 @@ interface ClickHouseSummaryResponse {
     sourceUpdatedAt: unknown
     collectedAt: unknown
     membershipSnapshotAt: unknown
+    membersAddedLastHour?: unknown
+    membersAddedLast24Hours?: unknown
     addedLast24Hours?: unknown
     source: string
     countMode: string
@@ -268,6 +273,28 @@ export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
       response.data.memberAccounts,
       'ClickHouse member count',
     ),
+    // Optional during the gateway-first rollout; never invent a zero.
+    membersAddedLastHour:
+      response.data.membersAddedLastHour == null
+        ? null
+        : portalClickHouseCount(
+            response.data.membersAddedLastHour,
+            'members added in the last hour',
+          ),
+    membersAddedLast24Hours:
+      response.data.membersAddedLast24Hours == null
+        ? null
+        : portalClickHouseCount(
+            response.data.membersAddedLast24Hours,
+            'members added in the last 24 hours',
+          ),
+    membershipSnapshotAt:
+      response.data.membershipSnapshotAt == null
+        ? null
+        : portalClickHouseTimestamp(
+            String(response.data.membershipSnapshotAt),
+            'membership snapshot timestamp',
+          ),
     // Older gateway releases omit the field; null hides the 24h note.
     addedLast24Hours:
       response.data.addedLast24Hours == null
@@ -788,19 +815,6 @@ async function fetchPortalJoinedThisWeek(): Promise<number> {
   return exactCount(response, 'upload')
 }
 
-export async function fetchPortalRecentMemberCount(): Promise<number> {
-  const now = Date.now()
-  const response = await portalRestRequest(
-    'user_directory',
-    new URLSearchParams({
-      select: 'account_id',
-      and: `(joined_at.gte.${new Date(now - 86_400_000).toISOString()},joined_at.lte.${new Date(now).toISOString()})`,
-    }),
-    { method: 'HEAD', prefer: 'count=exact' },
-  )
-  return exactCount(response, 'recent members')
-}
-
 // Arguments participate in the cache key, keeping staging/prod sources and
 // deployment environments isolated even when the Data Cache survives deploys.
 const getCachedTrendsSnapshot = unstable_cache(
@@ -815,7 +829,7 @@ const getCachedCorpusRange = unstable_cache(
 )
 const getCachedGlobalStats = unstable_cache(
   async (_sourceKey: string) => fetchPortalGlobalStats(),
-  ['portal-global-stats-v2'],
+  ['portal-global-stats-v3'],
   { revalidate: 60 },
 )
 const getCachedJoinedThisWeek = unstable_cache(

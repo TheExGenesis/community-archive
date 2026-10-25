@@ -9,11 +9,6 @@ import {
 } from './HomepageDataSections'
 import { getLatestDigestPreview } from '@/lib/digest/data'
 
-jest.mock('@/lib/portal/recentMembers', () => ({
-  getRecentMemberCount: jest.fn(),
-}))
-import { getRecentMemberCount } from '@/lib/portal/recentMembers'
-
 jest.mock('@/lib/digest/data', () => ({ getLatestDigestPreview: jest.fn() }))
 jest.mock('@/components/portal/Portal', () => ({
   HomeResearchPanel: () => <div>Research</div>,
@@ -50,28 +45,54 @@ test('renders ready panels while trends and the digest remain pending', async ()
   expect(screen.queryByText('Weekly trends')).not.toBeInTheDocument()
 })
 
-const growthStats = (tweets: number | null, failed = false) =>
+const growthStats = (overrides = {}, failed = false) =>
   Promise.resolve({
     data: {
-      totalTweets: 1,
-      memberCount: 1,
-      addedLast24Hours: tweets,
-      generatedAt: '2026-10-24T00:00:00Z',
+      totalTweets: 21_023_737,
+      memberCount: 1_261,
+      membersAddedLastHour: 0,
+      membersAddedLast24Hours: 259,
+      membershipSnapshotAt: '2026-10-25T18:00:00Z',
+      addedLast24Hours: 668_600,
+      generatedAt: '2026-10-25T18:00:13Z',
+      ...overrides,
     },
     failed,
   })
-test('shows both rolling additions, including zero, independently of digest loading', async () => {
-  jest.mocked(getRecentMemberCount).mockResolvedValue(0)
-  render(await HomepageGrowth({ data: growthStats(1234) }))
-  expect(screen.getByText('0 members')).toBeInTheDocument()
-  expect(screen.getByText('1,234 tweets')).toBeInTheDocument()
-  expect(screen.getByText(/Added in the last 24 hours/)).toBeInTheDocument()
+
+test('shows every digit of the totals and both member windows, including zero', async () => {
+  render(await HomepageGrowth({ data: growthStats() }))
+  expect(screen.getByText('21,023,737')).toBeInTheDocument()
+  expect(screen.getByText('1,261')).toBeInTheDocument()
+  expect(screen.getByText('0')).toBeInTheDocument()
+  expect(screen.getByText('259')).toBeInTheDocument()
+  expect(screen.getByText('668,600 tweets')).toBeInTheDocument()
+  expect(screen.getByText(/Membership as of/)).toBeInTheDocument()
+  expect(screen.getByText(/Oct 25, 6:00 PM UTC/)).toHaveAttribute(
+    'datetime',
+    '2026-10-25T18:00:00Z',
+  )
 })
-test('omits unavailable figures rather than displaying an invented zero', async () => {
-  jest.mocked(getRecentMemberCount).mockRejectedValue(new Error('offline'))
-  const { unmount } = render(await HomepageGrowth({ data: growthStats(1) }))
-  expect(screen.getByText('1 tweet')).toBeInTheDocument()
-  expect(screen.queryByText(/members/)).not.toBeInTheDocument()
-  unmount()
-  expect(await HomepageGrowth({ data: growthStats(null, true) })).toBeNull()
+
+test('keeps missing growth visible as unavailable and preserves the totals', async () => {
+  render(
+    await HomepageGrowth({
+      data: growthStats({
+        membersAddedLastHour: null,
+        membersAddedLast24Hours: null,
+        addedLast24Hours: null,
+      }),
+    }),
+  )
+  expect(screen.getAllByText('Unavailable')).toHaveLength(2)
+  expect(screen.getByText('1,261')).toBeInTheDocument()
+  expect(screen.queryByText('668,600 tweets')).not.toBeInTheDocument()
+})
+
+test('shows an explicit failure instead of zero totals', async () => {
+  render(await HomepageGrowth({ data: growthStats({}, true) }))
+  expect(
+    screen.getByText('Archive counts are temporarily unavailable.'),
+  ).toBeInTheDocument()
+  expect(screen.queryByText('1,261')).not.toBeInTheDocument()
 })

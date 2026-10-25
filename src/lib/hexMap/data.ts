@@ -9,7 +9,8 @@ import { getAppPolicy, getStrands } from '@/lib/community-apps/data'
 import { filterStrands } from '@/lib/community-apps/strand-list'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import type { PortalTweet } from '@/lib/portal/types'
-import { locate } from './gateway'
+import { locate, type MapLookup } from './gateway'
+import { measureServerRead } from '@/lib/performance/server'
 import snapshot from './snapshot.json'
 import { selectStories } from './selectStories'
 import type { MapStory, StoryPage, StoryDetail } from './stories'
@@ -51,10 +52,21 @@ function people(tweets: PortalTweet[]) {
   )
 }
 
+// Location candidates are private server-side input. Only freshly checked
+// members contribute people or cells to the response. Location failures remain
+// optional for browse, but community-filtered requests fail closed.
+async function storyLocations(names: string[]): Promise<MapLookup | null> {
+  try {
+    return await measureServerRead('map.stories.locations', () => locate(names))
+  } catch {
+    return null
+  }
+}
+
 async function unlocatedStoryPage(
   kind: 'digest' | 'strand',
   offset: number,
-): Promise<StoryPage> {
+): Promise<{ page: StoryPage; lookup: MapLookup | null }> {
   if (kind === 'strand') {
     const { strands } = await getStrands()
     const sorted = filterStrands(strands, '')
@@ -113,24 +125,36 @@ async function unlocatedStoryPage(
       cells: [],
     }))
     return {
-      stories,
-      editions: [],
-      nextOffset:
-        offset + page.length < sorted.length ? offset + page.length : null,
-      located: false,
+      page: {
+        stories,
+        editions: [],
+        nextOffset:
+          offset + page.length < sorted.length ? offset + page.length : null,
+        located: false,
+      },
+      lookup: await storyLocations(
+        stories.flatMap((s) => s.people.map((p) => p.username)),
+      ),
     }
   }
   const preview = getPreviewDigestEdition()
   let editions
   if (preview) editions = offset === 0 ? [preview] : []
   else editions = await getPublishedDigestEditions(offset)
-  const allowed = await memberTweets(
-    editions.flatMap((e) =>
-      e.content.stories.flatMap((s) => [...s.bangers, ...s.commentary]),
-    ),
+  const tweets = editions.flatMap((e) =>
+    e.content.stories.flatMap((s) => [...s.bangers, ...s.commentary]),
   )
+  const names = Array.from(new Set(tweets.map((t) => t.username.toLowerCase())))
+  // Overlap independent reads without caching consent decisions. If candidates
+  // exceed the gateway limit, locate the checked members afterward as before.
+  const pendingLookup = names.length <= 300 ? storyLocations(names) : undefined
+  const allowed = await measureServerRead('map.stories.policy', () =>
+    memberTweets(tweets),
+  )
+  const lookup = await (pendingLookup ??
+    storyLocations(allowed.map((t) => t.username)))
   const byId = new Map(allowed.map((t) => [t.id, t]))
-  return {
+  const page: StoryPage = {
     stories: [],
     editions: editions.map((e) => ({
       date: e.digestDate,
@@ -155,6 +179,7 @@ async function unlocatedStoryPage(
     nextOffset: !preview && editions.length === 2 ? offset + 2 : null,
     located: false,
   }
+  return { page, lookup }
 }
 
 export async function storyDetail(
@@ -209,12 +234,9 @@ export async function storyPage(
   offset: number,
   cells: number[] = [],
 ): Promise<StoryPage> {
-  const page = await unlocatedStoryPage(kind, offset)
+  const { page, lookup } = await unlocatedStoryPage(kind, offset)
   const stories = [...page.stories, ...page.editions.flatMap((e) => e.stories)]
-  try {
-    const lookup = await locate(
-      stories.flatMap((s) => s.people.map((p) => p.username)),
-    )
+  if (lookup) {
     const byName = new Map(
       lookup.people.map((p) => [p.username.toLowerCase(), p.cell]),
     )
@@ -241,8 +263,8 @@ export async function storyPage(
             )?.short
     }
     page.located = true
-  } catch {
-    if (cells.length) throw new Error('Story locations unavailable')
+  } else if (cells.length) {
+    throw new Error('Story locations unavailable')
   }
   return selectStories(page, cells, snapshot)
 }

@@ -29,7 +29,7 @@ const getTwitterUsername = (
 export default async function SettingsPage() {
   const { user } = await requireAuth('/settings')
   const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient(cookieStore, { readSource: 'app' })
   const admin = createServerAdminClient(cookieStore)
   const rawTwitterAccountId = user.app_metadata?.provider_id
   const twitterAccountId =
@@ -73,7 +73,7 @@ export default async function SettingsPage() {
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
       twitterAccountId
-        ? getPublicProfileSettings(twitterAccountId)
+        ? getPublicProfileSettings(twitterAccountId, { readSource: 'app' })
         : Promise.resolve({ downloadArchiveVisible: true }),
       twitterAccountId
         ? getSubscriptionForAccount(twitterAccountId).catch(() => null)

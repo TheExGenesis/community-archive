@@ -108,13 +108,16 @@ async function getManuallyCuratedBangers(
     .map(manuallyCuratedBanger)
 }
 
-export async function getPublicProfileSettings(accountId: string) {
+export async function getPublicProfileSettings(
+  accountId: string,
+  options: { readSource?: 'app' } = {},
+) {
   if (!accountPattern.test(accountId)) {
     return { downloadArchiveVisible: true }
   }
 
   try {
-    const supabase = createServerServiceRoleClient()
+    const supabase = createServerServiceRoleClient(options)
     const { data, error } = await supabase
       .from('profile_settings')
       .select('download_archive_visible')

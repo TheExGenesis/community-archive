@@ -153,6 +153,7 @@ describe('single archive deletion route', () => {
     expect(response.status).toBe(404)
     expect(query.eq).toHaveBeenCalledWith('id', 42)
     expect(query.eq).toHaveBeenCalledWith('account_id', 'owner-id')
+    expect(mockedServiceRoleClient).toHaveBeenCalledWith({ readSource: 'app' })
     expect(rpc).not.toHaveBeenCalled()
     expect(mockedRemove).not.toHaveBeenCalled()
   })

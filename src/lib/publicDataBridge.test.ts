@@ -1,4 +1,5 @@
 import { POST, GET } from '@/app/api/public-data/route'
+import { getSubscriptionForAccount } from '@/lib/digest/emailSubscriptions'
 import {
   createRoutedSupabaseFetch,
   createBrowserReadFetch,
@@ -189,6 +190,19 @@ test('misconfigured mutations cannot write to either the configured or known pro
     }
   }
   expect(fetchMock).not.toHaveBeenCalled()
+})
+
+test('a staging account subscription is read from staging even when admin reads use production', async () => {
+  process.env.DATA_READ_SOURCE = 'production'
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://stage.example.com'
+  process.env.SUPABASE_SERVICE_ROLE = 'staging-service'
+  await expect(getSubscriptionForAccount('123')).resolves.toBeNull()
+  expect(String(fetchMock.mock.calls[0][0])).toContain(
+    'https://stage.example.com/rest/v1/digest_email_subscriptions?',
+  )
+  expect(
+    new Headers(fetchMock.mock.calls[0][1].headers).get('authorization'),
+  ).toBe('Bearer staging-service')
 })
 
 test('public browser content uses anonymous production reads, while personal consent and writes stay staging', async () => {

@@ -66,12 +66,10 @@ it('rejects invalid input before querying', async () => {
 })
 it('filters current membership in production without rechecking opt-outs', async () => {
   process.env.VERCEL_ENV = 'production'
-  jest
-    .mocked(readMembers)
-    .mockResolvedValueOnce({
-      members: new Set(['exgenesis']),
-      avatars: new Map(),
-    })
+  jest.mocked(readMembers).mockResolvedValueOnce({
+    members: new Set(['exgenesis']),
+    avatars: new Map(),
+  })
   expect((await (await GET(request())).json()).people).toEqual(result.people)
   jest
     .mocked(readMembers)

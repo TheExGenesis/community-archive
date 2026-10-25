@@ -84,8 +84,7 @@ export async function HomepageGrowth({
               timeZone: 'UTC',
             })}{' '}
             UTC
-          </time>{' '}
-          · refreshed hourly
+          </time>
         </p>
       )}
     </div>

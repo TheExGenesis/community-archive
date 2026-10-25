@@ -67,7 +67,7 @@ test('shows every digit of the totals and both member windows, including zero', 
   expect(screen.getByText('0')).toBeInTheDocument()
   expect(screen.getByText('259')).toBeInTheDocument()
   expect(screen.getByText('668,600 tweets')).toBeInTheDocument()
-  expect(screen.getByText(/refreshed hourly/)).toBeInTheDocument()
+  expect(screen.getByText(/Membership as of/)).toBeInTheDocument()
   expect(screen.getByText(/Oct 25, 6:00 PM UTC/)).toHaveAttribute(
     'datetime',
     '2026-10-25T18:00:00Z',

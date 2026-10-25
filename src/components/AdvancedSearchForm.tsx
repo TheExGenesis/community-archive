@@ -23,7 +23,11 @@ import {
   SearchFilterKey,
 } from '@/lib/searchParams'
 
-export default function AdvancedSearchForm() {
+export default function AdvancedSearchForm({
+  allowUserSuggestions = true,
+}: {
+  allowUserSuggestions?: boolean
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -113,14 +117,26 @@ export default function AdvancedSearchForm() {
       <div className="flex flex-col gap-2.5 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <UserSearchInput
-            id="main-search"
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Search words, phrases, or from:username"
-            className="h-10 rounded-lg bg-background pl-10 pr-4 text-sm"
-            autoComplete="off"
-          />
+          {allowUserSuggestions ? (
+            <UserSearchInput
+              id="main-search"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search words, phrases, or from:username"
+              className="h-10 rounded-lg bg-background pl-10 pr-4 text-sm"
+              autoComplete="off"
+            />
+          ) : (
+            <Input
+              id="main-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search words, phrases, or from:username"
+              className="h-10 rounded-lg bg-background pl-10 pr-4 text-sm"
+              autoComplete="off"
+            />
+          )}
         </div>
         <Button
           type="submit"

@@ -1,3 +1,4 @@
+import { requireBrowsingUser } from '@/lib/browsingAuth'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
@@ -39,6 +40,8 @@ import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
 // A cold profile waits on several gateway reads; Vercel's 15s default cut
 // streamed renders off mid-way (504).
+export const dynamic = 'force-dynamic'
+
 export const maxDuration = 60
 
 interface PageProps {
@@ -49,9 +52,10 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
+  await requireBrowsingUser(`/user/${encodeURIComponent(params.account_id)}`)
   const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) return { title: 'User not found' }
-  const { accountId, isMember, profile } = resolved
+  const { accountId, profile } = resolved
   const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
   const normalizedBio = profile.bio?.replace(/\s+/g, ' ').trim()
   const description = normalizedBio
@@ -64,8 +68,7 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: canonicalPath },
-    // Only people who joined the archive are offered to search engines.
-    ...(isMember ? {} : { robots: { index: false } }),
+    robots: { index: false },
     openGraph: {
       type: 'website',
       url: canonicalPath,
@@ -150,6 +153,7 @@ async function ProfileArchivedAt({ accountId }: { accountId: string }) {
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
+  await requireBrowsingUser(`/user/${encodeURIComponent(params.account_id)}`)
   const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) notFound()
 

@@ -1,10 +1,12 @@
+jest.mock('@/lib/browsingAuth', () => ({ requireBrowsingUser: jest.fn() }))
 import {
   Children,
   isValidElement,
   type ReactElement,
   type ReactNode,
 } from 'react'
-import UserPage from '@/app/user/[account_id]/page'
+import { requireBrowsingUser } from '@/lib/browsingAuth'
+import UserPage, { generateMetadata } from '@/app/user/[account_id]/page'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
 import { resolveProfileCore } from '@/lib/metaTwitter/profile'
 import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
@@ -65,3 +67,17 @@ test('renders the profile before owner authentication and reads settings only fo
   expect(getPublicProfileSettings).toHaveBeenCalledWith('42')
   expect(actions.props.downloadArchiveVisible).toBe(false)
 })
+
+test.each([UserPage, generateMetadata])(
+  'authenticates before reading profile data (%#)',
+  async (render) => {
+    jest.clearAllMocks()
+    ;(requireBrowsingUser as jest.Mock).mockRejectedValueOnce(
+      new Error('login redirect'),
+    )
+    await expect(
+      render({ params: { account_id: 'alice' }, searchParams: {} }),
+    ).rejects.toThrow('login redirect')
+    expect(resolveProfileCore).not.toHaveBeenCalled()
+  },
+)

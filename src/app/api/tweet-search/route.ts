@@ -1,3 +1,4 @@
+import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   analyticsGatewayRequestUrl,
@@ -9,6 +10,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 export async function GET(request: NextRequest) {
+  const authError = await browsingAuthError()
+  if (authError) return authError
+
   if (!isClickHouseReadsEnabled()) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

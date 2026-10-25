@@ -2,11 +2,17 @@ import { render, screen } from '@testing-library/react'
 import type { HomepageData } from '@/lib/portal/data'
 import {
   HomepageStats,
+  HomepageGrowth,
   HomepageResearch,
   HomepageTrends,
   HomepageDigest,
 } from './HomepageDataSections'
 import { getLatestDigestPreview } from '@/lib/digest/data'
+
+jest.mock('@/lib/portal/recentMembers', () => ({
+  getRecentMemberCount: jest.fn(),
+}))
+import { getRecentMemberCount } from '@/lib/portal/recentMembers'
 
 jest.mock('@/lib/digest/data', () => ({ getLatestDigestPreview: jest.fn() }))
 jest.mock('@/components/portal/Portal', () => ({
@@ -42,4 +48,30 @@ test('renders ready panels while trends and the digest remain pending', async ()
   expect(screen.getByText(/14.0M public tweets/)).toBeInTheDocument()
   expect(screen.getByText('Research')).toBeInTheDocument()
   expect(screen.queryByText('Weekly trends')).not.toBeInTheDocument()
+})
+
+const growthStats = (tweets: number | null, failed = false) =>
+  Promise.resolve({
+    data: {
+      totalTweets: 1,
+      memberCount: 1,
+      addedLast24Hours: tweets,
+      generatedAt: '2026-10-24T00:00:00Z',
+    },
+    failed,
+  })
+test('shows both rolling additions, including zero, independently of digest loading', async () => {
+  jest.mocked(getRecentMemberCount).mockResolvedValue(0)
+  render(await HomepageGrowth({ data: growthStats(1234) }))
+  expect(screen.getByText('0 members')).toBeInTheDocument()
+  expect(screen.getByText('1,234 tweets')).toBeInTheDocument()
+  expect(screen.getByText(/Added in the last 24 hours/)).toBeInTheDocument()
+})
+test('omits unavailable figures rather than displaying an invented zero', async () => {
+  jest.mocked(getRecentMemberCount).mockRejectedValue(new Error('offline'))
+  const { unmount } = render(await HomepageGrowth({ data: growthStats(1) }))
+  expect(screen.getByText('1 tweet')).toBeInTheDocument()
+  expect(screen.queryByText(/members/)).not.toBeInTheDocument()
+  unmount()
+  expect(await HomepageGrowth({ data: growthStats(null, true) })).toBeNull()
 })

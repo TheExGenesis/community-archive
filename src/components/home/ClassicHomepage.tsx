@@ -142,13 +142,7 @@ export default async function ClassicHomepage({
         </div>
       </section>
 
-      <HexHero
-        stats={
-          <Suspense fallback={<>Preserving public conversations.</>}>
-            <HomepageStats data={data.globalStats} />
-          </Suspense>
-        }
-      />
+      <HexHero />
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
         <HomepagePortal data={data} isMember={isMember} />

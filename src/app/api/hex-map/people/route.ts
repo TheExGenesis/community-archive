@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { readMapLookup } from '@/lib/hexMap/lookup'
 import type { MapPeoplePage } from '@/lib/hexMap/gateway'
 import { MAP_VERSION } from '@/lib/hexMap/version'
-import { createServerServiceRoleClient } from '@/utils/supabase'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
@@ -33,26 +32,7 @@ export async function GET(request: NextRequest) {
       offset,
       peoplePage: '1',
     })) as MapPeoplePage
-    const people = result.people
-    if (people.length && process.env.VERCEL_ENV !== 'preview') {
-      const { data, error } = await createServerServiceRoleClient()
-        .from('user_directory')
-        .select('account_id,avatar_media_url')
-        .in(
-          'account_id',
-          people.map((person) => person.account_id),
-        )
-      if (error) throw new Error('Member avatars unavailable')
-      const avatars = new Map(
-        data?.map((row) => [row.account_id, row.avatar_media_url]),
-      )
-      for (const person of people)
-        person.avatar = avatars.get(person.account_id) ?? null
-    }
-    return NextResponse.json(
-      { people, nextOffset: result.nextOffset },
-      { headers },
-    )
+    return NextResponse.json(result, { headers })
   } catch {
     return NextResponse.json(
       { error: 'People are temporarily unavailable' },

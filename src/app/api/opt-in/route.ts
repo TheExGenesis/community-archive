@@ -1,3 +1,4 @@
+import { revalidateTag } from 'next/cache'
 import {
   createServerClient,
   createServerServiceRoleClient,
@@ -173,6 +174,8 @@ export async function POST(request: NextRequest) {
       result = data
     }
 
+    revalidateTag('hex-map-members')
+    revalidateTag('homepage-recent-members')
     return NextResponse.json({
       success: true,
       data: result,

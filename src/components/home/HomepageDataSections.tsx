@@ -10,6 +10,37 @@ import { getLatestDigestPreview } from '@/lib/digest/data'
 import { formatNumber } from '@/lib/formatNumber'
 import type { HomepageData } from '@/lib/portal/data'
 import { measureServerRead } from '@/lib/performance/server'
+import { getRecentMemberCount } from '@/lib/portal/recentMembers'
+
+export async function HomepageGrowth({
+  data,
+}: {
+  data: HomepageData['globalStats']
+}) {
+  const [stats, members] = await Promise.all([
+    data,
+    getRecentMemberCount().catch(() => null),
+  ])
+  const tweets = stats.failed ? null : stats.data.addedLast24Hours
+  if (members === null && tweets === null) return null
+  return (
+    <p className="mt-4 text-center text-sm text-muted-foreground">
+      Added in the last 24 hours:{' '}
+      {members !== null && (
+        <strong className="font-medium text-foreground">
+          {members.toLocaleString()} {members === 1 ? 'member' : 'members'}
+        </strong>
+      )}
+      {members !== null && tweets !== null && ' and '}
+      {tweets !== null && (
+        <strong className="font-medium text-foreground">
+          {tweets.toLocaleString()} {tweets === 1 ? 'tweet' : 'tweets'}
+        </strong>
+      )}
+      .
+    </p>
+  )
+}
 
 export async function HomepageStats({
   data,
@@ -104,9 +135,14 @@ export function HomepagePortal({
   return (
     <HomepageHighlightsLayout
       digest={
-        <Suspense fallback={<SectionLoading label="daily digest" />}>
-          <HomepageDigest />
-        </Suspense>
+        <>
+          <Suspense fallback={<SectionLoading label="daily digest" />}>
+            <HomepageDigest />
+          </Suspense>
+          <Suspense fallback={null}>
+            <HomepageGrowth data={data.globalStats} />
+          </Suspense>
+        </>
       }
       trends={
         <Suspense fallback={<SectionLoading label="trending terms" />}>

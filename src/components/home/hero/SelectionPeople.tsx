@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -15,13 +15,23 @@ import {
 import type { MapPerson, MapPeoplePage } from '@/lib/hexMap/gateway'
 import { mapUrl } from '@/lib/hexMap/version'
 import styles from './hero.module.css'
+import { selectionPeopleOptions } from './useSelectionPreview'
 
 function PeopleList({ cells }: { cells: string }) {
+  const client = useQueryClient()
+  const previewKey = selectionPeopleOptions(cells).queryKey
   const scroll = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLButtonElement>(null)
   const query = useInfiniteQuery({
     queryKey: ['hex-selection-people-pages', cells],
     initialPageParam: 0,
+    initialData: () => {
+      const first = client.getQueryData<MapPeoplePage>(previewKey)
+      return first && first.nextOffset !== undefined
+        ? { pages: [first], pageParams: [0] }
+        : undefined
+    },
+    initialDataUpdatedAt: () => client.getQueryState(previewKey)?.dataUpdatedAt,
     queryFn: async ({ pageParam, signal }): Promise<MapPeoplePage> => {
       const response = await fetch(
         mapUrl(`people?cells=${cells}&offset=${pageParam}`),

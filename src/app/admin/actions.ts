@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import {
   AccountRecord,
   AccountsCursor,
@@ -233,6 +233,8 @@ export async function manualOptIn(
     }
 
     revalidatePath('/admin')
+    revalidateTag('hex-map-members')
+    revalidateTag('homepage-recent-members')
     return {
       ok: true,
       optInRecord: writeResponse.data as OptInRecord,
@@ -315,6 +317,8 @@ export async function adminSetOptInState(
     }
 
     revalidatePath('/admin')
+    revalidateTag('hex-map-members')
+    revalidateTag('homepage-recent-members')
     return {
       ok: true,
       optInRecord: writeResponse.data as OptInRecord,
@@ -398,6 +402,8 @@ export async function adminOptOutAccount(
       : `@${username}: opt-out saved; no Twitter account id was available to tombstone.`
 
     revalidatePath('/admin')
+    revalidateTag('hex-map-members')
+    revalidateTag('homepage-recent-members')
     return {
       ok: true,
       optInRecord: writeResponse.data as OptInRecord,

@@ -4,6 +4,8 @@ import { mapGateway } from './gateway'
 import { getAppPolicy } from '@/lib/community-apps/data'
 import { MAP_VERSION } from './version'
 
+jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
+
 jest.mock('./gateway', () => ({ mapGateway: jest.fn() }))
 jest.mock('@/lib/community-apps/data', () => ({ getAppPolicy: jest.fn() }))
 jest.mock('@/utils/supabase', () => ({

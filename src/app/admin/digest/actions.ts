@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { start } from 'workflow/api'
 import { requireAdmin } from '@/app/admin/data'
@@ -70,6 +70,7 @@ function describeError(error: unknown): string {
 }
 
 const revalidateDigestPaths = (digestDate?: string) => {
+  revalidateTag('published-digests')
   revalidatePath('/')
   revalidatePath('/digest')
   revalidatePath('/admin/digest')

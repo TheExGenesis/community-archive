@@ -3,6 +3,7 @@ import { getAppPolicy } from '@/lib/community-apps/data'
 import { mapGateway, type MapLookup, type MapPeoplePage } from './gateway'
 import { MAP_VERSION } from './version'
 import { readMemberPage } from './memberCache'
+import { usesProductionReadSource } from '@/lib/publicDataSource'
 
 /** The gateway applies its fresh production membership/opt-out projection first. */
 export async function readMapLookup(
@@ -38,7 +39,7 @@ export async function readMapLookup(
       : result.people
   // Preview sessions and consent writes use staging. Rechecking these public
   // production results against staging would incorrectly remove real members.
-  if (process.env.VERCEL_ENV === 'preview')
+  if (process.env.VERCEL_ENV === 'preview' && !usesProductionReadSource())
     return { ...result, people: candidates }
   const policy = await getAppPolicy(candidates.map((p) => p.username))
   return {

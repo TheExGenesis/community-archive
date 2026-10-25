@@ -112,9 +112,13 @@ describe('resolvePublicProfileIdentity', () => {
       accountId: '42',
       username: 'alice',
     })
-    expect(rpcMock).toHaveBeenCalledWith('resolve_directory_identity', {
-      identifier: 'Alice',
-    })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'resolve_directory_identity',
+      {
+        identifier: 'Alice',
+      },
+      { get: true },
+    )
     expect(fromMock).not.toHaveBeenCalled()
   })
 
@@ -122,9 +126,13 @@ describe('resolvePublicProfileIdentity', () => {
     rpcMock.mockResolvedValue({ data: [], error: null })
 
     await expect(resolvePublicProfileIdentity('42')).resolves.toBeNull()
-    expect(rpcMock).toHaveBeenCalledWith('resolve_directory_identity', {
-      identifier: '42',
-    })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'resolve_directory_identity',
+      {
+        identifier: '42',
+      },
+      { get: true },
+    )
     expect(fromMock).not.toHaveBeenCalled()
   })
 

@@ -1,3 +1,4 @@
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
@@ -193,7 +194,12 @@ const cachedOutcome = (subject: TweetPageSubject, allowGeneration: boolean) =>
       if (stored) return stored
       throw new GenerationSkipped()
     },
-    ['tweet-page-summary', `v${SUMMARY_PROMPT_VERSION}`, subject.key],
+    [
+      'tweet-page-summary',
+      `v${SUMMARY_PROMPT_VERSION}`,
+      subject.key,
+      productionReadCacheKey(),
+    ],
     { revalidate: false, tags: [`tweet-page-summary:${subject.key}`] },
   )()
 

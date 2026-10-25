@@ -1,8 +1,12 @@
 import 'server-only'
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { SupabaseClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import { Database } from '@/database-types'
+import {
+  createPublicReadClient,
+  publicDataConfig,
+} from '@/lib/publicDataSource'
 import { devLog } from '@/lib/devLog'
 import { isTwitterUsername } from '@/lib/apiInputValidation'
 import { createServerServiceRoleClient } from '@/utils/supabase'
@@ -16,30 +20,8 @@ export type { ArchiveMediaItem, ArchivePerson, ProfileHeaderData }
 
 const DAY = 86_400
 
-const getMetaClient = (
-  options: { noStore?: boolean } = {},
-): SupabaseClient<Database> => {
-  const isDevelopment = process.env.NODE_ENV === 'development'
-  const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
-  const url =
-    isDevelopment && !useRemoteDevDb
-      ? process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL!
-      : process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const anonKey =
-    isDevelopment && !useRemoteDevDb
-      ? process.env.NEXT_PUBLIC_LOCAL_ANON_KEY!
-      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  return createClient<Database>(url, anonKey, {
-    auth: { persistSession: false },
-    ...(options.noStore
-      ? {
-          global: {
-            fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-              fetch(input, { ...init, cache: 'no-store' }),
-          },
-        }
-      : {}),
-  })
+const getMetaClient = (): SupabaseClient<Database> => {
+  return createPublicReadClient()
 }
 
 async function fetchProfileHeader(
@@ -226,8 +208,8 @@ async function fetchMediaCount(scope: SidebarScope): Promise<number> {
   return count ?? 0
 }
 
-export const getCachedProfileHeader = unstable_cache(
-  fetchProfileHeader,
+const cachedProfileHeader = unstable_cache(
+  (accountId: string, _source: string) => fetchProfileHeader(accountId),
   ['meta-twitter-profile-header-v4'],
   { revalidate: 3600 },
 )
@@ -265,7 +247,7 @@ export const resolvePublicProfileIdentity = async (
     return null
   }
 
-  const supabase = getMetaClient({ noStore: true })
+  const supabase = getMetaClient()
   const viewLookup = () => {
     const baseQuery = supabase
       .from('user_directory')
@@ -280,9 +262,13 @@ export const resolvePublicProfileIdentity = async (
   // The RPC skips the directory view entirely when neither base table could
   // contain the identifier, so a miss costs index probes, not a view scan.
   const rpcLookup = async () => {
-    const rpc = await supabase.rpc('resolve_directory_identity', {
-      identifier: decoded,
-    })
+    const rpc = await supabase.rpc(
+      'resolve_directory_identity',
+      {
+        identifier: decoded,
+      },
+      { get: true },
+    )
     // Migration not applied yet: keep serving through the view.
     if (rpc.error && isMissingFunctionError(rpc.error)) return viewLookup()
     return { data: rpc.data?.[0] ?? null, error: rpc.error }
@@ -319,8 +305,8 @@ export const isPolicyBlockedAccount = async (
   return data !== false
 }
 
-export const getCachedArchivedAt = unstable_cache(
-  async (accountId: string): Promise<string | null> => {
+const cachedArchivedAt = unstable_cache(
+  async (accountId: string, _source: string): Promise<string | null> => {
     const supabase = getMetaClient()
     const { data } = await supabase
       .from('archive_upload')
@@ -335,8 +321,8 @@ export const getCachedArchivedAt = unstable_cache(
   { revalidate: DAY },
 )
 
-export const getCachedProfileSidebarData = unstable_cache(
-  async (accountId: string, year: number | undefined) => {
+const cachedProfileSidebarData = unstable_cache(
+  async (accountId: string, year: number | undefined, _source: string) => {
     const scope: SidebarScope = { accountId, year }
     const [media, people, mediaCount] = await Promise.all([
       fetchMedia(scope, 6),
@@ -348,3 +334,12 @@ export const getCachedProfileSidebarData = unstable_cache(
   ['meta-twitter-profile-sidebar-v2'],
   { revalidate: DAY },
 )
+
+export const getCachedProfileHeader = (accountId: string) =>
+  cachedProfileHeader(accountId, publicDataConfig().sourceId)
+export const getCachedArchivedAt = (accountId: string) =>
+  cachedArchivedAt(accountId, publicDataConfig().sourceId)
+export const getCachedProfileSidebarData = (
+  accountId: string,
+  year: number | undefined,
+) => cachedProfileSidebarData(accountId, year, publicDataConfig().sourceId)

@@ -1,6 +1,10 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import {
+  createPublicReadClient,
+  usesProductionReadSource,
+} from '@/lib/publicDataSource'
 import { mapGateway, type MapPeoplePage } from './gateway'
 import { MAP_VERSION } from './version'
 
@@ -28,11 +32,17 @@ export const readMemberPage = unstable_cache(
     )
       throw new Error('Invalid map member page')
 
-    if (!result.people.length || process.env.VERCEL_ENV === 'preview')
+    if (
+      !result.people.length ||
+      (process.env.VERCEL_ENV === 'preview' && !usesProductionReadSource())
+    )
       return result
-    const { data, error } = await createServerServiceRoleClient({
-      noStore: true,
-    })
+    const client = usesProductionReadSource()
+      ? createPublicReadClient()
+      : createServerServiceRoleClient({
+          noStore: true,
+        })
+    const { data, error } = await client
       .from('user_directory')
       .select('account_id,avatar_media_url')
       .in(
@@ -51,6 +61,12 @@ export const readMemberPage = unstable_cache(
       })),
     }
   },
-  ['hex-member-pages-v1', MAP_VERSION, process.env.VERCEL_ENV ?? 'local'],
+  [
+    'hex-member-pages-v2',
+    MAP_VERSION,
+    process.env.VERCEL_ENV ?? 'local',
+    process.env.DATA_READ_SOURCE ?? 'app',
+    process.env.PORTAL_READ_SUPABASE_URL ?? '',
+  ],
   { revalidate: 60, tags: [MAP_MEMBERS_TAG] },
 )

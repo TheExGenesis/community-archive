@@ -53,6 +53,7 @@ beforeEach(() => {
     members: new Set(['me_one']),
     blocked: new Set(),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   jest.mocked(mapGateway).mockImplementation(async (endpoint) =>
     endpoint === 'hex-self'
@@ -89,6 +90,7 @@ it('lets an opted-in user locate another member', async () => {
     members: new Set(['me_one', 'someone']),
     blocked: new Set(),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   const res = await GET(request('&name=someone'))
   expect(res.status).toBe(200)
@@ -183,6 +185,7 @@ it('also honors the current authoritative policy by stable account ID', async ()
     members: new Set(['me_one']),
     blocked: new Set(),
     blockedIds: new Set(['123']),
+    avatars: new Map(),
   })
   expect((await GET(request())).status).toBe(403)
   expect(mapGateway).not.toHaveBeenCalled()
@@ -235,6 +238,7 @@ it('returns all mapped members in a batch', async () => {
     members: new Set(['me_one', 'someone']),
     blocked: new Set(),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   const res = await GET(request('&name=me_one,someone'))
   expect(await res.json()).toEqual({
@@ -272,6 +276,7 @@ it('locates a fresh opt-in before either directory or analytical membership catc
     members: new Set(),
     blocked: new Set(),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   const res = await GET(request('&account_id=456'))
   expect(res.status).toBe(200)

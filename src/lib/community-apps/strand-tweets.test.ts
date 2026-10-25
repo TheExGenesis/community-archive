@@ -17,31 +17,28 @@ jest.mock('@/lib/portal/data', () => ({ enrichPortalTweets: jest.fn() }))
 jest.mock('./data', () => ({ getAppPolicy: jest.fn() }))
 beforeEach(() => {
   jest.clearAllMocks()
-  jest
-    .mocked(getAppPolicy)
-    .mockResolvedValue({
-      blocked: new Set(['withdrawn']),
-      blockedIds: new Set(['blocked-id']),
-      members: new Set(),
-    })
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    blocked: new Set(['withdrawn']),
+    blockedIds: new Set(['blocked-id']),
+    members: new Set(),
+    avatars: new Map(),
+  })
 })
 test('current opt-outs filter both authors and quoted authors after full enrichment', async () => {
   jest.mocked(isClickHouseReadsEnabled).mockReturnValue(false)
   const query = {
     select: jest.fn().mockReturnThis(),
-    in: jest
-      .fn()
-      .mockResolvedValue({
-        data: [
-          {
-            tweet_id: '123',
-            username: 'member',
-            created_at: '2020-01-01',
-            full_text: 'complete source',
-          },
-        ],
-        error: null,
-      }),
+    in: jest.fn().mockResolvedValue({
+      data: [
+        {
+          tweet_id: '123',
+          username: 'member',
+          created_at: '2020-01-01',
+          full_text: 'complete source',
+        },
+      ],
+      error: null,
+    }),
   }
   jest
     .mocked(createServerServiceRoleClient)

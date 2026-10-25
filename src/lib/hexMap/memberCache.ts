@@ -5,6 +5,7 @@ import {
   createPublicReadClient,
   usesProductionReadSource,
 } from '@/lib/publicDataSource'
+import { readDirectoryMembers } from '@/lib/directoryMembers'
 import { mapGateway, type MapPeoplePage } from './gateway'
 import { MAP_VERSION } from './version'
 
@@ -42,16 +43,12 @@ export const readMemberPage = unstable_cache(
       : createServerServiceRoleClient({
           noStore: true,
         })
-    const { data, error } = await client
-      .from('user_directory')
-      .select('account_id,avatar_media_url')
-      .in(
-        'account_id',
-        result.people.map((person) => person.account_id),
-      )
-    if (error) throw new Error('Member avatars unavailable')
+    const members = await readDirectoryMembers(
+      client,
+      result.people.map((person) => person.username),
+    )
     const avatars = new Map(
-      data?.map((row) => [row.account_id, row.avatar_media_url]),
+      members.map((row) => [row.account_id, row.avatar_media_url]),
     )
     return {
       ...result,

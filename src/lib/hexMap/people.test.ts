@@ -25,9 +25,7 @@ const request = (params = 'cells=2&offset=24') =>
 beforeEach(() => {
   jest.clearAllMocks()
   jest.mocked(createServerServiceRoleClient).mockReturnValue({
-    from: () => ({
-      select: () => ({ in: async () => ({ data: [], error: null }) }),
-    }),
+    rpc: async () => ({ data: [], error: null }),
   } as never)
   process.env.VERCEL_ENV = 'preview'
   jest.mocked(mapGateway).mockResolvedValue({
@@ -47,6 +45,7 @@ it('requests a bounded selected page and preserves continuation across fully pol
     members: new Set(),
     blocked: new Set(),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   const response = await GET(request())
   expect(response.status).toBe(200)
@@ -67,13 +66,21 @@ it('hydrates the entire allowed page and excludes a blocked account ID', async (
     members: new Set(people.map((person) => person.username)),
     blocked: new Set(),
     blockedIds: new Set(['1']),
+    avatars: new Map(),
   })
-  const inIds = jest.fn().mockResolvedValue({
-    data: [{ account_id: '24', avatar_media_url: 'https://test/avatar.jpg' }],
+  const rpc = jest.fn().mockResolvedValue({
+    data: [
+      {
+        account_id: '24',
+        username: 'member23',
+        has_archive: true,
+        avatar_media_url: 'https://test/avatar.jpg',
+      },
+    ],
     error: null,
   })
   jest.mocked(createServerServiceRoleClient).mockReturnValue({
-    from: () => ({ select: () => ({ in: inIds }) }),
+    rpc,
   } as never)
   const response = await GET(request())
   const page = await response.json()
@@ -83,9 +90,10 @@ it('hydrates the entire allowed page and excludes a blocked account ID', async (
     account_id: '24',
     avatar: 'https://test/avatar.jpg',
   })
-  expect(inIds).toHaveBeenCalledWith(
-    'account_id',
-    people.map((person) => person.account_id),
+  expect(rpc).toHaveBeenCalledWith(
+    'directory_members_by_username',
+    { p_usernames: people.map((person) => person.username) },
+    { get: true },
   )
 })
 it.each([

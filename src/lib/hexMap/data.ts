@@ -1,5 +1,4 @@
 import 'server-only'
-import { createServerServiceRoleClient } from '@/utils/supabase'
 import {
   getPublishedDigest,
   getPublishedDigestEditions,
@@ -81,26 +80,6 @@ async function unlocatedStoryPage(
       ),
     ).filter((name) => /^[a-z0-9_]{1,15}$/.test(name))
     const policy = await getAppPolicy(names)
-    const avatars = new Map<string, string | null>()
-    const admin = createServerServiceRoleClient()
-    const members = names.filter(
-      (name) => policy.members.has(name) && !policy.blocked.has(name),
-    )
-    for (let start = 0; start < members.length; start += 40) {
-      const { data, error } = await admin
-        .from('user_directory')
-        .select('username,avatar_media_url')
-        .or(
-          members
-            .slice(start, start + 40)
-            .map((name) => `username.ilike.${name}`)
-            .join(','),
-        )
-      if (error) throw new Error('Member avatars unavailable')
-      for (const row of data ?? [])
-        if (row.username)
-          avatars.set(row.username.toLowerCase(), row.avatar_media_url)
-    }
     const stories: MapStory[] = page.map((s) => ({
       id: s.id,
       kind,
@@ -120,7 +99,7 @@ async function unlocatedStoryPage(
         .filter((name) => policy.members.has(name) && !policy.blocked.has(name))
         .map((username) => ({
           username,
-          avatar: avatars.get(username) ?? null,
+          avatar: policy.avatars.get(username) ?? null,
         })),
       cells: [],
     }))

@@ -37,11 +37,18 @@ it('shares normalized first-page candidates and avatars, but rechecks consent on
     people: [{ account_id: '1', username: 'one', cell: 2 }],
   })
   const avatars = jest.fn().mockResolvedValue({
-    data: [{ account_id: '1', avatar_media_url: 'https://test/avatar' }],
+    data: [
+      {
+        account_id: '1',
+        username: 'one',
+        has_archive: true,
+        avatar_media_url: 'https://test/avatar',
+      },
+    ],
     error: null,
   })
   jest.mocked(createServerServiceRoleClient).mockReturnValue({
-    from: () => ({ select: () => ({ in: avatars }) }),
+    rpc: avatars,
   } as never)
   jest
     .mocked(getAppPolicy)
@@ -49,11 +56,13 @@ it('shares normalized first-page candidates and avatars, but rechecks consent on
       members: new Set(['one']),
       blocked: new Set(),
       blockedIds: new Set(),
+      avatars: new Map(),
     })
     .mockResolvedValueOnce({
       members: new Set(['one']),
       blocked: new Set(),
       blockedIds: new Set(['1']),
+      avatars: new Map(),
     })
   const preview = await readMapLookup({ cells: '3,2,2', names: '' })
   expect(preview.people[0].avatar).toBe('https://test/avatar')

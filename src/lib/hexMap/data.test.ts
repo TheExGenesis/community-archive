@@ -48,6 +48,7 @@ it('requires membership, blocks by ID or handle, and preserves public quote cont
     members: new Set(['alice', 'blocked', 'renamed']),
     blocked: new Set(['blocked']),
     blockedIds: new Set(['old-id']),
+    avatars: new Map(),
   })
   const alice = {
     ...tweet('Alice'),
@@ -98,20 +99,13 @@ it('loads strand cards without hydrating tweet threads and omits nonmember parti
     members: new Set(['alice']),
     blocked: new Set(),
     blockedIds: new Set(),
+    avatars: new Map([['alice', 'https://test/alice.jpg']]),
   })
-  const select = jest.fn(() => ({
-    or: jest.fn().mockResolvedValue({
-      data: [{ username: 'alice', avatar_media_url: null }],
-      error: null,
-    }),
-  }))
-  jest
-    .mocked(createServerServiceRoleClient)
-    .mockReturnValue({ from: () => ({ select }) } as unknown as ReturnType<
-      typeof createServerServiceRoleClient
-    >)
   const page = await storyPage('strand', 0)
-  expect(page.stories[0].people).toEqual([{ username: 'alice', avatar: null }])
+  expect(page.stories[0].people).toEqual([
+    { username: 'alice', avatar: 'https://test/alice.jpg' },
+  ])
+  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
   expect(getStrandTweets).not.toHaveBeenCalled()
   jest.mocked(locate).mockResolvedValue({
     version: snapshot.version,
@@ -156,6 +150,7 @@ it('keeps the focal banger first across map regions and filters opted-out posts'
     members: new Set(['jack', 'reply', 'blocked']),
     blocked: new Set(['blocked']),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   jest.mocked(locate).mockResolvedValue({
     version: snapshot.version,
@@ -229,6 +224,7 @@ it('overlaps Digest locations with fresh policy and never exposes unchecked part
     members: new Set(['alice', 'blocked']),
     blocked: new Set(),
     blockedIds: new Set(['blocked']),
+    avatars: new Map(),
   })
   const page = await pending
   expect(page.editions[0].stories[0].people).toEqual([

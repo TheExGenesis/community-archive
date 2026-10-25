@@ -86,6 +86,7 @@ beforeEach(() => {
     members: new Set(['alice']),
     blocked: new Set(),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   jest
     .mocked(getAppDataManifest)
@@ -141,6 +142,7 @@ test('owner identity and matching account are required, with consent rechecked o
     members: new Set(),
     blocked: new Set(['alice']),
     blockedIds: new Set(['123']),
+    avatars: new Map(),
   })
   expect(await loadAccessibleBirdseye()).toBeNull()
 })
@@ -256,6 +258,7 @@ test('real admins can list and read eligible profiles without becoming the owner
     members: new Set(),
     blocked: new Set(['alice']),
     blockedIds: new Set(),
+    avatars: new Map(),
   })
   expect(await getBirdseyeProfiles()).toEqual([])
   expect(await loadAccessibleBirdseye('alice')).toBeNull()

@@ -70,6 +70,7 @@ it('retains additional authoritative policy checks in production', async () => {
     members: new Set(['exgenesis']),
     blocked: new Set(),
     blockedIds: new Set(['322603863']),
+    avatars: new Map(),
   })
   expect((await (await GET(request())).json()).people).toEqual([])
   expect(getAppPolicy).toHaveBeenCalledWith(['exgenesis'])

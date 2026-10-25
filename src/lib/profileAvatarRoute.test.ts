@@ -1,3 +1,4 @@
+jest.mock('@/lib/browsingAuth', () => ({ browsingAuthError: async () => null }))
 import { GET } from '@/app/api/profile/[account_id]/avatar/route'
 import { getProfileBangersPage } from '@/lib/metaTwitter/bangers'
 import { fetchSyndicatedTweets } from '@/lib/twitterSyndication'

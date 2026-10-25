@@ -1,3 +1,4 @@
+import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   searchRelatedDigestStories,
@@ -11,6 +12,9 @@ const headers = { 'Cache-Control': 'private, no-store' }
 // Strands and digest stories are requested separately so a slow strand
 // consent check never holds back digest matches.
 export async function GET(request: NextRequest) {
+  const authError = await browsingAuthError()
+  if (authError) return authError
+
   const query = (request.nextUrl.searchParams.get('q') ?? '').trim()
   const type = request.nextUrl.searchParams.get('type')
   if (

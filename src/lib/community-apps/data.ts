@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { publicDataConfig } from '@/lib/publicDataSource'
 import type { AppDataManifest, BirdseyeAnalysis, Strand } from './types'
 import positions from './strand-positions.json'
 import display from './strand-display.json'
@@ -17,7 +18,7 @@ const BUCKET = 'community-app-data'
 // Only normalized display data lives here. Never expose private Storage URLs,
 // credentials, pickle files, original archives, or embedding vectors.
 const readSnapshot = unstable_cache(
-  async (key: string): Promise<unknown> => {
+  async (key: string, _source: string): Promise<unknown> => {
     if (!/^[a-zA-Z0-9_./-]+$/.test(key) || key.includes('..'))
       throw new Error('Invalid app data path')
     if (process.env.COMMUNITY_APP_DATA_DIR) {
@@ -39,14 +40,17 @@ const readSnapshot = unstable_cache(
 )
 
 export async function getAppDataManifest(): Promise<AppDataManifest> {
-  const manifest = (await readSnapshot('manifest.json')) as AppDataManifest
+  const manifest = (await readSnapshot(
+    'manifest.json',
+    publicDataConfig().sourceId,
+  )) as AppDataManifest
   if (manifest.version !== 1 || !/^v1\/[a-zA-Z0-9_-]+$/.test(manifest.prefix))
     throw new Error('Unsupported community app data manifest')
   return manifest
 }
 // Policy is checked on every request, independently of the snapshot cache.
 export async function getAppPolicy(usernames: string[]) {
-  const admin = createServerServiceRoleClient()
+  const admin = createServerServiceRoleClient({ noStore: true })
   const names = Array.from(
     new Set(usernames.map((name) => name.toLowerCase())),
   ).filter((name) => /^[a-z0-9_]{1,15}$/.test(name))
@@ -132,6 +136,7 @@ export async function getBirdseyeAnalysis(
     throw new Error('Invalid Birdseye username')
   const analysis = (await readSnapshot(
     `${manifest.prefix}/birdseye/${username}.json`,
+    publicDataConfig().sourceId,
   )) as BirdseyeAnalysis
   const hidden = new Set(
     manifest.birdseye.find((entry) => entry.username === username)
@@ -150,6 +155,7 @@ async function loadStrands() {
   const manifest = await getAppDataManifest()
   const strands = (await readSnapshot(
     `${manifest.prefix}/strands.json`,
+    publicDataConfig().sourceId,
   )) as Strand[]
   const policy = await getAppPolicy(strands.map((strand) => strand.username))
   return {
@@ -199,6 +205,7 @@ export async function getVisibleStrand(seed: string) {
   const manifest = await getAppDataManifest()
   const strands = (await readSnapshot(
     `${manifest.prefix}/strands.json`,
+    publicDataConfig().sourceId,
   )) as Strand[]
   const strand = strands.find((item) => item.id === seed)
   if (!strand) return null

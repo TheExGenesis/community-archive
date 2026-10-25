@@ -42,7 +42,7 @@ export async function DELETE(
     )
   }
 
-  const serviceRole = createServerServiceRoleClient()
+  const serviceRole = createServerServiceRoleClient({ readSource: 'app' })
   const { data: upload, error: uploadError } = await serviceRole
     .from('archive_upload')
     .select('account_id,storage_path,storage_sha256')

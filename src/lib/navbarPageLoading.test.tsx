@@ -1,3 +1,9 @@
+import DigestStoryPage from '@/app/digest/[date]/[slug]/page'
+import { DigestStoryView } from '@/components/digest/DigestStoryView'
+import { loadDigestQuotePosts } from '@/lib/digest/quotePosts'
+jest.mock('@/lib/digest/quotePosts', () => ({
+  loadDigestQuotePosts: jest.fn(),
+}))
 import {
   Children,
   isValidElement,
@@ -114,4 +120,17 @@ test('signed-out Trends still redirects before requesting analytical data', asyn
   jest.mocked(getIsMember).mockResolvedValue(false)
   await expect(TrendsPage({})).rejects.toThrow('redirect')
   expect(getPortalTrendSnapshot).not.toHaveBeenCalled()
+})
+
+test('story article resolves without waiting for archived quote posts', async () => {
+  jest.mocked(getPublishedDigest).mockResolvedValue(AUGUST_11_MOCK_DIGEST)
+  jest.mocked(loadDigestQuotePosts).mockReturnValue(pending)
+  const story = AUGUST_11_MOCK_DIGEST.content.stories[0]
+  const page = await DigestStoryPage({
+    params: { date: AUGUST_11_MOCK_DIGEST.digestDate, slug: story.slug },
+  })
+  expect(page.type).toBe(DigestStoryView)
+  expect(page.props.story.title).toBe(story.title)
+  expect(page.props.archivedQuotes.props.fallback.props.role).toBe('status')
+  expect(loadDigestQuotePosts).not.toHaveBeenCalled()
 })

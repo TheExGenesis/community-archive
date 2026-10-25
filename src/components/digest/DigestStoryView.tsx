@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import type { ReactNode } from 'react'
+import { DigestArchivedQuotePosts } from './DigestArchivedQuotePosts'
 import TweetCard from '@/components/TweetCard'
 import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import { MUTED, SERIF } from '@/components/portal/styles'
@@ -22,25 +24,18 @@ export function DigestStoryView({
   edition,
   story,
   quotePosts = [],
+  archivedQuotes,
 }: {
   edition: DigestEdition
   story: DigestStory
   quotePosts?: DigestQuotePosts[]
+  archivedQuotes?: ReactNode
 }) {
   const returnTo = `/digest/${edition.digestDate}/${story.slug}`
-  const archivedQuotes = story.bangers.reduce(
+  const archivedQuoteCount = story.bangers.reduce(
     (total, tweet) => total + (tweet.quoteCount ?? 0),
     0,
   )
-  const selectedCommentaryIds = new Set(story.commentary.map(({ id }) => id))
-  const unselectedQuotePosts = quotePosts
-    .map((group) => ({
-      ...group,
-      tweets: group.tweets.filter(
-        (tweet) => !selectedCommentaryIds.has(tweet.id),
-      ),
-    }))
-    .filter(({ tweets }) => tweets.length > 0)
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#111114]">
@@ -73,8 +68,8 @@ export function DigestStoryView({
             </span>
             <span>· {story.bangers.length} bangers</span>
             <span>
-              · {archivedQuotes} archived quote
-              {archivedQuotes === 1 ? '' : 's'}
+              · {archivedQuoteCount} archived quote
+              {archivedQuoteCount === 1 ? '' : 's'}
             </span>
             {story.replyCount > 0 ? (
               <span>· {story.replyCount} replies</span>
@@ -152,47 +147,13 @@ export function DigestStoryView({
               </section>
             ) : null}
 
-            {unselectedQuotePosts.length ? (
-              <section>
-                <div className="flex items-center gap-3.5">
-                  <h2 className={sectionLabel}>Archived quote posts</h2>
-                  <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
-                </div>
-                <p className={`mt-2 text-sm leading-6 ${MUTED}`}>
-                  Community Archive members who quoted the featured bangers.
-                </p>
-                <div className="mt-5 space-y-8">
-                  {unselectedQuotePosts.map((group) => {
-                    const banger = story.bangers.find(
-                      ({ id }) => id === group.bangerId,
-                    )
-                    if (!banger) return null
-                    return (
-                      <section key={group.bangerId}>
-                        <div className="mb-1 flex items-baseline gap-2 text-xs text-muted-foreground">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                            Quotes of @{banger.username}
-                          </span>
-                          <span>· {group.totalCount} archived</span>
-                        </div>
-                        {group.tweets.map((tweet) => (
-                          <TweetCard
-                            key={tweet.id}
-                            tweet={tweet}
-                            variant="editorial"
-                            collapsible
-                            showDate
-                            quotedTweetDisplay="summary"
-                            origin="digest"
-                            returnTo={returnTo}
-                          />
-                        ))}
-                      </section>
-                    )
-                  })}
-                </div>
-              </section>
-            ) : null}
+            {archivedQuotes ?? (
+              <DigestArchivedQuotePosts
+                edition={edition}
+                story={story}
+                quotePosts={quotePosts}
+              />
+            )}
           </div>
 
           <aside className="mt-12 border-zinc-200 pt-8 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-0 lg:border-l lg:py-0 lg:pl-10">

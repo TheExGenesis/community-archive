@@ -1,7 +1,6 @@
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import { NextRequest, NextResponse } from 'next/server'
 import { readMapLookup } from '@/lib/hexMap/lookup'
-import { createServerServiceRoleClient } from '@/utils/supabase'
 import { parseMapUsernames } from '@/lib/hexMap/usernames'
 import { sampleFeaturedArchives } from '@/lib/featuredArchives'
 export const dynamic = 'force-dynamic'
@@ -26,25 +25,10 @@ export async function GET(request: NextRequest) {
       : cells
         ? []
         : sampleFeaturedArchives()
-            .slice(0, 6)
+            .slice(0, 3)
             .map((p) => p.username)
     const result = await readMapLookup({ names: names.join(','), cells })
-    const people = result.people
-    if (cells && people.length && process.env.VERCEL_ENV !== 'preview') {
-      const { data, error } = await createServerServiceRoleClient()
-        .from('user_directory')
-        .select('account_id,avatar_media_url')
-        .in(
-          'account_id',
-          people.slice(0, 6).map((p) => p.account_id),
-        )
-      if (error) throw new Error('Member avatars unavailable')
-      for (const person of people)
-        person.avatar =
-          data?.find((r) => r.account_id === person.account_id)
-            ?.avatar_media_url ?? null
-    }
-    return NextResponse.json({ ...result, people }, { headers })
+    return NextResponse.json(result, { headers })
   } catch {
     return NextResponse.json(
       { error: 'Map locations are temporarily unavailable' },

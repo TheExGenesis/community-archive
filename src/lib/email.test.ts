@@ -23,6 +23,19 @@ describe('sendEmail', () => {
     return sendEmail
   }
 
+  it('cannot send to production recipients while staging reads production data', async () => {
+    process.env.DATA_READ_SOURCE = 'production'
+    const sendEmail = await loadSendEmail()
+    expect(
+      await sendEmail({
+        to: 'member@example.com',
+        subject: 'Digest',
+        html: '<p>Digest</p>',
+      }),
+    ).toEqual({ ok: false, error: expect.stringContaining('disabled') })
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
   it('returns the message id on success', async () => {
     sendMock.mockResolvedValue({ data: { id: 'msg_123' }, error: null })
     const sendEmail = await loadSendEmail()
@@ -39,7 +52,7 @@ describe('sendEmail', () => {
         to: 'someone@example.com',
         subject: 'Hello',
         from: expect.stringContaining('@community-archive.org'),
-      })
+      }),
     )
   })
 

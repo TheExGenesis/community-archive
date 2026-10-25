@@ -2,14 +2,14 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { queryOptions, useQueryClient } from '@tanstack/react-query'
 import type { HexSnapshot } from '@/lib/hexMap/types'
-import type { MapLookup } from '@/lib/hexMap/gateway'
+import type { MapPeoplePage } from '@/lib/hexMap/gateway'
 import { mapUrl } from '@/lib/hexMap/version'
 import { prefetchMapFeed, selectionFeedPath } from './useMapFeed'
 
 export function selectionPeopleOptions(ids: string) {
   return queryOptions({
     queryKey: ['hex-selection-people', ids],
-    queryFn: async ({ signal }): Promise<MapLookup> => {
+    queryFn: async ({ signal }): Promise<MapPeoplePage> => {
       const response = await fetch(mapUrl(`lookup?cells=${ids}`), { signal })
       if (!response.ok) throw new Error('Locations unavailable')
       return response.json()

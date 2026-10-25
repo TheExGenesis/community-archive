@@ -58,6 +58,70 @@ Scope these overrides to the portal PR/staging branch. Keep
 all writes remain isolated. `PORTAL_READ_SUPABASE_ANON_KEY` is server-only and
 must be the public anonymous key, never the production service-role key.
 
+### Production reads with staging writes
+
+Set the following on the intended staging/Preview branch. This routes server
+public **and admin** database reads to production, while the existing staging
+Supabase variables still own login, consent, uploads and all mutations:
+
+```env
+DATA_READ_SOURCE=production
+NEXT_PUBLIC_DATA_READ_SOURCE=production
+PORTAL_READ_SUPABASE_URL=<production-supabase-url>
+PORTAL_READ_SUPABASE_ANON_KEY=<production-anon-key>
+PUBLIC_READ_ORIGIN=https://www.community-archive.org
+PUBLIC_READ_SECRET=<shared-random-secret-at-least-32-characters>
+```
+
+`DATA_READ_SOURCE=app` (or unset) restores ordinary staging reads. The public
+browser flag is built into the client bundle; redeploy after either flag changes.
+The normal `NEXT_PUBLIC_SUPABASE_*` variables and `SUPABASE_SERVICE_ROLE` must
+remain staging credentials. The production anonymous key is public; **never put
+the production service-role key in staging**.
+
+Activation requires deploying `/api/public-data` to Production and setting the
+same `PUBLIC_READ_SECRET` there first. Leave `DATA_READ_SOURCE` unset in
+Production. Scope the shared secret to Production and the intended protected
+Preview branch. Keep Vercel protection enabled. If Vercel challenges the
+server-to-server request, set the server-only `PUBLIC_READ_PROTECTION_BYPASS`
+on that branch to the project's existing Vercel automation bypass credential.
+It is sent only as a header on the authenticated bridge request, never to
+staging writes, Supabase or the browser. No firewall rule change is needed.
+Removing the Preview flags and redeploying rolls back the read override
+without any data migration.
+
+The protected bridge accepts only GET/HEAD reads against PostgREST and the
+normalized community display/cover buckets. Production credentials stay on the
+production server. It preserves query, pagination and count headers, never
+forwards staging cookies/JWTs, and returns `private, no-store`. Read-only RPCs
+are explicitly listed in `src/utils/supabaseReadPolicy.ts` and sent as GET;
+PostgREST runs GET/HEAD in a [read-only transaction](https://postgrest.org/en/stable/references/transactions.html).
+Unknown POST RPCs and every INSERT/UPDATE/DELETE stay on staging. Do not add a
+mutating function to that list. A misconfigured mutation targeting the production
+Supabase host is rejected.
+
+Browser public content uses the anonymous production source through a same-origin
+read endpoint. Administrative reads still require the existing staging admin
+check; production-read mode grants no new app permissions. Auth/session checks,
+personal consent state and auth administration stay on staging so a simulated
+user cannot become a production identity. Original archive files are excluded.
+ClickHouse reads continue using the configured analytical gateway; point its read
+URLs at production as in the configuration above. Email delivery and production
+social-graph rebuilds are disabled in this mode so reading production recipients
+or admin data cannot trigger those external writes.
+
+Published Digest pages, map stories, profiles, search and admin views share this
+source selection. Preview Digest fixtures turn off automatically in production
+read mode; `DIGEST_MOCK_DATA=true` remains an explicit fixture override. Shared
+Supabase-backed caches include source identity. Published Digest bodies are
+cached across visitors, but a fresh publication/revision pointer is checked on
+every request: a withdrawn or tombstoned edition cannot reappear from cache.
+Story quote-post lookups stream separately after the article.
+
+Writes apply to the staging dataset. A production object ID that is absent in
+staging can return not-found when edited; this mode does not clone production
+records into staging, and a reload continues to show production's version.
+
 ### Reviewing real members on the homepage map
 
 The homepage lookup reads the existing authenticated analytical gateway directly.

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SelectionPeople from './SelectionPeople'
+import { selectionPeopleOptions } from './useSelectionPreview'
 
 jest.mock('./hero.module.css', () => ({}))
 let intersect: IntersectionObserverCallback
@@ -106,4 +107,19 @@ it('retains loaded people on a later-page error and retries only on request', as
   fireEvent.click(screen.getByRole('button', { name: 'Retry loading more' }))
   await screen.findByRole('link', { name: '@member25' })
   expect(fetchMock).toHaveBeenCalledTimes(3)
+})
+
+it('opens immediately from the preview first page without another request', async () => {
+  client.setQueryData(selectionPeopleOptions('2').queryKey, {
+    people: people(1, 24),
+    nextOffset: 24,
+    counts: {},
+    version: 'test',
+  })
+  render(<List />)
+  open()
+  expect(
+    await screen.findByRole('link', { name: '@member24' }),
+  ).toBeInTheDocument()
+  expect(fetchMock).not.toHaveBeenCalled()
 })

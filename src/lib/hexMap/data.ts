@@ -1,8 +1,9 @@
 import 'server-only'
-import { cookies } from 'next/headers'
 import { createServerServiceRoleClient } from '@/utils/supabase'
-import { createDigestPublicClient } from '@/lib/digest/database'
-import { getPublishedDigest, mapDigestEdition } from '@/lib/digest/data'
+import {
+  getPublishedDigest,
+  getPublishedDigestEditions,
+} from '@/lib/digest/data'
 import { getPreviewDigestEdition } from '@/lib/digest/mock'
 import { getAppPolicy, getStrands } from '@/lib/community-apps/data'
 import { filterStrands } from '@/lib/community-apps/strand-list'
@@ -18,7 +19,12 @@ import type { MapStory, StoryPage, StoryDetail } from './stories'
 export async function memberTweets(
   tweets: PortalTweet[],
 ): Promise<PortalTweet[]> {
-  const policy = await getAppPolicy(tweets.map((t) => t.username))
+  const policy = await getAppPolicy(
+    tweets.flatMap((t) => [
+      t.username,
+      ...(t.quotedTweet ? [t.quotedTweet.username] : []),
+    ]),
+  )
   const allowed = (t: { username: string; accountId?: string }) =>
     policy.members.has(t.username.toLowerCase()) &&
     !policy.blocked.has(t.username.toLowerCase()) &&
@@ -117,18 +123,7 @@ async function unlocatedStoryPage(
   const preview = getPreviewDigestEdition()
   let editions
   if (preview) editions = offset === 0 ? [preview] : []
-  else {
-    const { data, error } = await createDigestPublicClient(cookies())
-      .from('digest_editions')
-      .select('*')
-      .eq('status', 'published')
-      .order('digest_date', { ascending: false })
-      .range(offset, offset + 1)
-    if (error) throw new Error('Digest unavailable')
-    editions = (data ?? [])
-      .map(mapDigestEdition)
-      .filter((d): d is NonNullable<typeof d> => d !== null)
-  }
+  else editions = await getPublishedDigestEditions(offset)
   const allowed = await memberTweets(
     editions.flatMap((e) =>
       e.content.stories.flatMap((s) => [...s.bangers, ...s.commentary]),

@@ -522,8 +522,20 @@ export default memo(function HexMap({
       },
       size.width,
       size.height,
+      {
+        cells: snapshot.cells.map((cell) => ({
+          x: cell.x * t.scale + t.x,
+          y: -cell.y * t.scale + t.y,
+        })),
+        radius: snapshot.radius * t.scale,
+        center: {
+          x: (geo.bounds.x + geo.bounds.width / 2) * t.scale + t.x,
+          y: (geo.bounds.y + geo.bounds.height / 2) * t.scale + t.y,
+        },
+      },
     )
   }, [
+    geo.bounds,
     pins,
     selfLocations,
     tweetHover,

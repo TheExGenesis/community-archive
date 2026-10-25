@@ -75,3 +75,46 @@ it('keeps a searched account visible when background labels fill every placement
   expect(result[0].box.x).toBeGreaterThanOrEqual(8)
   expect(result[0].box.y).toBeGreaterThanOrEqual(66)
 })
+
+it('caps examples at three while keeping an explicitly highlighted account', () => {
+  const result = placeCallouts(
+    [
+      ...Array.from({ length: 6 }, (_, index) => ({
+        ...person,
+        username: `example${index}`,
+        x: 150 + index * 100,
+      })),
+      { ...person, username: 'searched', highlighted: true, y: 300 },
+    ],
+    [],
+    measure,
+    900,
+    500,
+  )
+  expect(result.filter((callout) => !callout.highlighted)).toHaveLength(3)
+  expect(result.some((callout) => callout.username === 'searched')).toBe(true)
+})
+
+it.each([150, 350])(
+  'prefers empty space outside the map for a pin at x=%s',
+  (x) => {
+    const cells = Array.from({ length: 9 }, (_, column) =>
+      Array.from({ length: 9 }, (_, row) => ({
+        x: 130 + column * 30,
+        y: 130 + row * 30,
+      })),
+    ).flat()
+    const [result] = placeCallouts(
+      [{ ...person, x, y: 250 }],
+      [],
+      measure,
+      500,
+      500,
+      { cells, radius: 20, center: { x: 250, y: 250 } },
+    )
+    if (x < 250) expect(result.box.x + result.box.width).toBeLessThan(110)
+    else expect(result.box.x).toBeGreaterThan(390)
+    expect(result.x).toBe(x)
+    expect(result.y).toBe(250)
+  },
+)

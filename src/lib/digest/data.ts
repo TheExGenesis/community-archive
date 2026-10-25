@@ -1,8 +1,12 @@
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
+import { publicDataConfig } from '@/lib/publicDataSource'
+import { measureServerRead } from '@/lib/performance/server'
 import { cookies } from 'next/headers'
 import type { Json } from '@/database-types'
 import {
   createDigestAdminClient,
+  createDigestReadClient,
   createDigestPublicClient,
   type DigestEditionRow,
   type DigestPromptVersionRow,
@@ -173,28 +177,78 @@ export async function loadDigestLabState(runId?: string) {
   }
 }
 
+export const PUBLISHED_DIGEST_TAG = 'published-digests'
+
+// Read the small publication pointer fresh. An opt-out archives/tombstones a
+// saved edition in PostgreSQL; a shared body cache must never revive that copy.
+const cachedPublishedDigest = unstable_cache(
+  async (
+    id: string,
+    updatedAt: string,
+    _source: string,
+  ): Promise<DigestEdition | null> => {
+    const { data, error } = await createDigestReadClient()
+      .from('digest_editions')
+      .select('*')
+      .eq('status', 'published')
+      .eq('id', id)
+      .eq('updated_at', updatedAt)
+      .maybeSingle()
+    if (error) throw new Error('Published digest is temporarily unavailable')
+    return data ? mapDigestEdition(data) : null
+  },
+  ['published-digest-body-v2'],
+  { revalidate: 300, tags: [PUBLISHED_DIGEST_TAG] },
+)
+
+async function readPublishedEditions(
+  digestDate: string | undefined,
+  offset: number,
+  limit: number,
+): Promise<DigestEdition[]> {
+  let query = createDigestReadClient()
+    .from('digest_editions')
+    .select('id,updated_at')
+    .eq('status', 'published')
+    .order('digest_date', { ascending: false })
+    .range(offset, offset + limit - 1)
+  if (digestDate) query = query.eq('digest_date', digestDate)
+  const { data, error } = await query
+  if (error) throw new Error('Published digest is temporarily unavailable')
+  const source = publicDataConfig().sourceId
+  const editions = await Promise.all(
+    (data ?? []).map((row) =>
+      cachedPublishedDigest(row.id, row.updated_at, source),
+    ),
+  )
+  return editions.filter(
+    (edition): edition is DigestEdition => edition !== null,
+  )
+}
+
+export async function getPublishedDigestEditions(offset: number, limit = 2) {
+  return measureServerRead('digest.editions', () =>
+    readPublishedEditions(undefined, offset, limit),
+  )
+}
+
 async function readPublishedDigest(
   digestDate?: string,
   options: { strict?: boolean } = {},
 ): Promise<DigestEdition | null> {
   const preview = getPreviewDigestEdition(digestDate)
   if (preview) return preview
-  const client = createDigestPublicClient(cookies())
-  let query = client
-    .from('digest_editions')
-    .select('*')
-    .eq('status', 'published')
-  query = digestDate
-    ? query.eq('digest_date', digestDate)
-    : query.order('digest_date', { ascending: false }).limit(1)
-  const { data, error } = await query.maybeSingle()
-  if (error) {
+  try {
+    const editions = await measureServerRead('digest.edition', () =>
+      readPublishedEditions(digestDate, 0, 1),
+    )
+    return editions[0] ?? null
+  } catch (error) {
     if (options.strict)
       throw new Error('Published digest is temporarily unavailable')
-    console.error('Published digest read failed:', error.message)
+    console.error('Published digest read failed:', error)
     return getPreviewDigestEdition(digestDate)
   }
-  return data ? mapDigestEdition(data) : getPreviewDigestEdition(digestDate)
 }
 
 // Next supplies request-local cache in RSC; plain React 18 test runtimes do not.
@@ -220,7 +274,7 @@ export async function getDigestLikeState(
   const user = await getCurrentUser()
 
   const [countResult, likedResult] = await Promise.all([
-    client
+    createDigestReadClient()
       .from('digest_edition_likes')
       .select('*', { count: 'exact', head: true })
       .eq('edition_id', edition.id),
@@ -254,8 +308,7 @@ export async function getDigestCommentCount(
 ): Promise<number> {
   if (!edition || edition.isPreview) return 0
 
-  const client = createDigestPublicClient(cookies())
-  const { count, error } = await client
+  const { count, error } = await createDigestReadClient()
     .from('digest_edition_comments')
     .select('*', { count: 'exact', head: true })
     .eq('edition_id', edition.id)
@@ -289,7 +342,7 @@ export async function getLatestDigestPreview(): Promise<DigestPreview | null> {
 
 export async function listPublishedDigestDays(): Promise<DigestCalendarDay[]> {
   const preview = getPreviewDigestEdition()
-  const client = createDigestPublicClient(cookies())
+  const client = createDigestReadClient()
   const published: DigestCalendarDay[] = []
   const pageSize = 1_000
 

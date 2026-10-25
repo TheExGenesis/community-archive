@@ -8,6 +8,10 @@ jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
+jest.mock('@/lib/publicDataSource', () => ({
+  usesProductionReadSource: () => false,
+  publicDataConfig: () => ({ sourceId: 'test-source' }),
+}))
 const makeClient = jest.mocked(createServerServiceRoleClient)
 
 function stubDatabase({

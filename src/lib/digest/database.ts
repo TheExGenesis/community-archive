@@ -5,6 +5,7 @@ import {
 } from '@/utils/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { cookies } from 'next/headers'
+import { createPublicReadClient } from '@/lib/publicDataSource'
 
 export interface DigestPromptVersionRow {
   id: string
@@ -153,6 +154,9 @@ type DigestDatabase = {
 
 export const createDigestAdminClient = () =>
   createServerServiceRoleClient() as unknown as SupabaseClient<DigestDatabase>
+
+export const createDigestReadClient = () =>
+  createPublicReadClient() as unknown as SupabaseClient<DigestDatabase>
 
 export const createDigestPublicClient = (
   cookieStore: ReturnType<typeof cookies>,

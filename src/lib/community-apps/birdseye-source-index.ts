@@ -1,3 +1,4 @@
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
@@ -29,7 +30,7 @@ const sourceMetadata = unstable_cache(
     }
     return { ids, rows }
   },
-  ['birdseye-source-metadata-v3'],
+  ['birdseye-source-metadata-v3', productionReadCacheKey()],
   { revalidate: 300 },
 )
 

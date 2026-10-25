@@ -1,6 +1,8 @@
 import { timingSafeEqual } from 'node:crypto'
+import { isPublicBrowserRead } from '@/utils/supabaseReadRouting'
 import { isReadRpc } from '@/utils/supabaseReadPolicy'
 import { NextResponse } from 'next/server'
+import { publicDataConfig } from '@/lib/publicDataSource'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
@@ -97,6 +99,61 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { message: 'Production read unavailable' },
+      { status: 503, headers },
+    )
+  }
+}
+
+/** Anonymous public content only. No staging identity or privileged key crosses. */
+export async function GET(request: Request) {
+  if (process.env.DATA_READ_SOURCE !== 'production')
+    return new Response(null, { status: 404, headers })
+  try {
+    const incoming = new URL(request.url)
+    const path = incoming.searchParams.get('path') ?? ''
+    const { url: origin, key } = publicDataConfig()
+    const url = new URL(path, origin)
+    if (
+      !path.startsWith('/') ||
+      url.origin !== new URL(origin).origin ||
+      url.hash ||
+      !isPublicBrowserRead(url.pathname)
+    )
+      return new Response(null, { status: 400, headers })
+    const upstreamHeaders = new Headers({
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    })
+    for (const name of ['accept', 'range', 'range-unit']) {
+      const value = request.headers.get(name)
+      if (value) upstreamHeaders.set(name, value)
+    }
+    const prefer = request.headers
+      .get('prefer')
+      ?.split(',')
+      .map((value) => value.trim())
+      .filter((value) => /^count=(exact|planned|estimated)$/.test(value))
+      .join(',')
+    if (prefer) upstreamHeaders.set('prefer', prefer)
+    const response = await fetch(url, {
+      method: incoming.searchParams.get('head') === '1' ? 'HEAD' : 'GET',
+      headers: upstreamHeaders,
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+    })
+    const responseHeaders = new Headers(headers)
+    for (const name of ['content-type', 'content-range', 'range-unit']) {
+      const value = response.headers.get(name)
+      if (value) responseHeaders.set(name, value)
+    }
+    return new Response(response.body, {
+      status: response.status,
+      headers: responseHeaders,
+    })
+  } catch {
+    return NextResponse.json(
+      { message: 'Public read unavailable' },
       { status: 503, headers },
     )
   }

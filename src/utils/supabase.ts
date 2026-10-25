@@ -8,6 +8,10 @@ import {
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import {
+  createBrowserReadFetch,
+  createRoutedSupabaseFetch,
+} from './supabaseReadRouting'
 
 const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   const isDevelopment = process.env.NODE_ENV === 'development'
@@ -59,7 +63,10 @@ const createCookieHandler = (cookieStore: ReturnType<typeof cookies>) => ({
 
 export const createBrowserClient = () => {
   const { url, anonKey } = getSupabaseConfig()
-  return browserClient<Database>(url, anonKey)
+  return browserClient<Database, 'public'>(url, anonKey, {
+    cookies: {},
+    global: { fetch: createBrowserReadFetch() },
+  })
 }
 
 export const createAdminBrowserClient = () => {
@@ -83,10 +90,14 @@ export const createAdminBrowserClient = () => {
   return browserClient<Database>(url, serviceRole)
 }
 
-export const createServerClient = (cookieStore: ReturnType<typeof cookies>) => {
+export const createServerClient = (
+  cookieStore: ReturnType<typeof cookies>,
+  options: { readSource?: 'app' } = {},
+) => {
   const { url, anonKey } = getSupabaseConfig()
   return serverClient<Database>(url, anonKey, {
     cookies: createCookieHandler(cookieStore),
+    global: { fetch: createRoutedSupabaseFetch('anon', options) },
   })
 }
 
@@ -143,26 +154,18 @@ export const createServerAnonClient = () => {
   return createClient<Database>(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: {
-      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-        fetch(input, { ...init, cache: 'no-store' }),
+      fetch: createRoutedSupabaseFetch('anon', { noStore: true }),
     },
   })
 }
 
 export const createServerServiceRoleClient = (
-  options: { noStore?: boolean } = {},
+  options: { noStore?: boolean; readSource?: 'app' } = {},
 ) => {
   const { url, serviceRole } = getSupabaseConfig(true)
   return createClient<Database>(url, serviceRole!, {
     auth: { autoRefreshToken: false, persistSession: false },
-    ...(options.noStore
-      ? {
-          global: {
-            fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-              fetch(input, { ...init, cache: 'no-store' }),
-          },
-        }
-      : {}),
+    global: { fetch: createRoutedSupabaseFetch('service_role', options) },
   })
 }
 

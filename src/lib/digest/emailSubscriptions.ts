@@ -73,7 +73,7 @@ export async function upsertSubscription(
   accountId?: string | null,
 ): Promise<DigestEmailSubscription> {
   const normalized = normalizeSubscriptionEmail(email)
-  const admin = createServerServiceRoleClient()
+  const admin = createServerServiceRoleClient({ readSource: 'app' })
   const existing = await admin
     .from('digest_email_subscriptions')
     .select(SUBSCRIPTION_COLUMNS)
@@ -123,7 +123,7 @@ export async function getSubscriptionForAccount(
   accountId: string,
   subscriptionId?: string,
 ): Promise<DigestEmailSubscription | null> {
-  const admin = createServerServiceRoleClient()
+  const admin = createServerServiceRoleClient({ readSource: 'app' })
   let query = admin
     .from('digest_email_subscriptions')
     .select(SUBSCRIPTION_COLUMNS)

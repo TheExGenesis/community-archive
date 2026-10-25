@@ -788,6 +788,19 @@ async function fetchPortalJoinedThisWeek(): Promise<number> {
   return exactCount(response, 'upload')
 }
 
+export async function fetchPortalRecentMemberCount(): Promise<number> {
+  const now = Date.now()
+  const response = await portalRestRequest(
+    'user_directory',
+    new URLSearchParams({
+      select: 'account_id',
+      and: `(joined_at.gte.${new Date(now - 86_400_000).toISOString()},joined_at.lte.${new Date(now).toISOString()})`,
+    }),
+    { method: 'HEAD', prefer: 'count=exact' },
+  )
+  return exactCount(response, 'recent members')
+}
+
 // Arguments participate in the cache key, keeping staging/prod sources and
 // deployment environments isolated even when the Data Cache survives deploys.
 const getCachedTrendsSnapshot = unstable_cache(

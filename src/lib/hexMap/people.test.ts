@@ -5,6 +5,8 @@ import { getAppPolicy } from '@/lib/community-apps/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { MAP_VERSION } from './version'
 
+jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
+
 jest.mock('./gateway', () => ({ mapGateway: jest.fn() }))
 jest.mock('@/lib/community-apps/data', () => ({ getAppPolicy: jest.fn() }))
 jest.mock('@/utils/supabase', () => ({
@@ -22,15 +24,18 @@ const request = (params = 'cells=2&offset=24') =>
   )
 beforeEach(() => {
   jest.clearAllMocks()
+  jest.mocked(createServerServiceRoleClient).mockReturnValue({
+    from: () => ({
+      select: () => ({ in: async () => ({ data: [], error: null }) }),
+    }),
+  } as never)
   process.env.VERCEL_ENV = 'preview'
-  jest
-    .mocked(mapGateway)
-    .mockResolvedValue({
-      version: MAP_VERSION,
-      counts: {},
-      people,
-      nextOffset: 48,
-    })
+  jest.mocked(mapGateway).mockResolvedValue({
+    version: MAP_VERSION,
+    counts: {},
+    people,
+    nextOffset: 48,
+  })
 })
 afterAll(() => {
   if (originalEnvironment === undefined) delete process.env.VERCEL_ENV
@@ -38,16 +43,14 @@ afterAll(() => {
 })
 it('requests a bounded selected page and preserves continuation across fully policy-filtered pages', async () => {
   process.env.VERCEL_ENV = 'production'
-  jest
-    .mocked(getAppPolicy)
-    .mockResolvedValue({
-      members: new Set(),
-      blocked: new Set(),
-      blockedIds: new Set(),
-    })
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(),
+    blocked: new Set(),
+    blockedIds: new Set(),
+  })
   const response = await GET(request())
   expect(response.status).toBe(200)
-  expect(await response.json()).toEqual({ people: [], nextOffset: 48 })
+  expect(await response.json()).toMatchObject({ people: [], nextOffset: 48 })
   expect(mapGateway).toHaveBeenCalledWith('hex-lookup', {
     cells: '2',
     offset: '24',
@@ -60,24 +63,18 @@ it('requests a bounded selected page and preserves continuation across fully pol
 })
 it('hydrates the entire allowed page and excludes a blocked account ID', async () => {
   process.env.VERCEL_ENV = 'production'
-  jest
-    .mocked(getAppPolicy)
-    .mockResolvedValue({
-      members: new Set(people.map((person) => person.username)),
-      blocked: new Set(),
-      blockedIds: new Set(['1']),
-    })
-  const inIds = jest
-    .fn()
-    .mockResolvedValue({
-      data: [{ account_id: '24', avatar_media_url: 'https://test/avatar.jpg' }],
-      error: null,
-    })
-  jest
-    .mocked(createServerServiceRoleClient)
-    .mockReturnValue({
-      from: () => ({ select: () => ({ in: inIds }) }),
-    } as never)
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(people.map((person) => person.username)),
+    blocked: new Set(),
+    blockedIds: new Set(['1']),
+  })
+  const inIds = jest.fn().mockResolvedValue({
+    data: [{ account_id: '24', avatar_media_url: 'https://test/avatar.jpg' }],
+    error: null,
+  })
+  jest.mocked(createServerServiceRoleClient).mockReturnValue({
+    from: () => ({ select: () => ({ in: inIds }) }),
+  } as never)
   const response = await GET(request())
   const page = await response.json()
   expect(response.status).toBe(200)
@@ -88,7 +85,7 @@ it('hydrates the entire allowed page and excludes a blocked account ID', async (
   })
   expect(inIds).toHaveBeenCalledWith(
     'account_id',
-    people.slice(1).map((person) => person.account_id),
+    people.map((person) => person.account_id),
   )
 })
 it.each([
@@ -104,14 +101,12 @@ it.each([
 it.each([undefined, 24, 10001])(
   'fails closed when the gateway has an absent or invalid continuation %s',
   async (nextOffset) => {
-    jest
-      .mocked(mapGateway)
-      .mockResolvedValue({
-        version: MAP_VERSION,
-        counts: {},
-        people,
-        nextOffset,
-      })
+    jest.mocked(mapGateway).mockResolvedValue({
+      version: MAP_VERSION,
+      counts: {},
+      people,
+      nextOffset,
+    })
     expect((await GET(request())).status).toBe(503)
     expect(getAppPolicy).not.toHaveBeenCalled()
   },

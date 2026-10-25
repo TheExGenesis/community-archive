@@ -4,7 +4,10 @@ jest.mock('./gateway', () => ({
   locate: jest.fn().mockRejectedValue(new Error('Unavailable')),
 }))
 import { memberTweets, storyPage, locatedDetail } from './data'
-import { getPublishedDigest } from '@/lib/digest/data'
+import {
+  getPublishedDigest,
+  getPublishedDigestEditions,
+} from '@/lib/digest/data'
 import { getAppPolicy, getStrands } from '@/lib/community-apps/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
@@ -17,8 +20,11 @@ jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
 jest.mock('@/lib/digest/database', () => ({}))
-jest.mock('@/lib/digest/data', () => ({ getPublishedDigest: jest.fn() }))
-jest.mock('@/lib/digest/mock', () => ({}))
+jest.mock('@/lib/digest/data', () => ({
+  getPublishedDigest: jest.fn(),
+  getPublishedDigestEditions: jest.fn(),
+}))
+jest.mock('@/lib/digest/mock', () => ({ getPreviewDigestEdition: () => null }))
 jest.mock('@/lib/community-apps/strand-list', () => ({
   filterStrands: (strands: unknown[]) => strands,
 }))
@@ -170,4 +176,67 @@ it('keeps the focal banger first across map regions and filters opted-out posts'
     'reply',
   ])
   expect(result?.tweets[0].cell).toBe(firstCell)
+})
+
+it('overlaps Digest locations with fresh policy and never exposes unchecked participants or cells', async () => {
+  jest.mocked(getPublishedDigestEditions).mockResolvedValue([
+    {
+      digestDate: '2026-10-24',
+      content: {
+        executiveSummary: ['A day'],
+        stories: [
+          {
+            slug: 'story',
+            title: 'A story',
+            subtitle: 'Summary',
+            bangers: [tweet('alice'), tweet('blocked')],
+            commentary: [],
+          },
+        ],
+      },
+    },
+  ] as unknown as Awaited<ReturnType<typeof getPublishedDigestEditions>>)
+  let releasePolicy!: (policy: Awaited<ReturnType<typeof getAppPolicy>>) => void
+  const policy = new Promise<Awaited<ReturnType<typeof getAppPolicy>>>(
+    (resolve) => {
+      releasePolicy = resolve
+    },
+  )
+  let locationStarted!: () => void
+  const started = new Promise<void>((resolve) => {
+    locationStarted = resolve
+  })
+  jest.mocked(getAppPolicy).mockReturnValue(policy)
+  jest.mocked(locate).mockImplementation(async () => {
+    locationStarted()
+    return {
+      version: snapshot.version,
+      counts: {},
+      people: [
+        { account_id: 'alice', username: 'alice', cell: 0 },
+        { account_id: 'blocked', username: 'blocked', cell: 1 },
+      ],
+    }
+  })
+  let settled = false
+  const pending = storyPage('digest', 0, [0]).then((page) => {
+    settled = true
+    return page
+  })
+  await started
+  expect(settled).toBe(false)
+  releasePolicy({
+    members: new Set(['alice', 'blocked']),
+    blocked: new Set(),
+    blockedIds: new Set(['blocked']),
+  })
+  const page = await pending
+  expect(page.editions[0].stories[0].people).toEqual([
+    { username: 'alice', avatar: null, cell: 0 },
+  ])
+  expect(page.editions[0].stories[0].cells).toEqual([0])
+  jest.mocked(getAppPolicy).mockRejectedValue(new Error('consent unavailable'))
+  await expect(storyPage('digest', 0, [0])).rejects.toThrow(
+    'consent unavailable',
+  )
 })

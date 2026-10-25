@@ -15,5 +15,5 @@ export default async function SearchLayout({
   children: React.ReactNode
 }) {
   await requireBrowsingUser('/search')
-  return children
+  return <>{children}</>
 }

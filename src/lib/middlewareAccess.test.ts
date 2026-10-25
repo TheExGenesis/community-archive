@@ -74,7 +74,7 @@ test.each([
   expect(response.headers.get('x-middleware-next')).toBeNull()
 })
 
-test.each([
+test.each<{ cookie?: string; headers?: Record<string, string> }>([
   { headers: { 'user-agent': 'Twitterbot/1.0' } },
   { headers: { 'user-agent': 'Googlebot/2.1' } },
   { headers: { rsc: '1', accept: '*/*' } },

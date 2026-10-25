@@ -5,6 +5,8 @@ import type {
   PostHogConfig,
 } from 'posthog-js/dist/module.slim'
 import {
+  capturePostHogEvent,
+  initializePostHog,
   capturePostHogEventWhenReady,
   capturePostHogEventWithClient,
   createPostHogConfig,
@@ -16,11 +18,23 @@ import {
 
 type TestPostHogClient = Pick<
   PostHog,
-  'capture' | 'get_property' | 'identify' | 'init' | 'reset'
+  | 'capture'
+  | 'get_property'
+  | 'identify'
+  | 'init'
+  | 'reset'
+  | 'opt_in_capturing'
+  | 'opt_out_capturing'
+  | 'stopSessionRecording'
+  | 'startSessionRecording'
 >
 
 function createClient(): jest.Mocked<TestPostHogClient> {
   return {
+    opt_in_capturing: jest.fn(),
+    opt_out_capturing: jest.fn(),
+    stopSessionRecording: jest.fn(),
+    startSessionRecording: jest.fn(),
     capture: jest.fn(),
     get_property: jest.fn(),
     identify: jest.fn(),
@@ -463,9 +477,13 @@ describe('syncPostHogIdentity', () => {
   const identify = jest.fn()
   const reset = jest.fn()
   const getPersistedUserId = jest.fn<ReturnType<() => string | null>, []>()
-  const actions = { identify, reset, getPersistedUserId }
+  const optIn = jest.fn()
+  const optOut = jest.fn()
+  const actions = { identify, reset, getPersistedUserId, optIn, optOut }
 
   beforeEach(() => {
+    optIn.mockReset()
+    optOut.mockReset()
     identify.mockReset()
     reset.mockReset()
     getPersistedUserId.mockReset().mockReturnValue(null)
@@ -533,6 +551,10 @@ describe('syncPostHogIdentity', () => {
       syncPostHogIdentity('SIGNED_OUT', null, 'user-123', actions),
     ).toBeNull()
     expect(reset).toHaveBeenCalledTimes(1)
+    expect(optOut).toHaveBeenCalledTimes(1)
+    expect(optOut.mock.invocationCallOrder[0]).toBeLessThan(
+      reset.mock.invocationCallOrder[0],
+    )
   })
 
   it('clears a previous identity for an initial signed-out session', () => {
@@ -577,5 +599,117 @@ describe('getPostHogPersonProperties', () => {
     expect(getPostHogPersonProperties(session.user)).toEqual({
       email: 'user-123@example.com',
     })
+  })
+})
+
+const mockRuntimeClient = createClient()
+const mockRuntimeLoaded = jest.fn()
+jest.mock('@/lib/posthogRuntime', () => {
+  mockRuntimeLoaded()
+  return {
+    __esModule: true,
+    default: mockRuntimeClient,
+    postHogMonitoringExtensions: {},
+  }
+})
+
+describe('authenticated analytics lifecycle', () => {
+  const originalToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
+  const originalHost = process.env.NEXT_PUBLIC_POSTHOG_HOST
+
+  beforeAll(() => {
+    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = 'test-token'
+    process.env.NEXT_PUBLIC_POSTHOG_HOST = 'https://analytics.example.com'
+  })
+  afterAll(() => {
+    if (originalToken === undefined)
+      delete process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
+    else process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = originalToken
+    if (originalHost === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_HOST
+    else process.env.NEXT_PUBLIC_POSTHOG_HOST = originalHost
+  })
+
+  it('does not load the SDK or retain signed-out activity for a later login', async () => {
+    await initializePostHog(null)
+    capturePostHogEvent('archive_deleted')
+    await Promise.resolve()
+    expect(mockRuntimeLoaded).not.toHaveBeenCalled()
+    expect(mockRuntimeClient.capture).not.toHaveBeenCalled()
+    const beforeSend = createPostHogConfig('https://analytics.example.com')
+      .before_send as (event: CaptureResult) => CaptureResult | null
+    expect(
+      beforeSend(captureResult('$pageview', { distinct_id: 'stale-user' })),
+    ).toBeNull()
+  })
+
+  it('does not initialize when logout races the SDK import', async () => {
+    const pending = initializePostHog(sessionFor('old-user'))
+    await initializePostHog(null)
+    await pending
+    expect(mockRuntimeClient.init).not.toHaveBeenCalled()
+    expect(mockRuntimeClient.opt_in_capturing).not.toHaveBeenCalled()
+  })
+
+  it('tracks authenticated users, stops on logout, and supports another login', async () => {
+    await initializePostHog(sessionFor('user-123'))
+    expect(mockRuntimeClient.init).toHaveBeenCalledWith(
+      'test-token',
+      expect.objectContaining({
+        opt_out_capturing_by_default: true,
+        bootstrap: { distinctID: 'user-123', isIdentifiedID: true },
+      }),
+    )
+    expect(mockRuntimeClient.identify).toHaveBeenCalledWith(
+      'user-123',
+      expect.any(Object),
+    )
+    expect(mockRuntimeClient.opt_in_capturing).toHaveBeenCalledWith({
+      captureEventName: false,
+    })
+    expect(mockRuntimeClient.capture).not.toHaveBeenCalledWith(
+      'archive_deleted',
+      expect.anything(),
+    )
+    const beforeSend = createPostHogConfig('https://analytics.example.com')
+      .before_send as (event: CaptureResult) => CaptureResult | null
+    expect(
+      beforeSend(captureResult('$autocapture', { distinct_id: 'anonymous' })),
+    ).toBeNull()
+    expect(
+      beforeSend(captureResult('$pageview', { distinct_id: 'user-123' })),
+    ).not.toBeNull()
+    capturePostHogEvent('archive_deleted')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(mockRuntimeClient.capture).toHaveBeenCalledWith(
+      'archive_deleted',
+      expect.any(Object),
+    )
+
+    await initializePostHog(null)
+    expect(mockRuntimeClient.stopSessionRecording).toHaveBeenCalled()
+    expect(mockRuntimeClient.opt_out_capturing).toHaveBeenCalled()
+    expect(mockRuntimeClient.reset).toHaveBeenCalled()
+    expect(
+      beforeSend(captureResult('$snapshot', { distinct_id: 'user-123' })),
+    ).toBeNull()
+    mockRuntimeClient.capture.mockClear()
+    capturePostHogEvent('archive_deleted')
+    await Promise.resolve()
+    expect(mockRuntimeClient.capture).not.toHaveBeenCalled()
+
+    await initializePostHog(sessionFor('second-user'))
+    expect(mockRuntimeClient.init).toHaveBeenCalledTimes(1)
+    expect(mockRuntimeClient.startSessionRecording).toHaveBeenCalledTimes(2)
+    expect(mockRuntimeClient.identify).toHaveBeenLastCalledWith(
+      'second-user',
+      expect.any(Object),
+    )
+    expect(
+      beforeSend(captureResult('$pageview', { distinct_id: 'user-123' })),
+    ).toBeNull()
+    expect(
+      beforeSend(captureResult('$pageview', { distinct_id: 'second-user' })),
+    ).not.toBeNull()
+    await initializePostHog(null)
   })
 })

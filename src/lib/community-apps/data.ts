@@ -82,7 +82,6 @@ export async function getAppPolicy(usernames: string[]) {
             {
               username: row.username.toLowerCase(),
               accountId: row.account_id ?? '',
-              avatar: row.avatar_media_url,
             },
           ]
         : [],
@@ -92,13 +91,14 @@ export async function getAppPolicy(usernames: string[]) {
     loadOptouts(),
     loadCandidates(),
   ])
-  const allowed = candidates.filter(
-    (row) => !blocked.has(row.username) && !blockedIds.has(row.accountId),
+  const members = new Set(
+    candidates
+      .filter(
+        (row) => !blocked.has(row.username) && !blockedIds.has(row.accountId),
+      )
+      .map((row) => row.username),
   )
-  const members = new Set(allowed.map((row) => row.username))
-  // Avatars of current members only, from the same live directory read.
-  const avatars = new Map(allowed.map((row) => [row.username, row.avatar]))
-  return { blocked, blockedIds, members, avatars }
+  return { blocked, blockedIds, members }
 }
 export function hasBlockedParticipant(
   participants: string[],

@@ -16,16 +16,19 @@ jest.mock('@/utils/supabase', () => ({
 }))
 beforeEach(() => {
   jest.clearAllMocks()
-  jest.mocked(getStrands).mockResolvedValue({
-    generatedAt: '',
-    strands: [{ id: '123', essentialTweets: [{ id: '456' }] }],
-  } as never)
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    blocked: new Set(['withdrawn']),
-    blockedIds: new Set(['blocked']),
-    members: new Set(),
-    avatars: new Map(),
-  })
+  jest
+    .mocked(getStrands)
+    .mockResolvedValue({
+      generatedAt: '',
+      strands: [{ id: '123', essentialTweets: [{ id: '456' }] }],
+    } as never)
+  jest
+    .mocked(getAppPolicy)
+    .mockResolvedValue({
+      blocked: new Set(['withdrawn']),
+      blockedIds: new Set(['blocked']),
+      members: new Set(),
+    })
   jest.mocked(getStrandTweets).mockResolvedValue(new Map())
 })
 const request = (id = '456') =>
@@ -49,17 +52,19 @@ test('withdrawn authors break ancestry and reply traversal before any content hy
     username,
     account_id,
   })
-  jest.mocked(fetchClickHouseTweetThreadPageData).mockResolvedValue({
-    threadTree: {
-      tweets: {
-        '456': n('456', '1'),
-        '1': n('1', null, 'withdrawn'),
-        '2': n('2', '456', 'renamed', 'blocked'),
-        '3': n('3', '2'),
-        '4': n('4', '456'),
+  jest
+    .mocked(fetchClickHouseTweetThreadPageData)
+    .mockResolvedValue({
+      threadTree: {
+        tweets: {
+          '456': n('456', '1'),
+          '1': n('1', null, 'withdrawn'),
+          '2': n('2', '456', 'renamed', 'blocked'),
+          '3': n('3', '2'),
+          '4': n('4', '456'),
+        },
       },
-    },
-  } as never)
+    } as never)
   const response = await GET(request(), { params: { seed: '123' } })
   expect(response.status).toBe(200)
   expect(getStrandTweets).toHaveBeenCalledWith(['4'])

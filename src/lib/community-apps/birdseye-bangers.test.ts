@@ -16,27 +16,30 @@ test('counts distinct member quotes, excluding self-quotes, nonmembers and opt-o
     select: jest.fn().mockReturnThis(),
     in: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
-    range: jest.fn().mockResolvedValue({
-      data: [
-        quote('10', 'owner', 'alice'),
-        quote('11', 'b', 'bob'),
-        quote('11', 'b', 'bob'),
-        quote('12', 'c', 'carol'),
-        quote('13', 'd', 'dave'),
-        quote('14', 'e', 'erin'),
-      ],
-      error: null,
-    }),
+    range: jest
+      .fn()
+      .mockResolvedValue({
+        data: [
+          quote('10', 'owner', 'alice'),
+          quote('11', 'b', 'bob'),
+          quote('11', 'b', 'bob'),
+          quote('12', 'c', 'carol'),
+          quote('13', 'd', 'dave'),
+          quote('14', 'e', 'erin'),
+        ],
+        error: null,
+      }),
   }
   jest
     .mocked(createServerServiceRoleClient)
     .mockReturnValue({ from: () => query } as never)
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    members: new Set(['alice', 'bob', 'dave', 'erin']),
-    blocked: new Set(['dave']),
-    blockedIds: new Set(['e']),
-    avatars: new Map(),
-  })
+  jest
+    .mocked(getAppPolicy)
+    .mockResolvedValue({
+      members: new Set(['alice', 'bob', 'dave', 'erin']),
+      blocked: new Set(['dave']),
+      blockedIds: new Set(['e']),
+    })
   expect(await getBirdseyeBangerScores(new Map([['1', 'owner']]))).toEqual(
     new Map([['1', 1]]),
   )

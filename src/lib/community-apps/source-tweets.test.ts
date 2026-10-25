@@ -21,7 +21,6 @@ beforeEach(() => {
     blocked: new Set(['withdrawn']),
     blockedIds: new Set(['blocked-id']),
     members: new Set(),
-    avatars: new Map(),
   })
 })
 test('current opt-outs filter both authors and quoted authors after full enrichment', async () => {

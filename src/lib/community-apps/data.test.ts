@@ -49,16 +49,13 @@ test('explicit withdrawal overrides archived membership with case-insensitive ma
   const { rpc } = stubDatabase({ optedOut: ['WiThDrAwN'] })
   const policy = await getAppPolicy(['member', 'withdrawn', 'Member'])
   expect(Array.from(policy.members)).toEqual(['member'])
-  // One indexed directory read for every distinct handle; avatars only for members.
+  // One indexed directory read for every distinct handle.
   expect(rpc).toHaveBeenCalledTimes(1)
   expect(rpc).toHaveBeenCalledWith(
     'directory_members_by_username',
     { p_usernames: ['member', 'withdrawn'] },
     { get: true },
   )
-  expect(Array.from(policy.avatars)).toEqual([
-    ['member', 'https://test/member.jpg'],
-  ])
   expect(hasBlockedParticipant(['WITHDRAWN', 'member'], policy.blocked)).toBe(
     true,
   )

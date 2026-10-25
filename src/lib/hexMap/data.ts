@@ -4,7 +4,8 @@ import {
   getPublishedDigestEditions,
 } from '@/lib/digest/data'
 import { getPreviewDigestEdition } from '@/lib/digest/mock'
-import { getAppPolicy, getStrands } from '@/lib/community-apps/data'
+import { getStrands } from '@/lib/community-apps/data'
+import { readMembers } from '@/lib/directoryMembers'
 import { filterStrands } from '@/lib/community-apps/strand-list'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import type { PortalTweet } from '@/lib/portal/types'
@@ -14,30 +15,13 @@ import snapshot from './snapshot.json'
 import { selectStories } from './selectStories'
 import type { MapStory, StoryPage, StoryDetail } from './stories'
 
-// Recheck current membership as well as opt-outs even for published snapshots.
-// Top-level posts must be members; quoted context follows the permalink opt-out policy.
+// Top-level posts must come from current members. Opt-outs are enforced at
+// ingestion, so stored quoted context is served as-is.
 export async function memberTweets(
   tweets: PortalTweet[],
 ): Promise<PortalTweet[]> {
-  const policy = await getAppPolicy(
-    tweets.flatMap((t) => [
-      t.username,
-      ...(t.quotedTweet ? [t.quotedTweet.username] : []),
-    ]),
-  )
-  const allowed = (t: { username: string; accountId?: string }) =>
-    policy.members.has(t.username.toLowerCase()) &&
-    !policy.blocked.has(t.username.toLowerCase()) &&
-    !policy.blockedIds.has(t.accountId ?? '')
-  return tweets.filter(allowed).map((t) => ({
-    ...t,
-    quotedTweet:
-      t.quotedTweet &&
-      !policy.blocked.has(t.quotedTweet.username.toLowerCase()) &&
-      !policy.blockedIds.has(t.quotedTweet.accountId ?? '')
-        ? t.quotedTweet
-        : undefined,
-  }))
+  const { members } = await readMembers(tweets.map((t) => t.username))
+  return tweets.filter((t) => members.has(t.username.toLowerCase()))
 }
 
 function people(tweets: PortalTweet[]) {
@@ -79,7 +63,7 @@ async function unlocatedStoryPage(
           .map((name) => name.toLowerCase()),
       ),
     ).filter((name) => /^[a-z0-9_]{1,15}$/.test(name))
-    const policy = await getAppPolicy(names)
+    const policy = await readMembers(names)
     const stories: MapStory[] = page.map((s) => ({
       id: s.id,
       kind,
@@ -96,7 +80,7 @@ async function unlocatedStoryPage(
           ),
         ),
       )
-        .filter((name) => policy.members.has(name) && !policy.blocked.has(name))
+        .filter((name) => policy.members.has(name))
         .map((username) => ({
           username,
           avatar: policy.avatars.get(username) ?? null,
@@ -124,10 +108,10 @@ async function unlocatedStoryPage(
     e.content.stories.flatMap((s) => [...s.bangers, ...s.commentary]),
   )
   const names = Array.from(new Set(tweets.map((t) => t.username.toLowerCase())))
-  // Overlap independent reads without caching consent decisions. If candidates
-  // exceed the gateway limit, locate the checked members afterward as before.
+  // Overlap independent reads. If candidates exceed the gateway limit, locate
+  // the filtered members afterward as before.
   const pendingLookup = names.length <= 300 ? storyLocations(names) : undefined
-  const allowed = await measureServerRead('map.stories.policy', () =>
+  const allowed = await measureServerRead('map.stories.members', () =>
     memberTweets(tweets),
   )
   const lookup = await (pendingLookup ??

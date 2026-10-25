@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/database-types'
+import { createServerServiceRoleClient } from '@/utils/supabase'
 
 export type DirectoryMember =
   Database['public']['Functions']['directory_members_by_username']['Returns'][number]
@@ -34,4 +35,21 @@ export async function readDirectoryMembers(
     }),
   )
   return results.flat()
+}
+
+/**
+ * Membership filter for serving paths. Opt-outs are enforced at ingestion, so
+ * this only answers "is this handle a current member" (and their avatar).
+ */
+export async function readMembers(usernames: string[]) {
+  const rows = await readDirectoryMembers(
+    createServerServiceRoleClient({ noStore: true }),
+    usernames,
+  )
+  return {
+    members: new Set(rows.map((row) => row.username.toLowerCase())),
+    avatars: new Map(
+      rows.map((row) => [row.username.toLowerCase(), row.avatar_media_url]),
+    ),
+  }
 }

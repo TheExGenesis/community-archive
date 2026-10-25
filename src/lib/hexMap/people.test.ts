@@ -1,14 +1,17 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/hex-map/people/route'
 import { mapGateway } from './gateway'
-import { getAppPolicy } from '@/lib/community-apps/data'
+import { readMembers } from '@/lib/directoryMembers'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { MAP_VERSION } from './version'
 
 jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
 
 jest.mock('./gateway', () => ({ mapGateway: jest.fn() }))
-jest.mock('@/lib/community-apps/data', () => ({ getAppPolicy: jest.fn() }))
+jest.mock('@/lib/directoryMembers', () => ({
+  ...jest.requireActual('@/lib/directoryMembers'),
+  readMembers: jest.fn(),
+}))
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
@@ -39,14 +42,11 @@ afterAll(() => {
   if (originalEnvironment === undefined) delete process.env.VERCEL_ENV
   else process.env.VERCEL_ENV = originalEnvironment
 })
-it('requests a bounded selected page and preserves continuation across fully policy-filtered pages', async () => {
+it('requests a bounded selected page and preserves continuation across fully membership-filtered pages', async () => {
   process.env.VERCEL_ENV = 'production'
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    members: new Set(),
-    blocked: new Set(),
-    blockedIds: new Set(),
-    avatars: new Map(),
-  })
+  jest
+    .mocked(readMembers)
+    .mockResolvedValue({ members: new Set(), avatars: new Map() })
   const response = await GET(request())
   expect(response.status).toBe(200)
   expect(await response.json()).toMatchObject({ people: [], nextOffset: 48 })
@@ -55,17 +55,15 @@ it('requests a bounded selected page and preserves continuation across fully pol
     offset: '24',
     peoplePage: '1',
   })
-  expect(getAppPolicy).toHaveBeenCalledWith(
+  expect(readMembers).toHaveBeenCalledWith(
     people.map((person) => person.username),
   )
   expect(response.headers.get('Cache-Control')).toBe('private, no-store')
 })
-it('hydrates the entire allowed page and excludes a blocked account ID', async () => {
+it('hydrates the entire member page and excludes nonmembers', async () => {
   process.env.VERCEL_ENV = 'production'
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    members: new Set(people.map((person) => person.username)),
-    blocked: new Set(),
-    blockedIds: new Set(['1']),
+  jest.mocked(readMembers).mockResolvedValue({
+    members: new Set(people.slice(1).map((person) => person.username)),
     avatars: new Map(),
   })
   const rpc = jest.fn().mockResolvedValue({
@@ -116,11 +114,11 @@ it.each([undefined, 24, 10001])(
       nextOffset,
     })
     expect((await GET(request())).status).toBe(503)
-    expect(getAppPolicy).not.toHaveBeenCalled()
+    expect(readMembers).not.toHaveBeenCalled()
   },
 )
-it('fails closed if the current policy is unavailable', async () => {
+it('fails closed if current membership is unavailable', async () => {
   process.env.VERCEL_ENV = 'production'
-  jest.mocked(getAppPolicy).mockRejectedValue(new Error('offline'))
+  jest.mocked(readMembers).mockRejectedValue(new Error('offline'))
   expect((await GET(request())).status).toBe(503)
 })

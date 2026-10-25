@@ -12,7 +12,7 @@ import { MAP_VERSION } from './version'
 export const MAP_MEMBERS_TAG = 'hex-map-members'
 
 // Shared across visitors and both selection surfaces. Cache candidates and
-// avatars only; readMapLookup still checks current consent on every request.
+// avatars only; readMapLookup still filters current membership on every request.
 export const readMemberPage = unstable_cache(
   async (cells: string, offset: string): Promise<MapPeoplePage> => {
     const result = await mapGateway<MapPeoplePage>('hex-lookup', {

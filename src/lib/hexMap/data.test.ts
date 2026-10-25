@@ -8,17 +8,19 @@ import {
   getPublishedDigest,
   getPublishedDigestEditions,
 } from '@/lib/digest/data'
-import { getAppPolicy, getStrands } from '@/lib/community-apps/data'
-import { createServerServiceRoleClient } from '@/utils/supabase'
+import { getStrands } from '@/lib/community-apps/data'
+import { readMembers } from '@/lib/directoryMembers'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import type { PortalTweet } from '@/lib/portal/types'
-jest.mock('@/lib/community-apps/data', () => ({
-  getAppPolicy: jest.fn(),
-  getStrands: jest.fn(),
-}))
-jest.mock('@/utils/supabase', () => ({
-  createServerServiceRoleClient: jest.fn(),
-}))
+jest.mock('@/lib/community-apps/data', () => ({ getStrands: jest.fn() }))
+jest.mock('@/lib/directoryMembers', () => ({ readMembers: jest.fn() }))
+const members = (
+  names: string[],
+  avatars: [string, string | null][] = [],
+): Awaited<ReturnType<typeof readMembers>> => ({
+  members: new Set(names),
+  avatars: new Map(avatars),
+})
 jest.mock('@/lib/digest/database', () => ({}))
 jest.mock('@/lib/digest/data', () => ({
   getPublishedDigest: jest.fn(),
@@ -43,34 +45,19 @@ const tweet = (username: string, accountId = username): PortalTweet => ({
   likes: 0,
   rts: 0,
 })
-it('requires membership, blocks by ID or handle, and preserves public quote context while blocking opt-outs', async () => {
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    members: new Set(['alice', 'blocked', 'renamed']),
-    blocked: new Set(['blocked']),
-    blockedIds: new Set(['old-id']),
-    avatars: new Map(),
-  })
+it('requires current membership for top-level posts and serves stored quote context as-is', async () => {
+  jest.mocked(readMembers).mockResolvedValue(members(['alice']))
   const alice = {
     ...tweet('Alice'),
     quotedTweet: { ...tweet('outsider'), media: [] },
   }
-  const result = await memberTweets([
-    alice,
-    tweet('outsider'),
-    tweet('blocked'),
-    tweet('renamed', 'old-id'),
-  ])
+  const result = await memberTweets([alice, tweet('outsider')])
   expect(result).toEqual([alice])
-  expect(
-    (
-      await memberTweets([
-        { ...alice, quotedTweet: { ...tweet('renamed', 'old-id'), media: [] } },
-      ])
-    )[0].quotedTweet,
-  ).toBeUndefined()
+  // Opt-outs are enforced at ingestion; serving adds no per-request recheck.
+  expect(readMembers).toHaveBeenCalledWith(['Alice', 'outsider'])
 })
-it('fails closed when current consent is unavailable', async () => {
-  jest.mocked(getAppPolicy).mockRejectedValue(new Error('unavailable'))
+it('fails closed when membership is unavailable', async () => {
+  jest.mocked(readMembers).mockRejectedValue(new Error('unavailable'))
   await expect(memberTweets([tweet('alice')])).rejects.toThrow('unavailable')
 })
 
@@ -95,17 +82,15 @@ it('loads strand cards without hydrating tweet threads and omits nonmember parti
       },
     ],
   } as Awaited<ReturnType<typeof getStrands>>)
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    members: new Set(['alice']),
-    blocked: new Set(),
-    blockedIds: new Set(),
-    avatars: new Map([['alice', 'https://test/alice.jpg']]),
-  })
+  jest
+    .mocked(readMembers)
+    .mockResolvedValue(
+      members(['alice'], [['alice', 'https://test/alice.jpg']]),
+    )
   const page = await storyPage('strand', 0)
   expect(page.stories[0].people).toEqual([
     { username: 'alice', avatar: 'https://test/alice.jpg' },
   ])
-  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
   expect(getStrandTweets).not.toHaveBeenCalled()
   jest.mocked(locate).mockResolvedValue({
     version: snapshot.version,
@@ -131,7 +116,7 @@ it('loads strand cards without hydrating tweet threads and omits nonmember parti
   )
 })
 
-it('keeps the focal banger first across map regions and filters opted-out posts', async () => {
+it('keeps the focal banger first across map regions and filters nonmember posts', async () => {
   const firstCell = snapshot.cells.findIndex(
     (c) => c.region > snapshot.cells[0].region,
   )
@@ -141,17 +126,12 @@ it('keeps the focal banger first across map regions and filters opted-out posts'
         {
           slug: 'story',
           bangers: [tweet('jack')],
-          commentary: [tweet('reply'), tweet('blocked'), tweet('jack')],
+          commentary: [tweet('reply'), tweet('outsider'), tweet('jack')],
         },
       ],
     },
   } as unknown as NonNullable<Awaited<ReturnType<typeof getPublishedDigest>>>)
-  jest.mocked(getAppPolicy).mockResolvedValue({
-    members: new Set(['jack', 'reply', 'blocked']),
-    blocked: new Set(['blocked']),
-    blockedIds: new Set(),
-    avatars: new Map(),
-  })
+  jest.mocked(readMembers).mockResolvedValue(members(['jack', 'reply']))
   jest.mocked(locate).mockResolvedValue({
     version: snapshot.version,
     counts: {},
@@ -163,7 +143,7 @@ it('keeps the focal banger first across map regions and filters opted-out posts'
   jest
     .mocked(getStrandTweets)
     .mockResolvedValue(
-      new Map(['jack', 'reply', 'blocked'].map((name) => [name, tweet(name)])),
+      new Map(['jack', 'reply', 'outsider'].map((name) => [name, tweet(name)])),
     )
   const result = await locatedDetail('digest', '2026-10-21/story')
   expect(result?.tweets.map(({ tweet }) => tweet.username)).toEqual([
@@ -173,7 +153,7 @@ it('keeps the focal banger first across map regions and filters opted-out posts'
   expect(result?.tweets[0].cell).toBe(firstCell)
 })
 
-it('overlaps Digest locations with fresh policy and never exposes unchecked participants or cells', async () => {
+it('overlaps Digest locations with the membership read and never exposes nonmember participants or cells', async () => {
   jest.mocked(getPublishedDigestEditions).mockResolvedValue([
     {
       digestDate: '2026-10-24',
@@ -184,24 +164,24 @@ it('overlaps Digest locations with fresh policy and never exposes unchecked part
             slug: 'story',
             title: 'A story',
             subtitle: 'Summary',
-            bangers: [tweet('alice'), tweet('blocked')],
+            bangers: [tweet('alice'), tweet('outsider')],
             commentary: [],
           },
         ],
       },
     },
   ] as unknown as Awaited<ReturnType<typeof getPublishedDigestEditions>>)
-  let releasePolicy!: (policy: Awaited<ReturnType<typeof getAppPolicy>>) => void
-  const policy = new Promise<Awaited<ReturnType<typeof getAppPolicy>>>(
+  let releaseMembers!: (result: Awaited<ReturnType<typeof readMembers>>) => void
+  const membership = new Promise<Awaited<ReturnType<typeof readMembers>>>(
     (resolve) => {
-      releasePolicy = resolve
+      releaseMembers = resolve
     },
   )
   let locationStarted!: () => void
   const started = new Promise<void>((resolve) => {
     locationStarted = resolve
   })
-  jest.mocked(getAppPolicy).mockReturnValue(policy)
+  jest.mocked(readMembers).mockReturnValue(membership)
   jest.mocked(locate).mockImplementation(async () => {
     locationStarted()
     return {
@@ -209,7 +189,7 @@ it('overlaps Digest locations with fresh policy and never exposes unchecked part
       counts: {},
       people: [
         { account_id: 'alice', username: 'alice', cell: 0 },
-        { account_id: 'blocked', username: 'blocked', cell: 1 },
+        { account_id: 'outsider', username: 'outsider', cell: 1 },
       ],
     }
   })
@@ -220,19 +200,16 @@ it('overlaps Digest locations with fresh policy and never exposes unchecked part
   })
   await started
   expect(settled).toBe(false)
-  releasePolicy({
-    members: new Set(['alice', 'blocked']),
-    blocked: new Set(),
-    blockedIds: new Set(['blocked']),
-    avatars: new Map(),
-  })
+  releaseMembers(members(['alice']))
   const page = await pending
   expect(page.editions[0].stories[0].people).toEqual([
     { username: 'alice', avatar: null, cell: 0 },
   ])
   expect(page.editions[0].stories[0].cells).toEqual([0])
-  jest.mocked(getAppPolicy).mockRejectedValue(new Error('consent unavailable'))
+  jest
+    .mocked(readMembers)
+    .mockRejectedValue(new Error('membership unavailable'))
   await expect(storyPage('digest', 0, [0])).rejects.toThrow(
-    'consent unavailable',
+    'membership unavailable',
   )
 })

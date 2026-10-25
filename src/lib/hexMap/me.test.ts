@@ -4,6 +4,7 @@ import { GET } from '@/app/api/hex-map/me/route'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getAppPolicy } from '@/lib/community-apps/data'
+import { readMembers } from '@/lib/directoryMembers'
 import { mapGateway } from './gateway'
 import { MAP_VERSION } from './version'
 
@@ -12,6 +13,7 @@ jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
 jest.mock('@/lib/community-apps/data', () => ({ getAppPolicy: jest.fn() }))
+jest.mock('@/lib/directoryMembers', () => ({ readMembers: jest.fn() }))
 jest.mock('./gateway', () => ({ mapGateway: jest.fn() }))
 const user = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -53,8 +55,10 @@ beforeEach(() => {
     members: new Set(['me_one']),
     blocked: new Set(),
     blockedIds: new Set(),
-    avatars: new Map(),
   })
+  jest
+    .mocked(readMembers)
+    .mockResolvedValue({ members: new Set(['me_one']), avatars: new Map() })
   jest.mocked(mapGateway).mockImplementation(async (endpoint) =>
     endpoint === 'hex-self'
       ? { version: MAP_VERSION, person: { account_id: '123', cell: 4 } }
@@ -86,10 +90,8 @@ it('does not trust client-mutable profile identity', async () => {
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })
 it('lets an opted-in user locate another member', async () => {
-  jest.mocked(getAppPolicy).mockResolvedValue({
+  jest.mocked(readMembers).mockResolvedValue({
     members: new Set(['me_one', 'someone']),
-    blocked: new Set(),
-    blockedIds: new Set(),
     avatars: new Map(),
   })
   const res = await GET(request('&name=someone'))
@@ -106,7 +108,7 @@ it('requires viewer consent before searching another username', async () => {
   expect((await GET(request('&name=someone'))).status).toBe(403)
   expect(mapGateway).not.toHaveBeenCalled()
 })
-it('does not plot a target excluded by policy', async () => {
+it('does not plot a target who is not a current member', async () => {
   expect((await GET(request('&name=someone'))).status).toBe(404)
 })
 it('rejects invalid target names', async () => {
@@ -185,7 +187,6 @@ it('also honors the current authoritative policy by stable account ID', async ()
     members: new Set(['me_one']),
     blocked: new Set(),
     blockedIds: new Set(['123']),
-    avatars: new Map(),
   })
   expect((await GET(request())).status).toBe(403)
   expect(mapGateway).not.toHaveBeenCalled()
@@ -220,7 +221,7 @@ it('rejects incompatible geometry on either side of the lookup', async () => {
   expect((await GET(request())).status).toBe(503)
 })
 
-it('looks up a normalized batch once and reports policy-excluded targets as missing', async () => {
+it('looks up a normalized batch once and reports nonmember targets as missing', async () => {
   const res = await GET(request('&name=%40ME_ONE,someone,me_one,absent'))
   expect(res.status).toBe(200)
   expect(await res.json()).toEqual({
@@ -234,10 +235,8 @@ it('looks up a normalized batch once and reports policy-excluded targets as miss
   })
 })
 it('returns all mapped members in a batch', async () => {
-  jest.mocked(getAppPolicy).mockResolvedValue({
+  jest.mocked(readMembers).mockResolvedValue({
     members: new Set(['me_one', 'someone']),
-    blocked: new Set(),
-    blockedIds: new Set(),
     avatars: new Map(),
   })
   const res = await GET(request('&name=me_one,someone'))
@@ -276,7 +275,6 @@ it('locates a fresh opt-in before either directory or analytical membership catc
     members: new Set(),
     blocked: new Set(),
     blockedIds: new Set(),
-    avatars: new Map(),
   })
   const res = await GET(request('&account_id=456'))
   expect(res.status).toBe(200)

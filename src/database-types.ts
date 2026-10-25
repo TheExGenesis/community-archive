@@ -77,6 +77,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_collection_preferences: {
+        Row: {
+          account_id: string
+          enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          enabled: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       all_account: {
         Row: {
           account_display_name: string
@@ -1056,12 +1074,6 @@ export type Database = {
           user_id?: string | null
           username?: string
         }
-        Relationships: []
-      }
-      account_collection_preferences: {
-        Row: { account_id: string; enabled: boolean; updated_at: string }
-        Insert: { account_id: string; enabled: boolean; updated_at?: string }
-        Update: { account_id?: string; enabled?: boolean; updated_at?: string }
         Relationships: []
       }
       profile_curation: {
@@ -2106,6 +2118,17 @@ export type Database = {
           p_account_id: string
         }
         Returns: undefined
+      }
+      directory_members_by_username: {
+        Args: {
+          p_usernames: string[]
+        }
+        Returns: {
+          account_id: string
+          username: string
+          has_archive: boolean
+          avatar_media_url: string
+        }[]
       }
       drop_all_policies: {
         Args: {

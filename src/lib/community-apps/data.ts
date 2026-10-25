@@ -5,6 +5,7 @@ import path from 'node:path'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { publicDataConfig } from '@/lib/publicDataSource'
+import { readDirectoryMembers } from '@/lib/directoryMembers'
 import type { AppDataManifest, BirdseyeAnalysis, Strand } from './types'
 import positions from './strand-positions.json'
 import display from './strand-display.json'
@@ -74,39 +75,17 @@ export async function getAppPolicy(usernames: string[]) {
     }
     return { blocked, blockedIds }
   }
-  const loadCandidates = async () => {
-    const candidates: { username: string; accountId: string }[] = []
-    // Independent reads overlap, with at most four membership batches in flight.
-    for (let offset = 0; offset < names.length; offset += 160) {
-      const batches = Array.from(
-        { length: Math.min(4, Math.ceil((names.length - offset) / 40)) },
-        (_, index) =>
-          names.slice(offset + index * 40, offset + (index + 1) * 40),
-      )
-      const results = await Promise.all(
-        batches.map(async (batch) => {
-          const { data, error } = await admin
-            .from('user_directory')
-            .select('account_id,username,has_archive,is_opted_in')
-            .or(batch.map((name) => `username.ilike.${name}`).join(','))
-          if (error) throw new Error('Community app membership check failed')
-          return data ?? []
-        }),
-      )
-      for (const row of results.flat()) {
-        if (
-          row.username &&
-          nameSet.has(row.username.toLowerCase()) &&
-          (row.has_archive || row.is_opted_in)
-        )
-          candidates.push({
-            username: row.username.toLowerCase(),
-            accountId: row.account_id ?? '',
-          })
-      }
-    }
-    return candidates
-  }
+  const loadCandidates = async () =>
+    (await readDirectoryMembers(admin, names)).flatMap((row) =>
+      nameSet.has(row.username.toLowerCase())
+        ? [
+            {
+              username: row.username.toLowerCase(),
+              accountId: row.account_id ?? '',
+            },
+          ]
+        : [],
+    )
   // Never publish candidates until BOTH current membership and consent succeed.
   const [{ blocked, blockedIds }, candidates] = await Promise.all([
     loadOptouts(),

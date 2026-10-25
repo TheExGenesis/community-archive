@@ -19,46 +19,52 @@ function stubDatabase({
   members = ['member', 'withdrawn'],
   fail = false,
 } = {}) {
-  const from = jest.fn((table: string) => {
-    const response =
-      table === 'optin'
-        ? {
-            data: optedOut.map((username) => ({ username })),
-            error: fail ? new Error('offline') : null,
-          }
-        : {
-            data: members.map((username) => ({
-              username,
-              has_archive: true,
-              is_opted_in: false,
-            })),
-            error: null,
-          }
+  const consent = {
+    data: optedOut.map((username) => ({ username })),
+    error: fail ? new Error('offline') : null,
+  }
+  const from = jest.fn(() => {
     const chain: Record<string, unknown> = {
       then: (resolve: (value: unknown) => void) =>
-        Promise.resolve(response).then(resolve),
+        Promise.resolve(consent).then(resolve),
     }
-    for (const method of ['select', 'eq', 'order', 'range', 'or'])
+    for (const method of ['select', 'eq', 'order', 'range'])
       chain[method] = jest.fn(() => chain)
     return chain
   })
-  makeClient.mockReturnValue({ from } as never)
-  return from
+  const rpc = jest.fn(async () => ({
+    data: members.map((username) => ({
+      account_id: `${username}-id`,
+      username,
+      has_archive: true,
+      avatar_media_url: `https://test/${username}.jpg`,
+    })),
+    error: null,
+  }))
+  makeClient.mockReturnValue({ from, rpc } as never)
+  return { from, rpc }
 }
 afterEach(() => jest.clearAllMocks())
 test('explicit withdrawal overrides archived membership with case-insensitive matching', async () => {
-  stubDatabase({ optedOut: ['WiThDrAwN'] })
-  const policy = await getAppPolicy(['member', 'withdrawn'])
+  const { rpc } = stubDatabase({ optedOut: ['WiThDrAwN'] })
+  const policy = await getAppPolicy(['member', 'withdrawn', 'Member'])
   expect(Array.from(policy.members)).toEqual(['member'])
+  // One indexed directory read for every distinct handle.
+  expect(rpc).toHaveBeenCalledTimes(1)
+  expect(rpc).toHaveBeenCalledWith(
+    'directory_members_by_username',
+    { p_usernames: ['member', 'withdrawn'] },
+    { get: true },
+  )
   expect(hasBlockedParticipant(['WITHDRAWN', 'member'], policy.blocked)).toBe(
     true,
   )
   expect(hasBlockedParticipant(['member'], policy.blocked)).toBe(false)
 })
 test('policy lookup failure fails closed instead of serving the saved snapshot', async () => {
-  const from = stubDatabase({ fail: true })
+  const { from } = stubDatabase({ fail: true })
   await expect(getAppPolicy(['member'])).rejects.toThrow('consent check failed')
-  expect(from).toHaveBeenCalledTimes(2)
+  expect(from).toHaveBeenCalledTimes(1)
 })
 test('rejects path traversal before accessing display storage', async () => {
   await expect(
@@ -104,26 +110,27 @@ test('overlaps membership with consent but waits for consent before accepting re
   })
   let membershipStarted = false
   makeClient.mockReturnValue({
-    from: (table: string) => {
+    from: () => {
       const chain: Record<string, unknown> = {
-        then: (resolve: (value: unknown) => void) => {
-          if (table === 'optin') return consent.then(resolve)
-          membershipStarted = true
-          return Promise.resolve({
-            data: [
-              {
-                username: 'renamed',
-                account_id: 'blocked-id',
-                has_archive: true,
-              },
-            ],
-            error: null,
-          }).then(resolve)
-        },
+        then: (resolve: (value: unknown) => void) => consent.then(resolve),
       }
-      for (const method of ['select', 'eq', 'order', 'range', 'or'])
+      for (const method of ['select', 'eq', 'order', 'range'])
         chain[method] = () => chain
       return chain
+    },
+    rpc: async () => {
+      membershipStarted = true
+      return {
+        data: [
+          {
+            username: 'renamed',
+            account_id: 'blocked-id',
+            has_archive: true,
+            avatar_media_url: null,
+          },
+        ],
+        error: null,
+      }
     },
   } as never)
   let completed = false

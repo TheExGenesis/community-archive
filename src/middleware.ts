@@ -119,6 +119,9 @@ const IN_MEMORY_MAX_AUTH_CALLBACK_SG = 10
 // caches each answer for up to two minutes, so its lookups get their own
 // larger bucket. The route itself requires a server-to-server bearer secret.
 const IN_MEMORY_MAX_PUBLIC_API_VERIFIER = 600
+// Staging can fan out several reads per page from one server IP. The bridge
+// authenticates every request itself; keep its budget separate and bounded.
+const IN_MEMORY_MAX_PRODUCTION_READ_BRIDGE = 600
 const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 let lastCleanup = Date.now()
@@ -157,6 +160,18 @@ function getApiRateLimitPolicy(
   method: string,
   isSG: boolean,
 ) {
+  if (pathname === '/api/public-data') {
+    return {
+      bucket:
+        method === 'POST' ? 'api:production-read-bridge' : 'api:public-data',
+      maxRequests:
+        method === 'POST'
+          ? IN_MEMORY_MAX_PRODUCTION_READ_BRIDGE
+          : isSG
+            ? IN_MEMORY_MAX_API_SG
+            : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
   if (method === 'GET' && pathname.startsWith('/api/companion/v1/')) {
     return {
       bucket: 'api:companion',
@@ -407,7 +422,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
     pathname === '/api/bulletin/preview-board' ||
-    pathname === '/api/internal/public-api/keys/verify'
+    pathname === '/api/internal/public-api/keys/verify' ||
+    (pathname === '/api/public-data' && request.method === 'POST')
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (

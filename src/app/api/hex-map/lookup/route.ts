@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       : cells
         ? []
         : sampleFeaturedArchives()
-            .slice(0, 6)
+            .slice(0, 3)
             .map((p) => p.username)
     const result = await readMapLookup({ names: names.join(','), cells })
     return NextResponse.json(result, { headers })

@@ -37,6 +37,24 @@ const request = (
   )
 
 describe('API middleware rate limits', () => {
+  it('lets server bridge reads reach secret validation with their own bounded budget', async () => {
+    const bridgeRequest = (method = 'POST') =>
+      middleware(
+        new NextRequest('https://www.community-archive.org/api/public-data', {
+          method,
+          headers: {
+            'user-agent': 'undici',
+            'x-forwarded-for': '203.0.113.79',
+          },
+        }),
+      )
+    for (let index = 0; index < 600; index++)
+      expect((await bridgeRequest()).status).toBe(200)
+    expect((await bridgeRequest()).status).toBe(429)
+    expect((await bridgeRequest('GET')).status).toBe(403)
+    expect((await request('/api/public-data', '203.0.113.79')).status).toBe(200)
+    expect((await request('/api/search', '203.0.113.79')).status).toBe(200)
+  })
   it.each([
     ['US', 20, '203.0.113.90'],
     ['SG', 5, '203.0.113.91'],

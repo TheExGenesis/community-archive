@@ -14,10 +14,14 @@ import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import type { PortalTweet } from '@/lib/portal/types'
 jest.mock('@/lib/community-apps/data', () => ({ getStrands: jest.fn() }))
 jest.mock('@/lib/directoryMembers', () => ({ readMembers: jest.fn() }))
+type Members = Awaited<ReturnType<typeof readMembers>>
 const members = (
   names: string[],
-  avatars: [string, string | null][] = [],
-): Awaited<ReturnType<typeof readMembers>> => ({
+  avatars: [
+    string,
+    Members['avatars'] extends Map<string, infer A> ? A : never,
+  ][] = [],
+): Members => ({
   members: new Set(names),
   avatars: new Map(avatars),
 })

@@ -177,6 +177,11 @@ export function createRoutedSupabaseFetch(
         redirect: 'error',
         signal: init?.signal ?? AbortSignal.timeout(15_000),
       })
+      if (!response.ok)
+        console.error('Production read bridge request failed', {
+          status: response.status,
+          challenged: response.headers.has('x-vercel-mitigated'),
+        })
       return response
     }
     if (

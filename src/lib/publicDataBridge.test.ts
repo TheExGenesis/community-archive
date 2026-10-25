@@ -173,6 +173,28 @@ test('missing bridge settings fail closed; authorization reads can explicitly st
   expect(String(fetchMock.mock.calls[0][0])).toContain('stage.example.com')
 })
 
+test('bridge failures log status without disclosing credentials or requested data', async () => {
+  process.env.DATA_READ_SOURCE = 'production'
+  fetchMock.mockResolvedValue(
+    new Response('challenge', {
+      status: 429,
+      headers: { 'x-vercel-mitigated': 'challenge' },
+    }),
+  )
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    await createRoutedSupabaseFetch('service_role')(
+      'https://stage.example.com/rest/v1/optin',
+    )
+    expect(log).toHaveBeenCalledWith('Production read bridge request failed', {
+      status: 429,
+      challenged: true,
+    })
+  } finally {
+    log.mockRestore()
+  }
+})
+
 test('misconfigured mutations cannot write to either the configured or known production database', async () => {
   process.env.DATA_READ_SOURCE = 'production'
   process.env.PORTAL_READ_SUPABASE_URL = 'https://production-db.example.com'

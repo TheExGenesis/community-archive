@@ -1,14 +1,22 @@
+jest.mock('@/lib/browsingAuth', () => ({ getBrowsingUser: jest.fn() }))
 import {
   Children,
   isValidElement,
   type ReactElement,
   type ReactNode,
 } from 'react'
-import UserPage from '@/app/user/[account_id]/page'
+import { getBrowsingUser } from '@/lib/browsingAuth'
+import UserPage, { generateMetadata } from '@/app/user/[account_id]/page'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
 import { resolveProfileCore } from '@/lib/metaTwitter/profile'
 import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
-import { getPublicProfileSettings } from '@/lib/profileCuration'
+import {
+  getPublicProfileSettings,
+  getCuratedProfileBangersPage,
+} from '@/lib/profileCuration'
+import GuestProfile from '@/components/metaTwitter/GuestProfile'
+import { withBackfilledMedia } from '@/lib/metaTwitter/profile'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 jest.mock('@/lib/metaTwitter/profile', () => ({
   resolveProfileCore: jest.fn(),
@@ -31,20 +39,26 @@ function findHeader(node: ReactNode): ReactElement | undefined {
   }
 }
 
-test('renders the profile before owner authentication and reads settings only for its owner', async () => {
-  const profile = {
-    account_id: '42',
-    username: 'alice',
-    account_display_name: 'Alice',
-    has_archive: true,
-    bio: 'Hello',
-    avatar_media_url: null,
-    header_media_url: null,
-  }
+const profile = {
+  account_id: '42',
+  username: 'alice',
+  account_display_name: 'Alice',
+  has_archive: true,
+  bio: 'Hello',
+  avatar_media_url: null,
+  header_media_url: null,
+}
+
+beforeEach(() => {
+  jest.clearAllMocks()
+  ;(getBrowsingUser as jest.Mock).mockResolvedValue({ id: 'viewer' })
   ;(resolveProfileCore as jest.Mock).mockResolvedValue({
     accountId: '42',
     profile,
   })
+})
+
+test('renders the profile before owner authentication and reads settings only for its owner', async () => {
   const page = await UserPage({
     params: { account_id: 'alice' },
     searchParams: {},
@@ -64,4 +78,40 @@ test('renders the profile before owner authentication and reads settings only fo
   const actions = await owner.type(owner.props)
   expect(getPublicProfileSettings).toHaveBeenCalledWith('42')
   expect(actions.props.downloadArchiveVisible).toBe(false)
+})
+
+test('shows only basic identity and a destination-preserving login prompt to guests', async () => {
+  ;(getBrowsingUser as jest.Mock).mockResolvedValue(null)
+  const page = await UserPage({
+    params: { account_id: 'alice' },
+    searchParams: { chapter: '2025', section: 'hello' },
+  })
+  expect(page.type).toBe(GuestProfile)
+  expect(page.props).toEqual({
+    displayName: 'Alice',
+    username: 'alice',
+    bio: 'Hello',
+    avatarUrl: null,
+    returnTo: '/user/alice?chapter=2025&section=hello',
+  })
+  const html = renderToStaticMarkup(page)
+  expect(html).toContain('Log in to explore this profile')
+  expect(html).toContain(
+    '/login?redirect=%2Fuser%2Falice%3Fchapter%3D2025%26section%3Dhello',
+  )
+  expect(findHeader(page)).toBeUndefined()
+  expect(getCuratedProfileBangersPage).not.toHaveBeenCalled()
+  expect(withBackfilledMedia).not.toHaveBeenCalled()
+  expect(getAuthenticatedAccountId).not.toHaveBeenCalled()
+  expect(getPublicProfileSettings).not.toHaveBeenCalled()
+})
+
+test('provides basic, noindex profile metadata for the guest preview', async () => {
+  ;(getBrowsingUser as jest.Mock).mockResolvedValue(null)
+  const metadata = await generateMetadata({
+    params: { account_id: 'alice' },
+    searchParams: {},
+  })
+  expect(metadata.title).toContain('Alice (@alice)')
+  expect(metadata.robots).toEqual({ index: false })
 })

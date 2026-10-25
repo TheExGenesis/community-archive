@@ -1,3 +1,5 @@
+import { getBrowsingUser } from '@/lib/browsingAuth'
+import GuestProfile from '@/components/metaTwitter/GuestProfile'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
@@ -39,6 +41,8 @@ import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
 // A cold profile waits on several gateway reads; Vercel's 15s default cut
 // streamed renders off mid-way (504).
+export const dynamic = 'force-dynamic'
+
 export const maxDuration = 60
 
 interface PageProps {
@@ -51,7 +55,7 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) return { title: 'User not found' }
-  const { accountId, isMember, profile } = resolved
+  const { accountId, profile } = resolved
   const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
   const normalizedBio = profile.bio?.replace(/\s+/g, ' ').trim()
   const description = normalizedBio
@@ -64,8 +68,7 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: canonicalPath },
-    // Only people who joined the archive are offered to search engines.
-    ...(isMember ? {} : { robots: { index: false } }),
+    robots: { index: false },
     openGraph: {
       type: 'website',
       url: canonicalPath,
@@ -150,7 +153,10 @@ async function ProfileArchivedAt({ accountId }: { accountId: string }) {
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
-  const resolved = await resolveProfileCore(params.account_id)
+  const [viewer, resolved] = await Promise.all([
+    getBrowsingUser(),
+    resolveProfileCore(params.account_id),
+  ])
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
@@ -181,6 +187,22 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     const canonicalQuery = canonicalParams.toString()
     redirect(
       `${canonicalProfilePath}${canonicalQuery ? `?${canonicalQuery}` : ''}`,
+    )
+  }
+
+  if (!viewer) {
+    const returnParams = new URLSearchParams()
+    if (candidateYear) returnParams.set('chapter', String(candidateYear))
+    if (candidateSection) returnParams.set('section', candidateSection)
+    const query = returnParams.toString()
+    return (
+      <GuestProfile
+        displayName={profile.account_display_name}
+        username={profile.username}
+        bio={profile.bio}
+        avatarUrl={profile.avatar_media_url}
+        returnTo={`${canonicalProfilePath}${query ? `?${query}` : ''}`}
+      />
     )
   }
 

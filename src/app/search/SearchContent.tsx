@@ -1,0 +1,196 @@
+'use client'
+
+import AdvancedSearchForm from '@/components/AdvancedSearchForm'
+import dynamic from 'next/dynamic'
+import {
+  FilterCriteria,
+  type TweetSearchSort,
+} from '@/lib/queries/tweetQueries'
+import { normalizeSearchParams } from '@/lib/searchParams'
+import { Search, SlidersHorizontal } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
+import { capturePostHogEvent } from '@/lib/posthog'
+import UserMatchResults from '@/components/UserMatchResults'
+import RelatedContentResults from '@/components/search/RelatedContentResults'
+import BrowsingSignInPrompt from '@/components/BrowsingSignInPrompt'
+
+const TweetList = dynamic(() => import('@/components/TweetList'), {
+  loading: () => <p role="status">Loading results…</p>,
+})
+
+const starterSearches = [
+  { label: 'Open source', query: 'open source' },
+  { label: 'AI alignment', query: 'AI alignment' },
+  { label: 'Community notes', query: 'community notes' },
+]
+
+// This wrapper is needed because useSearchParams can only be used in Client Components,
+// and Suspense is recommended for pages that use it.
+export function SearchPageContent({ canSearch }: { canSearch: boolean }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const normalizedSearchParams = normalizeSearchParams(
+    new URLSearchParams(searchParams.toString()),
+  )
+
+  const rawQuery = normalizedSearchParams.get('q')
+  let formattedQuery: string | undefined
+  // Strip quotes if present, keep the clean text for two-query exact-match-first logic
+  let cleanRawText: string | undefined
+
+  if (rawQuery) {
+    const trimmedQuery = rawQuery.trim()
+    if (trimmedQuery.startsWith('"') && trimmedQuery.endsWith('"')) {
+      cleanRawText = trimmedQuery.substring(1, trimmedQuery.length - 1).trim()
+    } else {
+      cleanRawText = trimmedQuery
+    }
+    // For single-word queries or fallback, still provide a formatted query
+    const words = cleanRawText.split(/\s+/).filter(Boolean)
+    formattedQuery = words.join(' & ')
+  }
+
+  const filterCriteria: FilterCriteria = {
+    searchQuery: formattedQuery,
+    rawSearchQuery: cleanRawText,
+    fromUsername: normalizedSearchParams.get('fromUser') || undefined,
+    replyToUsername: normalizedSearchParams.get('replyToUser') || undefined,
+    startDate: normalizedSearchParams.get('sinceDate') || undefined,
+    endDate: normalizedSearchParams.get('untilDate') || undefined,
+    excludeRetweets: true,
+    includeQuoteTweets: true,
+    sort: (normalizedSearchParams.get('sort') || 'newest') as TweetSearchSort,
+  }
+
+  const handleSortChange = (sort: TweetSearchSort) => {
+    capturePostHogEvent('search_interface_action', {
+      action: 'result_sort_changed',
+      has_query: Boolean(cleanRawText),
+      active_filter_count: [
+        filterCriteria.fromUsername,
+        filterCriteria.replyToUsername,
+        filterCriteria.startDate,
+        filterCriteria.endDate,
+      ].filter(Boolean).length,
+    })
+    const next = new URLSearchParams(normalizedSearchParams)
+    if (sort === 'newest') next.delete('sort')
+    else next.set('sort', sort)
+    router.replace(`/search?${next.toString()}`)
+  }
+
+  const tweetListKey = normalizedSearchParams.toString()
+  const hasSearch = tweetListKey.length > 0
+  const canSortSearchResults = Boolean(cleanRawText)
+  const searchDescription = cleanRawText
+    ? `Matching “${cleanRawText}” and the filters above`
+    : 'Matching the filters above'
+
+  return (
+    <main className="min-h-screen bg-background">
+      <section className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <div className={hasSearch ? 'mb-4' : 'mb-8 max-w-2xl'}>
+          <div
+            className={`flex items-center gap-1.5 font-semibold uppercase tracking-[0.16em] text-brand ${
+              hasSearch ? 'mb-2 text-[11px]' : 'mb-4 text-xs'
+            }`}
+          >
+            <Search className={hasSearch ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
+            Archive search
+          </div>
+          <h1
+            className={`font-bold tracking-tight text-foreground ${
+              hasSearch ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'
+            }`}
+          >
+            Search the archive
+          </h1>
+          <p
+            className={`text-muted-foreground ${
+              hasSearch
+                ? 'mt-1 text-sm leading-5'
+                : 'mt-3 text-base leading-7 sm:text-lg'
+            }`}
+          >
+            Find public conversations by keyword, author, reply, or date.
+          </p>
+        </div>
+
+        <AdvancedSearchForm allowUserSuggestions={canSearch} />
+
+        <div className={hasSearch ? 'mt-5' : 'mt-10'}>
+          {!canSearch ? (
+            <BrowsingSignInPrompt
+              title="Log in to search the archive"
+              description="Explore conversations, find people, and search by author or date. Log in to see your search results."
+              returnTo={`/search${tweetListKey ? `?${tweetListKey}` : ''}`}
+            />
+          ) : hasSearch ? (
+            <>
+              <UserMatchResults query={cleanRawText} />
+              <RelatedContentResults query={cleanRawText} />
+              <TweetList
+                key={tweetListKey}
+                filterCriteria={filterCriteria}
+                resultsHeading="Search results"
+                resultsDescription={searchDescription}
+                collapseLongTweets
+                compact
+                permalinkOrigin="search"
+                permalinkReturnTo={`/search?${tweetListKey}`}
+                onSearchSortChange={
+                  canSortSearchResults ? handleSortChange : undefined
+                }
+              />
+            </>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">
+              <SlidersHorizontal className="mx-auto h-8 w-8 text-muted-foreground" />
+              <h2 className="mt-4 text-2xl font-semibold text-foreground">
+                Start with a topic or phrase
+              </h2>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                Use filters for a specific account or date range, or try one of
+                these searches.
+              </p>
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {starterSearches.map((item) => (
+                  <Link
+                    key={item.query}
+                    href={`/search?q=${encodeURIComponent(item.query)}`}
+                    onClick={() =>
+                      capturePostHogEvent('search_interface_action', {
+                        action: 'starter_search_selected',
+                        has_query: false,
+                        active_filter_count: 0,
+                      })
+                    }
+                    className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export default function SearchContent({ canSearch }: { canSearch: boolean }) {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-background px-4 py-14 text-center text-muted-foreground">
+          Loading search…
+        </main>
+      }
+    >
+      <SearchPageContent canSearch={canSearch} />
+    </Suspense>
+  )
+}

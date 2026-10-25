@@ -1,4 +1,5 @@
-// The search page is a client component, so its metadata lives here.
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Search · Community Archive',
   description:
@@ -10,5 +11,5 @@ export default function SearchLayout({
 }: {
   children: React.ReactNode
 }) {
-  return children
+  return <>{children}</>
 }

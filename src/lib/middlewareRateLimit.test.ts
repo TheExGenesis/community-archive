@@ -1,5 +1,19 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { middleware } from '../../src/middleware'
+
+jest.mock('@/utils/supabase', () => ({
+  createMiddlewareClient: () => ({
+    supabase: {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: 'viewer' } },
+          error: null,
+        }),
+      },
+    },
+    response: NextResponse.next(),
+  }),
+}))
 
 const browserUserAgent =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36'
@@ -15,6 +29,7 @@ const request = (
       method,
       headers: {
         'user-agent': browserUserAgent,
+        cookie: 'sb-test-auth-token=session',
         'x-forwarded-for': ip,
         'x-vercel-ip-country': country,
       },

@@ -110,18 +110,27 @@ export const createMiddlewareClient = (request: NextRequest) => {
       get: (name: string) => request.cookies.get(name)?.value,
       set: (name: string, value: string, options: CookieOptions) => {
         request.cookies.set({ name, value, ...options })
+        const previousCookies = response.cookies.getAll()
         response = NextResponse.next({ request: { headers: request.headers } })
+        for (const cookie of previousCookies) response.cookies.set(cookie)
         response.cookies.set({ name, value, ...options })
       },
       remove: (name: string, options: CookieOptions) => {
         request.cookies.set({ name, value: '', ...options })
+        const previousCookies = response.cookies.getAll()
         response = NextResponse.next({ request: { headers: request.headers } })
+        for (const cookie of previousCookies) response.cookies.set(cookie)
         response.cookies.set({ name, value: '', ...options })
       },
     },
   })
 
-  return { supabase, response }
+  return {
+    supabase,
+    get response() {
+      return response
+    },
+  }
 }
 
 export const createServerAdminClient = (

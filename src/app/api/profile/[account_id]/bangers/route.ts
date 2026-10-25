@@ -1,3 +1,4 @@
+import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   PROFILE_BANGERS_PAGE_LIMIT,
@@ -37,6 +38,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { account_id: string } },
 ) {
+  const authError = await browsingAuthError()
+  if (authError) return authError
+
   try {
     if (!ACCOUNT_ID_PATTERN.test(params.account_id)) {
       throw new Error('Invalid profile account')

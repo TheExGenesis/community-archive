@@ -1,3 +1,4 @@
+import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { getUserDirectoryPage } from '@/lib/userDirectory'
@@ -6,11 +7,14 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 15
 
 export async function GET(request: NextRequest) {
+  const authError = await browsingAuthError()
+  if (authError) return authError
+
   try {
     const page = await getUserDirectoryPage(new URL(request.url).searchParams)
     return NextResponse.json(page, {
       headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        'Cache-Control': 'private, no-store',
       },
     })
   } catch (error) {

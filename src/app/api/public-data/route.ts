@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
-import { isPublicBrowserRead, isReadRpc } from '@/utils/supabaseReadRouting'
+import { isPublicBrowserRead } from '@/utils/supabaseReadRouting'
+import { isReadRpc } from '@/utils/supabaseReadPolicy'
 import { NextResponse } from 'next/server'
 import { publicDataConfig } from '@/lib/publicDataSource'
 

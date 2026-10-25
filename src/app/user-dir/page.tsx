@@ -1,7 +1,10 @@
+import { requireBrowsingUser } from '@/lib/browsingAuth'
 import { Suspense } from 'react'
 import UserDirectoryClient from './UserDirectoryClient'
 import { getStats } from '@/lib/stats'
 import { getUserDirectoryPage } from '@/lib/userDirectory'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Member directory · Community Archive',
@@ -10,6 +13,7 @@ export const metadata = {
 }
 
 export default async function UserDirectoryPage() {
+  await requireBrowsingUser('/user-dir')
   const totalCount = getStats()
     .then((stats) => stats.userCount)
     .catch((error) => {

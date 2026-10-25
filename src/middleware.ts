@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { isMonitoringHealthRoute } from '@/lib/monitoringHealthRoute'
 import { createMiddlewareClient } from '@/utils/supabase'
+import { loginHref } from '@/lib/authRedirect'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -378,6 +379,20 @@ function isPublicDocumentationRoute(pathname: string): boolean {
   )
 }
 
+/** Temporary login requirement for archive search and account browsing. */
+function requiresLogin(pathname: string): boolean {
+  return [
+    '/search',
+    '/user',
+    '/user-dir',
+    '/profile',
+    '/api/tweet-search',
+    '/api/search',
+    '/api/user-directory',
+    '/api/profile',
+  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
 // ─── Main Middleware ─────────────────────────────────────────────────────────
 
 export async function middleware(request: NextRequest) {
@@ -604,22 +619,53 @@ export async function middleware(request: NextRequest) {
   // ── Stage 5: Conditional Supabase Session Refresh ───────────────────────
   let response: NextResponse
 
-  // Only call Supabase if auth cookies exist
+  const loginRequired = requiresLogin(pathname)
+  const guestPreview =
+    pathname === '/search' || /^\/user\/[^/]+\/?$/.test(pathname)
+  let authenticated = false
+
+  // Chunked Supabase sessions use -auth-token.0, -auth-token.1, etc.
   const hasAuthCookies = request.cookies
     .getAll()
-    .some((c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
+    .some((c) => /^sb-.+-auth-token(?:\.\d+)?$/.test(c.name))
 
   if (hasAuthCookies) {
     try {
-      const { supabase, response: supabaseResponse } =
-        createMiddlewareClient(request)
-      await supabase.auth.getSession()
-      response = supabaseResponse
+      const client = createMiddlewareClient(request)
+      if (loginRequired) {
+        const { data, error } = await client.supabase.auth.getUser()
+        authenticated = !error && Boolean(data.user)
+      } else {
+        await client.supabase.auth.getSession()
+      }
+      response = client.response
     } catch {
       response = NextResponse.next({ request: { headers: request.headers } })
     }
   } else {
     response = NextResponse.next({ request: { headers: request.headers } })
+  }
+
+  if (loginRequired) {
+    if (!authenticated && !guestPreview) {
+      const returnUrl = request.nextUrl.clone()
+      returnUrl.searchParams.delete('_rsc')
+      const denied = pathname.startsWith('/api/')
+        ? NextResponse.json(
+            { error: 'Authentication required' },
+            { status: 401 },
+          )
+        : NextResponse.redirect(
+            new URL(
+              loginHref(returnUrl.pathname + returnUrl.search),
+              request.url,
+            ),
+          )
+      for (const cookie of response.cookies.getAll()) denied.cookies.set(cookie)
+      response = denied
+    }
+    response.headers.set('Cache-Control', 'private, no-store')
+    response.headers.set('X-Robots-Tag', 'noindex')
   }
 
   // ── Stage 6: Security Headers (all responses) ──────────────────────────

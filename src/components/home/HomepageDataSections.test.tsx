@@ -60,33 +60,40 @@ const growthStats = (overrides = {}, failed = false) =>
     failed,
   })
 
-test('shows every digit of the totals and both member windows, including zero', async () => {
+test('shows full totals with compact 24-hour additions', async () => {
   render(await HomepageGrowth({ data: growthStats() }))
   expect(screen.getByText('21,023,737')).toBeInTheDocument()
   expect(screen.getByText('1,261')).toBeInTheDocument()
-  expect(screen.getByText('0')).toBeInTheDocument()
-  expect(screen.getByText('259')).toBeInTheDocument()
-  expect(screen.getByText('668,600 tweets')).toBeInTheDocument()
-  expect(screen.getByText(/Membership as of/)).toBeInTheDocument()
-  expect(screen.getByText(/Oct 25, 6:00 PM UTC/)).toHaveAttribute(
-    'datetime',
-    '2026-10-25T18:00:00Z',
+  expect(screen.getByText('(+668,600)')).toHaveAttribute(
+    'title',
+    'Tweets added in the last 24 hours',
   )
+  expect(screen.getByText('(+259)')).toHaveAttribute(
+    'title',
+    'Members added in the last 24 hours',
+  )
+  expect(screen.queryByText(/Members added:/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/Membership as of/)).not.toBeInTheDocument()
 })
 
-test('keeps missing growth visible as unavailable and preserves the totals', async () => {
-  render(
+test('shows zero additions and omits unavailable additions', async () => {
+  const { rerender } = render(
+    await HomepageGrowth({
+      data: growthStats({ membersAddedLast24Hours: 0, addedLast24Hours: 0 }),
+    }),
+  )
+  expect(screen.getAllByText('(+0)')).toHaveLength(2)
+  rerender(
     await HomepageGrowth({
       data: growthStats({
-        membersAddedLastHour: null,
         membersAddedLast24Hours: null,
         addedLast24Hours: null,
       }),
     }),
   )
-  expect(screen.getAllByText('Unavailable')).toHaveLength(2)
+  expect(screen.getByText('21,023,737')).toBeInTheDocument()
   expect(screen.getByText('1,261')).toBeInTheDocument()
-  expect(screen.queryByText('668,600 tweets')).not.toBeInTheDocument()
+  expect(screen.queryByText(/\(\+/)).not.toBeInTheDocument()
 })
 
 test('shows an explicit failure instead of zero totals', async () => {

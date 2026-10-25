@@ -27,67 +27,46 @@ export async function HomepageGrowth({
   const {
     totalTweets,
     memberCount,
-    membersAddedLastHour,
     membersAddedLast24Hours,
-    membershipSnapshotAt,
     addedLast24Hours,
   } = stats.data
   const count = (value: number) => value.toLocaleString('en-US')
   return (
-    <div className="mt-4 space-y-1 text-center text-sm text-muted-foreground">
-      <p>
+    <p className="mt-4 text-center text-sm text-muted-foreground">
+      <span className="inline-block whitespace-nowrap">
         <strong className="font-medium tabular-nums text-foreground">
           {count(totalTweets)}
         </strong>{' '}
-        public tweets
-        {' · '}
+        tweets
+        {addedLast24Hours != null && (
+          <span
+            className="tabular-nums"
+            title="Tweets added in the last 24 hours"
+            aria-label={`${count(addedLast24Hours)} tweets added in the last 24 hours`}
+          >
+            {' '}
+            (+{count(addedLast24Hours)})
+          </span>
+        )}
+      </span>
+      {' · '}
+      <span className="inline-block whitespace-nowrap">
         <strong className="font-medium tabular-nums text-foreground">
           {count(memberCount)}
         </strong>{' '}
-        community members
-      </p>
-      <p>
-        Members added:{' '}
-        <strong className="font-medium tabular-nums text-foreground">
-          {membersAddedLastHour == null
-            ? 'Unavailable'
-            : count(membersAddedLastHour)}
-        </strong>{' '}
-        in the last hour
-        {' · '}
-        <strong className="font-medium tabular-nums text-foreground">
-          {membersAddedLast24Hours == null
-            ? 'Unavailable'
-            : count(membersAddedLast24Hours)}
-        </strong>{' '}
-        in the last 24 hours
-      </p>
-      {addedLast24Hours !== null && (
-        <p>
-          Added in the last 24 hours:{' '}
-          <strong className="font-medium tabular-nums text-foreground">
-            {count(addedLast24Hours)}{' '}
-            {addedLast24Hours === 1 ? 'tweet' : 'tweets'}
-          </strong>
-          .
-        </p>
-      )}
-      {membershipSnapshotAt && (
-        <p className="text-xs">
-          Membership as of{' '}
-          <time dateTime={membershipSnapshotAt}>
-            {new Date(membershipSnapshotAt).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              timeZone: 'UTC',
-            })}{' '}
-            UTC
-          </time>
-        </p>
-      )}
-    </div>
+        members
+        {membersAddedLast24Hours != null && (
+          <span
+            className="tabular-nums"
+            title="Members added in the last 24 hours"
+            aria-label={`${count(membersAddedLast24Hours)} members added in the last 24 hours`}
+          >
+            {' '}
+            (+{count(membersAddedLast24Hours)})
+          </span>
+        )}
+      </span>
+    </p>
   )
 }
 

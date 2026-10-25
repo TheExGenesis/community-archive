@@ -98,6 +98,7 @@ test('bridge refuses writes, auth, original archives, arbitrary targets, and mut
 
 test('one admin client routes reads to production, writes and authentication to staging', async () => {
   process.env.DATA_READ_SOURCE = 'production'
+  process.env.PUBLIC_READ_PROTECTION_BYPASS = 'existing-platform-credential'
   const routed = createRoutedSupabaseFetch('service_role')
   await routed('https://stage.example.com/rest/v1/digest_editions?select=id', {
     method: 'GET',
@@ -105,6 +106,9 @@ test('one admin client routes reads to production, writes and authentication to 
   })
   expect(String(fetchMock.mock.calls[0][0])).toBe(
     'https://production.example.com/api/public-data',
+  )
+  expect(fetchMock.mock.calls[0][1].headers['x-vercel-protection-bypass']).toBe(
+    'existing-platform-credential',
   )
   expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
     role: 'service_role',
@@ -125,6 +129,14 @@ test('one admin client routes reads to production, writes and authentication to 
     'https://stage.example.com/rest/v1/digest_editions',
     'https://stage.example.com/auth/v1/user',
   ])
+  expect(
+    fetchMock.mock.calls
+      .slice(1)
+      .every(
+        (call) =>
+          !new Headers(call[1]?.headers).has('x-vercel-protection-bypass'),
+      ),
+  ).toBe(true)
 })
 
 test('known read RPCs become GET with PostgREST arrays; publication and view increments stay staging', async () => {

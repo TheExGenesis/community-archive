@@ -165,6 +165,12 @@ export function createRoutedSupabaseFetch(
         headers: {
           Authorization: `Bearer ${secret}`,
           'Content-Type': 'application/json',
+          ...(process.env.PUBLIC_READ_PROTECTION_BYPASS
+            ? {
+                'x-vercel-protection-bypass':
+                  process.env.PUBLIC_READ_PROTECTION_BYPASS,
+              }
+            : {}),
         },
         body: JSON.stringify({
           operation: 'read',

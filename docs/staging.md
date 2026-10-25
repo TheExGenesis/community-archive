@@ -82,16 +82,19 @@ the production service-role key in staging**.
 Activation requires deploying `/api/public-data` to Production and setting the
 same `PUBLIC_READ_SECRET` there first. Leave `DATA_READ_SOURCE` unset in
 Production. Scope the shared secret to Production and the intended protected
-Preview branch. Keep Vercel protection enabled. If the production firewall
-challenges bridge requests, allow this endpoint specifically; do not disable
-protection globally. Removing the Preview flags and redeploying rolls back the
-read override without any data migration.
+Preview branch. Keep Vercel protection enabled. If Vercel challenges the
+server-to-server request, set the server-only `PUBLIC_READ_PROTECTION_BYPASS`
+on that branch to the project's existing Vercel automation bypass credential.
+It is sent only as a header on the authenticated bridge request, never to
+staging writes, Supabase or the browser. No firewall rule change is needed.
+Removing the Preview flags and redeploying rolls back the read override
+without any data migration.
 
 The protected bridge accepts only GET/HEAD reads against PostgREST and the
 normalized community display/cover buckets. Production credentials stay on the
 production server. It preserves query, pagination and count headers, never
 forwards staging cookies/JWTs, and returns `private, no-store`. Read-only RPCs
-are explicitly listed in `src/utils/supabaseReadRouting.ts` and sent as GET;
+are explicitly listed in `src/utils/supabaseReadPolicy.ts` and sent as GET;
 PostgREST runs GET/HEAD in a [read-only transaction](https://postgrest.org/en/stable/references/transactions.html).
 Unknown POST RPCs and every INSERT/UPDATE/DELETE stay on staging. Do not add a
 mutating function to that list. A misconfigured mutation targeting the production

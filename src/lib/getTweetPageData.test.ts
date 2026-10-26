@@ -1,13 +1,13 @@
 import type { TweetData } from '@/lib/tweets/types'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@/utils/supabase'
+import { createServerAnonClient } from '@/utils/supabase'
 import { isClickHouseReadsEnabled } from './clickhouseGateway'
 import { fetchClickHouseTweetThreadPageData } from './clickhouseTweetPage'
 import { fetchClickHouseQuotePosts } from './clickhouseQuotePosts'
 import { getTweetPageData } from './getTweetPageData'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn() }))
-jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
+jest.mock('@/utils/supabase', () => ({ createServerAnonClient: jest.fn() }))
 jest.mock('./clickhouseGateway', () => ({
   isClickHouseReadsEnabled: jest.fn(),
 }))
@@ -32,8 +32,8 @@ const fetchClickHouseQuotePostsMock =
   fetchClickHouseQuotePosts as jest.MockedFunction<
     typeof fetchClickHouseQuotePosts
   >
-const createServerClientMock = createServerClient as jest.MockedFunction<
-  typeof createServerClient
+const createServerAnonClientMock = createServerAnonClient as jest.MockedFunction<
+  typeof createServerAnonClient
 >
 
 const mainTweet = {
@@ -77,7 +77,7 @@ describe('getTweetPageData', () => {
       totalCount: 0,
     })
     ;(cookies as jest.Mock).mockResolvedValue({})
-    createServerClientMock.mockReturnValue({ rpc } as never)
+    createServerAnonClientMock.mockReturnValue({ rpc } as never)
     rpc.mockResolvedValue({ data: emptyRpcResult, error: null })
   })
 
@@ -150,7 +150,7 @@ describe('getTweetPageData', () => {
       tweet.tweet_id,
     )
     expect(fetchClickHouseQuotePostsMock).toHaveBeenCalledWith(tweet.tweet_id)
-    expect(createServerClientMock).not.toHaveBeenCalled()
+    expect(createServerAnonClientMock).not.toHaveBeenCalled()
     expect(rpc).not.toHaveBeenCalled()
   })
 
@@ -187,7 +187,7 @@ describe('getTweetPageData', () => {
       })
       expect(page.tweet).toBe(tweet)
       expect(page.quotePosts).toBeDefined()
-      expect(createServerClientMock).not.toHaveBeenCalled()
+      expect(createServerAnonClientMock).not.toHaveBeenCalled()
       const quotes = {
         tweets: [{ ...tweet, tweet_id: 'quote-1' }],
         totalCount: 17,
@@ -228,7 +228,7 @@ describe('getTweetPageData', () => {
         totalCount: 0,
       })
       expect(page.tweet).toBe(tweet)
-      expect(createServerClientMock).not.toHaveBeenCalled()
+      expect(createServerAnonClientMock).not.toHaveBeenCalled()
     } finally {
       log.mockRestore()
     }
@@ -274,7 +274,7 @@ describe('getTweetPageData', () => {
         error: 'gateway down',
       },
     )
-    expect(createServerClientMock).not.toHaveBeenCalled()
+    expect(createServerAnonClientMock).not.toHaveBeenCalled()
 
     consoleError.mockRestore()
   })
@@ -370,12 +370,12 @@ test('Bulletin permalinks never fall back to PostgreSQL, even with the general f
   fetchClickHouseTweetThreadPageDataMock.mockResolvedValue(null)
   const missing = await getTweetPageData('123', { clickhouseOnly: true })
   expect(missing.tweet).toBeNull()
-  expect(createServerClient).not.toHaveBeenCalled()
+  expect(createServerAnonClient).not.toHaveBeenCalled()
   fetchClickHouseTweetThreadPageDataMock.mockRejectedValue(
     new Error('source unavailable'),
   )
   await expect(
     getTweetPageData('123', { clickhouseOnly: true }),
   ).rejects.toThrow('source unavailable')
-  expect(createServerClient).not.toHaveBeenCalled()
+  expect(createServerAnonClient).not.toHaveBeenCalled()
 })

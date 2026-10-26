@@ -29,6 +29,12 @@ jest.mock('@/lib/profileCuration', () => ({
   getPublicProfileSettings: jest.fn(),
   getCuratedProfileBangersPage: jest.fn(),
 }))
+// The guest prompt reads the requested chapter in the browser so the cached
+// preview itself never depends on the query string.
+jest.mock('next/navigation', () => ({
+  ...jest.requireActual('next/navigation'),
+  useSearchParams: () => new URLSearchParams('chapter=2025&section=hello'),
+}))
 
 function findHeader(node: ReactNode): ReactElement | undefined {
   if (!isValidElement<{ children?: ReactNode }>(node)) return undefined
@@ -92,7 +98,7 @@ test('shows only basic identity and a destination-preserving login prompt to gue
     username: 'alice',
     bio: 'Hello',
     avatarUrl: null,
-    returnTo: '/user/alice?chapter=2025&section=hello',
+    basePath: '/user/alice',
   })
   const html = renderToStaticMarkup(page)
   expect(html).toContain('Log in to explore this profile')

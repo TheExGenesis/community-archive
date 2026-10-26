@@ -1,4 +1,3 @@
-import { createServerClient } from '@/utils/supabase'
 import { getTweetPageData } from '@/lib/getTweetPageData'
 import { loadTweetPage } from './loadTweetPage'
 import { getStoredTweetPageSummary } from './store'
@@ -9,8 +8,11 @@ jest.mock('react', () => ({
   ...jest.requireActual('react'),
   cache: (fn: unknown) => fn,
 }))
-jest.mock('next/headers', () => ({ cookies: jest.fn(async () => ({})) }))
-jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
+jest.mock('next/headers', () => ({
+  cookies: jest.fn(() => {
+    throw new Error('the cached permalink must not read the request')
+  }),
+}))
 jest.mock('@/lib/getTweetPageData', () => ({ getTweetPageData: jest.fn() }))
 jest.mock('./store', () => ({ getStoredTweetPageSummary: jest.fn() }))
 
@@ -31,12 +33,6 @@ const tweet = {
   urls: [],
 }
 
-function signIn(user: object | null) {
-  ;(createServerClient as jest.Mock).mockReturnValue({
-    auth: { getUser: async () => ({ data: { user } }) },
-  })
-}
-
 beforeEach(() => {
   jest.clearAllMocks()
   ;(getTweetPageData as jest.Mock).mockResolvedValue({
@@ -45,29 +41,30 @@ beforeEach(() => {
   })
 })
 
-test('a missing summary is generated only for a signed-in visitor', async () => {
+test('a missing summary is reported, never generated, without reading the request', async () => {
   ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue('missing')
 
-  signIn(null)
   expect(await loadTweetPage('123')).toMatchObject({
     summary: null,
-    summaryPending: false,
-  })
-
-  signIn({ id: 'user-1' })
-  expect(await loadTweetPage('124')).toMatchObject({
-    summary: null,
-    summaryPending: true,
+    summaryMissing: true,
   })
 })
 
-test('a stored summary is shown to everyone without checking auth', async () => {
+test('a stored summary is shown to everyone', async () => {
   const summary = { title: 'A title', description: 'A description' }
   ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue(summary)
 
   expect(await loadTweetPage('125')).toMatchObject({
     summary,
-    summaryPending: false,
+    summaryMissing: false,
   })
-  expect(createServerClient).not.toHaveBeenCalled()
+})
+
+test('a stored ineligible outcome stops the browser from asking again', async () => {
+  ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue(null)
+
+  expect(await loadTweetPage('126')).toMatchObject({
+    summary: null,
+    summaryMissing: false,
+  })
 })

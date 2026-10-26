@@ -1,30 +1,15 @@
 import 'server-only'
 import { cache } from 'react'
-import { cookies } from 'next/headers'
-import { createServerClient } from '@/utils/supabase'
 import { getTweetPageData } from '@/lib/getTweetPageData'
 import { buildTweetPageSubject } from './subject'
 import { getStoredTweetPageSummary } from './store'
 
-async function isSignedIn() {
-  try {
-    const supabase = createServerClient(await cookies())
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    return Boolean(user)
-  } catch {
-    return false
-  }
-}
-
 /**
- * Permalink data plus its subject and any summary that can be shown without
- * waiting. Metadata, the page body, and the share image all read through
- * this, so one request loads once. Only a signed-in visitor triggers a paid
- * generation: they get the page at once with `summaryPending` set, and the
- * body streams the summary in. Everyone else, including crawlers and
- * unfurlers, sees stored summaries only.
+ * Permalink data plus its subject and any stored summary. Metadata, the page
+ * body, and the share image all read through this, so one request loads
+ * once. It never reads the request: the page is cached and shared by every
+ * visitor, so a missing summary is reported as `summaryMissing` and the
+ * browser asks for generation only when its visitor is signed in.
  */
 export const loadTweetPage = cache(
   async (tweetId: string, clickhouseOnly = false) => {
@@ -37,7 +22,7 @@ export const loadTweetPage = cache(
     const page = { ...data, tweet: data.tweet, subject }
     const stored = await getStoredTweetPageSummary(subject)
     if (stored !== 'missing')
-      return { ...page, summary: stored, summaryPending: false }
-    return { ...page, summary: null, summaryPending: await isSignedIn() }
+      return { ...page, summary: stored, summaryMissing: false }
+    return { ...page, summary: null, summaryMissing: true }
   },
 )

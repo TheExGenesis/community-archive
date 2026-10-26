@@ -1,19 +1,23 @@
 import Image from 'next/image'
+import { Suspense } from 'react'
 import BrowsingSignInPrompt from '@/components/BrowsingSignInPrompt'
+import GuestProfileSignIn from '@/components/metaTwitter/GuestProfileSignIn'
 
 export default function GuestProfile({
   displayName,
   username,
   bio,
   avatarUrl,
-  returnTo,
+  basePath,
 }: {
   displayName: string
   username: string
   bio: string | null
   avatarUrl: string | null
-  returnTo: string
+  /** Canonical profile path; the sign-in prompt appends any chapter query. */
+  basePath: string
 }) {
+  const description = `See @${username}’s archived posts and conversations on Community Archive. Log in to view the full profile.`
   return (
     <main className="mx-auto w-full max-w-4xl px-4 pb-8 pt-4 sm:px-6">
       <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
@@ -25,6 +29,7 @@ export default function GuestProfile({
                 src={avatarUrl}
                 alt={displayName}
                 fill
+                unoptimized
                 className="object-cover"
                 sizes="112px"
               />
@@ -45,11 +50,17 @@ export default function GuestProfile({
           )}
         </div>
         <div className="border-t border-border bg-background/50 p-4 sm:p-6">
-          <BrowsingSignInPrompt
-            title="Log in to explore this profile"
-            description={`See @${username}’s archived posts and conversations on Community Archive. Log in to view the full profile.`}
-            returnTo={returnTo}
-          />
+          <Suspense
+            fallback={
+              <BrowsingSignInPrompt
+                title="Log in to explore this profile"
+                description={description}
+                returnTo={basePath}
+              />
+            }
+          >
+            <GuestProfileSignIn basePath={basePath} username={username} />
+          </Suspense>
         </div>
       </div>
     </main>

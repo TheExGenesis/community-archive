@@ -2,38 +2,38 @@ import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import TweetComponent from '@/components/TweetComponent'
-import TweetBackLink from '@/components/TweetBackLink'
+import TweetBackLink, { TweetBackLinkFallback } from '@/components/TweetBackLink'
 import ThreadView from '@/components/ThreadView'
 import QuotingTweetsSidebar from '@/components/QuotingTweetsSidebar'
-import { getTweetBackLink } from '@/lib/navigation'
+import SummaryHeading from '@/components/tweetSummary/SummaryHeading'
+import TweetSummaryRequester from '@/components/tweetSummary/TweetSummaryRequester'
 import {
   eyebrowLabel,
   fallbackTitle,
   plainTweetText,
-  type TweetPageSubject,
 } from '@/lib/tweetSummary/subject'
 import type { TweetData } from '@/lib/tweets/types'
 import type { ClickHouseQuotePostsData } from '@/lib/clickhouseQuotePosts'
-import type { GeneratedSummary } from '@/lib/tweetSummary/generation'
 import { loadTweetPage } from '@/lib/tweetSummary/loadTweetPage'
-import { getTweetPageSummary } from '@/lib/tweetSummary/store'
-import { Link2, MessagesSquare, Sparkles } from 'lucide-react'
+import { Link2, MessagesSquare } from 'lucide-react'
 
-// ISR: serve from CDN cache, revalidate at most once per hour
+// Rendered once per tweet and served from the route cache for an hour. The
+// page reads nothing from the request: the back link and the signed-in
+// summary request read the browser instead, and the archive reads below are
+// still fresh at render time (force-static keeps them from marking the route
+// dynamic). A visit from the Bulletin used to pin the read to ClickHouse; the
+// cached page serves the same record to every origin.
+export const dynamic = 'force-static'
 export const revalidate = 3600
-// The first signed-in visit keeps streaming while its summary generates.
-export const maxDuration = 30
 
 type PageProps = {
   params: { tweet_id: string }
-  searchParams?: Record<string, string | string[] | undefined>
 }
 
-const loadFromProps = ({ params, searchParams }: PageProps) =>
-  loadTweetPage(params.tweet_id, searchParams?.from === 'opportunities')
-
-export async function generateMetadata(props: PageProps): Promise<Metadata> {
-  const page = await loadFromProps(props)
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const page = await loadTweetPage(params.tweet_id)
   if (!page) return { title: 'Tweet not found · Community Archive' }
 
   const title = page.summary?.title ?? fallbackTitle(page.subject)
@@ -51,8 +51,8 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   }
 }
 
-export default async function TweetPage(props: PageProps) {
-  const page = await loadFromProps(props)
+export default async function TweetPage({ params }: PageProps) {
+  const page = await loadTweetPage(params.tweet_id)
   if (!page) {
     notFound()
   }
@@ -65,21 +65,18 @@ export default async function TweetPage(props: PageProps) {
     quotePosts,
     subject,
     summary,
-    summaryPending,
+    summaryMissing,
   } = page
   const isThread = subject.kind === 'thread'
   // A standalone tweet still shows the replies it collected.
   const replyIds = threadTree?.children[tweet.tweet_id] ?? []
-  const backLink = getTweetBackLink(props.searchParams)
 
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-        <TweetBackLink
-          href={backLink.href}
-          label={backLink.label}
-          useHistory={backLink.hasKnownOrigin}
-        />
+        <Suspense fallback={<TweetBackLinkFallback />}>
+          <TweetBackLink />
+        </Suspense>
 
         <header className="mb-8 mt-8 border-b border-border pb-7">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-brand">
@@ -90,12 +87,8 @@ export default async function TweetPage(props: PageProps) {
             )}
             {eyebrowLabel(subject.kind)}
           </div>
-          {summaryPending ? (
-            <Suspense
-              fallback={<SummaryHeading subject={subject} summary={null} />}
-            >
-              <GeneratedSummaryHeading subject={subject} />
-            </Suspense>
+          {summaryMissing ? (
+            <TweetSummaryRequester tweetId={tweet.tweet_id} subject={subject} />
           ) : (
             <SummaryHeading subject={subject} summary={summary} />
           )}
@@ -152,44 +145,6 @@ export default async function TweetPage(props: PageProps) {
       </section>
     </main>
   )
-}
-
-function SummaryHeading({
-  subject,
-  summary,
-}: {
-  subject: TweetPageSubject
-  summary: GeneratedSummary | null
-}) {
-  return (
-    <>
-      <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-foreground [text-wrap:balance] sm:text-5xl">
-        {summary?.title ?? fallbackTitle(subject)}
-      </h1>
-      {summary && (
-        <>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-            {summary.description}
-          </p>
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground/80">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            AI-generated summary. The author&rsquo;s original words are below.
-          </p>
-        </>
-      )}
-    </>
-  )
-}
-
-// Only rendered for a first visit by a signed-in user; everyone after reads
-// the stored summary without waiting.
-async function GeneratedSummaryHeading({
-  subject,
-}: {
-  subject: TweetPageSubject
-}) {
-  const summary = await getTweetPageSummary(subject, true)
-  return <SummaryHeading subject={subject} summary={summary} />
 }
 
 async function IncomingQuotes({

@@ -1,5 +1,4 @@
-import { createServerClient } from '@/utils/supabase'
-import { cookies } from 'next/headers'
+import { createServerAnonClient } from '@/utils/supabase'
 import {
   ConversationTree,
   ThreadTweet,
@@ -127,8 +126,9 @@ export async function getTweetPageData(
       quotingTweetCount: 0,
     }
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  // Permalinks are public and identical for every visitor. A cookie-bound
+  // client would read the request, which opts the page out of the route cache.
+  const supabase = createServerAnonClient()
 
   const { data, error } = await supabase.rpc('get_tweet_page_data' as any, {
     p_tweet_id: tweetId,

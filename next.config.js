@@ -13,6 +13,10 @@ const nextConfig = {
     },
   },
   images: {
+    // Optimized images are re-transformed when their cache entry expires. The
+    // default is 60 seconds, which made cache writes outnumber transformations
+    // three to one. Avatars, banners, and app thumbnails rarely change.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: 'https',

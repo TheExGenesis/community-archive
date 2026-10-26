@@ -92,6 +92,7 @@ const NOINDEX_PATH_PREFIXES = [
   '/settings',
   '/admin',
   '/auth',
+  '/guest',
 ]
 
 // ─── In-memory rate limiting (secondary signal) ──────────────────────────────
@@ -646,6 +647,16 @@ export async function middleware(request: NextRequest) {
     response = NextResponse.next({ request: { headers: request.headers } })
   }
 
+  // A signed-out profile view is the same for everyone, so it is served by
+  // the cached /guest route instead of the per-viewer page. The URL stays
+  // /user/..., and only this response may skip the private cache header.
+  const guestProfileRewrite =
+    loginRequired &&
+    !authenticated &&
+    guestPreview &&
+    request.method === 'GET' &&
+    pathname.startsWith('/user/')
+
   if (loginRequired) {
     if (!authenticated && !guestPreview) {
       const returnUrl = request.nextUrl.clone()
@@ -663,8 +674,20 @@ export async function middleware(request: NextRequest) {
           )
       for (const cookie of response.cookies.getAll()) denied.cookies.set(cookie)
       response = denied
+    } else if (guestProfileRewrite) {
+      // A plain URL, so the original trailing slash is not carried over.
+      const guestUrl = new URL(request.url)
+      guestUrl.pathname = `/guest${pathname.slice('/user'.length).replace(/\/$/, '')}`
+      const rewritten = NextResponse.rewrite(guestUrl, {
+        request: { headers: request.headers },
+      })
+      for (const cookie of response.cookies.getAll())
+        rewritten.cookies.set(cookie)
+      response = rewritten
     }
-    response.headers.set('Cache-Control', 'private, no-store')
+    if (!guestProfileRewrite) {
+      response.headers.set('Cache-Control', 'private, no-store')
+    }
     response.headers.set('X-Robots-Tag', 'noindex')
   }
 

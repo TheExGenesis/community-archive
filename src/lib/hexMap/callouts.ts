@@ -1,6 +1,50 @@
 import type { MapLabel, Point } from './geometry'
 
 type Box = Point & { width: number; height: number }
+type Leader = { start: Point; end: Point; box: Box }
+
+const cross = (a: Point, b: Point, c: Point) =>
+  (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+
+function linesCross(a: Point, b: Point, c: Point, d: Point) {
+  const ac = cross(a, b, c),
+    ad = cross(a, b, d)
+  // Shared pin endpoints are fine, but overlapping collinear leaders are not.
+  if (ac === 0 && ad === 0) {
+    const axis = Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? 'x' : 'y'
+    return (
+      Math.max(Math.min(a[axis], b[axis]), Math.min(c[axis], d[axis])) <
+      Math.min(Math.max(a[axis], b[axis]), Math.max(c[axis], d[axis]))
+    )
+  }
+  return ac * ad < 0 && cross(c, d, a) * cross(c, d, b) < 0
+}
+
+function lineHitsBox(start: Point, end: Point, box: Box) {
+  // Clip the segment to the box, checking both axes (including straight lines).
+  let low = 0,
+    high = 1
+  for (const axis of ['x', 'y'] as const) {
+    const delta = end[axis] - start[axis]
+    const min = box[axis],
+      max = min + (axis === 'x' ? box.width : box.height)
+    if (delta === 0) {
+      if (start[axis] < min || start[axis] > max) return false
+    } else {
+      const t1 = (min - start[axis]) / delta,
+        t2 = (max - start[axis]) / delta
+      low = Math.max(low, Math.min(t1, t2))
+      high = Math.min(high, Math.max(t1, t2))
+      if (low > high) return false
+    }
+  }
+  return true
+}
+
+const pointerAt = (person: Point, box: Box): Point => ({
+  x: Math.max(box.x, Math.min(box.x + box.width, person.x)),
+  y: Math.max(box.y, Math.min(box.y + box.height, person.y)),
+})
 type MapFootprint = {
   cells: Point[]
   radius: number
@@ -41,6 +85,7 @@ export function placeCallouts(
       height: map.radius * 2,
     })) ?? []
   const seen = new Set<string>()
+  const leaders: Leader[] = []
   let examples = 0
   return people.flatMap((person) => {
     const key = person.username.toLowerCase()
@@ -60,7 +105,7 @@ export function placeCallouts(
       vy = person.y - (map?.center.y ?? person.y),
       length = Math.hypot(vx, vy),
       outward = length ? { x: vx / length, y: vy / length } : { x: 1, y: 0 }
-    const candidates: { box: Box; score: number }[] = []
+    const candidates: { box: Box; conflicts: number; score: number }[] = []
     const distances = map ? [32, 52, 76, 104, 144, 192, 256] : [32, 52, 76, 104]
     for (const distance of distances) {
       const directions = [
@@ -118,8 +163,17 @@ export function placeCallouts(
               ),
           0,
         )
+        const pointer = pointerAt(person, box)
         candidates.push({
           box,
+          conflicts: leaders.reduce(
+            (count, leader) =>
+              count +
+              Number(linesCross(person, pointer, leader.start, leader.end)) +
+              Number(lineHitsBox(person, pointer, leader.box)) +
+              Number(lineHitsBox(leader.start, leader.end, box)),
+            0,
+          ),
           // Favor clear space without sending a leader across half the map
           // merely to remove the last few pixels of overlap.
           score: map
@@ -128,19 +182,20 @@ export function placeCallouts(
         })
       }
     }
-    candidates.sort((a, b) => a.score - b.score)
+    // Prefer an uncrossed route even when it needs a little more map overlap
+    // or distance. Retain the least-conflicted fallback in a crowded viewport.
+    candidates.sort((a, b) => a.conflicts - b.conflicts || a.score - b.score)
     const box = candidates[0]?.box
     if (box) {
       if (!person.highlighted) examples++
       occupied.push({ x: box.x - 4, y: box.y - 4, width: w + 8, height: h + 8 })
+      const pointer = pointerAt(person, box)
+      leaders.push({ start: person, end: pointer, box })
       return [
         {
           ...person,
           box,
-          pointer: {
-            x: Math.max(box.x, Math.min(box.x + w, person.x)),
-            y: Math.max(box.y, Math.min(box.y + h, person.y)),
-          },
+          pointer,
         },
       ]
     }
@@ -155,14 +210,13 @@ export function placeCallouts(
         height: h,
       }
       occupied.push(box)
+      const pointer = pointerAt(person, box)
+      leaders.push({ start: person, end: pointer, box })
       return [
         {
           ...person,
           box,
-          pointer: {
-            x: Math.max(box.x, Math.min(box.x + w, person.x)),
-            y: Math.max(box.y, Math.min(box.y + h, person.y)),
-          },
+          pointer,
         },
       ]
     }

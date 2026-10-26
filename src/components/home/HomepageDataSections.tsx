@@ -83,11 +83,11 @@ export async function HomepageStats({
       <SectionReady section="homepage_stats" />
       We preserve{' '}
       <strong className="font-semibold text-foreground">
-        {formatNumber(result.data.totalTweets)} public tweets
+        {formatNumber(result.data.totalTweets, 'floor')} public tweets
       </strong>{' '}
       from{' '}
       <strong className="font-semibold text-foreground">
-        {formatNumber(result.data.memberCount)} community members
+        {formatNumber(result.data.memberCount, 'floor')} community members
       </strong>
       .
     </>

@@ -3,7 +3,7 @@ import { devLog } from '@/lib/devLog'
 import {
   createBrowserClient as browserClient,
   createServerClient as serverClient,
-  type CookieOptions,
+  type CookieMethodsServer,
 } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
@@ -41,22 +41,17 @@ const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   return config
 }
 
-const createCookieHandler = (cookieStore: Awaited<ReturnType<typeof cookies>>) => ({
-  get: (name: string) => cookieStore.get(name)?.value,
-  set: (name: string, value: string, options: CookieOptions) => {
+const createCookieHandler = (
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+): CookieMethodsServer => ({
+  getAll: () => cookieStore.getAll(),
+  setAll: (cookiesToSet) => {
     try {
-      cookieStore.set({ name, value, ...options })
-    } catch (error) {
-      // The `set` method was called from a Server Component.
-      // This can be ignored if you have middleware refreshing user sessions.
-    }
-  },
-  remove: (name: string, options: CookieOptions) => {
-    try {
-      cookieStore.set({ name, value: '', ...options })
-    } catch (error) {
-      // The `delete` method was called from a Server Component.
-      // This can be ignored if you have middleware refreshing user sessions.
+      for (const { name, value, options } of cookiesToSet) {
+        cookieStore.set({ name, value, ...options })
+      }
+    } catch {
+      // Server Components cannot mutate cookies; middleware refreshes sessions.
     }
   },
 })
@@ -107,20 +102,26 @@ export const createMiddlewareClient = (request: NextRequest) => {
   const { url, anonKey } = getSupabaseConfig()
   const supabase = serverClient(url, anonKey, {
     cookies: {
-      get: (name: string) => request.cookies.get(name)?.value,
-      set: (name: string, value: string, options: CookieOptions) => {
-        request.cookies.set({ name, value, ...options })
+      getAll: () => request.cookies.getAll(),
+      setAll: (cookiesToSet, headers) => {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value)
+        }
         const previousCookies = response.cookies.getAll()
+        const previousHeaders = response.headers
         response = NextResponse.next({ request: { headers: request.headers } })
         for (const cookie of previousCookies) response.cookies.set(cookie)
-        response.cookies.set({ name, value, ...options })
-      },
-      remove: (name: string, options: CookieOptions) => {
-        request.cookies.set({ name, value: '', ...options })
-        const previousCookies = response.cookies.getAll()
-        response = NextResponse.next({ request: { headers: request.headers } })
-        for (const cookie of previousCookies) response.cookies.set(cookie)
-        response.cookies.set({ name, value: '', ...options })
+        for (const { name, value, options } of cookiesToSet) {
+          response.cookies.set({ name, value, ...options })
+        }
+        // SSR supplies these headers to prevent refreshed sessions being cached.
+        for (const name of ['cache-control', 'expires', 'pragma']) {
+          const value = previousHeaders.get(name)
+          if (value) response.headers.set(name, value)
+        }
+        for (const [name, value] of Object.entries(headers)) {
+          response.headers.set(name, value)
+        }
       },
     },
   })

@@ -662,6 +662,10 @@ export async function middleware(request: NextRequest) {
             ),
           )
       for (const cookie of response.cookies.getAll()) denied.cookies.set(cookie)
+      for (const name of ['cache-control', 'expires', 'pragma']) {
+        const value = response.headers.get(name)
+        if (value) denied.headers.set(name, value)
+      }
       response = denied
     }
     response.headers.set('Cache-Control', 'private, no-store')

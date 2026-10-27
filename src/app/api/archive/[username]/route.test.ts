@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { NextRequest } from 'next/server'
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
@@ -44,7 +43,7 @@ function client(options: {
     },
     rpc,
     storage: { from: jest.fn().mockReturnValue({ createSignedUrl }) },
-  } as unknown as SupabaseClient
+  } as unknown as ReturnType<typeof createServerClient>
   mockedCreateServerClient.mockReturnValue(value)
   return { createSignedUrl, rpc }
 }

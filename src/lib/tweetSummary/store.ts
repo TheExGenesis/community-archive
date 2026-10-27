@@ -19,7 +19,7 @@ import {
 } from './generation'
 import type { TweetPageKind, TweetPageSubject } from './subject'
 
-export interface TweetPageSummaryRow {
+export type TweetPageSummaryRow = {
   subject_key: string
   kind: TweetPageKind
   tweet_ids: string[]

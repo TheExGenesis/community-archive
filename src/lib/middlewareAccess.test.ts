@@ -160,6 +160,8 @@ test.each([true, false])(
   async (signedIn) => {
     getUser.mockImplementation(async () => {
       clientResponse = NextResponse.next()
+      clientResponse.headers.set('Expires', '0')
+      clientResponse.headers.set('Pragma', 'no-cache')
       clientResponse.cookies.set(
         'sb-test-auth-token.0',
         signedIn ? 'refreshed' : '',
@@ -171,6 +173,9 @@ test.each([true, false])(
       cookie: 'sb-test-auth-token.0=expired',
     })
     expect(response.status).toBe(signedIn ? 200 : 307)
+    expect(response.headers.get('expires')).toBe('0')
+    expect(response.headers.get('pragma')).toBe('no-cache')
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
     expect(response.cookies.get('sb-test-auth-token.0')?.value).toBe(
       signedIn ? 'refreshed' : '',
     )

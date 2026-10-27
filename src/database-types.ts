@@ -1,3095 +1,1581 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  dev: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      apply_dev_entities_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      apply_dev_liked_tweets_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      apply_dev_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      delete_all_archives: {
-        Args: {
-          p_account_id: string
-        }
-        Returns: undefined
-      }
-      drop_function_if_exists: {
-        Args: {
-          function_name: string
-          function_args: string[]
-        }
-        Returns: undefined
-      }
-      get_top_accounts_with_followers: {
-        Args: {
-          limit_count: number
-        }
-        Returns: {
-          account_id: string
-          created_via: string
-          username: string
-          created_at: string
-          account_display_name: string
-          avatar_media_url: string
-          bio: string
-          website: string
-          location: string
-          header_media_url: string
-          follower_count: number
-        }[]
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  public: {
-    Tables: {
-      account_collection_preferences: {
-        Row: {
-          account_id: string
-          enabled: boolean
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          enabled: boolean
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          enabled?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      agent_search_runs: {
-        Row: {
-          account_id: string
-          answer: string | null
-          cited_tweet_ids: string[]
-          completed_at: string | null
-          conversation_id: string | null
-          cost_usd: number
-          deleted_at: string | null
-          error: string | null
-          id: string
-          input_tokens: number
-          invalid_citation_ids: string[]
-          key_source: string
-          model: string
-          output_tokens: number
-          parts: Json | null
-          question: string
-          started_at: string
-          status: string
-          tool_calls: Json
-          workflow_run_id: string | null
-        }
-        Insert: {
-          account_id: string
-          answer?: string | null
-          cited_tweet_ids?: string[]
-          completed_at?: string | null
-          conversation_id?: string | null
-          cost_usd?: number
-          deleted_at?: string | null
-          error?: string | null
-          id: string
-          input_tokens?: number
-          invalid_citation_ids?: string[]
-          key_source?: string
-          model: string
-          output_tokens?: number
-          parts?: Json | null
-          question: string
-          started_at?: string
-          status: string
-          tool_calls?: Json
-          workflow_run_id?: string | null
-        }
-        Update: {
-          account_id?: string
-          answer?: string | null
-          cited_tweet_ids?: string[]
-          completed_at?: string | null
-          conversation_id?: string | null
-          cost_usd?: number
-          deleted_at?: string | null
-          error?: string | null
-          id?: string
-          input_tokens?: number
-          invalid_citation_ids?: string[]
-          key_source?: string
-          model?: string
-          output_tokens?: number
-          parts?: Json | null
-          question?: string
-          started_at?: string
-          status?: string
-          tool_calls?: Json
-          workflow_run_id?: string | null
-        }
-        Relationships: []
-      }
-      all_account: {
-        Row: {
-          account_display_name: string
-          account_id: string
-          created_at: string
-          created_via: string
-          is_tombstone: boolean
-          num_followers: number | null
-          num_following: number | null
-          num_likes: number | null
-          num_tweets: number | null
-          updated_at: string | null
-          username: string
-        }
-        Insert: {
-          account_display_name: string
-          account_id: string
-          created_at: string
-          created_via: string
-          is_tombstone?: boolean
-          num_followers?: number | null
-          num_following?: number | null
-          num_likes?: number | null
-          num_tweets?: number | null
-          updated_at?: string | null
-          username: string
-        }
-        Update: {
-          account_display_name?: string
-          account_id?: string
-          created_at?: string
-          created_via?: string
-          is_tombstone?: boolean
-          num_followers?: number | null
-          num_following?: number | null
-          num_likes?: number | null
-          num_tweets?: number | null
-          updated_at?: string | null
-          username?: string
-        }
-        Relationships: []
-      }
-      all_profile: {
-        Row: {
-          account_id: string
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          bio: string | null
-          header_media_url: string | null
-          location: string | null
-          updated_at: string | null
-          website: string | null
-        }
-        Insert: {
-          account_id: string
-          archive_upload_id?: number | null
-          avatar_media_url?: string | null
-          bio?: string | null
-          header_media_url?: string | null
-          location?: string | null
-          updated_at?: string | null
-          website?: string | null
-        }
-        Update: {
-          account_id?: string
-          archive_upload_id?: number | null
-          avatar_media_url?: string | null
-          bio?: string | null
-          header_media_url?: string | null
-          location?: string | null
-          updated_at?: string | null
-          website?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      archive_upload: {
-        Row: {
-          account_id: string
-          archive_at: string
-          created_at: string | null
-          end_date: string | null
-          id: number
-          keep_private: boolean | null
-          start_date: string | null
-          storage_path: string | null
-          storage_sha256: string | null
-          upload_likes: boolean | null
-          upload_phase: Database["public"]["Enums"]["upload_phase_enum"] | null
-          username: string | null
-        }
-        Insert: {
-          account_id: string
-          archive_at: string
-          created_at?: string | null
-          end_date?: string | null
-          id?: never
-          keep_private?: boolean | null
-          start_date?: string | null
-          storage_path?: string | null
-          storage_sha256?: string | null
-          upload_likes?: boolean | null
-          upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
-          username?: string | null
-        }
-        Update: {
-          account_id?: string
-          archive_at?: string
-          created_at?: string | null
-          end_date?: string | null
-          id?: never
-          keep_private?: boolean | null
-          start_date?: string | null
-          storage_path?: string | null
-          storage_sha256?: string | null
-          upload_likes?: boolean | null
-          upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
-          username?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "archive_upload_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "archive_upload_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "archive_upload_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
-      ca_tweet_likes: {
-        Row: {
-          account_id: string
-          created_at: string
-          display_name: string | null
-          id: string
-          tweet_id: string
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          display_name?: string | null
-          id?: string
-          tweet_id: string
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          display_name?: string | null
-          id?: string
-          tweet_id?: string
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: []
-      }
-      community_project_comments: {
-        Row: {
-          content: string
-          created_at: string
-          deleted_at: string | null
-          display_name: string | null
-          id: string
-          project_id: string
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          deleted_at?: string | null
-          display_name?: string | null
-          id?: string
-          project_id: string
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          deleted_at?: string | null
-          display_name?: string | null
-          id?: string
-          project_id?: string
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "community_project_comments_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "community_projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      community_project_likes: {
-        Row: {
-          created_at: string
-          id: string
-          project_id: string | null
-          project_slug: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          project_id?: string | null
-          project_slug: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          project_id?: string | null
-          project_slug?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "community_project_likes_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "community_projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      community_projects: {
-        Row: {
-          archive_use: string
-          category: string
-          cover_mime_type: string | null
-          cover_storage_path: string | null
-          creator_handle: string | null
-          creator_name: string
-          description: string
-          featured: boolean
-          id: string
-          name: string
-          project_url: string
-          published_at: string | null
-          published_by: string | null
-          slug: string
-          source_post_url: string
-          status: string
-          submitted_at: string
-          submitted_by: string | null
-          submitter_username: string
-          summary: string | null
-          tags: string[]
-        }
-        Insert: {
-          archive_use: string
-          category: string
-          cover_mime_type?: string | null
-          cover_storage_path?: string | null
-          creator_handle?: string | null
-          creator_name: string
-          description: string
-          featured?: boolean
-          id?: string
-          name: string
-          project_url: string
-          published_at?: string | null
-          published_by?: string | null
-          slug: string
-          source_post_url: string
-          status?: string
-          submitted_at?: string
-          submitted_by?: string | null
-          submitter_username: string
-          summary?: string | null
-          tags?: string[]
-        }
-        Update: {
-          archive_use?: string
-          category?: string
-          cover_mime_type?: string | null
-          cover_storage_path?: string | null
-          creator_handle?: string | null
-          creator_name?: string
-          description?: string
-          featured?: boolean
-          id?: string
-          name?: string
-          project_url?: string
-          published_at?: string | null
-          published_by?: string | null
-          slug?: string
-          source_post_url?: string
-          status?: string
-          submitted_at?: string
-          submitted_by?: string | null
-          submitter_username?: string
-          summary?: string | null
-          tags?: string[]
-        }
-        Relationships: []
-      }
-      conversations: {
-        Row: {
-          conversation_id: string | null
-          tweet_id: string
-        }
-        Insert: {
-          conversation_id?: string | null
-          tweet_id: string
-        }
-        Update: {
-          conversation_id?: string | null
-          tweet_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      digest_edition_comments: {
-        Row: {
-          content: string
-          created_at: string
-          deleted_at: string | null
-          display_name: string | null
-          edition_id: string
-          id: string
-          updated_at: string
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          deleted_at?: string | null
-          display_name?: string | null
-          edition_id: string
-          id?: string
-          updated_at?: string
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          deleted_at?: string | null
-          display_name?: string | null
-          edition_id?: string
-          id?: string
-          updated_at?: string
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "digest_edition_comments_edition_id_fkey"
-            columns: ["edition_id"]
-            isOneToOne: false
-            referencedRelation: "digest_editions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      digest_edition_likes: {
-        Row: {
-          created_at: string
-          edition_id: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          edition_id: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          edition_id?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "digest_edition_likes_edition_id_fkey"
-            columns: ["edition_id"]
-            isOneToOne: false
-            referencedRelation: "digest_editions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      digest_editions: {
-        Row: {
-          content: Json
-          created_at: string
-          created_by: string | null
-          digest_date: string
-          id: string
-          issue_number: number
-          published_at: string | null
-          source_run_id: string
-          status: string
-          updated_at: string
-          version: number
-          view_count: number
-        }
-        Insert: {
-          content: Json
-          created_at?: string
-          created_by?: string | null
-          digest_date: string
-          id?: string
-          issue_number?: never
-          published_at?: string | null
-          source_run_id: string
-          status?: string
-          updated_at?: string
-          version: number
-          view_count?: number
-        }
-        Update: {
-          content?: Json
-          created_at?: string
-          created_by?: string | null
-          digest_date?: string
-          id?: string
-          issue_number?: never
-          published_at?: string | null
-          source_run_id?: string
-          status?: string
-          updated_at?: string
-          version?: number
-          view_count?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "digest_editions_source_run_id_fkey"
-            columns: ["source_run_id"]
-            isOneToOne: false
-            referencedRelation: "digest_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      digest_email_sends: {
-        Row: {
-          edition_id: string
-          message_id: string | null
-          open_token: string | null
-          opened_at: string | null
-          sent_at: string
-          subscription_id: string
-        }
-        Insert: {
-          edition_id: string
-          message_id?: string | null
-          open_token?: string | null
-          opened_at?: string | null
-          sent_at?: string
-          subscription_id: string
-        }
-        Update: {
-          edition_id?: string
-          message_id?: string | null
-          open_token?: string | null
-          opened_at?: string | null
-          sent_at?: string
-          subscription_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "digest_email_sends_edition_id_fkey"
-            columns: ["edition_id"]
-            isOneToOne: false
-            referencedRelation: "digest_editions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "digest_email_sends_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "digest_email_subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      digest_email_subscriptions: {
-        Row: {
-          account_id: string | null
-          confirmed_at: string | null
-          created_at: string
-          email: string
-          id: string
-          token: string
-          unsubscribed_at: string | null
-          updated_at: string
-        }
-        Insert: {
-          account_id?: string | null
-          confirmed_at?: string | null
-          created_at?: string
-          email: string
-          id?: string
-          token?: string
-          unsubscribed_at?: string | null
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string | null
-          confirmed_at?: string | null
-          created_at?: string
-          email?: string
-          id?: string
-          token?: string
-          unsubscribed_at?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      digest_prompt_versions: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          label: string
-          model: string
-          parameters: Json
-          system_prompt: string
-          user_prompt_template: string
-          version: number
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          label: string
-          model: string
-          parameters?: Json
-          system_prompt: string
-          user_prompt_template: string
-          version?: never
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          label?: string
-          model?: string
-          parameters?: Json
-          system_prompt?: string
-          user_prompt_template?: string
-          version?: never
-        }
-        Relationships: []
-      }
-      digest_runs: {
-        Row: {
-          candidates: Json
-          completed_at: string | null
-          created_at: string
-          created_by: string | null
-          digest_date: string
-          duration_ms: number | null
-          error: string | null
-          events: Json
-          id: string
-          input_tokens: number | null
-          model: string | null
-          model_request: Json | null
-          output_tokens: number | null
-          parent_run_id: string | null
-          parsed_output: Json | null
-          prompt_version_id: string
-          raw_response: Json | null
-          response_id: string | null
-          revision_instruction: string | null
-          started_at: string | null
-          status: string
-          total_tokens: number | null
-          updated_at: string
-          window_end: string
-          window_start: string
-          workflow_run_id: string | null
-        }
-        Insert: {
-          candidates?: Json
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          digest_date: string
-          duration_ms?: number | null
-          error?: string | null
-          events?: Json
-          id?: string
-          input_tokens?: number | null
-          model?: string | null
-          model_request?: Json | null
-          output_tokens?: number | null
-          parent_run_id?: string | null
-          parsed_output?: Json | null
-          prompt_version_id: string
-          raw_response?: Json | null
-          response_id?: string | null
-          revision_instruction?: string | null
-          started_at?: string | null
-          status?: string
-          total_tokens?: number | null
-          updated_at?: string
-          window_end: string
-          window_start: string
-          workflow_run_id?: string | null
-        }
-        Update: {
-          candidates?: Json
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          digest_date?: string
-          duration_ms?: number | null
-          error?: string | null
-          events?: Json
-          id?: string
-          input_tokens?: number | null
-          model?: string | null
-          model_request?: Json | null
-          output_tokens?: number | null
-          parent_run_id?: string | null
-          parsed_output?: Json | null
-          prompt_version_id?: string
-          raw_response?: Json | null
-          response_id?: string | null
-          revision_instruction?: string | null
-          started_at?: string | null
-          status?: string
-          total_tokens?: number | null
-          updated_at?: string
-          window_end?: string
-          window_start?: string
-          workflow_run_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "digest_runs_parent_run_id_fkey"
-            columns: ["parent_run_id"]
-            isOneToOne: false
-            referencedRelation: "digest_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "digest_runs_prompt_version_id_fkey"
-            columns: ["prompt_version_id"]
-            isOneToOne: false
-            referencedRelation: "digest_prompt_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      followers: {
-        Row: {
-          account_id: string
-          archive_upload_id: number | null
-          follower_account_id: string
-          id: number
-          updated_at: string | null
-        }
-        Insert: {
-          account_id: string
-          archive_upload_id?: number | null
-          follower_account_id: string
-          id?: never
-          updated_at?: string | null
-        }
-        Update: {
-          account_id?: string
-          archive_upload_id?: number | null
-          follower_account_id?: string
-          id?: never
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "followers_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "followers_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "followers_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "followers_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      following: {
-        Row: {
-          account_id: string
-          archive_upload_id: number | null
-          following_account_id: string
-          id: number
-          updated_at: string | null
-        }
-        Insert: {
-          account_id: string
-          archive_upload_id?: number | null
-          following_account_id: string
-          id?: never
-          updated_at?: string | null
-        }
-        Update: {
-          account_id?: string
-          archive_upload_id?: number | null
-          following_account_id?: string
-          id?: never
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "following_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "following_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "following_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "following_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      liked_tweets: {
-        Row: {
-          author_account_id: string | null
-          fts: unknown | null
-          full_text: string
-          is_tombstone: boolean
-          tweet_id: string
-        }
-        Insert: {
-          author_account_id?: string | null
-          fts?: unknown | null
-          full_text: string
-          is_tombstone?: boolean
-          tweet_id: string
-        }
-        Update: {
-          author_account_id?: string | null
-          fts?: unknown | null
-          full_text?: string
-          is_tombstone?: boolean
-          tweet_id?: string
-        }
-        Relationships: []
-      }
-      likes: {
-        Row: {
-          account_id: string
-          archive_upload_id: number | null
-          id: number
-          liked_tweet_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          account_id: string
-          archive_upload_id?: number | null
-          id?: never
-          liked_tweet_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          account_id?: string
-          archive_upload_id?: number | null
-          id?: never
-          liked_tweet_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "likes_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "likes_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "likes_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "likes_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "likes_liked_tweet_id_fkey"
-            columns: ["liked_tweet_id"]
-            isOneToOne: false
-            referencedRelation: "liked_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      mentioned_users: {
-        Row: {
-          is_tombstone: boolean
-          name: string
-          screen_name: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          is_tombstone?: boolean
-          name: string
-          screen_name: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          is_tombstone?: boolean
-          name?: string
-          screen_name?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      optin: {
-        Row: {
-          created_at: string | null
-          explicit_optout: boolean | null
-          id: string
-          opt_out_reason: string | null
-          opted_in: boolean
-          opted_in_at: string | null
-          opted_out_at: string | null
-          terms_version: string
-          twitter_user_id: string | null
-          updated_at: string | null
-          user_id: string | null
-          username: string
-        }
-        Insert: {
-          created_at?: string | null
-          explicit_optout?: boolean | null
-          id?: string
-          opt_out_reason?: string | null
-          opted_in?: boolean
-          opted_in_at?: string | null
-          opted_out_at?: string | null
-          terms_version?: string
-          twitter_user_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          username: string
-        }
-        Update: {
-          created_at?: string | null
-          explicit_optout?: boolean | null
-          id?: string
-          opt_out_reason?: string | null
-          opted_in?: boolean
-          opted_in_at?: string | null
-          opted_out_at?: string | null
-          terms_version?: string
-          twitter_user_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          username?: string
-        }
-        Relationships: []
-      }
-      profile_curation: {
-        Row: {
-          account_id: string
-          created_at: string
-          is_featured: boolean
-          is_hidden: boolean
-          item_id: string
-          position: number | null
-          section: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          is_featured?: boolean
-          is_hidden?: boolean
-          item_id: string
-          position?: number | null
-          section: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          is_featured?: boolean
-          is_hidden?: boolean
-          item_id?: string
-          position?: number | null
-          section?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      profile_settings: {
-        Row: {
-          account_id: string
-          created_at: string
-          download_archive_visible: boolean
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          download_archive_visible?: boolean
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          download_archive_visible?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      quote_tweets: {
-        Row: {
-          quoted_tweet_id: string
-          tweet_id: string
-        }
-        Insert: {
-          quoted_tweet_id: string
-          tweet_id: string
-        }
-        Update: {
-          quoted_tweet_id?: string
-          tweet_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_quote_tweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_quote_tweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_quote_tweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      retweets: {
-        Row: {
-          retweeted_tweet_id: string | null
-          tweet_id: string
-        }
-        Insert: {
-          retweeted_tweet_id?: string | null
-          tweet_id: string
-        }
-        Update: {
-          retweeted_tweet_id?: string | null
-          tweet_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_retweets_retweeted_tweet_id"
-            columns: ["retweeted_tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_retweets_retweeted_tweet_id"
-            columns: ["retweeted_tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_retweets_retweeted_tweet_id"
-            columns: ["retweeted_tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_retweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_retweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_retweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      scraper_count: {
-        Row: {
-          count: number | null
-        }
-        Insert: {
-          count?: number | null
-        }
-        Update: {
-          count?: number | null
-        }
-        Relationships: []
-      }
-      strand_comments: {
-        Row: {
-          content: string
-          created_at: string
-          deleted_at: string | null
-          display_name: string | null
-          id: string
-          strand_id: string
-          updated_at: string
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          deleted_at?: string | null
-          display_name?: string | null
-          id?: string
-          strand_id: string
-          updated_at?: string
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          deleted_at?: string | null
-          display_name?: string | null
-          id?: string
-          strand_id?: string
-          updated_at?: string
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: []
-      }
-      strand_likes: {
-        Row: {
-          created_at: string
-          id: string
-          strand_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          strand_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          strand_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      tweet_link_previews: {
-        Row: {
-          canonical_url: string | null
-          content_type: string | null
-          created_at: string
-          description: string | null
-          expires_at: string
-          fetched_at: string | null
-          image_url: string | null
-          normalized_url: string
-          site_name: string | null
-          status: string
-          title: string | null
-          updated_at: string
-          url_hash: string
-        }
-        Insert: {
-          canonical_url?: string | null
-          content_type?: string | null
-          created_at?: string
-          description?: string | null
-          expires_at?: string
-          fetched_at?: string | null
-          image_url?: string | null
-          normalized_url: string
-          site_name?: string | null
-          status?: string
-          title?: string | null
-          updated_at?: string
-          url_hash: string
-        }
-        Update: {
-          canonical_url?: string | null
-          content_type?: string | null
-          created_at?: string
-          description?: string | null
-          expires_at?: string
-          fetched_at?: string | null
-          image_url?: string | null
-          normalized_url?: string
-          site_name?: string | null
-          status?: string
-          title?: string | null
-          updated_at?: string
-          url_hash?: string
-        }
-        Relationships: []
-      }
-      tweet_media: {
-        Row: {
-          archive_upload_id: number | null
-          height: number | null
-          media_id: number
-          media_type: string
-          media_url: string
-          tweet_id: string
-          updated_at: string | null
-          width: number | null
-        }
-        Insert: {
-          archive_upload_id?: number | null
-          height?: number | null
-          media_id: number
-          media_type: string
-          media_url: string
-          tweet_id: string
-          updated_at?: string | null
-          width?: number | null
-        }
-        Update: {
-          archive_upload_id?: number | null
-          height?: number | null
-          media_id?: number
-          media_type?: string
-          media_url?: string
-          tweet_id?: string
-          updated_at?: string | null
-          width?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweet_media_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      tweet_page_summaries: {
-        Row: {
-          description: string | null
-          eligible: boolean
-          generated_at: string
-          ineligible_reason: string | null
-          kind: string
-          model: string
-          prompt_version: number
-          search_vector: unknown | null
-          subject_key: string
-          title: string | null
-          tweet_ids: string[]
-        }
-        Insert: {
-          description?: string | null
-          eligible: boolean
-          generated_at?: string
-          ineligible_reason?: string | null
-          kind: string
-          model: string
-          prompt_version: number
-          search_vector?: unknown | null
-          subject_key: string
-          title?: string | null
-          tweet_ids: string[]
-        }
-        Update: {
-          description?: string | null
-          eligible?: boolean
-          generated_at?: string
-          ineligible_reason?: string | null
-          kind?: string
-          model?: string
-          prompt_version?: number
-          search_vector?: unknown | null
-          subject_key?: string
-          title?: string | null
-          tweet_ids?: string[]
-        }
-        Relationships: []
-      }
-      tweet_urls: {
-        Row: {
-          display_url: string
-          expanded_url: string | null
-          id: number
-          tweet_id: string
-          updated_at: string | null
-          url: string
-        }
-        Insert: {
-          display_url: string
-          expanded_url?: string | null
-          id?: never
-          tweet_id: string
-          updated_at?: string | null
-          url: string
-        }
-        Update: {
-          display_url?: string
-          expanded_url?: string | null
-          id?: never
-          tweet_id?: string
-          updated_at?: string | null
-          url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      tweets: {
-        Row: {
-          account_id: string
-          archive_upload_id: number | null
-          created_at: string
-          favorite_count: number
-          fts: unknown | null
-          full_text: string
-          is_tombstone: boolean
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-          reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          account_id: string
-          archive_upload_id?: number | null
-          created_at: string
-          favorite_count: number
-          fts?: unknown | null
-          full_text: string
-          is_tombstone?: boolean
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-          reply_to_username?: string | null
-          retweet_count?: number | null
-          tweet_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          account_id?: string
-          archive_upload_id?: number | null
-          created_at?: string
-          favorite_count?: number
-          fts?: unknown | null
-          full_text?: string
-          is_tombstone?: boolean
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-          reply_to_username?: string | null
-          retweet_count?: number | null
-          tweet_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_action_log: {
-        Row: {
-          account_id: string | null
-          action_type: string
-          created_at: string
-          id: number
-          metadata: Json | null
-          notes: string | null
-          user_id: string | null
-        }
-        Insert: {
-          account_id?: string | null
-          action_type: string
-          created_at?: string
-          id?: number
-          metadata?: Json | null
-          notes?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          account_id?: string | null
-          action_type?: string
-          created_at?: string
-          id?: number
-          metadata?: Json | null
-          notes?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      user_mentions: {
-        Row: {
-          id: number
-          mentioned_user_id: string
-          tweet_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          id?: never
-          mentioned_user_id: string
-          tweet_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          id?: never
-          mentioned_user_id?: string
-          tweet_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_mentions_mentioned_user_id_fkey"
-            columns: ["mentioned_user_id"]
-            isOneToOne: false
-            referencedRelation: "mentioned_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-    }
-    Views: {
-      account: {
-        Row: {
-          account_display_name: string | null
-          account_id: string | null
-          created_at: string | null
-          created_via: string | null
-          num_followers: number | null
-          num_following: number | null
-          num_likes: number | null
-          num_tweets: number | null
-          username: string | null
-        }
-        Relationships: []
-      }
-      account_activity_summary: {
-        Row: {
-          account_id: string | null
-          last_updated: string | null
-          mentioned_accounts: Json | null
-          most_favorited_tweets: Json | null
-          most_retweeted_tweets: Json | null
-          num_followers: number | null
-          num_tweets: number | null
-          top_engaged_tweets: Json | null
-          total_likes: number | null
-          total_mentions: number | null
-          username: string | null
-        }
-        Relationships: []
-      }
-      enriched_tweets: {
-        Row: {
-          account_display_name: string | null
-          account_id: string | null
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          conversation_id: string | null
-          created_at: string | null
-          favorite_count: number | null
-          full_text: string | null
-          quoted_tweet_id: string | null
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-          reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string | null
-          username: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      global_activity_summary: {
-        Row: {
-          last_updated: string | null
-          top_accounts_with_followers: Json | null
-          top_mentioned_users: Json | null
-          total_accounts: number | null
-          total_likes: number | null
-          total_tweets: number | null
-          total_user_mentions: number | null
-        }
-        Relationships: []
-      }
-      global_monthly_tweet_counts: {
-        Row: {
-          active_accounts: number | null
-          avg_tweets_per_account: number | null
-          month: string | null
-          total_tweets: number | null
-        }
-        Relationships: []
-      }
-      monthly_tweet_counts_mv: {
-        Row: {
-          account_id: string | null
-          avg_favorites: number | null
-          avg_retweets: number | null
-          days_active: number | null
-          max_favorites: number | null
-          max_retweets: number | null
-          month: string | null
-          tweet_count: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
-      profile: {
-        Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          bio: string | null
-          header_media_url: string | null
-          location: string | null
-          website: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tweet_replies_view: {
-        Row: {
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-        }
-        Insert: {
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-        }
-        Update: {
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-        }
-        Relationships: []
-      }
-      tweets_w_conversation_id: {
-        Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          conversation_id: string | null
-          created_at: string | null
-          favorite_count: number | null
-          fts: unknown | null
-          full_text: string | null
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-          reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_directory: {
-        Row: {
-          account_display_name: string | null
-          account_id: string | null
-          archive_at: string | null
-          archive_uploaded_at: string | null
-          avatar_media_url: string | null
-          bio: string | null
-          created_at: string | null
-          directory_id: string | null
-          has_archive: boolean | null
-          is_opted_in: boolean | null
-          joined_at: string | null
-          location: string | null
-          num_followers: number | null
-          num_following: number | null
-          num_likes: number | null
-          num_tweets: number | null
-          opted_in_at: string | null
-          username: string | null
-          website: string | null
-        }
-        Relationships: []
-      }
-    }
-    Functions: {
-      admin_activity_page: {
-        Args: {
-          p_before_at?: string
-          p_before_id?: string
-          p_kind?: string
-          p_search?: string
-          p_limit?: number
-        }
-        Returns: {
-          id: string
-          kind: string
-          occurred_at: string
-          account_id: string
-          username: string
-          status: string
-          detail: string
-          reason: string
-          error: string
-          date_basis: string
-        }[]
-      }
-      admin_enqueue_delete_with_export: {
-        Args: {
-          p_account_id: string
-          p_username: string
-          p_reason?: string
-          p_requested_by_user_id?: string
-        }
-        Returns: string
-      }
-      admin_list_blocked_scraping_users: {
-        Args: {
-          p_account_ids: string[]
-        }
-        Returns: string[]
-      }
-      admin_list_recent_delete_jobs: {
-        Args: {
-          p_limit?: number
-        }
-        Returns: {
-          job_key: string
-          status: string
-          account_id: string
-          username: string
-          reason: string
-          created_at: string
-          updated_at: string
-          error: string
-        }[]
-      }
-      admin_set_scrape_block: {
-        Args: {
-          p_account_id: string
-          p_blocked: boolean
-        }
-        Returns: undefined
-      }
-      agent_search_add_usage: {
-        Args: {
-          p_run_id: string
-          p_input_tokens: number
-          p_output_tokens: number
-          p_cost_usd: number
-        }
-        Returns: undefined
-      }
-      agent_search_admit: {
-        Args: {
-          p_run_id: string
-          p_account_id: string
-          p_conversation_id: string
-          p_question: string
-          p_model: string
-          p_daily_limit: number
-          p_global_daily_usd: number
-          p_stale_after_seconds: number
-          p_key_source: string
-          p_monthly_limit: number
-        }
-        Returns: string
-      }
-      apply_public_entities_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      apply_public_liked_tweets_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      apply_public_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      apply_public_rls_policies_not_private: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      apply_readonly_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      archive_upload_is_allowed: {
-        Args: {
-          p_account_id: string
-          p_username: string
-        }
-        Returns: boolean
-      }
-      assert_archive_upload_allowed: {
-        Args: {
-          p_account_id: string
-          p_username: string
-        }
-        Returns: boolean
-      }
-      ca_tweet_like_summary: {
-        Args: {
-          p_tweet_ids: string[]
-          p_viewer_account_id: string
-        }
-        Returns: {
-          tweet_id: string
-          like_count: number
-          viewer_liked: boolean
-        }[]
-      }
-      community_archive_monitoring_digest: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          publication_age_seconds: number
-          expected_date_published: number
-          automated_run_failed: number
-          healthy: number
-        }[]
-      }
-      compute_hourly_scraping_stats: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      create_public_api_key: {
-        Args: {
-          owner_user_id: string
-          owner_account_id: string
-          new_key_id: string
-          new_key_sha256: string
-          key_label: string
-        }
-        Returns: Json
-      }
-      delete_non_allowlist_streamed_tweet_batch: {
-        Args: {
-          p_limit?: number
-        }
-        Returns: {
-          requested_tweets: number
-          deleted_tweets: number
-          deleted_conversations: number
-          deleted_tweet_media: number
-          deleted_user_mentions: number
-          deleted_tweet_urls: number
-          deleted_private_tweet_user: number
-        }[]
-      }
-      delete_own_tweets: {
-        Args: {
-          p_tweet_ids: string[]
-        }
-        Returns: {
-          deleted_tweets: number
-          deleted_conversations: number
-          deleted_tweet_media: number
-          deleted_user_mentions: number
-          deleted_tweet_urls: number
-          deleted_private_tweet_user: number
-        }[]
-      }
-      delete_single_archive: {
-        Args: {
-          p_account_id: string
-          p_archive_upload_id: number
-        }
-        Returns: undefined
-      }
-      delete_tweets: {
-        Args: {
-          p_tweet_ids: string[]
-        }
-        Returns: {
-          deleted_tweets: number
-          deleted_conversations: number
-          deleted_tweet_media: number
-          deleted_user_mentions: number
-          deleted_tweet_urls: number
-          deleted_private_tweet_user: number
-        }[]
-      }
-      delete_user_archive: {
-        Args: {
-          p_account_id: string
-        }
-        Returns: undefined
-      }
-      directory_members_by_username: {
-        Args: {
-          p_usernames: string[]
-        }
-        Returns: {
-          account_id: string
-          username: string
-          has_archive: boolean
-          avatar_media_url: string
-        }[]
-      }
-      drop_all_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
-        Returns: undefined
-      }
-      enqueue_policy_archive_cleanup: {
-        Args: {
-          p_account_id: string
-          p_username: string
-          p_reason?: string
-        }
-        Returns: string
-      }
-      get_account_most_liked_tweets_archive_users: {
-        Args: {
-          username_: string
-          limit_?: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-          archive_upload_id: number
-          num_likes: number
-        }[]
-      }
-      get_account_most_mentioned_accounts: {
-        Args: {
-          username_: string
-          limit_: number
-        }
-        Returns: {
-          user_id: string
-          name: string
-          screen_name: string
-          mention_count: number
-        }[]
-      }
-      get_account_most_replied_tweets_by_archive_users: {
-        Args: {
-          username_: string
-          limit_: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-          archive_upload_id: number
-          num_replies: number
-        }[]
-      }
-      get_account_top_favorite_count_tweets: {
-        Args: {
-          username_: string
-          limit_: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-          archive_upload_id: number
-        }[]
-      }
-      get_account_top_retweet_count_tweets: {
-        Args: {
-          username_: string
-          limit_: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-          archive_upload_id: number
-        }[]
-      }
-      get_bulletin_board_state: {
-        Args: {
-          max_results?: number
-        }
-        Returns: Json
-      }
-      get_bulletin_dismissals: {
-        Args: {
-          viewer_id: string
-        }
-        Returns: string[]
-      }
-      get_bulletin_opportunities: {
-        Args: {
-          max_results?: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          username: string
-          posted_at: string
-          full_text: string
-          side: string
-          kind: string
-          summary: string
-          evidence: string
-          topics: string[]
-          respond: string
-          standing: boolean
-          expires_at: string
-          place: string
-          model: string
-        }[]
-      }
-      get_bulletin_prompts: {
-        Args: {
-          before_id?: number
-        }
-        Returns: Json
-      }
-      get_bulletin_refreshes: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_bulletin_relationships: {
-        Args: {
-          viewer_username?: string
-          viewer_account_id?: string
-        }
-        Returns: Json
-      }
-      get_bulletin_runs: {
-        Args: {
-          before_id?: number
-          max_results?: number
-        }
-        Returns: Json
-      }
-      get_hourly_scraping_stats: {
-        Args: {
-          p_hours_back?: number
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_hourly_stats_simple: {
-        Args: {
-          p_hours_back?: number
-        }
-        Returns: {
-          period_start: string
-          tweet_count: number
-        }[]
-      }
-      get_latest_tweets: {
-        Args: {
-          count: number
-          p_account_id?: string
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          avatar_media_url: string
-          username: string
-          account_display_name: string
-        }[]
-      }
-      get_main_thread: {
-        Args: {
-          p_conversation_id: string
-        }
-        Returns: {
-          tweet_id: string
-          conversation_id: string
-          reply_to_tweet_id: string
-          account_id: string
-          depth: number
-          max_depth: number
-          favorite_count: number
-          retweet_count: number
-        }[]
-      }
-      get_monthly_tweet_counts: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          month: string
-          tweet_count: number
-        }[]
-      }
-      get_monthly_tweet_counts_fast: {
-        Args: {
-          p_account_id?: string
-          p_start_date?: string
-          p_end_date?: string
-        }
-        Returns: {
-          month: string
-          account_id: string
-          tweet_count: number
-          days_active: number
-          avg_favorites: number
-          avg_retweets: number
-        }[]
-      }
-      get_most_liked_tweets_by_username: {
-        Args: {
-          username_: string
-        }
-        Returns: {
-          tweet_id: string
-          full_text: string
-          num_likes: number
-        }[]
-      }
-      get_most_mentioned_accounts_by_username: {
-        Args: {
-          username_: string
-        }
-        Returns: {
-          mentioned_user_id: string
-          mentioned_username: string
-          mention_count: number
-        }[]
-      }
-      get_non_allowlist_streamed_tweet_candidates: {
-        Args: {
-          p_limit?: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          reply_to_tweet_id: string
-          is_quote: boolean
-        }[]
-      }
-      get_scraper_counts_by_granularity: {
-        Args: {
-          start_date: string
-          end_date: string
-          granularity: string
-        }
-        Returns: {
-          scraper_date: string
-          unique_scrapers: number
-        }[]
-      }
-      get_simple_streamed_tweet_counts: {
-        Args: {
-          start_date: string
-          end_date: string
-          granularity: string
-        }
-        Returns: {
-          tweet_date: string
-          tweet_count: number
-        }[]
-      }
-      get_streaming_stats: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-          p_granularity?: string
-          p_streamed_only?: boolean
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_streaming_stats_daily: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_streaming_stats_daily_streamed_only: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_streaming_stats_hourly: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_streaming_stats_hourly_streamed_only: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_streaming_stats_weekly: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_streaming_stats_weekly_streamed_only: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
-        Returns: {
-          period_start: string
-          period_end: string
-          tweet_count: number
-          unique_scrapers: number
-        }[]
-      }
-      get_top_accounts_with_followers: {
-        Args: {
-          limit_count: number
-        }
-        Returns: {
-          account_id: string
-          created_via: string
-          username: string
-          created_at: string
-          account_display_name: string
-          avatar_media_url: string
-          bio: string
-          website: string
-          location: string
-          header_media_url: string
-          num_followers: number
-          num_tweets: number
-        }[]
-      }
-      get_top_liked_users: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          tweet_id: string
-          full_text: string
-          like_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-        }[]
-      }
-      get_top_mentioned_users: {
-        Args: {
-          limit_: number
-        }
-        Returns: {
-          user_id: string
-          name: string
-          screen_name: string
-          mention_count: number
-        }[]
-      }
-      get_top_retweeted_tweets_by_username: {
-        Args: {
-          username_: string
-          limit_: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-          archive_upload_id: number
-        }[]
-      }
-      get_trending_tweets: {
-        Args: {
-          hours_back?: number
-          limit_count?: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          full_text: string
-          created_at: string
-          favorite_count: number
-          retweet_count: number
-          engagement_score: number
-        }[]
-      }
-      get_tweet_count_by_date:
-        | {
-            Args: {
-              start_date: string
-              end_date: string
-            }
-            Returns: {
-              tweet_date: string
-              tweet_count: number
-            }[]
+  
+  "dev": {
+          Tables: {
+            [_ in never]: never
           }
-        | {
-            Args: {
-              start_date: string
-              end_date: string
-              granularity: string
-            }
-            Returns: {
-              tweet_date: string
-              tweet_count: number
-            }[]
+          Views: {
+            [_ in never]: never
           }
-      get_tweet_counts_by_granularity: {
-        Args: {
-          start_date: string
-          end_date: string
-          granularity: string
-        }
-        Returns: {
-          tweet_date: string
-          tweet_count: number
-        }[]
-      }
-      get_tweet_page_data: {
-        Args: {
-          p_tweet_id: string
-        }
-        Returns: Json
-      }
-      get_unique_scraper_count: {
-        Args: {
-          start_date: string
-          end_date: string
-        }
-        Returns: number
-      }
-      gtrgm_compress: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: {
-          "": unknown
-        }
-        Returns: undefined
-      }
-      gtrgm_out: {
-        Args: {
-          "": unknown
-        }
-        Returns: unknown
-      }
-      list_public_api_keys: {
-        Args: {
-          owner_user_id: string
-        }
-        Returns: Json
-      }
-      lock_policy_account: {
-        Args: {
-          p_account_id: string
-        }
-        Returns: undefined
-      }
-      policy_account_is_blocked: {
-        Args: {
-          p_account_id?: string
-          p_username?: string
-        }
-        Returns: boolean
-      }
-      policy_blocked_account_id: {
-        Args: {
-          p_username: string
-        }
-        Returns: string
-      }
-      policy_json_contains_blocked_author: {
-        Args: {
-          p_payload: Json
-        }
-        Returns: boolean
-      }
-      publish_digest_edition: {
-        Args: {
-          p_edition_id: string
-        }
-        Returns: {
-          content: Json
-          created_at: string
-          created_by: string | null
-          digest_date: string
-          id: string
-          issue_number: number
-          published_at: string | null
-          source_run_id: string
-          status: string
-          updated_at: string
-          version: number
-          view_count: number
-        }
-      }
-      record_digest_view: {
-        Args: {
-          p_edition_id: string
-        }
-        Returns: number
-      }
-      refresh_global_activity_summary: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      request_bulletin_refresh: {
-        Args: {
-          request_id: string
-          selection: string
-          expected_prompt_id: number
-          budget_usd: number
-          actor_id: string
-        }
-        Returns: string
-      }
-      resolve_directory_identity: {
-        Args: {
-          identifier: string
-        }
-        Returns: {
-          account_id: string
-          username: string
-        }[]
-      }
-      revoke_public_api_key: {
-        Args: {
-          owner_user_id: string
-          target_key_id: string
-        }
-        Returns: boolean
-      }
-      save_bulletin_prompt: {
-        Args: {
-          expected_id: number
-          prompt_body: string
-          change_note: string
-          actor_id: string
-        }
-        Returns: string
-      }
-      search_tweets:
-        | {
-            Args: {
-              search_query: string
-              from_user?: string
-              to_user?: string
-              since_date?: string
-              until_date?: string
-              limit_?: number
-              offset_?: number
-            }
-            Returns: {
-              tweet_id: string
-              account_id: string
-              created_at: string
-              full_text: string
-              retweet_count: number
-              favorite_count: number
-              reply_to_tweet_id: string
-              avatar_media_url: string
-              archive_upload_id: number
-              username: string
-              account_display_name: string
-              media: Json
+          Functions: {
+            "apply_dev_entities_rls_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"apply_dev_liked_tweets_rls_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"apply_dev_rls_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"delete_all_archives":
+{ Args: { "p_account_id": string }; Returns: undefined
+                           },
+"drop_function_if_exists":
+{ Args: { "function_args": (string)[],"function_name": string }; Returns: undefined
+                           },
+"get_top_accounts_with_followers":
+{ Args: { "limit_count": number }; Returns: {
+              "account_display_name": string,"account_id": string,"avatar_media_url": string,"bio": string,"created_at": string,"created_via": string,"follower_count": number,"header_media_url": string,"location": string,"username": string,"website": string
             }[]
+                           }
           }
-        | {
-            Args: {
-              search_query: string
-              limit_count?: number
-              account_filter?: string
-              date_from?: string
-              date_to?: string
-            }
-            Returns: {
-              tweet_id: string
-              account_id: string
-              full_text: string
-              created_at: string
-              favorite_count: number
-              retweet_count: number
-              relevance: number
+          Enums: {
+            [_ in never]: never
+          }
+          CompositeTypes: {
+            [_ in never]: never
+          }
+        },"public": {
+          Tables: {
+            "account_collection_preferences": {
+                  Row: {
+                    "account_id": string,"enabled": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"enabled": boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "account_id"?: string,"enabled"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"agent_search_runs": {
+                  Row: {
+                    "account_id": string,"answer": string | null,"cited_tweet_ids": (string)[],"completed_at": string | null,"conversation_id": string | null,"cost_usd": number,"deleted_at": string | null,"error": string | null,"id": string,"input_tokens": number,"invalid_citation_ids": (string)[],"key_source": string,"model": string,"output_tokens": number,"parts": Json | null,"question": string,"started_at": string,"status": string,"tool_calls": NonNullable<Json>,"workflow_run_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"answer"?: string | null,"cited_tweet_ids"?: (string)[],"completed_at"?: string | null,"conversation_id"?: string | null,"cost_usd"?: number,"deleted_at"?: string | null,"error"?: string | null,"id": string,"input_tokens"?: number,"invalid_citation_ids"?: (string)[],"key_source"?: string,"model": string,"output_tokens"?: number,"parts"?: Json | null,"question": string,"started_at"?: string,"status": string,"tool_calls"?: NonNullable<Json>,"workflow_run_id"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"answer"?: string | null,"cited_tweet_ids"?: (string)[],"completed_at"?: string | null,"conversation_id"?: string | null,"cost_usd"?: number,"deleted_at"?: string | null,"error"?: string | null,"id"?: string,"input_tokens"?: number,"invalid_citation_ids"?: (string)[],"key_source"?: string,"model"?: string,"output_tokens"?: number,"parts"?: Json | null,"question"?: string,"started_at"?: string,"status"?: string,"tool_calls"?: NonNullable<Json>,"workflow_run_id"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"all_account": {
+                  Row: {
+                    "account_display_name": string,"account_id": string,"created_at": string,"created_via": string,"is_tombstone": boolean,"num_followers": number | null,"num_following": number | null,"num_likes": number | null,"num_tweets": number | null,"updated_at": string | null,"username": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_display_name": string,"account_id": string,"created_at": string,"created_via": string,"is_tombstone"?: boolean,"num_followers"?: number | null,"num_following"?: number | null,"num_likes"?: number | null,"num_tweets"?: number | null,"updated_at"?: string | null,"username": string
+                  }
+                  Update: {
+                    "account_display_name"?: string,"account_id"?: string,"created_at"?: string,"created_via"?: string,"is_tombstone"?: boolean,"num_followers"?: number | null,"num_following"?: number | null,"num_likes"?: number | null,"num_tweets"?: number | null,"updated_at"?: string | null,"username"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"all_profile": {
+                  Row: {
+                    "account_id": string,"archive_upload_id": number | null,"avatar_media_url": string | null,"bio": string | null,"header_media_url": string | null,"location": string | null,"updated_at": string | null,"website": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"archive_upload_id"?: number | null,"avatar_media_url"?: string | null,"bio"?: string | null,"header_media_url"?: string | null,"location"?: string | null,"updated_at"?: string | null,"website"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"archive_upload_id"?: number | null,"avatar_media_url"?: string | null,"bio"?: string | null,"header_media_url"?: string | null,"location"?: string | null,"updated_at"?: string | null,"website"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "all_profile_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: true
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "all_profile_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: true
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "all_profile_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: true
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "all_profile_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"archive_upload": {
+                  Row: {
+                    "account_id": string,"archive_at": string,"created_at": string | null,"end_date": string | null,"id": number,"keep_private": boolean | null,"start_date": string | null,"storage_path": string | null,"storage_sha256": string | null,"upload_likes": boolean | null,"upload_phase": Database["public"]['Enums']["upload_phase_enum"] | null,"username": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"archive_at": string,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"archive_at"?: string,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "archive_upload_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "archive_upload_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "archive_upload_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    }
+                  ]
+                },"ca_tweet_likes": {
+                  Row: {
+                    "account_id": string,"created_at": string,"display_name": string | null,"id": string,"tweet_id": string,"user_id": string,"username": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"created_at"?: string,"display_name"?: string | null,"id"?: string,"tweet_id": string,"user_id": string,"username"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"created_at"?: string,"display_name"?: string | null,"id"?: string,"tweet_id"?: string,"user_id"?: string,"username"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"community_project_comments": {
+                  Row: {
+                    "content": string,"created_at": string,"deleted_at": string | null,"display_name": string | null,"id": string,"project_id": string,"user_id": string,"username": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "content": string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"id"?: string,"project_id": string,"user_id": string,"username"?: string | null
+                  }
+                  Update: {
+                    "content"?: string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"id"?: string,"project_id"?: string,"user_id"?: string,"username"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "community_project_comments_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "community_projects"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"community_project_likes": {
+                  Row: {
+                    "created_at": string,"id": string,"project_id": string | null,"project_slug": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"project_id"?: string | null,"project_slug": string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"project_id"?: string | null,"project_slug"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "community_project_likes_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "community_projects"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"community_projects": {
+                  Row: {
+                    "archive_use": string,"category": string,"cover_mime_type": string | null,"cover_storage_path": string | null,"creator_handle": string | null,"creator_name": string,"description": string,"featured": boolean,"id": string,"name": string,"project_url": string,"published_at": string | null,"published_by": string | null,"slug": string,"source_post_url": string,"status": string,"submitted_at": string,"submitted_by": string | null,"submitter_username": string,"summary": string | null,"tags": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archive_use": string,"category": string,"cover_mime_type"?: string | null,"cover_storage_path"?: string | null,"creator_handle"?: string | null,"creator_name": string,"description": string,"featured"?: boolean,"id"?: string,"name": string,"project_url": string,"published_at"?: string | null,"published_by"?: string | null,"slug": string,"source_post_url": string,"status"?: string,"submitted_at"?: string,"submitted_by"?: string | null,"submitter_username": string,"summary"?: string | null,"tags"?: (string)[]
+                  }
+                  Update: {
+                    "archive_use"?: string,"category"?: string,"cover_mime_type"?: string | null,"cover_storage_path"?: string | null,"creator_handle"?: string | null,"creator_name"?: string,"description"?: string,"featured"?: boolean,"id"?: string,"name"?: string,"project_url"?: string,"published_at"?: string | null,"published_by"?: string | null,"slug"?: string,"source_post_url"?: string,"status"?: string,"submitted_at"?: string,"submitted_by"?: string | null,"submitter_username"?: string,"summary"?: string | null,"tags"?: (string)[]
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"conversations": {
+                  Row: {
+                    "conversation_id": string | null,"tweet_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "conversation_id"?: string | null,"tweet_id": string
+                  }
+                  Update: {
+                    "conversation_id"?: string | null,"tweet_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "conversations_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: true
+      referencedRelation: "enriched_tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "conversations_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: true
+      referencedRelation: "tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "conversations_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: true
+      referencedRelation: "tweets_w_conversation_id"
+      referencedColumns: ["tweet_id"]
+    }
+                  ]
+                },"digest_edition_comments": {
+                  Row: {
+                    "content": string,"created_at": string,"deleted_at": string | null,"display_name": string | null,"edition_id": string,"id": string,"updated_at": string,"user_id": string,"username": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "content": string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"edition_id": string,"id"?: string,"updated_at"?: string,"user_id": string,"username"?: string | null
+                  }
+                  Update: {
+                    "content"?: string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"edition_id"?: string,"id"?: string,"updated_at"?: string,"user_id"?: string,"username"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "digest_edition_comments_edition_id_fkey"
+      columns: ["edition_id"]
+isOneToOne: false
+      referencedRelation: "digest_editions"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"digest_edition_likes": {
+                  Row: {
+                    "created_at": string,"edition_id": string,"id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"edition_id": string,"id"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"edition_id"?: string,"id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "digest_edition_likes_edition_id_fkey"
+      columns: ["edition_id"]
+isOneToOne: false
+      referencedRelation: "digest_editions"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"digest_editions": {
+                  Row: {
+                    "content": NonNullable<Json>,"created_at": string,"created_by": string | null,"digest_date": string,"id": string,"issue_number": number,"published_at": string | null,"source_run_id": string,"status": string,"updated_at": string,"version": number,"view_count": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "content": NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"digest_date": string,"id"?: string,"issue_number"?: never,"published_at"?: string | null,"source_run_id": string,"status"?: string,"updated_at"?: string,"version": number,"view_count"?: number
+                  }
+                  Update: {
+                    "content"?: NonNullable<Json>,"created_at"?: string,"created_by"?: string | null,"digest_date"?: string,"id"?: string,"issue_number"?: never,"published_at"?: string | null,"source_run_id"?: string,"status"?: string,"updated_at"?: string,"version"?: number,"view_count"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "digest_editions_source_run_id_fkey"
+      columns: ["source_run_id"]
+isOneToOne: false
+      referencedRelation: "digest_runs"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"digest_email_sends": {
+                  Row: {
+                    "edition_id": string,"message_id": string | null,"open_token": string | null,"opened_at": string | null,"sent_at": string,"subscription_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "edition_id": string,"message_id"?: string | null,"open_token"?: string | null,"opened_at"?: string | null,"sent_at"?: string,"subscription_id": string
+                  }
+                  Update: {
+                    "edition_id"?: string,"message_id"?: string | null,"open_token"?: string | null,"opened_at"?: string | null,"sent_at"?: string,"subscription_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "digest_email_sends_edition_id_fkey"
+      columns: ["edition_id"]
+isOneToOne: false
+      referencedRelation: "digest_editions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "digest_email_sends_subscription_id_fkey"
+      columns: ["subscription_id"]
+isOneToOne: false
+      referencedRelation: "digest_email_subscriptions"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"digest_email_subscriptions": {
+                  Row: {
+                    "account_id": string | null,"confirmed_at": string | null,"created_at": string,"email": string,"id": string,"token": string,"unsubscribed_at": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id"?: string | null,"confirmed_at"?: string | null,"created_at"?: string,"email": string,"id"?: string,"token"?: string,"unsubscribed_at"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "account_id"?: string | null,"confirmed_at"?: string | null,"created_at"?: string,"email"?: string,"id"?: string,"token"?: string,"unsubscribed_at"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"digest_prompt_versions": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": string,"label": string,"model": string,"parameters": NonNullable<Json>,"system_prompt": string,"user_prompt_template": string,"version": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"label": string,"model": string,"parameters"?: NonNullable<Json>,"system_prompt": string,"user_prompt_template": string,"version"?: never
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"label"?: string,"model"?: string,"parameters"?: NonNullable<Json>,"system_prompt"?: string,"user_prompt_template"?: string,"version"?: never
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"digest_runs": {
+                  Row: {
+                    "candidates": NonNullable<Json>,"completed_at": string | null,"created_at": string,"created_by": string | null,"digest_date": string,"duration_ms": number | null,"error": string | null,"events": NonNullable<Json>,"id": string,"input_tokens": number | null,"model": string | null,"model_request": Json | null,"output_tokens": number | null,"parent_run_id": string | null,"parsed_output": Json | null,"prompt_version_id": string,"raw_response": Json | null,"response_id": string | null,"revision_instruction": string | null,"started_at": string | null,"status": string,"total_tokens": number | null,"updated_at": string,"window_end": string,"window_start": string,"workflow_run_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "candidates"?: NonNullable<Json>,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"digest_date": string,"duration_ms"?: number | null,"error"?: string | null,"events"?: NonNullable<Json>,"id"?: string,"input_tokens"?: number | null,"model"?: string | null,"model_request"?: Json | null,"output_tokens"?: number | null,"parent_run_id"?: string | null,"parsed_output"?: Json | null,"prompt_version_id": string,"raw_response"?: Json | null,"response_id"?: string | null,"revision_instruction"?: string | null,"started_at"?: string | null,"status"?: string,"total_tokens"?: number | null,"updated_at"?: string,"window_end": string,"window_start": string,"workflow_run_id"?: string | null
+                  }
+                  Update: {
+                    "candidates"?: NonNullable<Json>,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"digest_date"?: string,"duration_ms"?: number | null,"error"?: string | null,"events"?: NonNullable<Json>,"id"?: string,"input_tokens"?: number | null,"model"?: string | null,"model_request"?: Json | null,"output_tokens"?: number | null,"parent_run_id"?: string | null,"parsed_output"?: Json | null,"prompt_version_id"?: string,"raw_response"?: Json | null,"response_id"?: string | null,"revision_instruction"?: string | null,"started_at"?: string | null,"status"?: string,"total_tokens"?: number | null,"updated_at"?: string,"window_end"?: string,"window_start"?: string,"workflow_run_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "digest_runs_parent_run_id_fkey"
+      columns: ["parent_run_id"]
+isOneToOne: false
+      referencedRelation: "digest_runs"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "digest_runs_prompt_version_id_fkey"
+      columns: ["prompt_version_id"]
+isOneToOne: false
+      referencedRelation: "digest_prompt_versions"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"followers": {
+                  Row: {
+                    "account_id": string,"archive_upload_id": number | null,"follower_account_id": string,"id": number,"updated_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"archive_upload_id"?: number | null,"follower_account_id": string,"id"?: never,"updated_at"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"archive_upload_id"?: number | null,"follower_account_id"?: string,"id"?: never,"updated_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "followers_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "followers_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "followers_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "followers_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"following": {
+                  Row: {
+                    "account_id": string,"archive_upload_id": number | null,"following_account_id": string,"id": number,"updated_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"archive_upload_id"?: number | null,"following_account_id": string,"id"?: never,"updated_at"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"archive_upload_id"?: number | null,"following_account_id"?: string,"id"?: never,"updated_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "following_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "following_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "following_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "following_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"liked_tweets": {
+                  Row: {
+                    "author_account_id": string | null,"fts": unknown,"full_text": string,"is_tombstone": boolean,"tweet_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "author_account_id"?: string | null,"fts"?: never,"full_text": string,"is_tombstone"?: boolean,"tweet_id": string
+                  }
+                  Update: {
+                    "author_account_id"?: string | null,"fts"?: never,"full_text"?: string,"is_tombstone"?: boolean,"tweet_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"likes": {
+                  Row: {
+                    "account_id": string,"archive_upload_id": number | null,"id": number,"liked_tweet_id": string,"updated_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"archive_upload_id"?: number | null,"id"?: never,"liked_tweet_id": string,"updated_at"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"archive_upload_id"?: number | null,"id"?: never,"liked_tweet_id"?: string,"updated_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "likes_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "likes_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "likes_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "likes_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "likes_liked_tweet_id_fkey"
+      columns: ["liked_tweet_id"]
+isOneToOne: false
+      referencedRelation: "liked_tweets"
+      referencedColumns: ["tweet_id"]
+    }
+                  ]
+                },"mentioned_users": {
+                  Row: {
+                    "is_tombstone": boolean,"name": string,"screen_name": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "is_tombstone"?: boolean,"name": string,"screen_name": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "is_tombstone"?: boolean,"name"?: string,"screen_name"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"optin": {
+                  Row: {
+                    "created_at": string | null,"explicit_optout": boolean | null,"id": string,"opt_out_reason": string | null,"opted_in": boolean,"opted_in_at": string | null,"opted_out_at": string | null,"terms_version": string,"twitter_user_id": string | null,"updated_at": string | null,"user_id": string | null,"username": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string | null,"explicit_optout"?: boolean | null,"id"?: string,"opt_out_reason"?: string | null,"opted_in"?: boolean,"opted_in_at"?: string | null,"opted_out_at"?: string | null,"terms_version"?: string,"twitter_user_id"?: string | null,"updated_at"?: string | null,"user_id"?: string | null,"username": string
+                  }
+                  Update: {
+                    "created_at"?: string | null,"explicit_optout"?: boolean | null,"id"?: string,"opt_out_reason"?: string | null,"opted_in"?: boolean,"opted_in_at"?: string | null,"opted_out_at"?: string | null,"terms_version"?: string,"twitter_user_id"?: string | null,"updated_at"?: string | null,"user_id"?: string | null,"username"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"profile_curation": {
+                  Row: {
+                    "account_id": string,"created_at": string,"is_featured": boolean,"is_hidden": boolean,"item_id": string,"position": number | null,"section": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"created_at"?: string,"is_featured"?: boolean,"is_hidden"?: boolean,"item_id": string,"position"?: number | null,"section": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "account_id"?: string,"created_at"?: string,"is_featured"?: boolean,"is_hidden"?: boolean,"item_id"?: string,"position"?: number | null,"section"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"profile_settings": {
+                  Row: {
+                    "account_id": string,"created_at": string,"download_archive_visible": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"created_at"?: string,"download_archive_visible"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "account_id"?: string,"created_at"?: string,"download_archive_visible"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"quote_tweets": {
+                  Row: {
+                    "quoted_tweet_id": string,"tweet_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "quoted_tweet_id": string,"tweet_id": string
+                  }
+                  Update: {
+                    "quoted_tweet_id"?: string,"tweet_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "fk_quote_tweets_tweet_id"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "enriched_tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "fk_quote_tweets_tweet_id"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "fk_quote_tweets_tweet_id"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets_w_conversation_id"
+      referencedColumns: ["tweet_id"]
+    }
+                  ]
+                },"retweets": {
+                  Row: {
+                    "retweeted_tweet_id": string | null,"tweet_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "retweeted_tweet_id"?: string | null,"tweet_id": string
+                  }
+                  Update: {
+                    "retweeted_tweet_id"?: string | null,"tweet_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "fk_retweets_retweeted_tweet_id"
+      columns: ["retweeted_tweet_id"]
+isOneToOne: false
+      referencedRelation: "enriched_tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "fk_retweets_retweeted_tweet_id"
+      columns: ["retweeted_tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "fk_retweets_retweeted_tweet_id"
+      columns: ["retweeted_tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets_w_conversation_id"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "fk_retweets_tweet_id"
+      columns: ["tweet_id"]
+isOneToOne: true
+      referencedRelation: "enriched_tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "fk_retweets_tweet_id"
+      columns: ["tweet_id"]
+isOneToOne: true
+      referencedRelation: "tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "fk_retweets_tweet_id"
+      columns: ["tweet_id"]
+isOneToOne: true
+      referencedRelation: "tweets_w_conversation_id"
+      referencedColumns: ["tweet_id"]
+    }
+                  ]
+                },"scraper_count": {
+                  Row: {
+                    "count": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "count"?: number | null
+                  }
+                  Update: {
+                    "count"?: number | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"strand_comments": {
+                  Row: {
+                    "content": string,"created_at": string,"deleted_at": string | null,"display_name": string | null,"id": string,"strand_id": string,"updated_at": string,"user_id": string,"username": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "content": string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"id"?: string,"strand_id": string,"updated_at"?: string,"user_id": string,"username"?: string | null
+                  }
+                  Update: {
+                    "content"?: string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"id"?: string,"strand_id"?: string,"updated_at"?: string,"user_id"?: string,"username"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"strand_likes": {
+                  Row: {
+                    "created_at": string,"id": string,"strand_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"strand_id": string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"strand_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"tweet_link_previews": {
+                  Row: {
+                    "canonical_url": string | null,"content_type": string | null,"created_at": string,"description": string | null,"expires_at": string,"fetched_at": string | null,"image_url": string | null,"normalized_url": string,"site_name": string | null,"status": string,"title": string | null,"updated_at": string,"url_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "canonical_url"?: string | null,"content_type"?: string | null,"created_at"?: string,"description"?: string | null,"expires_at"?: string,"fetched_at"?: string | null,"image_url"?: string | null,"normalized_url": string,"site_name"?: string | null,"status"?: string,"title"?: string | null,"updated_at"?: string,"url_hash": string
+                  }
+                  Update: {
+                    "canonical_url"?: string | null,"content_type"?: string | null,"created_at"?: string,"description"?: string | null,"expires_at"?: string,"fetched_at"?: string | null,"image_url"?: string | null,"normalized_url"?: string,"site_name"?: string | null,"status"?: string,"title"?: string | null,"updated_at"?: string,"url_hash"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"tweet_media": {
+                  Row: {
+                    "archive_upload_id": number | null,"height": number | null,"media_id": number,"media_type": string,"media_url": string,"tweet_id": string,"updated_at": string | null,"width": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archive_upload_id"?: number | null,"height"?: number | null,"media_id": number,"media_type": string,"media_url": string,"tweet_id": string,"updated_at"?: string | null,"width"?: number | null
+                  }
+                  Update: {
+                    "archive_upload_id"?: number | null,"height"?: number | null,"media_id"?: number,"media_type"?: string,"media_url"?: string,"tweet_id"?: string,"updated_at"?: string | null,"width"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tweet_media_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "tweet_media_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "enriched_tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "tweet_media_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "tweet_media_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets_w_conversation_id"
+      referencedColumns: ["tweet_id"]
+    }
+                  ]
+                },"tweet_page_summaries": {
+                  Row: {
+                    "description": string | null,"eligible": boolean,"generated_at": string,"ineligible_reason": string | null,"kind": string,"model": string,"prompt_version": number,"search_vector": unknown,"subject_key": string,"title": string | null,"tweet_ids": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "description"?: string | null,"eligible": boolean,"generated_at"?: string,"ineligible_reason"?: string | null,"kind": string,"model": string,"prompt_version": number,"search_vector"?: never,"subject_key": string,"title"?: string | null,"tweet_ids": (string)[]
+                  }
+                  Update: {
+                    "description"?: string | null,"eligible"?: boolean,"generated_at"?: string,"ineligible_reason"?: string | null,"kind"?: string,"model"?: string,"prompt_version"?: number,"search_vector"?: never,"subject_key"?: string,"title"?: string | null,"tweet_ids"?: (string)[]
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"tweet_urls": {
+                  Row: {
+                    "display_url": string,"expanded_url": string | null,"id": number,"tweet_id": string,"updated_at": string | null,"url": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "display_url": string,"expanded_url"?: string | null,"id"?: never,"tweet_id": string,"updated_at"?: string | null,"url": string
+                  }
+                  Update: {
+                    "display_url"?: string,"expanded_url"?: string | null,"id"?: never,"tweet_id"?: string,"updated_at"?: string | null,"url"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tweet_urls_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "enriched_tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "tweet_urls_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "tweet_urls_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets_w_conversation_id"
+      referencedColumns: ["tweet_id"]
+    }
+                  ]
+                },"tweets": {
+                  Row: {
+                    "account_id": string,"archive_upload_id": number | null,"created_at": string,"favorite_count": number,"fts": unknown,"full_text": string,"is_tombstone": boolean,"reply_to_tweet_id": string | null,"reply_to_user_id": string | null,"reply_to_username": string | null,"retweet_count": number | null,"tweet_id": string,"updated_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"archive_upload_id"?: number | null,"created_at": string,"favorite_count": number,"fts"?: never,"full_text": string,"is_tombstone"?: boolean,"reply_to_tweet_id"?: string | null,"reply_to_user_id"?: string | null,"reply_to_username"?: string | null,"retweet_count"?: number | null,"tweet_id": string,"updated_at"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"archive_upload_id"?: number | null,"created_at"?: string,"favorite_count"?: number,"fts"?: never,"full_text"?: string,"is_tombstone"?: boolean,"reply_to_tweet_id"?: string | null,"reply_to_user_id"?: string | null,"reply_to_username"?: string | null,"retweet_count"?: number | null,"tweet_id"?: string,"updated_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"user_action_log": {
+                  Row: {
+                    "account_id": string | null,"action_type": string,"created_at": string,"id": number,"metadata": Json | null,"notes": string | null,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id"?: string | null,"action_type": string,"created_at"?: string,"id"?: number,"metadata"?: Json | null,"notes"?: string | null,"user_id"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string | null,"action_type"?: string,"created_at"?: string,"id"?: number,"metadata"?: Json | null,"notes"?: string | null,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"user_mentions": {
+                  Row: {
+                    "id": number,"mentioned_user_id": string,"tweet_id": string,"updated_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "id"?: never,"mentioned_user_id": string,"tweet_id": string,"updated_at"?: string | null
+                  }
+                  Update: {
+                    "id"?: never,"mentioned_user_id"?: string,"tweet_id"?: string,"updated_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "user_mentions_mentioned_user_id_fkey"
+      columns: ["mentioned_user_id"]
+isOneToOne: false
+      referencedRelation: "mentioned_users"
+      referencedColumns: ["user_id"]
+    },{
+      foreignKeyName: "user_mentions_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "enriched_tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "user_mentions_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets"
+      referencedColumns: ["tweet_id"]
+    },{
+      foreignKeyName: "user_mentions_tweet_id_fkey"
+      columns: ["tweet_id"]
+isOneToOne: false
+      referencedRelation: "tweets_w_conversation_id"
+      referencedColumns: ["tweet_id"]
+    }
+                  ]
+                }
+          }
+          Views: {
+            "account": {
+                  Row: {
+                    "account_display_name": string,"account_id": string,"created_at": string,"created_via": string,"num_followers": number | null,"num_following": number | null,"num_likes": number | null,"num_tweets": number | null,"username": string
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                },"account_activity_summary": {
+                  Row: {
+                    "account_id": string,"last_updated": string | null,"mentioned_accounts": Json | null,"most_favorited_tweets": Json | null,"most_retweeted_tweets": Json | null,"num_followers": number | null,"num_tweets": number | null,"top_engaged_tweets": Json | null,"total_likes": number | null,"total_mentions": number | null,"username": string
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                },"enriched_tweets": {
+                  Row: {
+                    "account_display_name": string,"account_id": string,"archive_upload_id": number | null,"avatar_media_url": string | null,"conversation_id": string | null,"created_at": string,"favorite_count": number,"full_text": string,"quoted_tweet_id": string | null,"reply_to_tweet_id": string | null,"reply_to_user_id": string | null,"reply_to_username": string | null,"retweet_count": number | null,"tweet_id": string,"username": string
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"global_activity_summary": {
+                  Row: {
+                    "last_updated": string | null,"top_accounts_with_followers": Json | null,"top_mentioned_users": Json | null,"total_accounts": number | null,"total_likes": number | null,"total_tweets": number | null,"total_user_mentions": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                },"global_monthly_tweet_counts": {
+                  Row: {
+                    "active_accounts": number | null,"avg_tweets_per_account": number | null,"month": string | null,"total_tweets": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                },"monthly_tweet_counts_mv": {
+                  Row: {
+                    "account_id": string,"avg_favorites": number | null,"avg_retweets": number | null,"days_active": number | null,"max_favorites": number | null,"max_retweets": number | null,"month": string | null,"tweet_count": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    }
+                  ]
+                },"profile": {
+                  Row: {
+                    "account_id": string,"archive_upload_id": number | null,"avatar_media_url": string | null,"bio": string | null,"header_media_url": string | null,"location": string | null,"website": string | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "all_profile_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: true
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "all_profile_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: true
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "all_profile_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: true
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "all_profile_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"tweet_replies_view": {
+                  Row: {
+                    "reply_to_tweet_id": string | null,"reply_to_user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                           "reply_to_tweet_id"?: string | null,"reply_to_user_id"?: string | null
+                         }
+                        Update: {
+                           "reply_to_tweet_id"?: string | null,"reply_to_user_id"?: string | null
+                         }
+                        Relationships: [
+                    
+                  ]
+                },"tweets_w_conversation_id": {
+                  Row: {
+                    "account_id": string,"archive_upload_id": number | null,"conversation_id": string | null,"created_at": string,"favorite_count": number,"fts": unknown,"full_text": string,"reply_to_tweet_id": string | null,"reply_to_user_id": string | null,"reply_to_username": string | null,"retweet_count": number | null,"tweet_id": string
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "account_activity_summary"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "all_account"
+      referencedColumns: ["account_id"]
+    },{
+      foreignKeyName: "tweets_archive_upload_id_fkey"
+      columns: ["archive_upload_id"]
+isOneToOne: false
+      referencedRelation: "archive_upload"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"user_directory": {
+                  Row: {
+                    "account_display_name": string | null,"account_id": string | null,"archive_at": string | null,"archive_uploaded_at": string | null,"avatar_media_url": string | null,"bio": string | null,"created_at": string | null,"directory_id": string | null,"has_archive": boolean | null,"is_opted_in": boolean | null,"joined_at": string | null,"location": string | null,"num_followers": number | null,"num_following": number | null,"num_likes": number | null,"num_tweets": number | null,"opted_in_at": string | null,"username": string | null,"website": string | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
+                }
+          }
+          Functions: {
+            "admin_activity_page":
+{ Args: { "p_before_at"?: string,"p_before_id"?: string,"p_kind"?: string,"p_limit"?: number,"p_search"?: string }; Returns: {
+              "account_id": string,"date_basis": string,"detail": string,"error": string,"id": string,"kind": string,"occurred_at": string,"reason": string,"status": string,"username": string
             }[]
+                           },
+"admin_enqueue_delete_with_export":
+{ Args: { "p_account_id": string,"p_reason"?: string,"p_requested_by_user_id"?: string,"p_username": string }; Returns: string
+                           },
+"admin_list_blocked_scraping_users":
+{ Args: { "p_account_ids": (string)[] }; Returns: (string)[]
+                           },
+"admin_list_recent_delete_jobs":
+{ Args: { "p_limit"?: number }; Returns: {
+              "account_id": string,"created_at": string,"error": string,"job_key": string,"reason": string,"status": string,"updated_at": string,"username": string
+            }[]
+                           },
+"admin_set_scrape_block":
+{ Args: { "p_account_id": string,"p_blocked": boolean }; Returns: undefined
+                           },
+"agent_search_add_usage":
+{ Args: { "p_cost_usd": number,"p_input_tokens": number,"p_output_tokens": number,"p_run_id": string }; Returns: undefined
+                           },
+"agent_search_admit":
+{ Args: { "p_account_id": string,"p_conversation_id": string,"p_daily_limit": number,"p_global_daily_usd": number,"p_key_source": string,"p_model": string,"p_monthly_limit": number,"p_question": string,"p_run_id": string,"p_stale_after_seconds": number }; Returns: string
+                           },
+"apply_public_entities_rls_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"apply_public_liked_tweets_rls_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"apply_public_rls_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"apply_public_rls_policies_not_private":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"apply_readonly_rls_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"archive_upload_is_allowed":
+{ Args: { "p_account_id": string,"p_username": string }; Returns: boolean
+                           },
+"assert_archive_upload_allowed":
+{ Args: { "p_account_id": string,"p_username": string }; Returns: boolean
+                           },
+"ca_tweet_like_summary":
+{ Args: { "p_tweet_ids": (string)[],"p_viewer_account_id": string }; Returns: {
+              "like_count": number,"tweet_id": string,"viewer_liked": boolean
+            }[]
+                           },
+"community_archive_monitoring_digest":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "automated_run_failed": number,"expected_date_published": number,"healthy": number,"publication_age_seconds": number
+            }[]
+                           },
+"compute_hourly_scraping_stats":
+{ Args: { "p_end_date": string,"p_start_date": string }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"create_public_api_key":
+{ Args: { "key_label": string,"new_key_id": string,"new_key_sha256": string,"owner_account_id": string,"owner_user_id": string }; Returns: Json
+                           },
+"delete_non_allowlist_streamed_tweet_batch":
+{ Args: { "p_limit"?: number }; Returns: {
+              "deleted_conversations": number,"deleted_private_tweet_user": number,"deleted_tweet_media": number,"deleted_tweet_urls": number,"deleted_tweets": number,"deleted_user_mentions": number,"requested_tweets": number
+            }[]
+                           },
+"delete_own_tweets":
+{ Args: { "p_tweet_ids": (string)[] }; Returns: {
+              "deleted_conversations": number,"deleted_private_tweet_user": number,"deleted_tweet_media": number,"deleted_tweet_urls": number,"deleted_tweets": number,"deleted_user_mentions": number
+            }[]
+                           },
+"delete_single_archive":
+{ Args: { "p_account_id": string,"p_archive_upload_id": number }; Returns: undefined
+                           },
+"delete_tweets":
+{ Args: { "p_tweet_ids": (string)[] }; Returns: {
+              "deleted_conversations": number,"deleted_private_tweet_user": number,"deleted_tweet_media": number,"deleted_tweet_urls": number,"deleted_tweets": number,"deleted_user_mentions": number
+            }[]
+                           },
+"delete_user_archive":
+{ Args: { "p_account_id": string }; Returns: undefined
+                           },
+"directory_members_by_username":
+{ Args: { "p_usernames": (string)[] }; Returns: {
+              "account_id": string,"avatar_media_url": string,"has_archive": boolean,"username": string
+            }[]
+                           },
+"drop_all_policies":
+{ Args: { "schema_name": string,"table_name": string }; Returns: undefined
+                           },
+"enqueue_policy_archive_cleanup":
+{ Args: { "p_account_id": string,"p_reason"?: string,"p_username": string }; Returns: string
+                           },
+"get_account_most_liked_tweets_archive_users":
+{ Args: { "limit_"?: number,"username_": string }; Returns: {
+              "account_id": string,"archive_upload_id": number,"created_at": string,"favorite_count": number,"full_text": string,"num_likes": number,"reply_to_tweet_id": string,"reply_to_user_id": string,"reply_to_username": string,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"get_account_most_mentioned_accounts":
+{ Args: { "limit_": number,"username_": string }; Returns: {
+              "mention_count": number,"name": string,"screen_name": string,"user_id": string
+            }[]
+                           },
+"get_account_most_replied_tweets_by_archive_users":
+{ Args: { "limit_": number,"username_": string }; Returns: {
+              "account_id": string,"archive_upload_id": number,"created_at": string,"favorite_count": number,"full_text": string,"num_replies": number,"reply_to_tweet_id": string,"reply_to_user_id": string,"reply_to_username": string,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"get_account_top_favorite_count_tweets":
+{ Args: { "limit_": number,"username_": string }; Returns: {
+              "account_id": string,"archive_upload_id": number,"created_at": string,"favorite_count": number,"full_text": string,"reply_to_tweet_id": string,"reply_to_user_id": string,"reply_to_username": string,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"get_account_top_retweet_count_tweets":
+{ Args: { "limit_": number,"username_": string }; Returns: {
+              "account_id": string,"archive_upload_id": number,"created_at": string,"favorite_count": number,"full_text": string,"reply_to_tweet_id": string,"reply_to_user_id": string,"reply_to_username": string,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"get_bulletin_board_state":
+{ Args: { "max_results"?: number }; Returns: Json
+                           },
+"get_bulletin_dismissals":
+{ Args: { "viewer_id": string }; Returns: (string)[]
+                           },
+"get_bulletin_opportunities":
+{ Args: { "max_results"?: number }; Returns: {
+              "account_id": string,"evidence": string,"expires_at": string,"full_text": string,"kind": string,"model": string,"place": string,"posted_at": string,"respond": string,"side": string,"standing": boolean,"summary": string,"topics": (string)[],"tweet_id": string,"username": string
+            }[]
+                           },
+"get_bulletin_prompts":
+{ Args: { "before_id"?: number }; Returns: Json
+                           },
+"get_bulletin_refreshes":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"get_bulletin_relationships":
+{ Args: { "viewer_account_id"?: string,"viewer_username"?: string }; Returns: Json
+                           },
+"get_bulletin_runs":
+{ Args: { "before_id"?: number,"max_results"?: number }; Returns: Json
+                           },
+"get_hourly_scraping_stats":
+{ Args: { "p_hours_back"?: number }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_hourly_stats_simple":
+{ Args: { "p_hours_back"?: number }; Returns: {
+              "period_start": string,"tweet_count": number
+            }[]
+                           },
+"get_latest_tweets":
+{ Args: { "count": number,"p_account_id"?: string }; Returns: {
+              "account_display_name": string,"account_id": string,"avatar_media_url": string,"created_at": string,"favorite_count": number,"full_text": string,"reply_to_tweet_id": string,"retweet_count": number,"tweet_id": string,"username": string
+            }[]
+                           },
+"get_main_thread":
+{ Args: { "p_conversation_id": string }; Returns: {
+              "account_id": string,"conversation_id": string,"depth": number,"favorite_count": number,"max_depth": number,"reply_to_tweet_id": string,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"get_monthly_tweet_counts":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "month": string,"tweet_count": number
+            }[]
+                           },
+"get_monthly_tweet_counts_fast":
+{ Args: { "p_account_id"?: string,"p_end_date"?: string,"p_start_date"?: string }; Returns: {
+              "account_id": string,"avg_favorites": number,"avg_retweets": number,"days_active": number,"month": string,"tweet_count": number
+            }[]
+                           },
+"get_most_liked_tweets_by_username":
+{ Args: { "username_": string }; Returns: {
+              "full_text": string,"num_likes": number,"tweet_id": string
+            }[]
+                           },
+"get_most_mentioned_accounts_by_username":
+{ Args: { "username_": string }; Returns: {
+              "mention_count": number,"mentioned_user_id": string,"mentioned_username": string
+            }[]
+                           },
+"get_non_allowlist_streamed_tweet_candidates":
+{ Args: { "p_limit"?: number }; Returns: {
+              "account_id": string,"created_at": string,"is_quote": boolean,"reply_to_tweet_id": string,"tweet_id": string
+            }[]
+                           },
+"get_scraper_counts_by_granularity":
+{ Args: { "end_date": string,"granularity": string,"start_date": string }; Returns: {
+              "scraper_date": string,"unique_scrapers": number
+            }[]
+                           },
+"get_simple_streamed_tweet_counts":
+{ Args: { "end_date": string,"granularity": string,"start_date": string }; Returns: {
+              "tweet_count": number,"tweet_date": string
+            }[]
+                           },
+"get_streaming_stats":
+{ Args: { "p_end_date": string,"p_granularity"?: string,"p_start_date": string,"p_streamed_only"?: boolean }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_streaming_stats_daily":
+{ Args: { "p_end_date": string,"p_start_date": string }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_streaming_stats_daily_streamed_only":
+{ Args: { "p_end_date": string,"p_start_date": string }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_streaming_stats_hourly":
+{ Args: { "p_end_date": string,"p_start_date": string }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_streaming_stats_hourly_streamed_only":
+{ Args: { "p_end_date": string,"p_start_date": string }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_streaming_stats_weekly":
+{ Args: { "p_end_date": string,"p_start_date": string }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_streaming_stats_weekly_streamed_only":
+{ Args: { "p_end_date": string,"p_start_date": string }; Returns: {
+              "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
+            }[]
+                           },
+"get_top_accounts_with_followers":
+{ Args: { "limit_count": number }; Returns: {
+              "account_display_name": string,"account_id": string,"avatar_media_url": string,"bio": string,"created_at": string,"created_via": string,"header_media_url": string,"location": string,"num_followers": number,"num_tweets": number,"username": string,"website": string
+            }[]
+                           },
+"get_top_liked_users":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "full_text": string,"like_count": number,"reply_to_tweet_id": string,"reply_to_user_id": string,"reply_to_username": string,"tweet_id": string
+            }[]
+                           },
+"get_top_mentioned_users":
+{ Args: { "limit_": number }; Returns: {
+              "mention_count": number,"name": string,"screen_name": string,"user_id": string
+            }[]
+                           },
+"get_top_retweeted_tweets_by_username":
+{ Args: { "limit_": number,"username_": string }; Returns: {
+              "account_id": string,"archive_upload_id": number,"created_at": string,"favorite_count": number,"full_text": string,"reply_to_tweet_id": string,"reply_to_user_id": string,"reply_to_username": string,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"get_trending_tweets":
+{ Args: { "hours_back"?: number,"limit_count"?: number }; Returns: {
+              "account_id": string,"created_at": string,"engagement_score": number,"favorite_count": number,"full_text": string,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"get_tweet_count_by_date":
+{ Args: { "end_date": string,"start_date": string }; Returns: {
+              "tweet_count": number,"tweet_date": string
+            }[]
+                           } |
+{ Args: { "end_date": string,"granularity": string,"start_date": string }; Returns: {
+              "tweet_count": number,"tweet_date": string
+            }[]
+                           },
+"get_tweet_counts_by_granularity":
+{ Args: { "end_date": string,"granularity": string,"start_date": string }; Returns: {
+              "tweet_count": number,"tweet_date": string
+            }[]
+                           },
+"get_tweet_page_data":
+{ Args: { "p_tweet_id": string }; Returns: Json
+                           },
+"get_unique_scraper_count":
+{ Args: { "end_date": string,"start_date": string }; Returns: number
+                           },
+"list_public_api_keys":
+{ Args: { "owner_user_id": string }; Returns: Json
+                           },
+"lock_policy_account":
+{ Args: { "p_account_id": string }; Returns: undefined
+                           },
+"policy_account_is_blocked":
+{ Args: { "p_account_id"?: string,"p_username"?: string }; Returns: boolean
+                           },
+"policy_blocked_account_id":
+{ Args: { "p_username": string }; Returns: string
+                           },
+"policy_json_contains_blocked_author":
+{ Args: { "p_payload": Json }; Returns: boolean
+                           },
+"publish_digest_edition":
+{ Args: { "p_edition_id": string }; Returns: {
+              "content": NonNullable<Json>,
+"created_at": string,
+"created_by": string | null,
+"digest_date": string,
+"id": string,
+"issue_number": number,
+"published_at": string | null,
+"source_run_id": string,
+"status": string,
+"updated_at": string,
+"version": number,
+"view_count": number
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "digest_editions"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"record_digest_view":
+{ Args: { "p_edition_id": string }; Returns: number
+                           },
+"refresh_global_activity_summary":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
+"request_bulletin_refresh":
+{ Args: { "actor_id": string,"budget_usd": number,"expected_prompt_id": number,"request_id": string,"selection": string }; Returns: string
+                           },
+"resolve_directory_identity":
+{ Args: { "identifier": string }; Returns: {
+              "account_id": string,"username": string
+            }[]
+                           },
+"revoke_public_api_key":
+{ Args: { "owner_user_id": string,"target_key_id": string }; Returns: boolean
+                           },
+"save_bulletin_prompt":
+{ Args: { "actor_id": string,"change_note": string,"expected_id": number,"prompt_body": string }; Returns: string
+                           },
+"search_tweets":
+{ Args: { "from_user"?: string,"limit_"?: number,"offset_"?: number,"search_query": string,"since_date"?: string,"to_user"?: string,"until_date"?: string }; Returns: {
+              "account_display_name": string,"account_id": string,"archive_upload_id": number,"avatar_media_url": string,"created_at": string,"favorite_count": number,"full_text": string,"media": Json,"reply_to_tweet_id": string,"retweet_count": number,"tweet_id": string,"username": string
+            }[]
+                           } |
+{ Args: { "account_filter"?: string,"date_from"?: string,"date_to"?: string,"limit_count"?: number,"search_query": string }; Returns: {
+              "account_id": string,"created_at": string,"favorite_count": number,"full_text": string,"relevance": number,"retweet_count": number,"tweet_id": string
+            }[]
+                           },
+"search_tweets_exact_phrase":
+{ Args: { "exact_phrase": string,"from_user"?: string,"limit_"?: number,"offset_"?: number,"since_date"?: string,"to_user"?: string,"until_date"?: string }; Returns: {
+              "account_display_name": string,"account_id": string,"archive_upload_id": number,"avatar_media_url": string,"created_at": string,"favorite_count": number,"full_text": string,"media": Json,"reply_to_tweet_id": string,"retweet_count": number,"tweet_id": string,"username": string
+            }[]
+                           },
+"search_user_suggestions":
+{ Args: { "result_limit"?: number,"search_text": string }; Returns: {
+              "account_display_name": string,"account_id": string,"num_followers": number,"username": string
+            }[]
+                           },
+"set_bulletin_dismissal":
+{ Args: { "dismissed": boolean,"notice_tweet_id": string,"viewer_account_id": string,"viewer_id": string }; Returns: undefined
+                           },
+"show_limit":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
+"show_trgm":
+{ Args: { "": string }; Returns: (string)[]
+                           },
+"tombstone_policy_account":
+{ Args: { "p_account_id": string }; Returns: undefined
+                           },
+"update_foreign_keys":
+{ Args: { "new_table_name": string,"old_table_name": string,"schema_name": string }; Returns: undefined
+                           },
+"verify_public_api_key":
+{ Args: { "presented_key_sha256": string,"target_key_id": string }; Returns: Json
+                           },
+"word_occurrences":
+{ Args: { "end_date"?: string,"search_word": string,"start_date"?: string,"user_ids"?: (string)[] }; Returns: {
+              "month": string,"word_count": number
+            }[]
+                           }
           }
-      search_tweets_exact_phrase: {
-        Args: {
-          exact_phrase: string
-          from_user?: string
-          to_user?: string
-          since_date?: string
-          until_date?: string
-          limit_?: number
-          offset_?: number
+          Enums: {
+            "upload_phase_enum": "uploading"|"ready_for_commit"|"committing"|"completed"|"failed"
+          }
+          CompositeTypes: {
+            [_ in never]: never
+          }
         }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          avatar_media_url: string
-          archive_upload_id: number
-          username: string
-          account_display_name: string
-          media: Json
-        }[]
-      }
-      search_user_suggestions: {
-        Args: {
-          search_text: string
-          result_limit?: number
-        }
-        Returns: {
-          account_id: string
-          username: string
-          account_display_name: string
-          num_followers: number
-        }[]
-      }
-      set_bulletin_dismissal: {
-        Args: {
-          viewer_id: string
-          viewer_account_id: string
-          notice_tweet_id: string
-          dismissed: boolean
-        }
-        Returns: undefined
-      }
-      set_limit: {
-        Args: {
-          "": number
-        }
-        Returns: number
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: {
-          "": string
-        }
-        Returns: string[]
-      }
-      tombstone_policy_account: {
-        Args: {
-          p_account_id: string
-        }
-        Returns: undefined
-      }
-      update_foreign_keys: {
-        Args: {
-          old_table_name: string
-          new_table_name: string
-          schema_name: string
-        }
-        Returns: undefined
-      }
-      verify_public_api_key: {
-        Args: {
-          target_key_id: string
-          presented_key_sha256: string
-        }
-        Returns: Json
-      }
-      word_occurrences: {
-        Args: {
-          search_word: string
-          start_date?: string
-          end_date?: string
-          user_ids?: string[]
-        }
-        Returns: {
-          month: string
-          word_count: number
-        }[]
-      }
-    }
-    Enums: {
-      upload_phase_enum:
-        | "uploading"
-        | "ready_for_commit"
-        | "committing"
-        | "completed"
-        | "failed"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
     : never
+  : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
     : never
+  : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
     : never
+  : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
-    : never
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
+export const Constants = {
+  "dev": {
+          Enums: {
+            
+          }
+        },"public": {
+          Enums: {
+            "upload_phase_enum": ["uploading", "ready_for_commit", "committing", "completed", "failed"]
+          }
+        }
+} as const

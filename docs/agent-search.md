@@ -325,11 +325,11 @@ plain words; keep the two in step.
 ## Run storage
 
 Production stores runs in `public.agent_search_runs`
-(`supabase/migrations/20261008120000_agent_search_runs.sql`), written with the
+(`supabase/migrations/20261022120000_agent_search_runs.sql`), written with the
 service-role client; RLS is on with no user grants. Two functions, also
 service role only, do the writes that must be atomic:
-`agent_search_add_usage` (`20261009120000_agent_search_usage.sql`) and
-`agent_search_admit` (`20261009130000_agent_search_admission.sql`, which also
+`agent_search_add_usage` (`20261022120100_agent_search_usage.sql`) and
+`agent_search_admit` (`20261022120200_agent_search_admission.sql`, which also
 adds `workflow_run_id`). Outside production the store is JSON files under
 `.agent-search-runs/` (git-ignored) with the same rules, so local development
 never writes production Supabase. The migrations must be applied to production

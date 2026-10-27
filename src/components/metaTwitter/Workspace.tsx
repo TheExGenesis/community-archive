@@ -507,6 +507,7 @@ export function Workspace({
                         width={36}
                         height={36}
                         sizes="36px"
+                        unoptimized
                         className="h-9 w-9 flex-none rounded-full object-cover"
                       />
                     ) : (

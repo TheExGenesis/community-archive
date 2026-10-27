@@ -8,11 +8,18 @@ import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 type MockImageProps = React.ComponentProps<'img'> & {
   fill?: boolean
   priority?: boolean
+  unoptimized?: boolean
 }
 
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ fill, priority, alt = '', ...props }: MockImageProps) => (
+  default: ({
+    fill,
+    priority,
+    unoptimized,
+    alt = '',
+    ...props
+  }: MockImageProps) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img alt={alt} {...props} />
   ),

@@ -31,6 +31,7 @@ import {
   resolveProfileCore,
   withBackfilledMedia,
 } from '@/lib/metaTwitter/profile'
+import { profileMetadata } from '@/lib/metaTwitter/profileMetadata'
 import { getCachedProfileLinks } from '@/lib/profileLinks'
 import { measureServerRead } from '@/lib/performance/server'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
@@ -58,32 +59,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { account_id } = await params
   const resolved = await resolveProfileCore(account_id)
   if (!resolved) return { title: 'User not found' }
-  const { accountId, profile } = resolved
-  const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
-  const normalizedBio = profile.bio?.replace(/\s+/g, ' ').trim()
-  const description = normalizedBio
-    ? normalizedBio.length > 200
-      ? `${normalizedBio.slice(0, 199).trimEnd()}…`
-      : normalizedBio
-    : `Explore @${profile.username}'s archived posts on Community Archive.`
-  const canonicalPath = userProfileHref(profile.username, accountId)
-  return {
-    title,
-    description,
-    alternates: { canonical: canonicalPath },
-    robots: { index: false },
-    openGraph: {
-      type: 'website',
-      url: canonicalPath,
-      title,
-      description,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-    },
-  }
+  return profileMetadata(resolved)
 }
 
 async function ProfileArchiveContent({
@@ -197,18 +173,16 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     )
   }
 
+  // Guest document requests are rewritten to the cached /guest route by the
+  // middleware; this covers anything that still reaches the dynamic page.
   if (!viewer) {
-    const returnParams = new URLSearchParams()
-    if (candidateYear) returnParams.set('chapter', String(candidateYear))
-    if (candidateSection) returnParams.set('section', candidateSection)
-    const query = returnParams.toString()
     return (
       <GuestProfile
         displayName={profile.account_display_name}
         username={profile.username}
         bio={profile.bio}
         avatarUrl={profile.avatar_media_url}
-        returnTo={`${canonicalProfilePath}${query ? `?${query}` : ''}`}
+        basePath={canonicalProfilePath}
       />
     )
   }
@@ -301,6 +275,7 @@ async function OptionalProfileBanner({
       src={`${url.replace(/\/$/, '')}/1500x500`}
       alt=""
       fill
+      unoptimized
       sizes="(max-width: 1220px) 100vw, 1220px"
       className="object-cover"
     />

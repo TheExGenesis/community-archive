@@ -54,17 +54,138 @@ test.each([
   expect(createMiddlewareClient).not.toHaveBeenCalled()
 })
 
+test.each(['/search', '/search?q=open+source&fromUser=alice'])(
+  'allows a private guest preview at %s',
+  async (path) => {
+    const response = await request(path)
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(response.headers.get('x-robots-tag')).toBe('noindex')
+    expect(createMiddlewareClient).not.toHaveBeenCalled()
+  },
+)
+
 test.each([
-  '/search',
-  '/search?q=open+source&fromUser=alice',
-  '/user/alice?chapter=2025',
-  '/user/42',
-])('allows a private guest preview at %s', async (path) => {
-  const response = await request(path)
+  ['/user/alice?chapter=2025', '/guest/user/alice?chapter=2025'],
+  ['/user/42', '/guest/user/42'],
+  ['/user/alice/', '/guest/user/alice'],
+])(
+  'serves the cacheable guest preview for %s from %s',
+  async (path, guestPath) => {
+    const response = await request(path)
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      `https://archive.test${guestPath}`,
+    )
+    expect(response.headers.get('cache-control')).toBeNull()
+    expect(response.headers.get('x-robots-tag')).toBe('noindex')
+    expect(createMiddlewareClient).not.toHaveBeenCalled()
+  },
+)
+
+test('preserves cleared session chunks and SDK cache headers on a guest rewrite', async () => {
+  const cacheHeaders = {
+    'Cache-Control': 'private, no-cache, no-store, must-revalidate, max-age=0',
+    Expires: '0',
+    Pragma: 'no-cache',
+  }
+  getUser.mockImplementation(async () => {
+    const incoming = (createMiddlewareClient as jest.Mock).mock
+      .calls[0][0] as NextRequest
+    for (const chunk of ['sb-test-auth-token.0', 'sb-test-auth-token.1']) {
+      incoming.cookies.set(chunk, '')
+    }
+    clientResponse = NextResponse.next({
+      request: { headers: incoming.headers },
+    })
+    for (const chunk of ['sb-test-auth-token.0', 'sb-test-auth-token.1']) {
+      clientResponse.cookies.set(chunk, '', {
+        path: '/',
+        maxAge: 0,
+        sameSite: 'lax',
+        secure: true,
+      })
+    }
+    for (const [name, value] of Object.entries(cacheHeaders)) {
+      clientResponse.headers.set(name, value)
+    }
+    return { data: { user: null }, error: new Error('Invalid token') }
+  })
+  const response = await request('/user/alice?chapter=2025', {
+    cookie:
+      'sb-test-auth-token.0=expired; sb-test-auth-token.1=stale; preference=kept',
+  })
+  expect(response.headers.get('x-middleware-rewrite')).toBe(
+    'https://archive.test/guest/user/alice?chapter=2025',
+  )
+  for (const chunk of ['sb-test-auth-token.0', 'sb-test-auth-token.1']) {
+    expect(response.cookies.get(chunk)).toMatchObject({
+      value: '',
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+      secure: true,
+    })
+  }
+  for (const [name, value] of Object.entries(cacheHeaders)) {
+    expect(response.headers.get(name)).toBe(value)
+  }
+  const forwardedCookies = response.headers.get('x-middleware-request-cookie')
+  expect(forwardedCookies).toContain('preference=kept')
+  expect(forwardedCookies).toContain('sb-test-auth-token.0=')
+  expect(forwardedCookies).toContain('sb-test-auth-token.1=')
+  expect(forwardedCookies).not.toContain('expired')
+  expect(forwardedCookies).not.toContain('stale')
+})
+
+test.each([
+  ['/tweets/123', '/guest/tweets/123'],
+  ['/tweets/123/', '/guest/tweets/123'],
+  ['/tweets/123?from=bangers', '/guest/tweets/123?from=bangers'],
+])(
+  'serves cookie-less tweet permalinks %s from the cached %s',
+  async (path, guestPath) => {
+    const response = await request(path)
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      `https://archive.test${guestPath}`,
+    )
+    expect(response.headers.get('cache-control')).toBeNull()
+    expect(createMiddlewareClient).not.toHaveBeenCalled()
+  },
+)
+
+test('sends visitors with a session to the consent-checked tweet page', async () => {
+  const response = await request('/tweets/123', {
+    cookie: 'sb-test-auth-token=session',
+  })
+  expect(response.headers.get('x-middleware-rewrite')).toBeNull()
   expect(response.headers.get('x-middleware-next')).toBe('1')
+})
+
+test.each(['/tweets/123/opengraph-image', '/tweets/abc', '/tweets'])(
+  'leaves other tweet paths alone: %s',
+  async (path) => {
+    expect(
+      (await request(path)).headers.get('x-middleware-rewrite'),
+    ).toBeNull()
+  },
+)
+
+test('does not rewrite guest previews that are not document reads', async () => {
+  const response = await middleware(
+    new NextRequest('https://archive.test/user/alice', {
+      method: 'HEAD',
+      headers: {
+        'user-agent': 'Mozilla/5.0 Chrome/140.0.0.0 Safari/537.36',
+        accept: 'text/html',
+        'accept-language': 'en-US',
+        'accept-encoding': 'gzip',
+        'x-forwarded-for': 'access-test-head',
+        cookie: `__cc=${challenge()}`,
+      },
+    }),
+  )
+  expect(response.headers.get('x-middleware-rewrite')).toBeNull()
   expect(response.headers.get('cache-control')).toBe('private, no-store')
-  expect(response.headers.get('x-robots-tag')).toBe('noindex')
-  expect(createMiddlewareClient).not.toHaveBeenCalled()
 })
 
 test.each([

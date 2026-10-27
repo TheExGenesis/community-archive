@@ -22,6 +22,7 @@ import {
 } from '@/lib/hexMap/geometry'
 import { placeCallouts } from '@/lib/hexMap/callouts'
 import type { HexSnapshot } from '@/lib/hexMap/types'
+import { captureHomepageMapAction } from '@/lib/posthog'
 import useMapCamera from './useMapCamera'
 import styles from './hero.module.css'
 
@@ -456,6 +457,7 @@ export default memo(function HexMap({
   }, [hovered, snapshot, onSelectionIntent])
 
   const selectRegion = (regionId: number, additive = false) => {
+    captureHomepageMapAction('community_selected')
     const region = snapshot.regions.find((r) => r.id === regionId)!
     const ids = snapshot.cells.flatMap((cell, id) =>
       cell.region === regionId ? [id] : [],
@@ -473,7 +475,22 @@ export default memo(function HexMap({
   }
   const selectCell = (id: number, additive = false, individual = false) => {
     if (!individual) return selectRegion(snapshot.cells[id].region, additive)
+    captureHomepageMapAction('hex_selected')
     onSelect(additive ? Array.from(new Set([...selected, id])) : [id])
+  }
+  const clearSelection = () => {
+    if (selected.length) captureHomepageMapAction('selection_cleared')
+    onSelect([])
+  }
+  const zoom = (direction: 'in' | 'out') => {
+    captureHomepageMapAction(
+      direction === 'in' ? 'zoom_in_clicked' : 'zoom_out_clicked',
+    )
+    camera.zoomAt(direction === 'in' ? 1.5 : 1 / 1.5)
+  }
+  const resetView = () => {
+    captureHomepageMapAction('view_reset')
+    camera.reset()
   }
   const atPointer = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -584,7 +601,7 @@ export default memo(function HexMap({
               return
             }
             clickedCell.current = id
-            id === null ? onSelect([]) : selectCell(id, additive)
+            id === null ? clearSelection() : selectCell(id, additive)
           }}
           onDoubleClick={(e) => {
             e.preventDefault()
@@ -599,10 +616,10 @@ export default memo(function HexMap({
           }}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return
-            if (e.key === 'Escape') onSelect([])
-            if (e.key === '+' || e.key === '=') camera.zoomAt(1.5)
-            if (e.key === '-') camera.zoomAt(1 / 1.5)
-            if (e.key === 'Home') camera.reset()
+            if (e.key === 'Escape') clearSelection()
+            if (e.key === '+' || e.key === '=') zoom('in')
+            if (e.key === '-') zoom('out')
+            if (e.key === 'Home') resetView()
             if (e.key.startsWith('Arrow')) {
               e.preventDefault()
               const next =
@@ -632,7 +649,12 @@ export default memo(function HexMap({
               type="checkbox"
               role="switch"
               checked={showArchived}
-              onChange={(event) => setShowArchived(event.target.checked)}
+              onChange={(event) => {
+                setShowArchived(event.target.checked)
+                captureHomepageMapAction('archive_overlay_toggled', {
+                  enabled: event.target.checked,
+                })
+              }}
             />
             Show archived
           </label>
@@ -755,25 +777,21 @@ export default memo(function HexMap({
         </div>
         {scrubber}
         <div className={styles.mobileMapControls} aria-label="Map controls">
-          <button
-            type="button"
-            aria-label="Zoom in"
-            onClick={() => camera.zoomAt(1.5)}
-          >
+          <button type="button" aria-label="Zoom in" onClick={() => zoom('in')}>
             +
           </button>
           <button
             type="button"
             aria-label="Zoom out"
-            onClick={() => camera.zoomAt(1 / 1.5)}
+            onClick={() => zoom('out')}
           >
             −
           </button>
-          <button type="button" onClick={() => camera.reset()}>
+          <button type="button" onClick={resetView}>
             Reset view
           </button>
           {!!selected.length && (
-            <button type="button" onClick={() => onSelect([])}>
+            <button type="button" onClick={clearSelection}>
               Clear selection
             </button>
           )}

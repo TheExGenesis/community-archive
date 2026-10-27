@@ -387,12 +387,14 @@ function isPageRoute(pathname: string): boolean {
 }
 
 /**
- * Public documentation must remain readable by non-browser clients. The rest
+ * The homepage and public documentation must be readable without JavaScript,
+ * browser headers, or cookies. This exemption is only for GET/HEAD reads. The rest
  * of the site keeps its scraper protections, while agents and API tools can
  * fetch these entry points without pretending to be a browser.
  */
-function isPublicDocumentationRoute(pathname: string): boolean {
+function isPublicInformationRoute(pathname: string): boolean {
   return (
+    pathname === '/' ||
     pathname === '/llms.txt' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
@@ -424,7 +426,9 @@ export async function middleware(request: NextRequest) {
   const ua = request.headers.get('user-agent') || ''
   const pageRoute = isPageRoute(pathname)
   const previewBot = isPreviewBot(ua)
-  const publicDocumentationRoute = isPublicDocumentationRoute(pathname)
+  const publicInformationRead =
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    isPublicInformationRoute(pathname)
   const monitoringHealthRoute = isMonitoringHealthRoute(pathname)
   const isRoutePrefetch =
     request.headers.get('next-router-prefetch') === '1' ||
@@ -467,7 +471,7 @@ export async function middleware(request: NextRequest) {
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (
     !previewBot &&
-    !publicDocumentationRoute &&
+    !publicInformationRead &&
     !monitoringHealthRoute &&
     !machineAuthRoute
   ) {
@@ -491,7 +495,7 @@ export async function middleware(request: NextRequest) {
   if (
     pageRoute &&
     !previewBot &&
-    !publicDocumentationRoute &&
+    !publicInformationRead &&
     !isServerAction &&
     !isRscRequest
   ) {
@@ -613,7 +617,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Stage 4: JS Challenge Gate (all page routes, first visit) ───────────
-  if (pageRoute && !previewBot && !publicDocumentationRoute) {
+  if (pageRoute && !previewBot && !publicInformationRead) {
     const challengeCookie = request.cookies.get('__cc')?.value
     if (!isValidChallengeCookie(challengeCookie)) {
       const challengeHtml = buildChallengeHtml(request.url)

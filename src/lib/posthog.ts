@@ -1,6 +1,13 @@
 'use client'
 
-import { productFeatures, productActions } from './productActionSchema'
+import {
+  productFeatures,
+  productActions,
+  homepageMapActions,
+  homepageMapTabs,
+  type HomepageMapAction,
+  type HomepageMapTab,
+} from './productActionSchema'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import type {
   CaptureResult,
@@ -197,6 +204,11 @@ const profileCurationProperties = {
 }
 
 export const allowedEventProperties = {
+  homepage_map_action: {
+    action: isOneOf(homepageMapActions),
+    tab: (value) => value === undefined || isOneOf(homepageMapTabs)(value),
+    enabled: (value) => value === undefined || isBoolean(value),
+  },
   community_app_action: {
     action: isOneOf(['details_opened', 'launch_clicked']),
     // Public catalog slugs include newly approved apps; never a URL or user input.
@@ -249,6 +261,7 @@ export const allowedEventProperties = {
     section: isOneOf([
       'navigation_shell',
       'homepage_stats',
+      'homepage_hex_map',
       'homepage_digest',
       'homepage_stream',
       'bangers_results',
@@ -714,6 +727,13 @@ export function capturePostHogEvent(
       ...properties,
     },
   )
+}
+
+export function captureHomepageMapAction(
+  action: HomepageMapAction,
+  details: { tab?: HomepageMapTab; enabled?: boolean } = {},
+) {
+  capturePostHogEvent('homepage_map_action', { action, ...details })
 }
 
 export async function capturePostHogEventWhenReady(

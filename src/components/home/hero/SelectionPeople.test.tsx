@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SelectionPeople from './SelectionPeople'
 import { selectionPeopleOptions } from './useSelectionPreview'
+import { captureHomepageMapAction } from '@/lib/posthog'
+jest.mock('@/lib/posthog', () => ({ captureHomepageMapAction: jest.fn() }))
 
 jest.mock('./hero.module.css', () => ({}))
 let intersect: IntersectionObserverCallback
@@ -17,6 +19,7 @@ const people = (start: number, count: number) =>
   }))
 let client: QueryClient
 beforeEach(() => {
+  jest.clearAllMocks()
   client = new QueryClient()
   global.fetch = fetchMock as typeof fetch
   fetchMock.mockReset()
@@ -62,7 +65,9 @@ it('fetches only on open, loads the next page at the dialog sentinel, and resets
     .mockResolvedValueOnce(respond(100, 1, null))
   const { rerender } = render(<List />)
   expect(fetchMock).not.toHaveBeenCalled()
+  expect(captureHomepageMapAction).not.toHaveBeenCalled()
   open()
+  expect(captureHomepageMapAction).toHaveBeenCalledWith('members_opened')
   await screen.findByRole('link', { name: '@member24' })
   expect(fetchMock).toHaveBeenCalledTimes(1)
   expect(observerRoot).toHaveAttribute('aria-label', 'Archive members')

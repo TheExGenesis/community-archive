@@ -1,6 +1,7 @@
 'use client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { MapStory } from '@/lib/hexMap/stories'
+import { captureHomepageMapAction } from '@/lib/posthog'
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { storyDetailOptions, warmStory } from './useStoryDetail'
@@ -49,7 +50,10 @@ export default function StoryCard({
       ref={ref}
       type="button"
       className={styles.story}
-      onClick={() => onOpen(story)}
+      onClick={() => {
+        captureHomepageMapAction('story_opened')
+        onOpen(story)
+      }}
       onMouseEnter={hover}
       onMouseLeave={() => onHover(null)}
       onFocus={hover}

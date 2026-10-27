@@ -14,8 +14,9 @@ const noStore = { 'Cache-Control': 'private, no-store' }
 // and steps still in flight add theirs when they finish.
 export async function POST(
   _request: Request,
-  { params }: { params: { runId: string } },
+  { params: paramsPromise }: { params: Promise<{ runId: string }> },
 ) {
+  const params = await paramsPromise
   const access = await getAgentSearchAccess()
   if (!access.ok) {
     return NextResponse.json(

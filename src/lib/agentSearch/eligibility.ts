@@ -73,7 +73,7 @@ function trustedUsername(user: User): string {
  * throw so the route can answer 503 rather than wrongly refusing a member.
  */
 export async function getAgentSearchViewer(): Promise<AgentSearchViewerResult> {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   if (
     process.env.NODE_ENV === 'development' &&
     cookieStore.get('dev_as_member')?.value === '1'

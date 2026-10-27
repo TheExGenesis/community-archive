@@ -20,8 +20,9 @@ const TWEET_ID = /^\d{1,20}$/
 // runs, so its ids are gone with it.
 export async function POST(
   request: Request,
-  { params }: { params: { conversationId: string } },
+  { params: paramsPromise }: { params: Promise<{ conversationId: string }> },
 ) {
+  const params = await paramsPromise
   const access = await getAgentSearchViewer()
   if (!access.ok) {
     return NextResponse.json(

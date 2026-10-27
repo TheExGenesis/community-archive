@@ -21,8 +21,9 @@ const noStore = { 'Cache-Control': 'private, no-store' }
 // Reconnects a refreshed page to a running answer. Only the asker may read it.
 export async function GET(
   request: Request,
-  { params }: { params: { runId: string } },
+  { params: paramsPromise }: { params: Promise<{ runId: string }> },
 ) {
+  const params = await paramsPromise
   const access = await getAgentSearchAccess()
   if (!access.ok) {
     return NextResponse.json(

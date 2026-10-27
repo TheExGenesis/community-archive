@@ -30,11 +30,11 @@ const store = { listConversation: jest.fn(), deleteConversation: jest.fn() }
 const ID = 'conv-12345678'
 const call = (id = ID) =>
   DELETE(new Request(`http://localhost/x/${id}`, { method: 'DELETE' }), {
-    params: { conversationId: id },
+    params: Promise.resolve({ conversationId: id }),
   })
 const get = (id = ID) =>
   GET(new Request(`http://localhost/x/${id}`), {
-    params: { conversationId: id },
+    params: Promise.resolve({ conversationId: id }),
   })
 const run = (overrides: Record<string, unknown> = {}) => ({
   id: 'r1',

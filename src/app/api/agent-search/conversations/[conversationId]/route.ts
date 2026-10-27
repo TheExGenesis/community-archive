@@ -16,8 +16,9 @@ const noStore = { 'Cache-Control': 'private, no-store' }
 // first), through the gateway, so opted-out posts drop out.
 export async function GET(
   _request: Request,
-  { params }: { params: { conversationId: string } },
+  { params: paramsPromise }: { params: Promise<{ conversationId: string }> },
 ) {
+  const params = await paramsPromise
   const access = await getAgentSearchViewer()
   if (!access.ok) {
     return NextResponse.json(
@@ -49,8 +50,9 @@ export async function GET(
 // unchanged (runStore.ts). Refused while its answer is being written.
 export async function DELETE(
   _request: Request,
-  { params }: { params: { conversationId: string } },
+  { params: paramsPromise }: { params: Promise<{ conversationId: string }> },
 ) {
+  const params = await paramsPromise
   const access = await getAgentSearchViewer()
   if (!access.ok) {
     return NextResponse.json(

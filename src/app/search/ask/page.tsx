@@ -56,12 +56,15 @@ function Gate({
 }
 
 export default async function AskTheArchivePage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { c?: string | string[] } & Partial<
-    Record<(typeof ASK_PREFILL_PARAMS)[number], string | string[]>
+  searchParams?: Promise<
+    { c?: string | string[] } & Partial<
+      Record<(typeof ASK_PREFILL_PARAMS)[number], string | string[]>
+    >
   >
 }) {
+  const searchParams = await searchParamsPromise
   const access = await getAgentSearchViewer()
 
   if (!access.ok && access.reason === 'signed_out') {

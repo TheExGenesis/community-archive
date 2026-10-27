@@ -152,7 +152,7 @@ export function ProfileLink({
   const people = useContext(ProfilePeopleContext)
   const person = people?.get(handleOf(children))
   const [open, setOpen] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(timer.current), [])
   const later = (next: boolean, ms: number) => {
     clearTimeout(timer.current)

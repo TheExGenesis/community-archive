@@ -32,7 +32,7 @@ const call = (body: unknown, id = ID) =>
       method: 'POST',
       body: typeof body === 'string' ? body : JSON.stringify(body),
     }),
-    { params: { conversationId: id } },
+    { params: Promise.resolve({ conversationId: id }) },
   )
 // A stored run whose searches returned 1, 2, 3 and 4; the prose cites 1.
 const run = (overrides: Record<string, unknown> = {}) => ({

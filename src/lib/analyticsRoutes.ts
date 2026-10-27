@@ -14,6 +14,9 @@ export const analyticsRoutes = {
   '/trends': ['trends', 'product'],
   '/user-dir': ['user_directory', 'product'],
   '/user/[account_id]': ['user_profile', 'product'],
+  // Cached signed-out views; the browser URL stays /user/... or /tweets/...
+  '/guest/user/[account_id]': ['user_profile', 'product'],
+  '/guest/tweets/[tweet_id]': ['tweet', 'product'],
   '/tweets': ['tweets', 'product'],
   '/tweets/[tweet_id]': ['tweet', 'product'],
   '/social-graph': ['social_graph', 'product'],

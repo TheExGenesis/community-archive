@@ -6,7 +6,6 @@ import {
 import { Petrona, Manrope } from 'next/font/google'
 import ThemeProvider from '@/providers/ThemeProvider'
 import NextTopLoader from 'nextjs-toploader'
-import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
@@ -152,7 +151,6 @@ export default function RootLayout({
                     </NavigationAudienceProvider>
                     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
                       {children}
-                      <Analytics />
                       <Footer />
                     </div>
                     <div className="hidden min-[980px]:block">

@@ -15,15 +15,16 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 export async function generateMetadata({
   params,
 }: {
-  params: { date: string; slug: string }
+  params: Promise<{ date: string; slug: string }>
 }): Promise<Metadata> {
-  const pathname = `/digest/${params.date}/${params.slug}`
-  if (!DATE_PATTERN.test(params.date))
+  const { date, slug } = await params
+  const pathname = `/digest/${date}/${slug}`
+  if (!DATE_PATTERN.test(date))
     return getDigestStoryMetadata(null, undefined, pathname)
-  const edition = await getPublishedDigest(params.date)
+  const edition = await getPublishedDigest(date)
   return getDigestStoryMetadata(
     edition,
-    edition?.content.stories.find((item) => item.slug === params.slug),
+    edition?.content.stories.find((item) => item.slug === slug),
     pathname,
   )
 }
@@ -31,12 +32,13 @@ export async function generateMetadata({
 export default async function DigestStoryPage({
   params,
 }: {
-  params: { date: string; slug: string }
+  params: Promise<{ date: string; slug: string }>
 }) {
-  if (!DATE_PATTERN.test(params.date)) notFound()
-  const edition = await getPublishedDigest(params.date)
+  const { date, slug } = await params
+  if (!DATE_PATTERN.test(date)) notFound()
+  const edition = await getPublishedDigest(date)
   const story = edition?.content.stories.find(
-    (item) => item.slug === params.slug,
+    (item) => item.slug === slug,
   )
   if (!edition || !story) notFound()
   return (

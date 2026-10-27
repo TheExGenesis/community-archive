@@ -23,7 +23,7 @@ export function InsightItem({
 }) {
   const [open, setOpen] = useState(false)
   const pinned = useRef(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const enter = () => {
     clearTimeout(timer.current)
     setOpen(true)

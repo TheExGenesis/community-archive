@@ -54,7 +54,7 @@ test('serves a bounded profile banger page', async () => {
     new NextRequest(
       'https://community-archive.org/api/profile/42/bangers?year=2025&offset=2&limit=2&sort=likes',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(200)
@@ -72,7 +72,7 @@ test('rejects invalid profile pagination without calling ClickHouse', async () =
     new NextRequest(
       'https://community-archive.org/api/profile/42/bangers?offset=-1',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(400)
@@ -84,7 +84,7 @@ test('rejects unknown profile sort modes instead of changing their meaning', asy
     new NextRequest(
       'https://community-archive.org/api/profile/42/bangers?sort=popular',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(400)
@@ -103,7 +103,7 @@ test('serves the year-scoped profile sidebar without shared HTTP caching', async
     new NextRequest(
       'https://community-archive.org/api/profile/42/sidebar?year=2024',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(200)
@@ -126,13 +126,13 @@ test('serves profile media and interactions without shared HTTP caching', async 
       new NextRequest(
         'https://community-archive.org/api/profile/42/media?year=2024',
       ),
-      { params: { account_id: '42' } },
+      { params: Promise.resolve({ account_id: '42' }) },
     ),
     getInteractions(
       new NextRequest(
         'https://community-archive.org/api/profile/42/interactions?year=2024',
       ),
-      { params: { account_id: '42' } },
+      { params: Promise.resolve({ account_id: '42' }) },
     ),
   ])
 
@@ -155,7 +155,7 @@ test('does not cache a transient profile sidebar failure as empty data', async (
 
   const response = await getSidebar(
     new NextRequest('https://community-archive.org/api/profile/42/sidebar'),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(502)

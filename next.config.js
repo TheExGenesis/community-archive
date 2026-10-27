@@ -5,12 +5,10 @@ const { withWorkflow } = require('workflow/next')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    outputFileTracingIncludes: {
-      '/user/*/opengraph-image': [
-        './src/app/user/*/community-archive-logo-white.png',
-      ],
-    },
+  outputFileTracingIncludes: {
+    '/user/*/opengraph-image': [
+      './src/app/user/*/community-archive-logo-white.png',
+    ],
   },
   images: {
     // Optimized images are re-transformed when their cache entry expires. The

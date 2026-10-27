@@ -45,7 +45,7 @@ describe('community project likes', () => {
   it('likes a catalog project before it has a database row', async () => {
     const db = setup(null)
     const response = await POST(new Request('http://localhost'), {
-      params: { id: 'tpot-trust' },
+      params: Promise.resolve({ id: 'tpot-trust' }),
     })
 
     expect(response.status).toBe(200)
@@ -64,7 +64,7 @@ describe('community project likes', () => {
       status: 'published',
     })
     const response = await POST(new Request('http://localhost'), {
-      params: { id: projectId },
+      params: Promise.resolve({ id: projectId }),
     })
 
     expect(response.status).toBe(200)
@@ -82,7 +82,7 @@ describe('community project likes', () => {
   it('unlikes a catalog project by slug', async () => {
     const db = setup(null)
     const response = await DELETE(new Request('http://localhost'), {
-      params: { id: 'tpot-trust' },
+      params: Promise.resolve({ id: 'tpot-trust' }),
     })
 
     expect(response.status).toBe(200)
@@ -93,7 +93,7 @@ describe('community project likes', () => {
   it('rejects unknown catalog slugs', async () => {
     setup(null)
     const response = await POST(new Request('http://localhost'), {
-      params: { id: 'unknown-project' },
+      params: Promise.resolve({ id: 'unknown-project' }),
     })
     expect(response.status).toBe(404)
   })

@@ -1,4 +1,4 @@
-import dynamic from 'next/dynamic'
+import SocialGraphExplorer from './DynamicSocialGraphExplorer'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import {
@@ -9,13 +9,6 @@ import {
 import { getCurrentUser } from '@/lib/portal/auth'
 import { SocialGraphAdminControls } from './SocialGraphAdminControls'
 
-const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[min(72vh,760px)] animate-pulse rounded-[4px] border border-zinc-200 bg-zinc-200/60 dark:border-[#26262a] dark:bg-[#151517]" />
-  ),
-})
-
 export const metadata = {
   title: 'Social graph · Community Archive',
   description:
@@ -23,8 +16,9 @@ export const metadata = {
 }
 
 export default async function SocialGraphPage({
-  searchParams = {},
-}: { searchParams?: { person?: string } } = {}) {
+  searchParams,
+}: { searchParams?: Promise<{ person?: string }> } = {}) {
+  const resolvedSearchParams = (await searchParams) ?? {}
   const snapshotResult = getSocialGraphSnapshot().then(
     (snapshot) => ({ snapshot, error: null }),
     (error: unknown) => ({ snapshot: null, error }),
@@ -91,9 +85,9 @@ export default async function SocialGraphPage({
           snapshot={snapshot}
           currentMember={currentMember}
           initialPerson={
-            typeof searchParams.person === 'string' &&
-            /^[A-Za-z0-9_]{1,15}$/.test(searchParams.person)
-              ? searchParams.person
+            typeof resolvedSearchParams.person === 'string' &&
+            /^[A-Za-z0-9_]{1,15}$/.test(resolvedSearchParams.person)
+              ? resolvedSearchParams.person
               : undefined
           }
         />

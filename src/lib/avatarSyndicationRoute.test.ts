@@ -18,7 +18,7 @@ describe('syndication avatar route', () => {
     })
 
     const response = await GET(new Request('http://localhost'), {
-      params: { tweet_id: '1234567890' },
+      params: Promise.resolve({ tweet_id: '1234567890' }),
     })
 
     expect(mockFetchSyndicatedTweet).toHaveBeenCalledWith('1234567890')
@@ -32,7 +32,7 @@ describe('syndication avatar route', () => {
     mockFetchSyndicatedTweet.mockResolvedValueOnce(null)
 
     const response = await GET(new Request('http://localhost'), {
-      params: { tweet_id: '1234567890' },
+      params: Promise.resolve({ tweet_id: '1234567890' }),
     })
 
     expect(response.status).toBe(404)

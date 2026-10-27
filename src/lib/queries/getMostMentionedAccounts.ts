@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 export async function getAccountMostMentionedAccounts(
   username: string,
 ): Promise<MentionedUser[]> {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
   const { data: users, error } = await supabase
@@ -56,7 +56,7 @@ export async function getAccountMostMentionedAccounts(
 export async function getArchiveMostMentionedAccounts(): Promise<
   MentionedUser[]
 > {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
   const { data: rawUsers, error } = await supabase
     .rpc('get_top_mentioned_users', { limit_: 10 })

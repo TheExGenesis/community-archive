@@ -205,10 +205,15 @@ function StrandPreview({
   )
 }
 
-export default async function Image({ params }: { params: { seed: string } }) {
-  if (!/^\d{1,20}$/.test(params.seed)) notFound()
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ seed: string }>
+}) {
+  const { seed } = await params
+  if (!/^\d{1,20}$/.test(seed)) notFound()
   const { strands } = await getStrands()
-  const strand = strands.find((item) => item.id === params.seed)
+  const strand = strands.find((item) => item.id === seed)
   if (!strand) notFound()
   const appFile = (...parts: string[]) =>
     readFile(join(process.cwd(), 'src', 'app', ...parts))

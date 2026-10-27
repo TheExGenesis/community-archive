@@ -100,7 +100,7 @@ export function Workspace({
   hasMore: boolean
   loadMoreFailed: boolean
   onLoadMore: () => void
-  loadMoreRef: RefObject<HTMLDivElement>
+  loadMoreRef: RefObject<HTMLDivElement | null>
   returnTo: string
   editing?: boolean
   editSaving?: boolean

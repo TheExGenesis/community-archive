@@ -13,12 +13,20 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 type PageProps = {
-  params: { tweet_id: string }
-  searchParams?: Record<string, string | string[] | undefined>
+  params: Promise<{ tweet_id: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-const loadFromProps = ({ params, searchParams }: PageProps) =>
-  loadTweetPage(params.tweet_id, searchParams?.from === 'opportunities')
+const loadFromProps = async ({ params, searchParams }: PageProps) => {
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ])
+  return loadTweetPage(
+    resolvedParams.tweet_id,
+    resolvedSearchParams?.from === 'opportunities',
+  )
+}
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
   return tweetPageMetadata(await loadFromProps(props))

@@ -29,7 +29,7 @@ const AvatarImage = React.forwardRef<
 >(({ avatarSize = 'small', className, src, ...props }, ref) => (
   <AvatarPrimitive.Image
     ref={ref}
-    src={getAvatarUrl(src, avatarSize)}
+    src={typeof src === 'string' ? getAvatarUrl(src, avatarSize) : src}
     className={cn('aspect-square h-full w-full', className)}
     {...props}
   />

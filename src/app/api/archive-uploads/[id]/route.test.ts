@@ -79,7 +79,8 @@ function setup(
   return { calls, rpc, query, serviceClient }
 }
 
-const remove = (id: string) => DELETE({} as NextRequest, { params: { id } })
+const remove = (id: string) =>
+  DELETE({} as NextRequest, { params: Promise.resolve({ id }) })
 
 describe('single archive deletion route', () => {
   beforeEach(() => {

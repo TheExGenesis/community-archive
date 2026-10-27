@@ -385,10 +385,11 @@ function ProfilePreview({
 export default async function Image({
   params,
 }: {
-  params: { account_id: string }
+  params: Promise<{ account_id: string }>
 }) {
-  await requireBrowsingUser(`/user/${encodeURIComponent(params.account_id)}`)
-  const resolved = await resolveProfile(params.account_id)
+  const { account_id } = await params
+  await requireBrowsingUser(`/user/${encodeURIComponent(account_id)}`)
+  const resolved = await resolveProfile(account_id)
   if (!resolved) notFound()
   const logo = await readFile(
     join(

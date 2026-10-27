@@ -7,9 +7,13 @@ export const runtime = 'nodejs'
 
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' }
 
-type Params = { params: { key_id: string } }
+type RouteParams = { key_id: string }
 
-export async function DELETE(request: NextRequest, { params }: Params) {
+export async function DELETE(
+  request: NextRequest,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   if (request.headers.get('origin') !== request.nextUrl.origin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers })
   }

@@ -15,17 +15,19 @@ export const dynamic = 'force-static'
 export const revalidate = 3600
 
 type PageProps = {
-  params: { tweet_id: string }
+  params: Promise<{ tweet_id: string }>
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  return tweetPageMetadata(await loadGuestTweetPage(params.tweet_id))
+  const { tweet_id } = await params
+  return tweetPageMetadata(await loadGuestTweetPage(tweet_id))
 }
 
 export default async function GuestTweetPage({ params }: PageProps) {
-  const page = await loadGuestTweetPage(params.tweet_id)
+  const { tweet_id } = await params
+  const page = await loadGuestTweetPage(tweet_id)
   if (!page) notFound()
   return <TweetPermalink page={page} />
 }

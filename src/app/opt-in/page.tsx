@@ -4,19 +4,20 @@ import { isStagingOptInPreviewEnabled } from '@/lib/stagingOptInPreview'
 import Link from 'next/link'
 
 interface OptInPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     mockOptIn?: string | string[]
     redirect?: string | string[]
-  }
+  }>
 }
 
 export default async function OptInPage({ searchParams }: OptInPageProps) {
+  const resolvedSearchParams = await searchParams
   const tweetReturn =
-    typeof searchParams?.redirect === 'string' &&
-    /^\/tweets\/\d{1,20}$/.test(searchParams.redirect)
-      ? searchParams.redirect
+    typeof resolvedSearchParams?.redirect === 'string' &&
+    /^\/tweets\/\d{1,20}$/.test(resolvedSearchParams.redirect)
+      ? resolvedSearchParams.redirect
       : null
-  const fromBulletin = searchParams?.redirect === '/bulletin'
+  const fromBulletin = resolvedSearchParams?.redirect === '/bulletin'
   const { user } = await requireAuth(
     fromBulletin
       ? '/opt-in?redirect=/bulletin'
@@ -25,7 +26,7 @@ export default async function OptInPage({ searchParams }: OptInPageProps) {
         : '/opt-in',
   )
   const mockOptIn = isStagingOptInPreviewEnabled(
-    searchParams?.mockOptIn === '1',
+    resolvedSearchParams?.mockOptIn === '1',
   )
   const optInData = mockOptIn ? null : (await getOptInStatus(user.id)).data
   const canVisitBulletin =

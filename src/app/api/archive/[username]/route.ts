@@ -8,8 +8,9 @@ const USERNAME = /^[A-Za-z0-9_]{1,15}$/
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { username: string } },
+  { params: paramsPromise }: { params: Promise<{ username: string }> },
 ) {
+  const params = await paramsPromise
   const username = params.username.toLowerCase()
   if (!USERNAME.test(username)) {
     return NextResponse.json({ error: 'Archive not found' }, { status: 404 })

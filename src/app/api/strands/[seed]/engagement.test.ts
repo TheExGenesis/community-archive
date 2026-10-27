@@ -60,7 +60,7 @@ function setupDb(results: Record<string, unknown[]>) {
   return chains
 }
 
-const params = { params: { seed: SEED } }
+const params = { params: Promise.resolve({ seed: SEED }) }
 const post = (body: unknown) =>
   new Request('http://localhost', {
     method: 'POST',
@@ -78,7 +78,7 @@ describe('strand engagement routes', () => {
   it('404s for malformed seeds without touching the database', async () => {
     setupDb({})
     const response = await likeRoute.GET(new Request('http://localhost'), {
-      params: { seed: 'not-a-seed' },
+      params: Promise.resolve({ seed: 'not-a-seed' }),
     })
     expect(response.status).toBe(404)
     expect(mockStrand).not.toHaveBeenCalled()
@@ -249,7 +249,7 @@ describe('strand engagement routes', () => {
     })
     const response = await commentRoute.DELETE(
       new Request('http://localhost'),
-      { params: { seed: SEED, commentId: COMMENT_ID } },
+      { params: Promise.resolve({ seed: SEED, commentId: COMMENT_ID }) },
     )
     expect(response.status).toBe(403)
   })
@@ -266,7 +266,7 @@ describe('strand engagement routes', () => {
     })
     const response = await commentRoute.DELETE(
       new Request('http://localhost'),
-      { params: { seed: SEED, commentId: COMMENT_ID } },
+      { params: Promise.resolve({ seed: SEED, commentId: COMMENT_ID }) },
     )
     expect(response.status).toBe(200)
     const [update] = chains.strand_comments[1]

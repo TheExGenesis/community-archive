@@ -10,14 +10,15 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 export async function generateMetadata({
   params,
 }: {
-  params: { date: string }
+  params: Promise<{ date: string }>
 }): Promise<Metadata> {
-  if (!DATE_PATTERN.test(params.date))
-    return getDigestMetadata(null, `/digest/${params.date}`, 'article')
+  const { date } = await params
+  if (!DATE_PATTERN.test(date))
+    return getDigestMetadata(null, `/digest/${date}`, 'article')
 
   return getDigestMetadata(
-    await getPublishedDigest(params.date),
-    `/digest/${params.date}`,
+    await getPublishedDigest(date),
+    `/digest/${date}`,
     'article',
   )
 }
@@ -25,10 +26,11 @@ export async function generateMetadata({
 export default async function DatedDigestPage({
   params,
 }: {
-  params: { date: string }
+  params: Promise<{ date: string }>
 }) {
-  if (!DATE_PATTERN.test(params.date)) notFound()
-  const edition = await getPublishedDigest(params.date)
+  const { date } = await params
+  if (!DATE_PATTERN.test(date)) notFound()
+  const edition = await getPublishedDigest(date)
   if (!edition) notFound()
   return <PublishedDigestView edition={edition} />
 }

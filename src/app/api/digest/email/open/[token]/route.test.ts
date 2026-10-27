@@ -18,7 +18,7 @@ test('marks the first open and returns an uncached image', async () => {
     .mocked(createServerServiceRoleClient)
     .mockReturnValue({ from: () => query } as never)
   const response = await GET(new Request('http://localhost'), {
-    params: { token: TOKEN },
+    params: Promise.resolve({ token: TOKEN }),
   })
   expect(response.status).toBe(200)
   expect(response.headers.get('Content-Type')).toBe('image/gif')
@@ -29,7 +29,7 @@ test('marks the first open and returns an uncached image', async () => {
 
 test('an invalid token returns the image without a database write', async () => {
   const response = await GET(new Request('http://localhost'), {
-    params: { token: 'invalid' },
+    params: Promise.resolve({ token: 'invalid' }),
   })
   expect(response.status).toBe(200)
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()

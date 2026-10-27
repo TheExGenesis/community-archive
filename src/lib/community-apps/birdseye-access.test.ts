@@ -223,7 +223,7 @@ test('a share link redirects without the secret and uses a private HttpOnly cook
   stored.app_metadata.birdseye_share = share.setting
   const response = await GET(
     new NextRequest(`https://ca.test/api/birdseye/share/${share.token}`),
-    { params: { token: share.token } },
+    { params: Promise.resolve({ token: share.token }) },
   )
   expect(response.status).toBe(303)
   expect(response.headers.get('location')).toBe(

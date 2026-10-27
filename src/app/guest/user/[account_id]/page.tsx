@@ -19,26 +19,29 @@ export const dynamic = 'force-static'
 export const revalidate = 300
 
 interface PageProps {
-  params: { account_id: string }
+  params: Promise<{ account_id: string }>
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const resolved = await resolveProfileCore(params.account_id)
+  const { account_id } = await params
+  const resolved = await resolveProfileCore(account_id)
   if (!resolved) return { title: 'User not found' }
   return profileMetadata(resolved)
 }
 
 export default async function GuestProfilePage({ params }: PageProps) {
-  const resolved = await resolveProfileCore(params.account_id)
+  const { account_id } = await params
+  const resolved = await resolveProfileCore(account_id)
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
-  const requestedProfilePath = `/user/${encodeURIComponent(params.account_id)}`
+  const requestedProfilePath = `/user/${encodeURIComponent(account_id)}`
   const canonicalProfilePath = userProfileHref(profile.username, accountId)
   // Sends the browser to the public URL; the middleware rewrites it back here.
-  if (canonicalProfilePath !== requestedProfilePath) redirect(canonicalProfilePath)
+  if (canonicalProfilePath !== requestedProfilePath)
+    redirect(canonicalProfilePath)
 
   return (
     <GuestProfile

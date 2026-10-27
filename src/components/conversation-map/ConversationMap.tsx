@@ -60,10 +60,12 @@ export default function ConversationMap({
   const chart = useRef<SVGSVGElement>(null),
     overview = useRef<SVGSVGElement>(null),
     card = useRef<HTMLDivElement>(null)
-  const geometry = useRef<MapGeometry>(),
-    drag = useRef<Drag>(),
-    overviewDrag = useRef<Drag>()
-  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(),
+  const geometry = useRef<MapGeometry | undefined>(undefined),
+    drag = useRef<Drag | undefined>(undefined),
+    overviewDrag = useRef<Drag | undefined>(undefined)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+      undefined,
+    ),
     hoverId = useRef<string | null>(null)
   const days = yearDays(year),
     span = range[1] - range[0],

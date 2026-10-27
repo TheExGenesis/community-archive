@@ -7,10 +7,14 @@ import {
 } from '@/lib/digest/database'
 import { ensurePublishedEdition } from '@/lib/digest/comments'
 
-type Params = { params: { editionId: string; commentId: string } }
+type RouteParams = { editionId: string; commentId: string }
 
-export async function DELETE(_request: Request, { params }: Params) {
-  const supabase = createDigestPublicClient(cookies())
+export async function DELETE(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
+  const supabase = createDigestPublicClient(await cookies())
   const {
     data: { user },
     error: authError,

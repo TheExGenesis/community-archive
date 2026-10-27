@@ -20,7 +20,7 @@ export function RefreshControls({
   const [budget, setBudget] = useState('0.10')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
-  const requestId = useRef<string>()
+  const requestId = useRef<string | undefined>(undefined)
   const active = state?.requests.some(
     (r) => r.status === 'queued' || r.status === 'running',
   )

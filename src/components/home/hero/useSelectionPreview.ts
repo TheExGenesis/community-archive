@@ -23,7 +23,7 @@ export function selectionPeopleOptions(ids: string) {
 
 export function useSelectionPreview(tab: string, snapshot?: HexSnapshot) {
   const client = useQueryClient()
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const preloadSelection = useCallback(
     (cells: number[], nextTab = tab) => {
       if (!cells.length) return

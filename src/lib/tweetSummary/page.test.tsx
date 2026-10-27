@@ -2,6 +2,7 @@ import {
   Children,
   isValidElement,
   Suspense,
+  type ComponentProps,
   type ReactElement,
   type ReactNode,
 } from 'react'
@@ -39,14 +40,19 @@ jest.mock('@/components/QuotingTweetsSidebar', () => ({
   default: () => null,
 }))
 
-function elements(node: ReactNode): ReactElement[] {
+type TreeProps = { children?: ReactNode; fallback?: ReactNode; tweet?: unknown }
+function elements(node: ReactNode): ReactElement<TreeProps>[] {
   return Children.toArray(node).flatMap((child) =>
-    isValidElement(child) ? [child, ...elements(child.props.children)] : [],
+    isValidElement<TreeProps>(child)
+      ? [child, ...elements(child.props.children)]
+      : [],
   )
 }
 
 // The routes return <TweetPermalink page={...} />; expand it the way React would.
-function render(route: ReactElement): ReactElement {
+function render(
+  route: ReactElement<ComponentProps<typeof TweetPermalink>>,
+): ReactElement {
   expect(route.type).toBe(TweetPermalink)
   return TweetPermalink(route.props)
 }
@@ -107,7 +113,7 @@ test('shows a real heading and tweet while summary and quotes are pending, then 
 
   // Neither optional promise has resolved when the page produces its shell.
   const shell = render(
-    await TweetPage({ params: { tweet_id: tweet.tweet_id } }),
+    await TweetPage({ params: Promise.resolve({ tweet_id: tweet.tweet_id }) }),
   )
   const nodes = elements(shell)
   const boundaries = nodes.filter((node) => node.type === Suspense)
@@ -122,7 +128,13 @@ test('shows a real heading and tweet while summary and quotes are pending, then 
   )
   expect(nodes.some((node) => node.props.tweet === tweet)).toBe(true)
 
-  const incoming = boundaries[2].props.children
+  const incoming = boundaries[2].props.children as ReactElement<
+    { quotePosts: typeof quotePosts; targetTweet: typeof tweet },
+    (props: {
+      quotePosts: typeof quotePosts
+      targetTweet: typeof tweet
+    }) => Promise<ReactNode>
+  >
   const sidebar = incoming.type(incoming.props)
   const quoted = { ...tweet, tweet_id: '456' }
   resolveQuotes({ tweets: [quoted], totalCount: 19 })
@@ -134,7 +146,9 @@ test('shows a real heading and tweet while summary and quotes are pending, then 
 
 test('guests see labeled previews without rendering conversation boundaries', async () => {
   ;(loadTweetPage as jest.Mock).mockResolvedValue(guestView)
-  const shell = render(await TweetPage({ params: { tweet_id: '123' } }))
+  const shell = render(
+    await TweetPage({ params: Promise.resolve({ tweet_id: '123' }) }),
+  )
   // Only the back link's boundary remains.
   expect(elements(shell).filter((node) => node.type === Suspense)).toHaveLength(
     1,
@@ -149,7 +163,9 @@ test('guests see labeled previews without rendering conversation boundaries', as
 test('the cached guest route renders the same preview from the request-free loader', async () => {
   ;(loadGuestTweetPage as jest.Mock).mockResolvedValue(guestView)
   const html = renderToStaticMarkup(
-    render(await GuestTweetPage({ params: { tweet_id: '123' } })),
+    render(
+      await GuestTweetPage({ params: Promise.resolve({ tweet_id: '123' }) }),
+    ),
   )
   expect(loadTweetPage).not.toHaveBeenCalled()
   expect(html).toContain('Tweet by Alice</h1>')

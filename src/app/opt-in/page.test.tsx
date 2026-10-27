@@ -26,7 +26,11 @@ beforeEach(() => {
 })
 
 test('explains the bulletin requirement and preserves the destination through login', async () => {
-  render(await OptInPage({ searchParams: { redirect: '/bulletin' } }))
+  render(
+    await OptInPage({
+      searchParams: Promise.resolve({ redirect: '/bulletin' }),
+    }),
+  )
   expect(requireAuth).toHaveBeenCalledWith('/opt-in?redirect=/bulletin')
   expect(screen.getByText(/choose whether to opt in/i)).toBeInTheDocument()
   expect(
@@ -41,7 +45,11 @@ test.each([false, true])(
       data: { opted_in: true, explicit_optout: optedOut },
       error: null,
     } as Awaited<ReturnType<typeof getOptInStatus>>)
-    render(await OptInPage({ searchParams: { redirect: '/bulletin' } }))
+    render(
+      await OptInPage({
+        searchParams: Promise.resolve({ redirect: '/bulletin' }),
+      }),
+    )
     const link = screen.queryByRole('link', {
       name: /continue to the bulletin/i,
     })
@@ -53,7 +61,7 @@ test.each([false, true])(
 test.each([undefined, 'https://example.com', ['/bulletin']])(
   'ignores unrelated or malformed redirect destinations: %s',
   async (redirect) => {
-    render(await OptInPage({ searchParams: { redirect } }))
+    render(await OptInPage({ searchParams: Promise.resolve({ redirect }) }))
     expect(requireAuth).toHaveBeenCalledWith('/opt-in')
     expect(
       screen.queryByText(/the bulletin is available/i),
@@ -66,7 +74,10 @@ test('mock opt-in never enables bulletin access', async () => {
   jest.mocked(isStagingOptInPreviewEnabled).mockReturnValue(true)
   render(
     await OptInPage({
-      searchParams: { redirect: '/bulletin', mockOptIn: '1' },
+      searchParams: Promise.resolve({
+        redirect: '/bulletin',
+        mockOptIn: '1',
+      }),
     }),
   )
   expect(getOptInStatus).not.toHaveBeenCalled()

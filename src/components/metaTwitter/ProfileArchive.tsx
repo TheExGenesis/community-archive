@@ -112,7 +112,7 @@ export function ProfileArchive({
     resources,
     setEditSaving,
   })
-  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
   const activeKey = feedKey(activeYear, sort)
   const activeFeed = feeds[activeKey]

@@ -22,7 +22,7 @@ function boundedInteger(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tweet_id: string } },
+  { params: paramsPromise }: { params: Promise<{ tweet_id: string }> },
 ) {
   if (!(await canReadTweetConversation())) {
     return NextResponse.json(
@@ -30,6 +30,7 @@ export async function GET(
       { status: 403, headers: { 'Cache-Control': 'private, no-store' } },
     )
   }
+  const params = await paramsPromise
   try {
     if (!/^\d{1,20}$/.test(params.tweet_id)) {
       return NextResponse.json({ error: 'Tweet not found' }, { status: 404 })

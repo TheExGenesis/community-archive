@@ -11,8 +11,9 @@ export const maxDuration = 60
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(
   request: NextRequest,
-  { params }: { params: { seed: string } },
+  { params: paramsPromise }: { params: Promise<{ seed: string }> },
 ) {
+  const params = await paramsPromise
   const id = request.nextUrl.searchParams.get('tweet_id') ?? ''
   if (!/^\d{1,20}$/.test(id) || !/^\d{1,20}$/.test(params.seed))
     return NextResponse.json(

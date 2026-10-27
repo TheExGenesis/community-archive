@@ -33,7 +33,7 @@ export async function companionSignedIn(request: Request): Promise<boolean> {
   if (authorization !== null) {
     if (!/^Bearer \S+$/i.test(authorization) || authorization.length > 8192)
       return false
-    const { data, error } = await createServerClient(cookies()).auth.getUser(
+    const { data, error } = await createServerClient(await cookies()).auth.getUser(
       authorization.slice(7),
     )
     return !error && !!data.user && !data.user.is_anonymous

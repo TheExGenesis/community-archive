@@ -21,7 +21,7 @@ beforeEach(() => {
 test('uses stored avatars for normal requests without external recovery', async () => {
   const response = await GET(
     new Request('https://archive.test/api/profile/42/avatar'),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
   expect(await response.json()).toEqual({
     avatar_media_url: 'https://pbs.twimg.com/old.jpg',
@@ -39,7 +39,7 @@ test('a failed-image refresh bypasses the known stored avatar and checks the aut
   )
   const response = await GET(
     new Request('https://archive.test/api/profile/42/avatar?refresh=1'),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
   expect(await response.json()).toEqual({
     avatar_media_url: 'https://pbs.twimg.com/new.jpg',
@@ -58,7 +58,7 @@ test('a failed-image refresh bypasses the known stored avatar and checks the aut
   )
   const mismatch = await GET(
     new Request('https://archive.test/api/profile/42/avatar?refresh=1'),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
   expect(mismatch.status).toBe(404)
 })

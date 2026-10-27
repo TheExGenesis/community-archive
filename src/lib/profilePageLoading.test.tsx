@@ -2,12 +2,16 @@ jest.mock('@/lib/browsingAuth', () => ({ getBrowsingUser: jest.fn() }))
 import {
   Children,
   isValidElement,
+  type ComponentProps,
   type ReactElement,
   type ReactNode,
 } from 'react'
 import { getBrowsingUser } from '@/lib/browsingAuth'
 import UserPage, { generateMetadata } from '@/app/user/[account_id]/page'
-import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
+import {
+  ProfileHeader,
+  ProfileOwnerActions,
+} from '@/components/metaTwitter/ProfileHeader'
 import { resolveProfileCore } from '@/lib/metaTwitter/profile'
 import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
 import {
@@ -36,8 +40,15 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('chapter=2025&section=hello'),
 }))
 
-function findHeader(node: ReactNode): ReactElement | undefined {
-  if (!isValidElement<{ children?: ReactNode }>(node)) return undefined
+function findHeader(
+  node: ReactNode,
+): ReactElement<ComponentProps<typeof ProfileHeader>> | undefined {
+  if (
+    !isValidElement<
+      ComponentProps<typeof ProfileHeader> & { children?: ReactNode }
+    >(node)
+  )
+    return undefined
   if (node.type === ProfileHeader) return node
   for (const child of Children.toArray(node.props.children)) {
     const result = findHeader(child)
@@ -66,14 +77,26 @@ beforeEach(() => {
 
 test('renders the profile before owner authentication and reads settings only for its owner', async () => {
   const page = await UserPage({
-    params: { account_id: 'alice' },
-    searchParams: {},
+    params: Promise.resolve({ account_id: 'alice' }),
+    searchParams: Promise.resolve({}),
   })
   expect(getAuthenticatedAccountId).not.toHaveBeenCalled()
   expect(getPublicProfileSettings).not.toHaveBeenCalled()
   const header = findHeader(page)!
   expect(header.props.profile).toBe(profile)
-  const owner = header.props.ownerActionsSlot.props.children
+  const ownerSlot = header.props.ownerActionsSlot
+  if (!isValidElement<{ children: ReactNode }>(ownerSlot)) {
+    throw new Error('Expected the owner actions suspense boundary')
+  }
+  type OwnerProps = Pick<ComponentProps<typeof ProfileHeader>, 'profile'>
+  const owner = ownerSlot.props.children as ReactElement<
+    OwnerProps,
+    (
+      props: OwnerProps,
+    ) => Promise<ReactElement<
+      ComponentProps<typeof ProfileOwnerActions>
+    > | null>
+  >
   ;(getAuthenticatedAccountId as jest.Mock).mockResolvedValue(null)
   expect(await owner.type(owner.props)).toBeNull()
   expect(getPublicProfileSettings).not.toHaveBeenCalled()
@@ -83,14 +106,17 @@ test('renders the profile before owner authentication and reads settings only fo
   })
   const actions = await owner.type(owner.props)
   expect(getPublicProfileSettings).toHaveBeenCalledWith('42')
-  expect(actions.props.downloadArchiveVisible).toBe(false)
+  expect(actions!.props.downloadArchiveVisible).toBe(false)
 })
 
 test('shows only basic identity and a destination-preserving login prompt to guests', async () => {
   ;(getBrowsingUser as jest.Mock).mockResolvedValue(null)
   const page = await UserPage({
-    params: { account_id: 'alice' },
-    searchParams: { chapter: '2025', section: 'hello' },
+    params: Promise.resolve({ account_id: 'alice' }),
+    searchParams: Promise.resolve({
+      chapter: '2025',
+      section: 'hello',
+    }),
   })
   expect(page.type).toBe(GuestProfile)
   expect(page.props).toEqual({
@@ -115,8 +141,8 @@ test('shows only basic identity and a destination-preserving login prompt to gue
 test('provides basic, noindex profile metadata for the guest preview', async () => {
   ;(getBrowsingUser as jest.Mock).mockResolvedValue(null)
   const metadata = await generateMetadata({
-    params: { account_id: 'alice' },
-    searchParams: {},
+    params: Promise.resolve({ account_id: 'alice' }),
+    searchParams: Promise.resolve({}),
   })
   expect(metadata.title).toContain('Alice (@alice)')
   expect(metadata.robots).toEqual({ index: false })

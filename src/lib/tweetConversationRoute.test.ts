@@ -14,7 +14,7 @@ test('the pagination endpoint cannot bypass the preview', async () => {
   ;(canReadTweetConversation as jest.Mock).mockResolvedValue(false)
   const response = await GET(
     new NextRequest('https://example.com/api/tweets/123/quotes'),
-    { params: { tweet_id: '123' } },
+    { params: Promise.resolve({ tweet_id: '123' }) },
   )
   expect(response.status).toBe(403)
   expect(response.headers.get('cache-control')).toBe('private, no-store')
@@ -29,7 +29,7 @@ test('opted-in visitors can still paginate quotes', async () => {
   })
   const response = await GET(
     new NextRequest('https://example.com/api/tweets/123/quotes?offset=12'),
-    { params: { tweet_id: '123' } },
+    { params: Promise.resolve({ tweet_id: '123' }) },
   )
   expect(response.status).toBe(200)
   expect(getQuotingTweetsPage).toHaveBeenCalledWith('123', 12, 12)

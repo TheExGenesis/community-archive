@@ -1,8 +1,29 @@
 # Product analytics
 
-PostHog has two layers: automatic pageviews/clicks for broad coverage, and named
-product events for actions and outcomes. Browser measurement respects DNT and
-cannot count clients that block or never execute analytics.
+PostHog measures signed-in use through automatic pageviews/clicks and named
+product events for actions and outcomes. Signed-out and anonymous-auth sessions
+are excluded; logging out stops collection and recording. Browser measurement
+respects DNT and cannot count clients that block or never execute analytics.
+
+## Weekly review: 15 minutes
+
+Start with [Product Pulse v2](https://us.posthog.com/project/546185/dashboard/2080935)
+and keep the audience on **Community only**. Check collection freshness before
+interpreting a quiet week, then use the last complete comparable weeks:
+
+1. **Adoption (5 minutes):** inspect engaged people and feature use. Which useful
+   action reaches people, and which feature needs improvement or discovery?
+2. **Return value (5 minutes):** inspect returning engaged people and people active
+   on 2+ days. Use counts alongside rates when cohorts are small. An archive can
+   be useful without daily use.
+3. **One journey (5 minutes):** start with Search submitted → canonical results →
+   result opened. Inspect empty results and failures separately, then watch 3–5
+   relevant recordings if available. Use 28 days when weekly samples are small;
+   the dashboard's this-week journey tiles alone may be too sparse.
+
+Choose one product change and its expected outcome. Recheck that measure after
+release within the same audience. Pageviews and recordings are supporting
+evidence; meaningful use and return behavior drive the decision.
 
 ## Dashboard
 
@@ -16,8 +37,17 @@ and do not count as meaningful use.
 The activity charts cover four complete Monday–Sunday UTC weeks plus the current
 partial week. Weekly tables use relative columns so they keep rolling forward.
 Retention retains its existing 30-day observation window and incomplete-follow-up
-handling. Production host and PostHog bot filters apply; team activity is included.
-Bot filtering and meaningful-action requirements are not proof of humanity.
+handling. Production host and PostHog bot filters apply. The default **Community
+only** audience excludes identified `exgenesis` and `christineist` activity;
+switch audience explicitly for team verification. Bot filtering and
+meaningful-action requirements are not proof of humanity.
+
+Collection changed to signed-in-only in [PR #1144](https://github.com/TheExGenesis/community-archive/pull/1144),
+merged October 25, 2026 UTC. Treat its deployment as an audience boundary:
+earlier broad traffic and later signed-in activity are not directly comparable.
+Verify the actual deployment time before choosing comparison windows. A separate
+drop around October 21 still needs production verification. Missing events do
+not establish zero use or a product decline.
 
 Metric definitions:
 
@@ -108,6 +138,34 @@ normalized. SDK click text/attributes and replay inputs/text are masked;
 are separate event families and must not be summed as page-view counts.
 
 ## Focused verification
+
+### Collection freshness
+
+Open [Collection freshness](https://us.posthog.com/project/546185/insights/8bvEB5Jp)
+or run the bounded aggregate below in PostHog SQL. It covers all hosts and
+audiences over the last three days; dashboard audience/date filters do not apply.
+A missing or changed `$host` property therefore cannot hide otherwise delivered
+events. It is a diagnostic query, not the dashboard's audience definition:
+
+```sql
+SELECT event, properties.$host AS host, count() AS events,
+       uniq(distinct_id) AS people, max(timestamp) AS latest
+FROM events
+WHERE timestamp >= now() - INTERVAL 3 DAY
+GROUP BY event, properties.$host
+ORDER BY latest DESC
+LIMIT 100
+```
+
+Check product actions and pageviews separately from `$exception`. Exception
+arrival alone does not prove product collection works. If actions are missing,
+use one ordinary signed-in search and inspect initialization, the sanitized
+payload, network delivery, and arrival in PostHog. For that check, include team
+activity and use the production hosts. Do not populate charts with fabricated
+production events. Separately verify a signed-out visit and post-logout action
+produce no analytics events or recording.
+
+### Code changes
 
 ```sh
 pnpm exec jest --selectProjects server client --runInBand --runTestsByPath \

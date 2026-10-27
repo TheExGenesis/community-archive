@@ -1,4 +1,5 @@
 'use client'
+import { captureHomepageMapAction } from '@/lib/posthog'
 
 import { useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
@@ -173,6 +174,7 @@ export default function SelectionPeople({
           type="button"
           className={styles.selectionAvatars}
           aria-label="View archive members in this selection"
+          onClick={() => captureHomepageMapAction('members_opened')}
         >
           <span className="flex" aria-hidden="true">
             {preview.slice(0, 6).map((person) => (

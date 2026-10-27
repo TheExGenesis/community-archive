@@ -10,6 +10,8 @@ import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
 import { safeTerm } from '@/lib/hexMap/geometry'
 import type { MapStory, StoryPage } from '@/lib/hexMap/stories'
+import { captureHomepageMapAction } from '@/lib/posthog'
+import { homepageMapTabs } from '@/lib/productActionSchema'
 import { selectionPeopleOptions } from './useSelectionPreview'
 import SelectionPeople from './SelectionPeople'
 import { useMapFeed, prefetchMapFeed, selectionFeedPath } from './useMapFeed'
@@ -245,7 +247,13 @@ export default function StoryPanel({
         <>
           <div ref={header} className={styles.panelHeader}>
             <header className={styles.selection}>
-              <button className={styles.back} onClick={onClear}>
+              <button
+                className={styles.back}
+                onClick={() => {
+                  captureHomepageMapAction('selection_cleared')
+                  onClear()
+                }}
+              >
                 ← Back to browse
               </button>
               <h2>
@@ -285,39 +293,41 @@ export default function StoryPanel({
               role="tablist"
               aria-label="Selection content"
             >
-              {['Stories', 'Bangers', 'Latest', 'Most liked', 'Strands'].map(
-                (label) => (
-                  <button
-                    role="tab"
-                    aria-selected={selectionTab === label}
-                    key={label}
-                    onMouseEnter={() =>
-                      void prefetchMapFeed(
-                        queryClient,
-                        selectionFeedPath(label, selectedIds),
-                        snapshot,
-                      )
-                    }
-                    onFocus={() =>
-                      void prefetchMapFeed(
-                        queryClient,
-                        selectionFeedPath(label, selectedIds),
-                        snapshot,
-                      )
-                    }
-                    onClick={() => {
-                      manualTabSelection.current = selectedIds
-                      onSelectionTab(label)
-                    }}
-                  >
-                    {label === 'Stories'
-                      ? 'Digest'
-                      : label === 'Bangers'
-                        ? 'Best'
-                        : label}
-                  </button>
-                ),
-              )}
+              {homepageMapTabs.map((label) => (
+                <button
+                  role="tab"
+                  aria-selected={selectionTab === label}
+                  key={label}
+                  onMouseEnter={() =>
+                    void prefetchMapFeed(
+                      queryClient,
+                      selectionFeedPath(label, selectedIds),
+                      snapshot,
+                    )
+                  }
+                  onFocus={() =>
+                    void prefetchMapFeed(
+                      queryClient,
+                      selectionFeedPath(label, selectedIds),
+                      snapshot,
+                    )
+                  }
+                  onClick={() => {
+                    if (selectionTab !== label)
+                      captureHomepageMapAction('content_tab_selected', {
+                        tab: label,
+                      })
+                    manualTabSelection.current = selectedIds
+                    onSelectionTab(label)
+                  }}
+                >
+                  {label === 'Stories'
+                    ? 'Digest'
+                    : label === 'Bangers'
+                      ? 'Best'
+                      : label}
+                </button>
+              ))}
             </div>
           </div>
           <SelectionFeed

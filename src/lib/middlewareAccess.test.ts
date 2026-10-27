@@ -66,9 +66,9 @@ test.each(['/search', '/search?q=open+source&fromUser=alice'])(
 )
 
 test.each([
-  ['/user/alice?chapter=2025', '/guest/alice?chapter=2025'],
-  ['/user/42', '/guest/42'],
-  ['/user/alice/', '/guest/alice'],
+  ['/user/alice?chapter=2025', '/guest/user/alice?chapter=2025'],
+  ['/user/42', '/guest/user/42'],
+  ['/user/alice/', '/guest/user/alice'],
 ])(
   'serves the cacheable guest preview for %s from %s',
   async (path, guestPath) => {
@@ -92,10 +92,43 @@ test('keeps a guest preview private when the session cookie fails to verify', as
     cookie: 'sb-test-auth-token.0=expired',
   })
   expect(response.headers.get('x-middleware-rewrite')).toBe(
-    'https://archive.test/guest/alice',
+    'https://archive.test/guest/user/alice',
   )
   expect(response.cookies.get('sb-test-auth-token.0')?.value).toBe('')
 })
+
+test.each([
+  ['/tweets/123', '/guest/tweets/123'],
+  ['/tweets/123/', '/guest/tweets/123'],
+  ['/tweets/123?from=bangers', '/guest/tweets/123?from=bangers'],
+])(
+  'serves cookie-less tweet permalinks %s from the cached %s',
+  async (path, guestPath) => {
+    const response = await request(path)
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      `https://archive.test${guestPath}`,
+    )
+    expect(response.headers.get('cache-control')).toBeNull()
+    expect(createMiddlewareClient).not.toHaveBeenCalled()
+  },
+)
+
+test('sends visitors with a session to the consent-checked tweet page', async () => {
+  const response = await request('/tweets/123', {
+    cookie: 'sb-test-auth-token=session',
+  })
+  expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+  expect(response.headers.get('x-middleware-next')).toBe('1')
+})
+
+test.each(['/tweets/123/opengraph-image', '/tweets/abc', '/tweets'])(
+  'leaves other tweet paths alone: %s',
+  async (path) => {
+    expect(
+      (await request(path)).headers.get('x-middleware-rewrite'),
+    ).toBeNull()
+  },
+)
 
 test('does not rewrite guest previews that are not document reads', async () => {
   const response = await middleware(

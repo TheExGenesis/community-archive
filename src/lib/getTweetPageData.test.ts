@@ -81,6 +81,19 @@ describe('getTweetPageData', () => {
     rpc.mockResolvedValue({ data: emptyRpcResult, error: null })
   })
 
+  test('skips the optional quote query for a guest preview', async () => {
+    clickHouseEnabledMock.mockReturnValue(true)
+    fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
+      tweet: mainTweet,
+      threadTree: null,
+    } as never)
+    await getTweetPageData('123', {
+      skipQuotePosts: true,
+      deferQuotePosts: true,
+    })
+    expect(fetchClickHouseQuotePostsMock).not.toHaveBeenCalled()
+  })
+
   test('loads a ClickHouse permalink and its quote posts without Supabase', async () => {
     const tweet = {
       tweet_id: '2085473085399150817',

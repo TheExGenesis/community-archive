@@ -1,5 +1,6 @@
+import { canReadTweetConversation } from '@/lib/tweetConversationAccess'
 import { getTweetPageData } from '@/lib/getTweetPageData'
-import { loadTweetPage } from './loadTweetPage'
+import { loadGuestTweetPage, loadTweetPage } from './loadTweetPage'
 import { getStoredTweetPageSummary } from './store'
 
 jest.mock('server-only', () => ({}))
@@ -10,8 +11,11 @@ jest.mock('react', () => ({
 }))
 jest.mock('next/headers', () => ({
   cookies: jest.fn(() => {
-    throw new Error('the cached permalink must not read the request')
+    throw new Error('the cached guest view must not read the request')
   }),
+}))
+jest.mock('@/lib/tweetConversationAccess', () => ({
+  canReadTweetConversation: jest.fn(),
 }))
 jest.mock('@/lib/getTweetPageData', () => ({ getTweetPageData: jest.fn() }))
 jest.mock('./store', () => ({ getStoredTweetPageSummary: jest.fn() }))
@@ -33,6 +37,18 @@ const tweet = {
   urls: [],
 }
 
+const guestView = {
+  tweet,
+  threadTree: null,
+  quotingTweets: [],
+  quotingTweetCount: 0,
+  quotePosts: undefined,
+  subject: { kind: 'tweet', context: [] },
+  summary: null,
+  summaryPending: false,
+  canReadConversation: false,
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   ;(getTweetPageData as jest.Mock).mockResolvedValue({
@@ -41,30 +57,58 @@ beforeEach(() => {
   })
 })
 
-test('a missing summary is reported, never generated, without reading the request', async () => {
-  ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue('missing')
+test('guests receive only the main tweet, even when real context and a stored summary exist', async () => {
+  ;(canReadTweetConversation as jest.Mock).mockResolvedValue(false)
+  ;(getTweetPageData as jest.Mock).mockResolvedValue({
+    tweet,
+    threadTree: { tweets: { private: { full_text: 'Hidden reply' } } },
+    quotingTweets: [{ full_text: 'Hidden quote' }],
+    quotingTweetCount: 1,
+    quotePosts: Promise.resolve({
+      tweets: [{ full_text: 'Deferred hidden quote' }],
+    }),
+  })
+  expect(await loadTweetPage('123')).toMatchObject(guestView)
+  expect(getStoredTweetPageSummary).not.toHaveBeenCalled()
+  expect(getTweetPageData).toHaveBeenCalledWith(
+    '123',
+    expect.objectContaining({ skipQuotePosts: true }),
+  )
+})
 
+test('the cached guest view never checks consent or reads the request', async () => {
+  expect(await loadGuestTweetPage('123')).toMatchObject(guestView)
+  expect(canReadTweetConversation).not.toHaveBeenCalled()
+  expect(getStoredTweetPageSummary).not.toHaveBeenCalled()
+  expect(getTweetPageData).toHaveBeenCalledWith(
+    '123',
+    expect.objectContaining({ skipQuotePosts: true }),
+  )
+})
+
+test('an unknown tweet is null in both views', async () => {
+  ;(getTweetPageData as jest.Mock).mockResolvedValue({ tweet: null })
+  ;(canReadTweetConversation as jest.Mock).mockResolvedValue(true)
+  expect(await loadGuestTweetPage('404')).toBeNull()
+  expect(await loadTweetPage('404')).toBeNull()
+})
+
+test('opted-in visitors can load stored summaries and generate missing ones', async () => {
+  ;(canReadTweetConversation as jest.Mock).mockResolvedValue(true)
+  ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue('missing')
   expect(await loadTweetPage('123')).toMatchObject({
     summary: null,
-    summaryMissing: true,
+    summaryPending: true,
+    canReadConversation: true,
   })
-})
-
-test('a stored summary is shown to everyone', async () => {
+  expect(getTweetPageData).toHaveBeenCalledWith(
+    '123',
+    expect.objectContaining({ skipQuotePosts: false }),
+  )
   const summary = { title: 'A title', description: 'A description' }
   ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue(summary)
-
-  expect(await loadTweetPage('125')).toMatchObject({
+  expect(await loadTweetPage('123')).toMatchObject({
     summary,
-    summaryMissing: false,
-  })
-})
-
-test('a stored ineligible outcome stops the browser from asking again', async () => {
-  ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue(null)
-
-  expect(await loadTweetPage('126')).toMatchObject({
-    summary: null,
-    summaryMissing: false,
+    summaryPending: false,
   })
 })

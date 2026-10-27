@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import GuestProfilePage, {
   generateMetadata,
-} from '@/app/guest/[account_id]/page'
+} from '@/app/guest/user/[account_id]/page'
 import GuestProfile from '@/components/metaTwitter/GuestProfile'
 import { resolveProfileCore } from '@/lib/metaTwitter/profile'
 

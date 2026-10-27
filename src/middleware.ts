@@ -309,6 +309,25 @@ function getIp(request: NextRequest): string {
   )
 }
 
+/**
+ * Serves a cached guest route under the public URL. Only the path changes:
+ * a plain URL drops any trailing slash, the query string is kept, and cookies
+ * the session refresh already set are carried onto the rewrite.
+ */
+function rewriteToGuestView(
+  request: NextRequest,
+  guestPath: string,
+  current: NextResponse,
+): NextResponse {
+  const guestUrl = new URL(request.url)
+  guestUrl.pathname = guestPath.replace(/\/$/, '')
+  const rewritten = NextResponse.rewrite(guestUrl, {
+    request: { headers: request.headers },
+  })
+  for (const cookie of current.cookies.getAll()) rewritten.cookies.set(cookie)
+  return rewritten
+}
+
 function addSecurityHeaders(response: NextResponse): NextResponse {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     response.headers.set(key, value)
@@ -675,20 +694,28 @@ export async function middleware(request: NextRequest) {
       for (const cookie of response.cookies.getAll()) denied.cookies.set(cookie)
       response = denied
     } else if (guestProfileRewrite) {
-      // A plain URL, so the original trailing slash is not carried over.
-      const guestUrl = new URL(request.url)
-      guestUrl.pathname = `/guest${pathname.slice('/user'.length).replace(/\/$/, '')}`
-      const rewritten = NextResponse.rewrite(guestUrl, {
-        request: { headers: request.headers },
-      })
-      for (const cookie of response.cookies.getAll())
-        rewritten.cookies.set(cookie)
-      response = rewritten
+      response = rewriteToGuestView(
+        request,
+        `/guest/user${pathname.slice('/user'.length)}`,
+        response,
+      )
     }
     if (!guestProfileRewrite) {
       response.headers.set('Cache-Control', 'private, no-store')
     }
     response.headers.set('X-Robots-Tag', 'noindex')
+  }
+
+  // Tweet permalinks show conversation only to visitors with live opt-in
+  // consent, which needs a session. Without a session cookie every visitor
+  // sees the same main-tweet preview, so it comes from the cached guest route
+  // and the consent-checked page is rendered only for signed-in visitors.
+  if (
+    request.method === 'GET' &&
+    !hasAuthCookies &&
+    /^\/tweets\/\d{1,20}\/?$/.test(pathname)
+  ) {
+    response = rewriteToGuestView(request, `/guest${pathname}`, response)
   }
 
   // ── Stage 6: Security Headers (all responses) ──────────────────────────

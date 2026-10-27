@@ -60,6 +60,16 @@ const growthStats = (overrides = {}, failed = false) =>
     failed,
   })
 
+test('rounds compact headline totals down to reached milestones', async () => {
+  render(
+    await HomepageStats({
+      data: growthStats({ memberCount: 1_650, totalTweets: 21_660_000 }),
+    }),
+  )
+  expect(screen.getByText('1.6K community members')).toBeInTheDocument()
+  expect(screen.getByText('21.6M public tweets')).toBeInTheDocument()
+})
+
 test('shows full totals with compact 24-hour additions', async () => {
   render(await HomepageGrowth({ data: growthStats() }))
   expect(screen.getByText('21,023,737')).toBeInTheDocument()

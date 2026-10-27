@@ -23,6 +23,12 @@ GRANT SELECT ON TABLE "public"."monthly_tweet_counts_mv" TO "readclient";
 GRANT SELECT ON TABLE "public"."optin" TO "readclient";
 GRANT SELECT ON TABLE "public"."profile" TO "readclient";
 GRANT SELECT ON TABLE "public"."scraper_count" TO "readclient";
+
+-- The counter is public-readable; only trusted server code may maintain it.
+REVOKE ALL PRIVILEGES ON TABLE "public"."scraper_count"
+  FROM PUBLIC, "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."scraper_count" TO "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."scraper_count" TO "service_role";
 GRANT SELECT ON TABLE "public"."tweet_media" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweet_replies_view" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweet_urls" TO "readclient";

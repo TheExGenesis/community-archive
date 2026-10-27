@@ -28,16 +28,16 @@ evidence; meaningful use and return behavior drive the decision.
 ## Dashboard
 
 [Product Pulse v2](https://us.posthog.com/project/546185/dashboard/2080935)
-leads with meaningful activity: weekly engaged people, weekly action volume,
-weekly feature and action tables, and return activity. The
+leads with ranked feature adoption, new/returning people, and cohort return
+counts, followed by weekly engaged people, action volume, and action details. The
 [original dashboard](https://us.posthog.com/project/546185/dashboard/2016936)
 remains available for traffic comparisons. Page visits are not verified humans
 and do not count as meaningful use.
 
-The activity charts cover four complete Monday–Sunday UTC weeks plus the current
-partial week. Weekly tables use relative columns so they keep rolling forward.
-Retention retains its existing 30-day observation window and incomplete-follow-up
-handling. Production host and PostHog bot filters apply. The default **Community
+The headline charts cover four complete Monday–Sunday UTC weeks. Detail tables
+also include the current partial week. Newly observed people and cohort returns
+use a 90-day lookback; incomplete follow-up is marked Pending. Production host
+and PostHog bot filters apply. The default **Community
 only** audience excludes identified `exgenesis` and `christineist` activity;
 switch audience explicitly for team verification. Bot filtering and
 meaningful-action requirements are not proof of humanity.
@@ -46,8 +46,9 @@ Collection changed to signed-in-only in [PR #1144](https://github.com/TheExGenes
 merged October 25, 2026 UTC. Treat its deployment as an audience boundary:
 earlier broad traffic and later signed-in activity are not directly comparable.
 Verify the actual deployment time before choosing comparison windows. A separate
-drop around October 21 still needs production verification. Missing events do
-not establish zero use or a product decline.
+drop around October 21 coincides with an exhausted free analytics allowance.
+Collection recovery still needs production verification. Missing events do not
+establish zero use or a product decline.
 
 Metric definitions:
 
@@ -69,7 +70,7 @@ Metric definitions:
   curation saves. App details, edit starts, failed saves, navigation, pageviews,
   background result delivery, and tweet collapse do not qualify.
 - Retention: weekly return activity from the first meaningful activity observed
-  in the 30-day window, not a claim about lifetime-new users. Incomplete follow-up
+  in the 90-day window, not a claim about lifetime-new users. Incomplete follow-up
   cells remain unavailable.
 
 Search conversion and experience health are saved separately but removed from
@@ -140,6 +141,19 @@ are separate event families and must not be summed as page-view counts.
 ## Focused verification
 
 ### Collection freshness
+
+First check [billing usage](https://us.posthog.com/organization/billing). Product
+analytics, replay, and error tracking have separate allowances: exceptions can
+keep arriving while analytics is paused. Dashboard bot filters only change query
+results; they do not prevent ingestion or recover consumed allowance. Keep the
+signed-in gate before SDK initialization and on every event so ordinary anonymous
+crawlers do not generate billable app telemetry. Do not sample meaningful actions
+to save allowance: that would bias feature adoption and return measurements.
+
+If a quota is exhausted, wait for its displayed cycle reset or obtain approval
+for a bounded billing change. Do not claim recovery until a real signed-in action
+arrives. Exclude the collection gap from comparisons; missing events cannot be
+reconstructed from dashboard filters.
 
 Open [Collection freshness](https://us.posthog.com/project/546185/insights/8bvEB5Jp)
 or run the bounded aggregate below in PostHog SQL. It covers all hosts and

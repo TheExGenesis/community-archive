@@ -12,9 +12,18 @@ interface OptInPageProps {
 
 export default async function OptInPage({ searchParams }: OptInPageProps) {
   const resolvedSearchParams = await searchParams
+  const tweetReturn =
+    typeof resolvedSearchParams?.redirect === 'string' &&
+    /^\/tweets\/\d{1,20}$/.test(resolvedSearchParams.redirect)
+      ? resolvedSearchParams.redirect
+      : null
   const fromBulletin = resolvedSearchParams?.redirect === '/bulletin'
   const { user } = await requireAuth(
-    fromBulletin ? '/opt-in?redirect=/bulletin' : '/opt-in',
+    fromBulletin
+      ? '/opt-in?redirect=/bulletin'
+      : tweetReturn
+        ? `/opt-in?redirect=${encodeURIComponent(tweetReturn)}`
+        : '/opt-in',
   )
   const mockOptIn = isStagingOptInPreviewEnabled(
     resolvedSearchParams?.mockOptIn === '1',
@@ -26,6 +35,16 @@ export default async function OptInPage({ searchParams }: OptInPageProps) {
   return (
     <main className="min-h-screen bg-card dark:bg-background">
       <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+        {tweetReturn && canVisitBulletin && (
+          <div className="mb-8 rounded-lg border p-4">
+            <Link
+              href={tweetReturn}
+              className="font-medium text-brand underline"
+            >
+              Continue to the conversation
+            </Link>
+          </div>
+        )}
         {fromBulletin && (
           <div className="mb-8 rounded-lg border p-4">
             {canVisitBulletin ? (

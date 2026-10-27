@@ -29,7 +29,9 @@ jest.mock('@/components/QuotingTweetsSidebar', () => ({
   default: () => null,
 }))
 
-function elements(node: ReactNode): ReactElement[] {
+// These assertions intentionally inspect arbitrary elements from the rendered
+// server component tree, whose prop shape depends on the child component.
+function elements(node: ReactNode): ReactElement<any>[] {
   return Children.toArray(node).flatMap((child) =>
     isValidElement(child) ? [child, ...elements(child.props.children)] : [],
   )

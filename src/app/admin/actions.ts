@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag } from 'next/cache'
 import {
+  type AdminClient,
   AccountRecord,
   AccountsCursor,
   AccountsPage,
@@ -84,7 +85,7 @@ const OPT_IN_SELECT =
   'id, user_id, username, twitter_user_id, opted_in, explicit_optout, opt_out_reason, created_at, updated_at, opted_in_at, opted_out_at'
 
 async function isBlocked(
-  admin: Awaited<ReturnType<typeof getAdminClient>>,
+  admin: AdminClient,
   accountId: string,
 ): Promise<boolean> {
   if (!accountId) return false
@@ -95,10 +96,7 @@ async function isBlocked(
   return Array.isArray(data) && (data as string[]).includes(accountId)
 }
 
-async function deleteScrapeBlock(
-  admin: Awaited<ReturnType<typeof getAdminClient>>,
-  accountId: string,
-) {
+async function deleteScrapeBlock(admin: AdminClient, accountId: string) {
   if (!accountId) return
   const { error } = await admin.rpc(
     'admin_set_scrape_block' as never,
@@ -110,10 +108,7 @@ async function deleteScrapeBlock(
   if (error) throw error
 }
 
-async function upsertScrapeBlock(
-  admin: Awaited<ReturnType<typeof getAdminClient>>,
-  accountId: string,
-) {
+async function upsertScrapeBlock(admin: AdminClient, accountId: string) {
   if (!accountId) return
   const { error } = await admin.rpc(
     'admin_set_scrape_block' as never,

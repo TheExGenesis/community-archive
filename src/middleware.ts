@@ -312,7 +312,7 @@ function getIp(request: NextRequest): string {
 /**
  * Serves a cached guest route under the public URL. Only the path changes:
  * a plain URL drops any trailing slash, the query string is kept, and cookies
- * the session refresh already set are carried onto the rewrite.
+ * and cache headers the session refresh already set are carried onto the rewrite.
  */
 function rewriteToGuestView(
   request: NextRequest,
@@ -325,6 +325,10 @@ function rewriteToGuestView(
     request: { headers: request.headers },
   })
   for (const cookie of current.cookies.getAll()) rewritten.cookies.set(cookie)
+  for (const name of ['cache-control', 'expires', 'pragma']) {
+    const value = current.headers.get(name)
+    if (value) rewritten.headers.set(name, value)
+  }
   return rewritten
 }
 
@@ -692,6 +696,10 @@ export async function middleware(request: NextRequest) {
             ),
           )
       for (const cookie of response.cookies.getAll()) denied.cookies.set(cookie)
+      for (const name of ['cache-control', 'expires', 'pragma']) {
+        const value = response.headers.get(name)
+        if (value) denied.headers.set(name, value)
+      }
       response = denied
     } else if (guestProfileRewrite) {
       response = rewriteToGuestView(

@@ -6,14 +6,14 @@ import { getVisibleStrand } from '@/lib/community-apps/data'
 
 export const STRAND_SEED_PATTERN = /^\d{1,20}$/
 
-export interface StrandLikeRow {
+export type StrandLikeRow = {
   id: string
   strand_id: string
   user_id: string
   created_at: string
 }
 
-export interface StrandCommentRow {
+export type StrandCommentRow = {
   id: string
   strand_id: string
   user_id: string

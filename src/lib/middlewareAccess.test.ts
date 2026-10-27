@@ -82,19 +82,59 @@ test.each([
   },
 )
 
-test('keeps a guest preview private when the session cookie fails to verify', async () => {
+test('preserves cleared session chunks and SDK cache headers on a guest rewrite', async () => {
+  const cacheHeaders = {
+    'Cache-Control': 'private, no-cache, no-store, must-revalidate, max-age=0',
+    Expires: '0',
+    Pragma: 'no-cache',
+  }
   getUser.mockImplementation(async () => {
-    clientResponse = NextResponse.next()
-    clientResponse.cookies.set('sb-test-auth-token.0', '', { path: '/' })
+    const incoming = (createMiddlewareClient as jest.Mock).mock
+      .calls[0][0] as NextRequest
+    for (const chunk of ['sb-test-auth-token.0', 'sb-test-auth-token.1']) {
+      incoming.cookies.set(chunk, '')
+    }
+    clientResponse = NextResponse.next({
+      request: { headers: incoming.headers },
+    })
+    for (const chunk of ['sb-test-auth-token.0', 'sb-test-auth-token.1']) {
+      clientResponse.cookies.set(chunk, '', {
+        path: '/',
+        maxAge: 0,
+        sameSite: 'lax',
+        secure: true,
+      })
+    }
+    for (const [name, value] of Object.entries(cacheHeaders)) {
+      clientResponse.headers.set(name, value)
+    }
     return { data: { user: null }, error: new Error('Invalid token') }
   })
-  const response = await request('/user/alice', {
-    cookie: 'sb-test-auth-token.0=expired',
+  const response = await request('/user/alice?chapter=2025', {
+    cookie:
+      'sb-test-auth-token.0=expired; sb-test-auth-token.1=stale; preference=kept',
   })
   expect(response.headers.get('x-middleware-rewrite')).toBe(
-    'https://archive.test/guest/user/alice',
+    'https://archive.test/guest/user/alice?chapter=2025',
   )
-  expect(response.cookies.get('sb-test-auth-token.0')?.value).toBe('')
+  for (const chunk of ['sb-test-auth-token.0', 'sb-test-auth-token.1']) {
+    expect(response.cookies.get(chunk)).toMatchObject({
+      value: '',
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+      secure: true,
+    })
+  }
+  for (const [name, value] of Object.entries(cacheHeaders)) {
+    expect(response.headers.get(name)).toBe(value)
+  }
+  const forwardedCookies = response.headers.get('x-middleware-request-cookie')
+  expect(forwardedCookies).toContain('preference=kept')
+  expect(forwardedCookies).toContain('sb-test-auth-token.0=')
+  expect(forwardedCookies).toContain('sb-test-auth-token.1=')
+  expect(forwardedCookies).not.toContain('expired')
+  expect(forwardedCookies).not.toContain('stale')
 })
 
 test.each([
@@ -241,6 +281,8 @@ test.each([true, false])(
   async (signedIn) => {
     getUser.mockImplementation(async () => {
       clientResponse = NextResponse.next()
+      clientResponse.headers.set('Expires', '0')
+      clientResponse.headers.set('Pragma', 'no-cache')
       clientResponse.cookies.set(
         'sb-test-auth-token.0',
         signedIn ? 'refreshed' : '',
@@ -252,6 +294,9 @@ test.each([true, false])(
       cookie: 'sb-test-auth-token.0=expired',
     })
     expect(response.status).toBe(signedIn ? 200 : 307)
+    expect(response.headers.get('expires')).toBe('0')
+    expect(response.headers.get('pragma')).toBe('no-cache')
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
     expect(response.cookies.get('sb-test-auth-token.0')?.value).toBe(
       signedIn ? 'refreshed' : '',
     )

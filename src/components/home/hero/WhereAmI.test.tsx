@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PreviewSessionProvider } from '@/components/PreviewSession'
 import { CommunityOptInProvider } from '@/components/CommunityOptIn'
 import WhereAmI from './WhereAmI'
+import { captureHomepageMapAction } from '@/lib/posthog'
+jest.mock('@/lib/posthog', () => ({ captureHomepageMapAction: jest.fn() }))
 jest.mock('./hero.module.css', () => ({}))
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: jest.fn(), refresh: jest.fn() }),
@@ -121,6 +123,8 @@ it('lets an opted-in visitor locate another member', async () => {
   })
   submit()
   await screen.findByText('@someone is here.')
+  expect(captureHomepageMapAction).toHaveBeenCalledTimes(1)
+  expect(captureHomepageMapAction).toHaveBeenCalledWith('find_submitted')
   expect(onLocated).toHaveBeenLastCalledWith([{ username: 'someone', cell: 5 }])
   expect(screen.getByRole('textbox', { name: 'Find usernames' })).toBeVisible()
 })

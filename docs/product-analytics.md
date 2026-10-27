@@ -60,6 +60,39 @@ Outcome definitions for release verification:
 Signed-in and Community Archive member are different states. Expanded action
 instrumentation changes the baseline; do not invent historical zeroes.
 
+## Homepage map
+
+The dashboard includes [people interacting each day](https://us.posthog.com/project/546185/insights/Bp99lEBn)
+and [actions and content tabs](https://us.posthog.com/project/546185/insights/SzANFErU),
+both for the last 28 days using its audience selector and production hosts.
+
+`homepage_map_action` measures deliberate interaction with the homepage map and
+its story panel, through the existing signed-in-only capture path. It collects
+fixed `action` values and, when relevant, a fixed content `tab` or boolean
+`enabled`. It does not collect usernames, query text, community names, cell IDs,
+story IDs, coordinates, or hover/pan/zoom frames.
+
+- `community_selected` / `hex_selected`: pointer, touch, or keyboard selection.
+  A double-click first selects the community, then the individual hex, so both
+  semantic actions can occur; these are not a raw physical-click counter.
+- `find_submitted`: a deliberate Find me / username finder submission, including
+  unsuccessful attempts. Automatic login/opt-in retries do not count again.
+- `content_tab_selected`: switching to Digest (`Stories`), Best (`Bangers`),
+  Latest, Most liked, or Strands. Automatic empty-Digest fallback is excluded.
+- `story_opened` / `members_opened`: opening a story or the members dialog.
+  Hover, focus and prefetch are excluded.
+- `archive_overlay_toggled`: the Show archived switch, with `enabled`.
+- `zoom_in_clicked` / `zoom_out_clicked` / `view_reset`: explicit buttons and
+  their keyboard equivalents. Wheel and pinch gestures are intentionally not
+  counted. `selection_cleared` counts clearing a nonempty selection.
+
+The map's existing `website_section_ready` marker (`section=homepage_hex_map`)
+is accepted by the sanitizer. It means map data rendered, not viewport exposure.
+Map metrics begin after this instrumentation is deployed and collection resumes;
+earlier missing rows are unmeasured, not historical zeroes. Distinct people per
+action overlap, so do not sum them to calculate all map users. These diagnostic
+interaction metrics are separate from the dashboard's qualifying-action totals.
+
 ## Apps and profile curation
 
 - `community_app_action`: `details_opened` from gallery cards, or `launch_clicked`

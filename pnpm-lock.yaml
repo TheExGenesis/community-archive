@@ -110,9 +110,6 @@ importers:
       '@tiptap/starter-kit':
         specifier: 3.30.1
         version: 3.30.1
-      '@vercel/analytics':
-        specifier: ^1.4.1
-        version: 1.4.1(next@15.5.28(@babel/core@7.26.7)(@types/node@20.3.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
       '@zip.js/zip.js':
         specifier: ^2.7.57
         version: 2.7.57
@@ -2604,32 +2601,6 @@ packages:
 
   '@unhead/schema@1.11.18':
     resolution: {integrity: sha512-a3TA/OJCRdfbFhcA3Hq24k1ZU1o9szicESrw8DZcGyQFacHnh84mVgnyqSkMnwgCmfN4kvjSiTBlLEHS6+wATw==}
-
-  '@vercel/analytics@1.4.1':
-    resolution: {integrity: sha512-ekpL4ReX2TH3LnrRZTUKjHHNpNy9S1I7QmS+g/RQXoSUQ8ienzosuX7T9djZ/s8zPhBx1mpHP/Rw5875N+zQIQ==}
-    peerDependencies:
-      '@remix-run/react': ^2
-      '@sveltejs/kit': ^1 || ^2
-      next: '>= 13'
-      react: ^18 || ^19 || ^19.0.0-rc
-      svelte: '>= 4'
-      vue: ^3
-      vue-router: ^4
-    peerDependenciesMeta:
-      '@remix-run/react':
-        optional: true
-      '@sveltejs/kit':
-        optional: true
-      next:
-        optional: true
-      react:
-        optional: true
-      svelte:
-        optional: true
-      vue:
-        optional: true
-      vue-router:
-        optional: true
 
   '@vercel/cli-auth@0.0.1':
     resolution: {integrity: sha512-CnqiuMlZ4pjs2LCPYiR6aLKPPd3Xb8SBI1Y7eotXKgpx6qgrGNY+E7EIyUt5ErGHJGIrCZyGG5WEo4bHtVmz2Q==}
@@ -9357,11 +9328,6 @@ snapshots:
     dependencies:
       hookable: 5.5.3
       zhead: 2.2.4
-
-  '@vercel/analytics@1.4.1(next@15.5.28(@babel/core@7.26.7)(@types/node@20.3.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)':
-    optionalDependencies:
-      next: 15.5.28(@babel/core@7.26.7)(@types/node@20.3.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      react: 19.3.1
 
   '@vercel/cli-auth@0.0.1':
     dependencies:

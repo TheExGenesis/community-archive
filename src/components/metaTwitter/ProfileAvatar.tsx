@@ -75,6 +75,9 @@ function ResolvedProfileAvatar({
         height={132}
         sizes="132px"
         priority
+        // Twitter already serves a sized avatar; re-encoding it on Vercel is a
+        // paid transformation per distinct avatar for no visible gain.
+        unoptimized
         onError={() => {
           setResolvedAvatarUrl(null)
           recoverAvatar(true)

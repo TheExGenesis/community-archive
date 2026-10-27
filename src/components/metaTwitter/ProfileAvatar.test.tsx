@@ -3,7 +3,16 @@ import { ProfileAvatar } from './ProfileAvatar'
 
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ alt = '', ...props }: { alt?: string }) => (
+  default: ({
+    alt = '',
+    priority: _priority,
+    unoptimized: _unoptimized,
+    ...props
+  }: {
+    alt?: string
+    priority?: boolean
+    unoptimized?: boolean
+  }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img alt={alt} {...props} />
   ),

@@ -2,10 +2,7 @@ import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import TweetComponent from '@/components/TweetComponent'
-import {
-  TweetSummaryPreview,
-  TweetConversationPreview,
-} from '@/components/TweetConversationPreview'
+import { TweetConversationPreview } from '@/components/TweetConversationPreview'
 import TweetBackLink from '@/components/TweetBackLink'
 import ThreadView from '@/components/ThreadView'
 import QuotingTweetsSidebar from '@/components/QuotingTweetsSidebar'
@@ -97,10 +94,7 @@ export default async function TweetPage(props: PageProps) {
             {eyebrowLabel(subject.kind)}
           </div>
           {!canReadConversation ? (
-            <>
-              <SummaryHeading subject={subject} summary={null} />
-              <TweetSummaryPreview href={optInHref} />
-            </>
+            <SummaryHeading subject={subject} summary={null} />
           ) : summaryPending ? (
             <Suspense
               fallback={<SummaryHeading subject={subject} summary={null} />}

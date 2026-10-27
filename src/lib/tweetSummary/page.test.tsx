@@ -130,7 +130,7 @@ test('guests see labeled previews without rendering conversation boundaries', as
     0,
   )
   const html = renderToStaticMarkup(shell)
-  expect(html).toContain('aria-label="Summary preview"')
+  expect(html).not.toContain('aria-label="Summary preview"')
   expect(html).toContain('aria-label="Replies preview"')
   expect(html).toContain('aria-label="Quote tweets preview"')
   expect(html).toContain('/opt-in?redirect=%2Ftweets%2F123')

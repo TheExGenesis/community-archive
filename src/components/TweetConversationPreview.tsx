@@ -1,11 +1,5 @@
 import Link from 'next/link'
-import {
-  ArrowUpRight,
-  LockKeyhole,
-  MessageCircle,
-  Quote,
-  Sparkles,
-} from 'lucide-react'
+import { LockKeyhole, MessageCircle, Quote } from 'lucide-react'
 
 function PlaceholderPost() {
   return (
@@ -26,37 +20,6 @@ function PlaceholderPost() {
         <div className="h-2.5 w-2/3 rounded bg-muted/60" />
       </div>
     </div>
-  )
-}
-
-export function TweetSummaryPreview({ href }: { href: string }) {
-  return (
-    <section
-      aria-label="Summary preview"
-      className="mt-6 max-w-3xl border border-brand/30 bg-brand/5 p-5 sm:p-6"
-    >
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand">
-        <Sparkles className="h-4 w-4" aria-hidden />
-        AI summary · Preview
-      </div>
-      <div aria-hidden="true" className="my-5 max-w-xl space-y-2.5">
-        <div className="h-2.5 w-full rounded bg-brand/10" />
-        <div className="h-2.5 w-4/5 rounded bg-brand/10" />
-      </div>
-      <p className="font-semibold text-foreground">
-        There’s more to the conversation.
-      </p>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-        Read the original tweet below. Opt in to Community Archive to explore
-        the AI summary, replies, and quote tweets around it.
-      </p>
-      <Link
-        href={href}
-        className="mt-4 inline-flex items-center gap-2 bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
-      >
-        Opt in to unlock <ArrowUpRight className="h-4 w-4" aria-hidden />
-      </Link>
-    </section>
   )
 }
 

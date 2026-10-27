@@ -156,6 +156,13 @@
       "@swc/core",
       "esbuild",
       "supabase"
-    ]
+    ],
+    "overrides": {
+      "@workflow/core@4.8.2>devalue": "5.9.3",
+      "@workflow/world-local@4.2.4>undici": "7.30.1",
+      "@workflow/world-vercel@4.6.2>undici": "7.30.1",
+      "next@15.5.28>postcss": "8.5.32",
+      "@typescript-eslint/typescript-estree@6.21.0>minimatch": "9.0.7"
+    }
   }
 }

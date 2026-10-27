@@ -117,7 +117,7 @@
     "supabase": "^1.226.4",
     "tailwind-merge": "^2.6.0",
     "tsx": "^4.19.2",
-    "undici": "6.28.1",
+    "undici": "6.29.1",
     "winston": "^3.17.0",
     "workflow": "4.8.2"
   },

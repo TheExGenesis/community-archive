@@ -198,8 +198,8 @@ importers:
         specifier: ^4.19.2
         version: 4.19.2
       undici:
-        specifier: 6.28.1
-        version: 6.28.1
+        specifier: 6.29.1
+        version: 6.29.1
       winston:
         specifier: ^3.17.0
         version: 3.17.0
@@ -6672,8 +6672,8 @@ packages:
   unctx@2.5.0:
     resolution: {integrity: sha512-p+Rz9x0R7X+CYDkT+Xg8/GhpcShTlU8n+cf9OtOEf7zEQsNcCZO1dPKNRDqvUTaq+P32PMMkxWHwfrxkqfqAYg==}
 
-  undici@6.28.1:
-    resolution: {integrity: sha512-zWpdTVD54H48CIybL0rWQ3ukpb9d23wM7eH5RtfdmeP70cWHNjtfo7P4vZX+5CoDcO53J4Pu5uXp7lNfjc6DRA==}
+  undici@6.29.1:
+    resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
 
   undici@7.28.0:
@@ -14322,7 +14322,7 @@ snapshots:
       magic-string: 0.30.21
       unplugin: 2.3.11
 
-  undici@6.28.1: {}
+  undici@6.29.1: {}
 
   undici@7.28.0: {}
 

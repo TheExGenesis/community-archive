@@ -11,6 +11,7 @@ Source repository: https://github.com/TheExGenesis/community-archive
 - [API v1 OpenAPI specification](https://analytics.community-archive.org/v1/openapi.json): Machine-readable schema for the current keyed API.
 - [API v1 migration guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-v1-migration.md): Call-by-call mapping from the legacy Supabase REST API to v1, with paging examples.
 - [API keys](https://www.community-archive.org/settings/api-keys): Sign in and create a personal key for v1.
+- [Semantic search API](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md#semantic-search-api): Open, keyless vector search over the corpus at https://embed.tweetstack.app.
 - [Agent and schema guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/agents.md): Tables, relationships, fields, and common query patterns.
 - [Legacy API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples for the Supabase API, which is retired on 2026-11-19.
 - [Legacy interactive API reference](https://www.community-archive.org/api/reference) and [legacy OpenAPI specification](https://www.community-archive.org/openapi.json): the PostgREST API.
@@ -20,7 +21,8 @@ Source repository: https://github.com/TheExGenesis/community-archive
 
 1. Filtered or application queries: use the Community Archive API v1 with a personal key. The public Supabase REST API still works until 2026-11-19, when it is retired; do not start new work on it.
 2. Bulk analysis: download the daily consent-safe Parquet package from the [latest release](https://github.com/TheExGenesis/community-archive/releases/latest).
-3. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
+3. Search by meaning: `POST https://embed.tweetstack.app/embeddings/search` (no key), then hydrate the returned tweet IDs through API v1.
+4. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
 
 ## Bulk dump
 
@@ -70,6 +72,28 @@ curl --get "https://analytics.community-archive.org/v1/accounts/exgenesis/tweets
   -H "Authorization: Bearer $CA_API_KEY" \
   --data-urlencode "order=desc" \
   --data-urlencode "limit=5"
+```
+
+## Semantic search API (open, no key)
+
+Base URL: https://embed.tweetstack.app
+Search: `POST /embeddings/search` with a JSON body. No API key; 100 requests a minute per client, with `X-RateLimit-*` headers and `429` beyond that.
+Coverage: the consent-filtered serving corpus (about 18.5 million tweets), refreshed every ten minutes. `GET /embeddings/stats` reports `vectorCount` and `dimension`.
+Model: `Qwen/Qwen3-Embedding-4B`, 1,024 dimensions. Send `searchTerm` (text) or a `vector` from the same model, not both.
+
+Body fields: `searchTerm` or `vector`; `k` (default 10, up to 1,000); `threshold` (minimum cosine similarity, default 0.65); `filter`; `with_payload` (default true); `with_vector` (default false).
+
+Filter: `{"must": [...], "should": [...], "must_not": [...]}` (AND, OR, NOT). Conditions are `{"key": "username", "match": {"value": "exgenesis"}}` (exact), `{"key": "text", "match": {"text": "archive"}}` (case-insensitive substring), or `{"key": "created_at", "range": {"gte": "2025-01-01T00:00:00Z", "lt": "2026-01-01T00:00:00Z"}}` (`gt`, `gte`, `lt`, `lte`; ISO 8601 or Unix milliseconds). Filter on `account_id`, `username`, `account_display_name`, or `created_at` for speed; a `text` substring filter is applied after retrieval and can return fewer than `k`.
+
+Response: `{"success": true, "results": [{"key": "<tweet_id>", "distance": <cosine similarity, higher is closer>, "metadata": {"account_id", "username", "account_display_name", "created_at", "text", "original_text", "reply_to_tweet_id", ...}}], "count": N}`, best match first. Errors are `{"success": false, "error": "..."}` with HTTP 400 for an invalid body. `key` is the tweet ID; fetch full tweets with `GET /v1/tweets?ids=A,B,C`. `POST /embeddings/retrieve` with `{"ids": [...], "with_vector": true}` returns stored metadata and embeddings for up to 1,000 tweet IDs.
+
+cURL example:
+
+```bash
+curl -s -X POST https://embed.tweetstack.app/embeddings/search \
+  -H "Content-Type: application/json" \
+  -d '{"searchTerm": "you can just do things", "k": 10, "threshold": 0.6,
+       "filter": {"must": [{"key": "username", "match": {"value": "exgenesis"}}]}}'
 ```
 
 ## Legacy Supabase REST API (retired on 2026-11-19)

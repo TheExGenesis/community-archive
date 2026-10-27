@@ -9,7 +9,7 @@ import {
 export const alt = 'An archived tweet on Community Archive'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 // Cut at a word boundary so the card never ends mid-word.
 const clip = (text: string, max: number) =>

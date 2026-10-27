@@ -69,6 +69,7 @@ test('shows a real heading and tweet while summary and quotes are pending, then 
     subject,
     summary: null,
     summaryPending: true,
+    canReadConversation: true,
     quotingTweets: [],
     quotingTweetCount: 0,
     quotePosts,
@@ -95,4 +96,42 @@ test('shows a real heading and tweet while summary and quotes are pending, then 
     key: '123',
     props: { tweets: [quoted], totalCount: 19, targetTweet: tweet },
   })
+})
+
+test('guests see labeled previews without rendering conversation boundaries', async () => {
+  const tweet = {
+    tweet_id: '123',
+    account_id: '1',
+    username: 'alice',
+    account_display_name: 'Alice',
+    created_at: '2026-10-20T00:00:00Z',
+    full_text: 'The original tweet',
+    favorite_count: 1,
+    retweet_count: 0,
+    reply_to_tweet_id: null,
+    quote_tweet_id: null,
+    retweeted_tweet_id: null,
+    avatar_media_url: null,
+    media: [],
+    urls: [],
+  }
+  ;(loadTweetPage as jest.Mock).mockResolvedValue({
+    tweet,
+    subject: buildTweetPageSubject(tweet, null),
+    threadTree: null,
+    summary: null,
+    summaryPending: false,
+    canReadConversation: false,
+    quotingTweets: [],
+    quotingTweetCount: 0,
+  })
+  const shell = await TweetPage({ params: { tweet_id: '123' } })
+  expect(elements(shell).filter((node) => node.type === Suspense)).toHaveLength(
+    0,
+  )
+  const html = renderToStaticMarkup(shell)
+  expect(html).not.toContain('aria-label="Summary preview"')
+  expect(html).toContain('aria-label="Replies preview"')
+  expect(html).toContain('aria-label="Quote tweets preview"')
+  expect(html).toContain('/opt-in?redirect=%2Ftweets%2F123')
 })

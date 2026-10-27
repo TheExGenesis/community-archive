@@ -2,6 +2,10 @@ import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import TweetComponent from '@/components/TweetComponent'
+import {
+  TweetSummaryPreview,
+  TweetConversationPreview,
+} from '@/components/TweetConversationPreview'
 import TweetBackLink from '@/components/TweetBackLink'
 import ThreadView from '@/components/ThreadView'
 import QuotingTweetsSidebar from '@/components/QuotingTweetsSidebar'
@@ -19,8 +23,8 @@ import { loadTweetPage } from '@/lib/tweetSummary/loadTweetPage'
 import { getTweetPageSummary } from '@/lib/tweetSummary/store'
 import { Link2, MessagesSquare, Sparkles } from 'lucide-react'
 
-// ISR: serve from CDN cache, revalidate at most once per hour
-export const revalidate = 3600
+// Consent-dependent responses must never enter the shared page cache.
+export const dynamic = 'force-dynamic'
 // The first signed-in visit keeps streaming while its summary generates.
 export const maxDuration = 30
 
@@ -66,7 +70,9 @@ export default async function TweetPage(props: PageProps) {
     subject,
     summary,
     summaryPending,
+    canReadConversation,
   } = page
+  const optInHref = `/opt-in?redirect=${encodeURIComponent(`/tweets/${tweet.tweet_id}`)}`
   const isThread = subject.kind === 'thread'
   // A standalone tweet still shows the replies it collected.
   const replyIds = threadTree?.children[tweet.tweet_id] ?? []
@@ -90,7 +96,12 @@ export default async function TweetPage(props: PageProps) {
             )}
             {eyebrowLabel(subject.kind)}
           </div>
-          {summaryPending ? (
+          {!canReadConversation ? (
+            <>
+              <SummaryHeading subject={subject} summary={null} />
+              <TweetSummaryPreview href={optInHref} />
+            </>
+          ) : summaryPending ? (
             <Suspense
               fallback={<SummaryHeading subject={subject} summary={null} />}
             >
@@ -118,6 +129,9 @@ export default async function TweetPage(props: PageProps) {
                     isPermalinkPage
                   />
                 </article>
+                {!canReadConversation && (
+                  <TweetConversationPreview kind="replies" href={optInHref} />
+                )}
                 {threadTree && replyIds.length > 0 && (
                   <ThreadView
                     tree={threadTree}
@@ -136,7 +150,9 @@ export default async function TweetPage(props: PageProps) {
             </div>
           </div>
 
-          {quotePosts ? (
+          {!canReadConversation ? (
+            <TweetConversationPreview kind="quotes" href={optInHref} />
+          ) : quotePosts ? (
             <Suspense fallback={<QuotePostsLoading />}>
               <IncomingQuotes quotePosts={quotePosts} targetTweet={tweet} />
             </Suspense>

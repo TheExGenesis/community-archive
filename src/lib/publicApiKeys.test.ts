@@ -188,7 +188,7 @@ describe('owner routes', () => {
 
   test('revocation is owner-scoped and same-origin', async () => {
     rpc.mockResolvedValueOnce({ data: true, error: null })
-    const params = { params: { key_id: summary.id } }
+    const params = { params: Promise.resolve({ key_id: summary.id }) }
     const ok = await DELETE(
       jsonRequest(`/api/settings/api-keys/${summary.id}`, 'DELETE'),
       params,
@@ -225,7 +225,7 @@ describe('owner routes', () => {
         await DELETE(
           jsonRequest('/api/settings/api-keys/NOT-AN-ID', 'DELETE'),
           {
-            params: { key_id: 'NOT-AN-ID' },
+            params: Promise.resolve({ key_id: 'NOT-AN-ID' }),
           },
         )
       ).status,

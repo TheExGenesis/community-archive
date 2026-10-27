@@ -45,7 +45,7 @@ test.each([
     const fetchSpy = jest.spyOn(global, 'fetch')
     const response = await handler(
       new NextRequest('https://archive.test/api/unused'),
-      { params: { account_id: '42' } },
+      { params: Promise.resolve({ account_id: '42' }) },
     )
     expect(response.status).toBe(401)
     expect(await response.json()).toEqual({ error: 'Authentication required' })

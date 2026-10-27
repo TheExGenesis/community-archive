@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params: paramsPromise }: { params: Promise<{ id: string }> },
 ) {
+  const params = await paramsPromise
   await requireBulletinUser()
   if (!/^\d{1,20}$/.test(params.id))
     return NextResponse.json(

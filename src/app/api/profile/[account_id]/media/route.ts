@@ -9,8 +9,9 @@ const ACCOUNT_ID_PATTERN = /^\d{1,20}$/
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { account_id: string } },
+  { params: paramsPromise }: { params: Promise<{ account_id: string }> },
 ) {
+  const params = await paramsPromise
   const authError = await browsingAuthError()
   if (authError) return authError
 

@@ -36,7 +36,7 @@ const detail = {
 } as TweetData
 const call = () =>
   GET(new Request('http://localhost/api/bulletin/tweet/123'), {
-    params: { id: '123' },
+    params: Promise.resolve({ id: '123' }),
   })
 beforeEach(() => {
   jest.resetAllMocks()

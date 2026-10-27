@@ -28,8 +28,9 @@ const avatarResponse = (
 
 export async function GET(
   request: Request,
-  { params }: { params: { account_id: string } },
+  { params: paramsPromise }: { params: Promise<{ account_id: string }> },
 ) {
+  const params = await paramsPromise
   const authError = await browsingAuthError()
   if (authError) return authError
 

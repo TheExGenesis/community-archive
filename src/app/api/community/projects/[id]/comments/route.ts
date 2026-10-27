@@ -76,8 +76,9 @@ function serializeComment(row: CommentRow, viewerId: string | null) {
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } },
+  { params: paramsPromise }: { params: Promise<{ id: string }> },
 ) {
+  const params = await paramsPromise
   const projectId = await publishedProjectId(params.id)
   if (!projectId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -107,8 +108,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  { params: paramsPromise }: { params: Promise<{ id: string }> },
 ) {
+  const params = await paramsPromise
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json(

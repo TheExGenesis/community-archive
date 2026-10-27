@@ -9,9 +9,9 @@ import { createServerServiceRoleClient } from '@/utils/supabase'
 
 export const runtime = 'nodejs'
 
-type Params = { params: { tweet_id: string } }
+type RouteParams = { tweet_id: string }
 
-async function setLike({ params }: Params, liked: boolean) {
+async function setLike(params: RouteParams, liked: boolean) {
   if (!TWEET_ID_PATTERN.test(params.tweet_id)) {
     return NextResponse.json({ error: 'Tweet not found' }, { status: 404 })
   }
@@ -67,10 +67,16 @@ async function setLike({ params }: Params, liked: boolean) {
   return NextResponse.json({ liked, count })
 }
 
-export async function POST(_request: Request, context: Params) {
-  return setLike(context, true)
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<RouteParams> },
+) {
+  return setLike(await params, true)
 }
 
-export async function DELETE(_request: Request, context: Params) {
-  return setLike(context, false)
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<RouteParams> },
+) {
+  return setLike(await params, false)
 }

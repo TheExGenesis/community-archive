@@ -87,14 +87,16 @@ async function toggleLike(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  { params: paramsPromise }: { params: Promise<{ id: string }> },
 ) {
+  const params = await paramsPromise
   return toggleLike(request, params, true)
 }
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } },
+  { params: paramsPromise }: { params: Promise<{ id: string }> },
 ) {
+  const params = await paramsPromise
   return toggleLike(request, params, false)
 }

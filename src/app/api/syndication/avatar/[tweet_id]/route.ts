@@ -3,8 +3,9 @@ import { fetchSyndicatedTweet } from '@/lib/twitterSyndication'
 
 export async function GET(
   _request: Request,
-  { params }: { params: { tweet_id: string } },
+  { params: paramsPromise }: { params: Promise<{ tweet_id: string }> },
 ) {
+  const params = await paramsPromise
   const tweet = await fetchSyndicatedTweet(params.tweet_id)
   const avatarMediaUrl = tweet?.avatar_media_url
 

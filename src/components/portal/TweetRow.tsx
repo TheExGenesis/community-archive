@@ -28,6 +28,7 @@ import { animatedGifVideoUrl } from '@/lib/portal/animatedGif'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
 import { AddToProfileButton } from './AddToProfileButton'
+import { useTweetLinkTarget, useTweetLinksInNewTab } from './tweetLinks'
 
 const FEATURED_CARD_HOVER =
   'transition-[transform,border-color,box-shadow] duration-100 ease-out hover:-translate-y-0.5 hover:border-[#d4d4d7]/75 hover:shadow-[0_3px_9px_rgba(24,24,27,0.08)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:hover:border-[#404046]/80 dark:hover:shadow-[0_3px_9px_rgba(0,0,0,0.22)]'
@@ -245,6 +246,7 @@ function QuotedTweet({
   onOpen: () => void
   highlightQuery?: string
 }) {
+  const linkTarget = useTweetLinkTarget()
   if (tweet.isDeleted) {
     return (
       <div className="mt-2 rounded-[4px] border border-dashed border-zinc-300 bg-white px-3 py-2 text-[12px] italic text-zinc-500 dark:border-[#3a3a40] dark:bg-[#18181b] dark:text-[#a7a7b4]">
@@ -260,6 +262,7 @@ function QuotedTweet({
     <div className="mt-2 rounded-[4px] border border-zinc-200 bg-white p-2.5 dark:border-[#303036] dark:bg-[#18181b]">
       <div className="flex items-center gap-2">
         <Link
+          {...linkTarget}
           href={profileHref}
           aria-label={`View @${tweet.username}'s profile`}
           className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
@@ -268,6 +271,7 @@ function QuotedTweet({
         </Link>
         <div className="min-w-0 text-[12px] leading-tight">
           <Link
+            {...linkTarget}
             href={profileHref}
             className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
@@ -288,6 +292,7 @@ function QuotedTweet({
         </div>
       </div>
       <Link
+        {...linkTarget}
         href={tweetPermalinkHref(tweet.id, origin, returnTo)}
         onClick={onOpen}
         className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
@@ -370,11 +375,13 @@ function ArchivedQuotesMetric({
   href: string
   onOpen: () => void
 }) {
+  const linkTarget = useTweetLinkTarget()
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Link
+            {...linkTarget}
             href={href}
             onClick={onOpen}
             aria-label={`${count} archived quotes. Open tweet to see them.`}
@@ -415,6 +422,8 @@ export function TweetRow({
   origin,
   returnTo,
 }: TweetCardProps) {
+  const opensInNewTab = useTweetLinksInNewTab()
+  const linkTarget = useTweetLinkTarget()
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
   const isPreview = previewHeight !== undefined
@@ -442,10 +451,15 @@ export function TweetRow({
     observer.observe(element)
     return () => observer.disconnect()
   }, [isMap, noClamp, isExpanded, tweet.text])
+  // A compact card clamps at two lines, so its text needs Read more sooner.
   const canExpand =
     isPreview ||
     (isMap && !noClamp && mapTextOverflows) ||
-    (collapsible && !noClamp && tweet.text.length > 280)
+    (collapsible && !noClamp && tweet.text.length > (compact ? 140 : 280))
+  // A compact card's Read more ends its second line, after the cut text,
+  // instead of taking a line of its own.
+  const inlineMore =
+    compact && !isMap && canExpand && !isExpanded && !noClamp && !isPreview
   const isClickable = clickable ?? isFeatured
   const captureAction = (
     action:
@@ -484,7 +498,8 @@ export function TweetRow({
 
   const activateCard = () => {
     captureAction('open')
-    router.push(href)
+    if (opensInNewTab) window.open(href, '_blank', 'noopener,noreferrer')
+    else router.push(href)
   }
   const handleCardClick = (event: MouseEvent<HTMLElement>) => {
     if (!isClickable) return
@@ -519,13 +534,28 @@ export function TweetRow({
           ? ''
           : isMap
             ? 'line-clamp-3'
-            : compact
-              ? 'line-clamp-2'
-              : canExpand && !isExpanded
-                ? 'line-clamp-5'
-                : ''
+            : inlineMore
+              ? // Two lines, and room kept at the end of the second for Read
+                // more: a spacer floats down to the last line and the
+                // placeholder below it takes the button's width.
+                "max-h-[2lh] w-full overflow-hidden before:float-right before:h-[calc(100%-1lh)] before:content-['']"
+              : compact
+                ? canExpand && isExpanded
+                  ? ''
+                  : 'line-clamp-2'
+                : canExpand && !isExpanded
+                  ? 'line-clamp-5'
+                  : ''
       }`}
     >
+      {inlineMore && (
+        <span
+          aria-hidden="true"
+          className="invisible float-right clear-both ml-1 text-[12px] font-semibold"
+        >
+          … Read more
+        </span>
+      )}
       <HighlightedText
         text={decodeTweetText(tweet.text)}
         query={highlightQuery}
@@ -541,9 +571,23 @@ export function TweetRow({
         captureAction(isExpanded ? 'collapse' : 'expand')
         setIsExpanded((expanded) => !expanded)
       }}
-      className="mt-1 shrink-0 self-start text-[12px] font-semibold text-brand"
+      className={
+        inlineMore
+          ? // Over the placeholder at the end of the second line, on the
+            // text's own line box so the baselines meet.
+            'absolute bottom-0 right-0 text-[13.5px] font-semibold leading-relaxed text-brand'
+          : 'mt-1 shrink-0 self-start text-[12px] font-semibold text-brand'
+      }
     >
-      {isExpanded ? 'Show less' : 'Read more'}
+      {inlineMore ? (
+        <span className="text-[12px]">
+          <span aria-hidden="true">… </span>Read more
+        </span>
+      ) : isExpanded ? (
+        'Show less'
+      ) : (
+        'Read more'
+      )}
     </button>
   ) : null
 
@@ -572,6 +616,7 @@ export function TweetRow({
   ) : stacked ? (
     <div className="min-w-0 leading-tight">
       <Link
+        {...linkTarget}
         href={profileHref}
         className="block max-w-full truncate rounded-sm text-[13.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
@@ -590,6 +635,7 @@ export function TweetRow({
   ) : (
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
       <Link
+        {...linkTarget}
         href={profileHref}
         className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
@@ -633,14 +679,18 @@ export function TweetRow({
           previewCollapsed ? 'min-h-0 flex-1 overflow-hidden' : undefined
         }
       >
-        <Link
-          href={href}
-          onClick={() => captureAction('open')}
-          className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        >
-          {tweetContent}
-        </Link>
-        {!isPreview && expandButton}
+        <div className={inlineMore ? 'relative' : undefined}>
+          <Link
+            {...linkTarget}
+            href={href}
+            onClick={() => captureAction('open')}
+            className={`${inlineMore ? 'flex' : 'block'} rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+          >
+            {tweetContent}
+          </Link>
+          {inlineMore && expandButton}
+        </div>
+        {!isPreview && !inlineMore && expandButton}
         <TweetImages
           media={tweet.media}
           compact={compact}
@@ -734,6 +784,7 @@ export function TweetRow({
       {stacked ? (
         <div className="flex items-center gap-2">
           <Link
+            {...linkTarget}
             href={profileHref}
             aria-label={`View @${tweet.username}'s profile`}
           >
@@ -743,6 +794,7 @@ export function TweetRow({
         </div>
       ) : (
         <Link
+          {...linkTarget}
           href={profileHref}
           aria-label={`View @${tweet.username}'s profile`}
         >

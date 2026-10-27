@@ -53,8 +53,16 @@ test('all seven affected consumers resolve the fixed stock Zod', () => {
   }
 })
 
-test('five serialized field sites preserve omitted, undefined, null, binary and legacy values', () => {
+test('five serialized field sites keep Workflow 5 optionality for omitted, undefined, null, binary and legacy values', () => {
   for (const fixture of serializedFieldCases()) {
+    if (fixture.requiredKey && fixture.valueName === 'absent') {
+      assert.equal(
+        schemas[fixture.schema].safeParse(fixture.input).success,
+        false,
+        fixture.name,
+      )
+      continue
+    }
     assert.deepEqual(
       schemas[fixture.schema].parse(fixture.input),
       normalized(fixture.input),
@@ -66,7 +74,7 @@ test('five serialized field sites preserve omitted, undefined, null, binary and 
   }
 })
 
-test('actual local storage get/list reads JSON that drops undefined fields', async (t) => {
+test('actual local storage get/list handles JSON that drops undefined fields', async (t) => {
   const dir = await temporary(t)
   let count = 0
   for (const fixture of serializedFieldCases()) {
@@ -78,13 +86,24 @@ test('actual local storage get/list reads JSON that drops undefined fields', asy
       : { ...fixture.input, runId, eventId, createdAt: now }
     const file = path.join(
       basedir,
-      isRun ? 'runs' : 'events',
+      // Workflow 5 local storage nests events under their run.
+      ...(isRun ? ['runs'] : ['events', runId]),
       `${isRun ? runId : `${runId}-${eventId}`}.json`,
     )
     await writeJSON(file, input)
     const persisted = await readFile(file, 'utf8')
+    const record = JSON.parse(persisted, jsonReviver)
+    // Workflow 5's event schema requires these keys, but its local reader
+    // restores a key that JSON dropped as undefined.
+    const dropped =
+      fixture.requiredKey && !Object.hasOwn(record.eventData, fixture.field)
     const expected = schemas[isRun ? 'WorkflowRunSchema' : 'EventSchema'].parse(
-      JSON.parse(persisted, jsonReviver),
+      dropped
+        ? {
+            ...record,
+            eventData: { ...record.eventData, [fixture.field]: undefined },
+          }
+        : record,
     )
     if (fixture.valueName === 'undefined' || fixture.valueName === 'absent') {
       assert.equal(

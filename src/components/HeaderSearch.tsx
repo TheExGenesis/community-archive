@@ -11,13 +11,34 @@ import {
 import { Search } from 'lucide-react'
 import UserSearchInput from '@/components/UserSearchInput'
 import { buildSearchHref, parseSearchExpression } from '@/lib/searchParams'
+import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { AskShortcutChip } from '@/components/AskShortcutChip'
+import {
+  AskSignInPopover,
+  useAskFromSearch,
+} from '@/components/AskSignInPopover'
 
 export default function HeaderSearch() {
   const router = useRouter()
   const { query, setQuery } = useArchiveSearch()
   const [open, setOpen] = useState(false)
   const searchHref = buildSearchHref(query)
+
+  // ⌘/Ctrl+Enter, or the chip, hands the text to Ask the archive instead.
+  const goAsk = () => {
+    if (!query.trim()) return
+    capturePostHogEvent('search_interface_action', {
+      action: 'ask_from_search',
+      has_query: true,
+      active_filter_count: Object.keys(parseSearchExpression(query).options)
+        .length,
+    })
+    setOpen(false)
+    router.push(buildAskHref(query))
+  }
+  // Signed out, asking explains and offers sign-in instead.
+  const { ask, explaining, setExplaining, available } = useAskFromSearch(goAsk)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,16 +52,35 @@ export default function HeaderSearch() {
     router.push(searchHref)
   }
 
+  const showChip = available && Boolean(query.trim())
   const input = (
     <div className="relative">
       <UserSearchInput
         placeholder="Search tweets, people, ideas"
         value={query}
         onValueChange={setQuery}
-        className="h-9 w-full border-border bg-muted py-1.5 pl-3 pr-9 text-xs focus:ring-brand"
+        className={`h-9 w-full border-border bg-muted py-1.5 pl-3 text-xs focus:ring-brand ${showChip ? 'pr-24' : 'pr-9'}`}
         aria-label="Search Community Archive"
+        aria-keyshortcuts="Control+Enter Meta+Enter"
+        title="Enter to search · Ctrl or ⌘ + Enter to ask the archive"
         autoComplete="off"
+        onKeyDownCapture={(event) => {
+          if (!available || !isAskShortcut(event) || !query.trim()) return
+          event.preventDefault()
+          ask()
+        }}
       />
+      {showChip && (
+        <AskSignInPopover
+          open={explaining}
+          onOpenChange={setExplaining}
+          question={query}
+        >
+          <span className="absolute right-9 top-1/2 -translate-y-1/2">
+            <AskShortcutChip onAsk={ask} />
+          </span>
+        </AskSignInPopover>
+      )}
       <button
         type="submit"
         aria-label="Search archive"

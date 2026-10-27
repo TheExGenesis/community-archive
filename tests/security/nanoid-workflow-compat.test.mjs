@@ -15,7 +15,7 @@ import {
 
 const baseline = JSON.parse(
   readFileSync(
-    new URL('./fixtures/nanoid-workflow-5.1.6.json', import.meta.url),
+    new URL('./fixtures/nanoid-workflow-core5.2.2.json', import.meta.url),
   ),
 )
 const packageInfo = JSON.parse(
@@ -72,7 +72,7 @@ test('ESM and CJS preserve historical seeded bytes, IDs and next PRNG value', ()
 for (const fixture of baseline.cases) {
   test(`actual core suspension and saved-event replay: ${fixture.runId}/${fixture.startedAt}/${fixture.count}`, async () => {
     // Golden values were captured before changing the override, using the
-    // unmodified deployed core4.8.2 + Nanoid5.1.6; do not regenerate on upgrade.
+    // unmodified core5.2.2 + Nanoid5.1.6; do not regenerate on upgrade.
     assert.deepEqual(await exerciseWorkflow(fixture), {
       pending: fixture.pending,
     })

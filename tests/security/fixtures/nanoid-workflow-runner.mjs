@@ -32,6 +32,8 @@ export async function exerciseWorkflow(fixture, events = []) {
     workflowName,
     status: 'running',
     startedAt: new Date(fixture.startedAt),
+    // Core 5 fixes correlation-ID time from createdAt, not startedAt.
+    createdAt: new Date(fixture.startedAt),
     specVersion: 2,
   }
   workflowRun.input = await serde.dehydrateWorkflowArguments(

@@ -10,6 +10,15 @@ const mockPush = jest.fn()
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
+let mockIsMember = true
+let mockAskEnabled = true
+jest.mock('@/components/NavigationAudience', () => ({
+  useNavigationAudience: () => ({
+    isMember: mockIsMember,
+    isAdmin: false,
+    askEnabled: mockAskEnabled,
+  }),
+}))
 
 jest.mock('@/lib/posthog', () => ({
   capturePostHogEvent: jest.fn(),
@@ -19,16 +28,19 @@ jest.mock('@/components/UserSearchInput', () => ({
   default: ({
     value,
     onValueChange,
+    onKeyDownCapture,
     ...props
   }: {
     value: string
     onValueChange: (value: string) => void
+    onKeyDownCapture?: (event: React.KeyboardEvent<HTMLInputElement>) => void
     'aria-label': string
   }) => (
     <input
       value={value}
       aria-label={props['aria-label']}
       onChange={(event) => onValueChange(event.target.value)}
+      onKeyDownCapture={onKeyDownCapture}
     />
   ),
 }))
@@ -59,5 +71,26 @@ describe('HomepageSearch analytics', () => {
     expect(mockPush).toHaveBeenCalledWith(
       '/search?q=a+potentially+sensitive+phrase',
     )
+  })
+})
+
+describe('HomepageSearch asking instead', () => {
+  beforeEach(() => jest.clearAllMocks())
+
+  it('⌘↵ or the Ask chip hands the text to Ask the archive', () => {
+    render(<HomepageSearch />)
+    expect(
+      screen.queryByRole('button', { name: 'Ask the archive instead' }),
+    ).toBeNull()
+    const box = screen.getByLabelText('Search Community Archive')
+    fireEvent.change(box, { target: { value: 'who writes about singapore' } })
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    expect(mockPush).toHaveBeenLastCalledWith(
+      '/search/ask?q=who+writes+about+singapore',
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ask the archive instead' }),
+    )
+    expect(mockPush).toHaveBeenCalledTimes(2)
   })
 })

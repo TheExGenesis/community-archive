@@ -2,7 +2,7 @@ module.exports = {
   hooks: {
     readPackage(pkg) {
       if (pkg.name !== 'workflow') return pkg
-      if (pkg.version !== '4.8.2') {
+      if (pkg.version !== '5.2.2') {
         throw new Error(
           'Review the Workflow Nest dependency removal before upgrading Workflow',
         )

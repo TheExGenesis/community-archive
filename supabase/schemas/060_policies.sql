@@ -1,5 +1,14 @@
 -- Row Level Security policies and enablement
 
+-- scraper_count is a public statistic. Keep reads available while grants
+-- restrict mutations to trusted service code.
+ALTER TABLE "public"."scraper_count" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Scraper count is publicly readable"
+  ON "public"."scraper_count"
+  FOR SELECT
+  TO PUBLIC
+  USING (true);
+
 -- Private generated research: no client policies or Data API exposure.
 ALTER TABLE "private"."profile_intelligence_runs" ENABLE ROW LEVEL SECURITY;
 

@@ -55,5 +55,8 @@ jobs:
 
       # Database integration suites are separate projects and require a
       # provisioned test Supabase project. The default CI command is hermetic.
+      - name: Run dependency security regressions
+        run: pnpm test:security
+
       - name: Run unit and component tests
         run: pnpm test:ci

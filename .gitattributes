@@ -1,1 +1,3 @@
 data/mock-archive/** -text
+# Unified patch context uses required single-space blank lines.
+patches/*.patch -whitespace

@@ -31,9 +31,12 @@ jest.mock('@/components/QuotingTweetsSidebar', () => ({
 
 // These assertions intentionally inspect arbitrary elements from the rendered
 // server component tree, whose prop shape depends on the child component.
-function elements(node: ReactNode): ReactElement<any>[] {
+type TreeProps = { children?: ReactNode; fallback?: ReactNode; tweet?: unknown }
+function elements(node: ReactNode): ReactElement<TreeProps>[] {
   return Children.toArray(node).flatMap((child) =>
-    isValidElement(child) ? [child, ...elements(child.props.children)] : [],
+    isValidElement<TreeProps>(child)
+      ? [child, ...elements(child.props.children)]
+      : [],
   )
 }
 
@@ -91,7 +94,13 @@ test('shows a real heading and tweet while summary and quotes are pending, then 
   )
   expect(nodes.some((node) => node.props.tweet === tweet)).toBe(true)
 
-  const incoming = boundaries[1].props.children
+  const incoming = boundaries[1].props.children as ReactElement<
+    { quotePosts: typeof quotePosts; targetTweet: typeof tweet },
+    (props: {
+      quotePosts: typeof quotePosts
+      targetTweet: typeof tweet
+    }) => Promise<ReactNode>
+  >
   const sidebar = incoming.type(incoming.props)
   const quoted = { ...tweet, tweet_id: '456' }
   resolveQuotes({ tweets: [quoted], totalCount: 19 })

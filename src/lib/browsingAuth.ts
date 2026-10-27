@@ -10,7 +10,7 @@ import { loginHref } from '@/lib/authRedirect'
 // Shared within a server render, including profile metadata and page content.
 export const getBrowsingUser = cache(async () => {
   try {
-    const client = createServerClient(cookies())
+    const client = createServerClient(await cookies())
     const { data, error } = await client.auth.getUser()
     return error ? null : data.user
   } catch {

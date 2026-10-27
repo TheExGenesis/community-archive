@@ -1,4 +1,4 @@
-import dynamic from 'next/dynamic'
+import SocialGraphExplorer from './DynamicSocialGraphExplorer'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import {
@@ -8,13 +8,6 @@ import {
 } from '@/app/admin/data'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { SocialGraphAdminControls } from './SocialGraphAdminControls'
-
-const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[min(72vh,760px)] animate-pulse rounded-[4px] border border-zinc-200 bg-zinc-200/60 dark:border-[#26262a] dark:bg-[#151517]" />
-  ),
-})
 
 export const metadata = {
   title: 'Social graph · Community Archive',

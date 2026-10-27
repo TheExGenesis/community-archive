@@ -13,7 +13,7 @@ import ReactQueryProvider from '@/providers/ReactQueryProvider'
 import PostHogProvider from '@/providers/PostHogProvider'
 import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
-import dynamic from 'next/dynamic'
+import DynamicSignIn from '@/components/DynamicSignIn'
 import HeaderSearch from '@/components/HeaderSearch'
 import { ArchiveSearchProvider } from '@/components/ArchiveSearchProvider'
 import MobileMenu from '@/components/MobileMenu'
@@ -29,10 +29,6 @@ import {
 import HeaderNavigation from '@/components/HeaderNavigation'
 import MobileNavigation from '@/components/MobileNavigation'
 import { getMobileNav, getPrimaryNav, getUtilityNav } from '@/lib/navigation'
-
-const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
-  ssr: false,
-})
 
 // Headings use Petrona (serif); body uses Manrope (sans).
 const petrona = Petrona({

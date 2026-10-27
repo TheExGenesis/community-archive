@@ -1,5 +1,5 @@
 import { PreviewHeroActions } from '@/components/PreviewSession'
-import dynamic from 'next/dynamic'
+import DynamicHeroCTAButtons from './DynamicHeroCTAButtons'
 import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
@@ -17,19 +17,6 @@ import {
   HomepagePortal,
   HomepageStats,
 } from '@/components/home/HomepageDataSections'
-
-const DynamicHeroCTAButtons = dynamic(
-  () => import('@/components/HeroCTAButtons'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
-        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
-        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
-      </div>
-    ),
-  },
-)
 
 interface ClassicHomepageProps {
   data: HomepageData

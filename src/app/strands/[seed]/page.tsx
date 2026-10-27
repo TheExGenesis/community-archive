@@ -102,9 +102,9 @@ export default async function StrandPage({
       className="mx-auto w-[max(70%,min(100%,1000px))] scroll-mt-20 px-5 py-10 sm:px-7"
     >
       <StrandEntry seedId={strand.id} />
-      <a href="/strands" className="text-sm font-semibold text-brand">
+      <Link href="/strands" className="text-sm font-semibold text-brand">
         ← All strands
-      </a>
+      </Link>
       <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1.93fr)_minmax(0,1fr)]">
         <article className="min-w-0">
           <div className="flex items-start justify-between gap-4">

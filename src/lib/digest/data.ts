@@ -270,7 +270,7 @@ export async function getDigestLikeState(
   const empty = { count: 0, likedByViewer: false }
   if (!edition || edition.isPreview) return empty
 
-  const client = createDigestPublicClient(cookies())
+  const client = createDigestPublicClient(await cookies())
   const user = await getCurrentUser()
 
   const [countResult, likedResult] = await Promise.all([

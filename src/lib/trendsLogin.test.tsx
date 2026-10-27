@@ -18,7 +18,9 @@ jest.mock('@/components/portal/PortalComponentErrorBoundary', () => () => null)
 test('preserves repeated Trends filters and gates reads before sign-in', async () => {
   jest.mocked(getIsMember).mockResolvedValue(false)
   const searchParams = { q: ['AI agents', 'art'], granularity: 'month' }
-  await expect(TrendsPage({ searchParams })).rejects.toThrow('/login?redirect=')
+  await expect(
+    TrendsPage({ searchParams: Promise.resolve(searchParams) }),
+  ).rejects.toThrow('/login?redirect=')
   const href = new URL(
     jest.mocked(redirect).mock.calls[0][0],
     'https://community-archive.org',

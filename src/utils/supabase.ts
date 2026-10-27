@@ -41,7 +41,7 @@ const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   return config
 }
 
-const createCookieHandler = (cookieStore: ReturnType<typeof cookies>) => ({
+const createCookieHandler = (cookieStore: Awaited<ReturnType<typeof cookies>>) => ({
   get: (name: string) => cookieStore.get(name)?.value,
   set: (name: string, value: string, options: CookieOptions) => {
     try {
@@ -91,7 +91,7 @@ export const createAdminBrowserClient = () => {
 }
 
 export const createServerClient = (
-  cookieStore: ReturnType<typeof cookies>,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
   options: { readSource?: 'app' } = {},
 ) => {
   const { url, anonKey } = getSupabaseConfig()
@@ -134,7 +134,7 @@ export const createMiddlewareClient = (request: NextRequest) => {
 }
 
 export const createServerAdminClient = (
-  cookieStore: ReturnType<typeof cookies>,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
 ) => {
   const { url, serviceRole } = getSupabaseConfig(true)
   return serverClient<Database>(url, serviceRole!, {

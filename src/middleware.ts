@@ -301,8 +301,8 @@ function isBotUA(ua: string): boolean {
 }
 
 function getIp(request: NextRequest): string {
+  // Next 15 removed request.ip. Vercel sets this header at its trusted edge.
   return (
-    request.ip ||
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
   )

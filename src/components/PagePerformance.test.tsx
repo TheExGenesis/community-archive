@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { act, fireEvent, render } from '@testing-library/react'
 import { usePathname } from 'next/navigation'
 import PagePerformance from './PagePerformance'
@@ -21,9 +22,12 @@ test('distinguishes document, observed clicks, and unknown navigation without le
   const { rerender } = render(
     <>
       <PagePerformance />
-      <a href="/user/private-name" onClick={(event) => event.preventDefault()}>
+      <Link
+        href="/user/private-name"
+        onClick={(event) => event.preventDefault()}
+      >
         Profile
-      </a>
+      </Link>
     </>,
   )
   flush()

@@ -159,6 +159,6 @@ export const createDigestReadClient = () =>
   createPublicReadClient() as unknown as SupabaseClient<DigestDatabase>
 
 export const createDigestPublicClient = (
-  cookieStore: ReturnType<typeof cookies>,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
 ) =>
   createServerClient(cookieStore) as unknown as SupabaseClient<DigestDatabase>

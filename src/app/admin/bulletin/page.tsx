@@ -16,12 +16,13 @@ export const metadata: Metadata = {
 export default async function BulletinRunsPage({
   searchParams,
 }: {
-  searchParams?: { before?: string; prompts_before?: string }
+  searchParams?: Promise<{ before?: string; prompts_before?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   await requireBulletinAdmin()
   const [data, prompts] = await Promise.all([
-    loadRunDashboard(searchParams?.before).catch(() => null),
-    loadPrompts(searchParams?.prompts_before).catch(() => null),
+    loadRunDashboard(resolvedSearchParams?.before).catch(() => null),
+    loadPrompts(resolvedSearchParams?.prompts_before).catch(() => null),
   ])
   return (
     <main className="mx-auto min-h-[70vh] w-full min-w-0 max-w-7xl space-y-8 px-4 py-10 sm:px-6">
@@ -47,7 +48,10 @@ export default async function BulletinRunsPage({
       </header>
       <CandidateFilters />
       {prompts ? (
-        <PromptEditor data={prompts} olderThan={searchParams?.prompts_before} />
+        <PromptEditor
+          data={prompts}
+          olderThan={resolvedSearchParams?.prompts_before}
+        />
       ) : (
         <p role="alert" className="rounded-lg border p-5">
           Prompt history could not be loaded. Check that the prompt migration is
@@ -55,7 +59,7 @@ export default async function BulletinRunsPage({
         </p>
       )}
       {data ? (
-        <RunDashboard data={data} olderThan={searchParams?.before} />
+        <RunDashboard data={data} olderThan={resolvedSearchParams?.before} />
       ) : (
         <div role="alert" className="space-y-4 rounded-lg border p-6">
           <p>Run history could not be loaded. Refresh to try again.</p>

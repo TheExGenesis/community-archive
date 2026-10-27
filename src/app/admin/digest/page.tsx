@@ -160,15 +160,16 @@ function EditionList({
 export default async function DigestLabPage({
   searchParams,
 }: {
-  searchParams?: {
+  searchParams?: Promise<{
     run?: string
     month?: string
     notice?: string
     error?: string
-  }
+  }>
 }) {
+  const resolvedSearchParams = await searchParams
   await requireAdmin()
-  const state = await loadDigestLabState(searchParams?.run)
+  const state = await loadDigestLabState(resolvedSearchParams?.run)
   const prompt = state.prompts[0]
   const pastDates = listPastDigestDates(365)
   const runningRuns = state.runs.filter(({ status }) => status === 'running')
@@ -249,20 +250,20 @@ export default async function DigestLabPage({
           </div>
         </div>
 
-        {searchParams?.notice ? (
+        {resolvedSearchParams?.notice ? (
           <div
             role="status"
             className="mb-5 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100"
           >
-            {searchParams.notice}
+            {resolvedSearchParams.notice}
           </div>
         ) : null}
-        {searchParams?.error ? (
+        {resolvedSearchParams?.error ? (
           <div
             role="alert"
             className="mb-5 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100"
           >
-            {searchParams.error}
+            {resolvedSearchParams.error}
           </div>
         ) : null}
 

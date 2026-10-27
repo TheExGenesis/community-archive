@@ -25,12 +25,25 @@ export const revalidate = 3600
 export const maxDuration = 30
 
 type PageProps = {
-  params: { tweet_id: string }
-  searchParams?: Record<string, string | string[] | undefined>
+  params: Promise<{ tweet_id: string }>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-const loadFromProps = ({ params, searchParams }: PageProps) =>
-  loadTweetPage(params.tweet_id, searchParams?.from === 'opportunities')
+const resolveProps = async ({ params, searchParams }: PageProps) => {
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ])
+  return { params: resolvedParams, searchParams: resolvedSearchParams ?? {} }
+}
+
+const loadFromProps = async (props: PageProps) => {
+  const resolved = await resolveProps(props)
+  return loadTweetPage(
+    resolved.params.tweet_id,
+    resolved.searchParams.from === 'opportunities',
+  )
+}
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
   const page = await loadFromProps(props)
@@ -52,7 +65,10 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
 }
 
 export default async function TweetPage(props: PageProps) {
-  const page = await loadFromProps(props)
+  const [resolvedProps, page] = await Promise.all([
+    resolveProps(props),
+    loadFromProps(props),
+  ])
   if (!page) {
     notFound()
   }
@@ -70,7 +86,7 @@ export default async function TweetPage(props: PageProps) {
   const isThread = subject.kind === 'thread'
   // A standalone tweet still shows the replies it collected.
   const replyIds = threadTree?.children[tweet.tweet_id] ?? []
-  const backLink = getTweetBackLink(props.searchParams)
+  const backLink = getTweetBackLink(resolvedProps.searchParams)
 
   return (
     <main className="min-h-screen bg-background">

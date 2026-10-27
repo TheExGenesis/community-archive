@@ -77,7 +77,9 @@ test('shows a real heading and tweet while summary and quotes are pending, then 
   })
 
   // Neither optional promise has resolved when the page produces its shell.
-  const shell = await TweetPage({ params: { tweet_id: tweet.tweet_id } })
+  const shell = await TweetPage({
+    params: Promise.resolve({ tweet_id: tweet.tweet_id }),
+  })
   const nodes = elements(shell)
   const boundaries = nodes.filter((node) => node.type === Suspense)
   expect(boundaries).toHaveLength(2)

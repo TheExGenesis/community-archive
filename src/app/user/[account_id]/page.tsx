@@ -46,14 +46,17 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 interface PageProps {
-  params: { account_id: string }
-  searchParams: { chapter?: string; section?: string; username?: string }
+  params: Promise<{ account_id: string }>
+  searchParams: Promise<{
+    chapter?: string
+    section?: string
+    username?: string
+  }>
 }
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const resolved = await resolveProfileCore(params.account_id)
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { account_id } = await params
+  const resolved = await resolveProfileCore(account_id)
   if (!resolved) return { title: 'User not found' }
   const { accountId, profile } = resolved
   const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
@@ -153,15 +156,19 @@ async function ProfileArchivedAt({ accountId }: { accountId: string }) {
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
+  const [{ account_id }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ])
   const [viewer, resolved] = await Promise.all([
     getBrowsingUser(),
-    resolveProfileCore(params.account_id),
+    resolveProfileCore(account_id),
   ])
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
-  const requestedYear = searchParams.chapter
-    ? Number.parseInt(searchParams.chapter, 10)
+  const requestedYear = resolvedSearchParams.chapter
+    ? Number.parseInt(resolvedSearchParams.chapter, 10)
     : null
   const candidateYear =
     requestedYear &&
@@ -173,12 +180,12 @@ export default async function UserPage({ params, searchParams }: PageProps) {
   // the archive content; here it only has to be shaped like a slug.
   const candidateSection =
     candidateYear &&
-    searchParams.section &&
-    /^[a-z0-9-]{1,64}$/.test(searchParams.section)
-      ? searchParams.section
+    resolvedSearchParams.section &&
+    /^[a-z0-9-]{1,64}$/.test(resolvedSearchParams.section)
+      ? resolvedSearchParams.section
       : null
 
-  const requestedProfilePath = `/user/${encodeURIComponent(params.account_id)}`
+  const requestedProfilePath = `/user/${encodeURIComponent(account_id)}`
   const canonicalProfilePath = userProfileHref(profile.username, accountId)
   if (canonicalProfilePath !== requestedProfilePath) {
     const canonicalParams = new URLSearchParams()

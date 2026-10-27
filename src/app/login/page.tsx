@@ -8,8 +8,9 @@ import { safeAuthRedirect } from '@/lib/authRedirect'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { redirect?: string }
+  searchParams: Promise<{ redirect?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
@@ -17,7 +18,7 @@ export default async function LoginPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const returnTo = safeAuthRedirect(searchParams.redirect)
+  const returnTo = safeAuthRedirect(resolvedSearchParams.redirect)
   if (user) redirect(returnTo)
 
   return (

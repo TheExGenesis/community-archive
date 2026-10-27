@@ -127,7 +127,10 @@ test('story article resolves without waiting for archived quote posts', async ()
   jest.mocked(loadDigestQuotePosts).mockReturnValue(pending)
   const story = AUGUST_11_MOCK_DIGEST.content.stories[0]
   const page = await DigestStoryPage({
-    params: { date: AUGUST_11_MOCK_DIGEST.digestDate, slug: story.slug },
+    params: Promise.resolve({
+      date: AUGUST_11_MOCK_DIGEST.digestDate,
+      slug: story.slug,
+    }),
   })
   expect(page.type).toBe(DigestStoryView)
   expect(page.props.story.title).toBe(story.title)

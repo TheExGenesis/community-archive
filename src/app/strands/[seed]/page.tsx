@@ -32,9 +32,10 @@ async function findStrand(seed: string) {
 export async function generateMetadata({
   params,
 }: {
-  params: { seed: string }
+  params: Promise<{ seed: string }>
 }): Promise<Metadata> {
-  const strand = await findStrand(params.seed)
+  const { seed } = await params
+  const strand = await findStrand(seed)
   const title = `${strand.title} · Strands · Community Archive`
   const description = strand.summary.slice(0, 160)
   const url = `https://www.community-archive.org/strands/${strand.id}`
@@ -77,9 +78,10 @@ async function Comments({ strandId }: { strandId: string }) {
 export default async function StrandPage({
   params,
 }: {
-  params: { seed: string }
+  params: Promise<{ seed: string }>
 }) {
-  const strand = await findStrand(params.seed)
+  const { seed } = await params
+  const strand = await findStrand(seed)
   const [{ strands }, tweets] = await Promise.all([
     getStrands(),
     getStrandTweets([strand.id, ...strand.essentialTweets.map((p) => p.id)]),

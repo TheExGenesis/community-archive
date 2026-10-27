@@ -4,19 +4,20 @@ import { isStagingOptInPreviewEnabled } from '@/lib/stagingOptInPreview'
 import Link from 'next/link'
 
 interface OptInPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     mockOptIn?: string | string[]
     redirect?: string | string[]
-  }
+  }>
 }
 
 export default async function OptInPage({ searchParams }: OptInPageProps) {
-  const fromBulletin = searchParams?.redirect === '/bulletin'
+  const resolvedSearchParams = await searchParams
+  const fromBulletin = resolvedSearchParams?.redirect === '/bulletin'
   const { user } = await requireAuth(
     fromBulletin ? '/opt-in?redirect=/bulletin' : '/opt-in',
   )
   const mockOptIn = isStagingOptInPreviewEnabled(
-    searchParams?.mockOptIn === '1',
+    resolvedSearchParams?.mockOptIn === '1',
   )
   const optInData = mockOptIn ? null : (await getOptInStatus(user.id)).data
   const canVisitBulletin =

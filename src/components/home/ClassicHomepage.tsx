@@ -44,7 +44,7 @@ export default async function ClassicHomepage({
   isMember,
   showCta,
 }: ClassicHomepageProps) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
   let isOptedIn = false

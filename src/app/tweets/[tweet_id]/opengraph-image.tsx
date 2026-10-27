@@ -23,9 +23,10 @@ const clip = (text: string, max: number) =>
 export default async function Image({
   params,
 }: {
-  params: { tweet_id: string }
+  params: Promise<{ tweet_id: string }>
 }) {
-  const page = await loadTweetPage(params.tweet_id)
+  const { tweet_id } = await params
+  const page = await loadTweetPage(tweet_id)
   const kind = page?.subject.kind ?? 'tweet'
   const title = page
     ? (page.summary?.title ?? fallbackTitle(page.subject))

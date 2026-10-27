@@ -60,8 +60,8 @@ beforeEach(() => {
 
 test('renders the profile before owner authentication and reads settings only for its owner', async () => {
   const page = await UserPage({
-    params: { account_id: 'alice' },
-    searchParams: {},
+    params: Promise.resolve({ account_id: 'alice' }),
+    searchParams: Promise.resolve({}),
   })
   expect(getAuthenticatedAccountId).not.toHaveBeenCalled()
   expect(getPublicProfileSettings).not.toHaveBeenCalled()
@@ -83,8 +83,11 @@ test('renders the profile before owner authentication and reads settings only fo
 test('shows only basic identity and a destination-preserving login prompt to guests', async () => {
   ;(getBrowsingUser as jest.Mock).mockResolvedValue(null)
   const page = await UserPage({
-    params: { account_id: 'alice' },
-    searchParams: { chapter: '2025', section: 'hello' },
+    params: Promise.resolve({ account_id: 'alice' }),
+    searchParams: Promise.resolve({
+      chapter: '2025',
+      section: 'hello',
+    }),
   })
   expect(page.type).toBe(GuestProfile)
   expect(page.props).toEqual({

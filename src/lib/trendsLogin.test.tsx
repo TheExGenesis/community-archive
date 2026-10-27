@@ -35,6 +35,8 @@ test('renders the selected filters after sign-in', async () => {
   jest
     .mocked(loadPortalComponentData)
     .mockResolvedValue({ data: {}, failed: false })
-  const page = await TrendsPage({ searchParams: { q: 'art' } })
+  const page = await TrendsPage({
+    searchParams: Promise.resolve({ q: 'art' }),
+  })
   expect(page.props.children.props.initialSearch).toBe('q=art')
 })

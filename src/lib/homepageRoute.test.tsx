@@ -52,7 +52,7 @@ describe('Homepage OAuth actions', () => {
       globalStats: new Promise(() => undefined),
     } as ReturnType<typeof startHomepageData>)
 
-    const page = await Homepage({ searchParams: {} })
+    const page = await Homepage({ searchParams: Promise.resolve({}) })
     const markup = renderToStaticMarkup(page)
 
     expect(markup).toContain('homepage people')
@@ -60,7 +60,9 @@ describe('Homepage OAuth actions', () => {
   })
 
   it('keeps an authenticated OAuth return on the opt-in completion surface', async () => {
-    const page = await Homepage({ searchParams: { action: 'optin' } })
+    const page = await Homepage({
+      searchParams: Promise.resolve({ action: 'optin' }),
+    })
 
     const markup = renderToStaticMarkup(page)
     expect(markup).toContain('shared homepage · member true · CTA true')
@@ -70,7 +72,7 @@ describe('Homepage OAuth actions', () => {
   })
 
   it('renders the same dashboard without the CTA for signed-in visitors', async () => {
-    const page = await Homepage({ searchParams: {} })
+    const page = await Homepage({ searchParams: Promise.resolve({}) })
 
     const markup = renderToStaticMarkup(page)
     expect(markup).toContain('shared homepage · member true · CTA false')
@@ -81,7 +83,7 @@ describe('Homepage OAuth actions', () => {
 
   it('renders the shared dashboard with the CTA for logged-out visitors', async () => {
     getIsMemberMock.mockResolvedValue(false)
-    const page = await Homepage({ searchParams: {} })
+    const page = await Homepage({ searchParams: Promise.resolve({}) })
 
     const markup = renderToStaticMarkup(page)
     expect(markup).toContain('shared homepage · member false · CTA true')

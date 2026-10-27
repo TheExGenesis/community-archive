@@ -23,8 +23,9 @@ export const metadata = {
 }
 
 export default async function SocialGraphPage({
-  searchParams = {},
-}: { searchParams?: { person?: string } } = {}) {
+  searchParams,
+}: { searchParams?: Promise<{ person?: string }> } = {}) {
+  const resolvedSearchParams = (await searchParams) ?? {}
   const snapshotResult = getSocialGraphSnapshot().then(
     (snapshot) => ({ snapshot, error: null }),
     (error: unknown) => ({ snapshot: null, error }),
@@ -91,9 +92,9 @@ export default async function SocialGraphPage({
           snapshot={snapshot}
           currentMember={currentMember}
           initialPerson={
-            typeof searchParams.person === 'string' &&
-            /^[A-Za-z0-9_]{1,15}$/.test(searchParams.person)
-              ? searchParams.person
+            typeof resolvedSearchParams.person === 'string' &&
+            /^[A-Za-z0-9_]{1,15}$/.test(resolvedSearchParams.person)
+              ? resolvedSearchParams.person
               : undefined
           }
         />

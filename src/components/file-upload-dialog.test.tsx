@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FileUploadDialog } from './file-upload-dialog'
 import {
@@ -160,7 +160,10 @@ test('preserves the existing reupload choice and allows an affirmative change', 
     />,
   )
   const select = await screen.findByLabelText('Collection after this upload')
+  await waitFor(() => expect(select).toBeEnabled())
+  expect(select).toHaveValue('ongoing')
   await userEvent.selectOptions(select, 'archive-only')
+  expect(select).toHaveValue('archive-only')
   await userEvent.click(screen.getByRole('button', { name: 'Upload' }))
   expect(saveCollectionPreference).toHaveBeenCalledWith('42', false)
 })

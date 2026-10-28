@@ -1,5 +1,5 @@
 import { FaExternalLinkAlt } from 'react-icons/fa'
-import { getResearchPosts } from '@/lib/portal/research'
+import { getResearchPosts, pinResearchPost } from '@/lib/portal/research'
 import { RESEARCH_SOURCE, type ResearchPost } from '@/lib/portal/types'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
@@ -25,7 +25,7 @@ const MODEL_BEHAVIOR_REPORTS: ResearchPost = {
 // Public: research built on the archive is useful to visitors and members.
 export default async function ResearchPage() {
   const feedPosts = await getResearchPosts(24)
-  const posts = [MODEL_BEHAVIOR_REPORTS, ...feedPosts]
+  const posts = pinResearchPost([MODEL_BEHAVIOR_REPORTS, ...feedPosts])
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">

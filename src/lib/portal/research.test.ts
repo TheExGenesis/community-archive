@@ -1,6 +1,10 @@
 jest.mock('server-only', () => ({}), { virtual: true })
 
-import { getResearchPosts, selectFeaturedResearchPosts } from './research'
+import {
+  getResearchPosts,
+  pinResearchPost,
+  selectFeaturedResearchPosts,
+} from './research'
 import type { ResearchPost } from './types'
 
 function post(title: string): ResearchPost {
@@ -24,12 +28,15 @@ test('selects the four featured research posts in editorial order', () => {
     post('opportunity mining | lab notes #6'),
     post('a theory of tpot (postrat twitter)'),
     post('Agentic Taste Modeling | lab notes #8'),
-    post('Towards a Pattern Language of Serendipity Online'),
+    {
+      ...post('Why do I care about twitter so much?'),
+      url: 'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
+    },
   ])
 
   expect(selected.map(({ title }) => title)).toEqual([
+    'Why do I care about twitter so much?',
     'The Switchboard Operator Benchmark',
-    'Towards a Pattern Language of Serendipity Online',
     'Agentic Taste Modeling | lab notes #8',
     'a theory of tpot (postrat twitter)',
   ])
@@ -69,4 +76,24 @@ test('shows the featured research posts and hides the phoenix post', async () =>
     'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
   ])
   fetchSpy.mockRestore()
+})
+
+test('keeps the pinned article when it is absent from the feed', () => {
+  const posts = pinResearchPost([post('Another research project')])
+  expect(posts.map(({ title }) => title)).toEqual([
+    'Why do I care about twitter so much?',
+    'Another research project',
+  ])
+  expect(selectFeaturedResearchPosts([])).toEqual([posts[0]])
+})
+
+test('pins by URL after a title change and keeps fresh metadata without duplicates', () => {
+  const article = {
+    ...post('A new title'),
+    url: 'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
+    excerpt: 'Updated excerpt',
+  }
+  const other = post('Another research project')
+  expect(pinResearchPost([other, article, article])).toEqual([article, other])
+  expect(selectFeaturedResearchPosts([other, article])).toEqual([article])
 })

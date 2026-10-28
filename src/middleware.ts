@@ -304,8 +304,7 @@ function isBotUA(ua: string): boolean {
 function getIp(request: NextRequest): string {
   // Next 15 removed request.ip. Vercel sets this header at its trusted edge.
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   )
 }
 
@@ -649,7 +648,9 @@ export async function middleware(request: NextRequest) {
 
   const loginRequired = requiresLogin(pathname)
   const guestPreview =
-    pathname === '/search' || /^\/user\/[^/]+\/?$/.test(pathname)
+    pathname === '/search' ||
+    /^\/user-dir\/?$/.test(pathname) ||
+    /^\/user\/[^/]+\/?$/.test(pathname)
   let authenticated = false
 
   // Chunked Supabase sessions use -auth-token.0, -auth-token.1, etc.
@@ -674,15 +675,16 @@ export async function middleware(request: NextRequest) {
     response = NextResponse.next({ request: { headers: request.headers } })
   }
 
-  // A signed-out profile view is the same for everyone, so it is served by
-  // the cached /guest route instead of the per-viewer page. The URL stays
-  // /user/..., and only this response may skip the private cache header.
+  // Signed-out profile and directory views are the same for everyone, so
+  // they are served by the cached /guest routes instead of the per-viewer
+  // pages. The URL stays public, and only this response may skip the private
+  // cache header.
   const guestProfileRewrite =
     loginRequired &&
     !authenticated &&
     guestPreview &&
     request.method === 'GET' &&
-    pathname.startsWith('/user/')
+    pathname.startsWith('/user')
 
   if (loginRequired) {
     if (!authenticated && !guestPreview) {
@@ -706,11 +708,7 @@ export async function middleware(request: NextRequest) {
       }
       response = denied
     } else if (guestProfileRewrite) {
-      response = rewriteToGuestView(
-        request,
-        `/guest/user${pathname.slice('/user'.length)}`,
-        response,
-      )
+      response = rewriteToGuestView(request, `/guest${pathname}`, response)
     }
     if (!guestProfileRewrite) {
       response.headers.set('Cache-Control', 'private, no-store')
@@ -728,6 +726,18 @@ export async function middleware(request: NextRequest) {
     /^\/tweets\/\d{1,20}\/?$/.test(pathname)
   ) {
     response = rewriteToGuestView(request, `/guest${pathname}`, response)
+  }
+
+  // Trends explorer series reads are member-only. Visitors without a session
+  // cookie get the cached preview of this week's terms instead of a redirect.
+  if (
+    request.method === 'GET' &&
+    !hasAuthCookies &&
+    !request.cookies.has('dev_as_member') &&
+    !request.nextUrl.searchParams.has('as') &&
+    /^\/trends\/?$/.test(pathname)
+  ) {
+    response = rewriteToGuestView(request, '/guest/trends', response)
   }
 
   // ── Stage 6: Security Headers (all responses) ──────────────────────────

@@ -218,7 +218,7 @@ affect later runs only. Changing a prompt does not reclassify cached decisions.
 The dashboard displays each run's actual pinned prompt. Older runs without that
 metadata say so rather than inventing attribution.
 
-Normal admission limits are $0.25/day and $5/calendar month, UTC, with 10%
+Normal admission limits are $1/day and $10/calendar month, UTC, with 10%
 headroom. Calls reserve a conservative maximum first; ambiguous or timed-out
 calls retain that reservation. Transient model-request failures (HTTP 408, 429,
 5xx, network errors including closed/reset connections, and timeouts) retry within

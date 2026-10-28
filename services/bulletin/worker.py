@@ -29,8 +29,8 @@ import output_schema
 
 MODEL = 'z-ai/glm-5.3-flash'
 VERSION = 'bulletin-143dc2d-v3-resolution'
-DAY_BUDGET = Decimal('0.10')
-MONTH_BUDGET = Decimal('1.00')
+DAY_BUDGET = Decimal('0.25')
+MONTH_BUDGET = Decimal('5.00')
 MAX_OUTPUT = 2048
 MAX_CALLS = 50
 MAX_PAGES = 100

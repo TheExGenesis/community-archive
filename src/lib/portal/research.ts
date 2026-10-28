@@ -48,9 +48,28 @@ const isRelevant = (title: string, url: string): boolean => {
   return RELEVANT_TITLE_KEYWORDS.some((k) => lower.includes(k))
 }
 
+// Keep this editorial pick available even after it leaves the recent RSS feed.
+const PINNED_RESEARCH_POST: ResearchPost = {
+  title: 'Why do I care about twitter so much?',
+  url: 'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
+  date: '2026-08-23T23:20:58.000Z',
+  excerpt: 'Towards a pattern language of serendipity online',
+  image:
+    'https://substack-post-media.s3.amazonaws.com/public/images/ea892e8e-d214-42a2-af73-4ddb7dc2be2e_896x1344.jpeg',
+  author: 'xiq',
+}
+
+/** Pin by stable URL, retaining fresh feed metadata without duplicating it. */
+export function pinResearchPost(posts: ResearchPost[]): ResearchPost[] {
+  return [
+    posts.find((post) => post.url === PINNED_RESEARCH_POST.url) ??
+      PINNED_RESEARCH_POST,
+    ...posts.filter((post) => post.url !== PINNED_RESEARCH_POST.url),
+  ]
+}
+
 const FEATURED_RESEARCH_TITLES = [
   'the switchboard operator benchmark',
-  'towards a pattern language of serendipity online',
   'agentic taste modeling',
   'a theory of tpot',
 ] as const
@@ -59,17 +78,21 @@ const FEATURED_RESEARCH_TITLES = [
 export function selectFeaturedResearchPosts(
   posts: ResearchPost[],
 ): ResearchPost[] {
-  const remaining = new Set(posts.map((post) => post.url))
-  return FEATURED_RESEARCH_TITLES.flatMap((title): ResearchPost[] => {
-    const post = posts.find(
-      (candidate) =>
-        remaining.has(candidate.url) &&
-        candidate.title.trim().toLocaleLowerCase().includes(title),
-    )
-    if (!post) return []
-    remaining.delete(post.url)
-    return [post]
-  })
+  const [pinned, ...otherPosts] = pinResearchPost(posts)
+  const remaining = new Set(otherPosts.map((post) => post.url))
+  return [
+    pinned,
+    ...FEATURED_RESEARCH_TITLES.flatMap((title): ResearchPost[] => {
+      const post = posts.find(
+        (candidate) =>
+          remaining.has(candidate.url) &&
+          candidate.title.trim().toLocaleLowerCase().includes(title),
+      )
+      if (!post) return []
+      remaining.delete(post.url)
+      return [post]
+    }),
+  ]
 }
 
 const decodeEntities = (s: string): string =>

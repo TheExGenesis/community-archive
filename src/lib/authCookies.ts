@@ -105,7 +105,7 @@ function combineChunks<T extends CookieLike>(
  * cookies that lost, so callers can expire them.
  */
 export function reconcileAuthCookies<T extends CookieLike>(
-  cookies: readonly T[],
+  cookies: T[],
 ): { cookies: T[]; stale: string[] } {
   const groups = new Map<string, { single: T[]; chunks: T[] }>()
   for (const cookie of cookies) {
@@ -138,7 +138,9 @@ export function reconcileAuthCookies<T extends CookieLike>(
     for (const cookie of keepChunks ? single : chunks) stale.add(cookie.name)
   })
 
-  if (stale.size === 0) return { cookies: cookies.slice(), stale: [] }
+  // Hand the original array back when nothing changed; callers and tests
+  // rely on getAll() returning the store's own list in that case.
+  if (stale.size === 0) return { cookies, stale: [] }
   return {
     cookies: cookies.filter((cookie) => !stale.has(cookie.name)),
     stale: Array.from(stale).sort(),

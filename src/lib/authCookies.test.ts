@@ -53,7 +53,10 @@ test('leaves cookie lists without duplicate sessions untouched', () => {
   const chunks = chunk(encode(session(2000, 5000)), 3180)
   expect(chunks.length).toBeGreaterThan(1)
   const cookies = [...verifiers, ...chunks, { name: 'other', value: '1' }]
-  expect(reconcileAuthCookies(cookies)).toEqual({ cookies, stale: [] })
+  const untouched = reconcileAuthCookies(cookies)
+  expect(untouched).toEqual({ cookies, stale: [] })
+  // The same array comes back, so cookie stores keep their identity.
+  expect(untouched.cookies).toBe(cookies)
 
   const single = [{ name: 'sb-ref-auth-token', value: encode(session(2000)) }]
   expect(reconcileAuthCookies(single)).toEqual({ cookies: single, stale: [] })

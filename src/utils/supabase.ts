@@ -4,8 +4,6 @@ import {
   parseDocumentCookie,
   reconcileAuthCookies,
 } from '@/lib/authCookies'
-import { browserAuthDiagnostics } from '@/lib/browserAuthDiagnostics'
-import { serverAuthDiagnostics } from '@/lib/serverAuthDiagnostics'
 import { devLog } from '@/lib/devLog'
 import {
   createBrowserClient as browserClient,
@@ -75,7 +73,6 @@ const createCookieHandler = (
       return current
     },
     setAll: (cookiesToSet) => {
-      serverAuthDiagnostics(cookieStore.getAll(), cookiesToSet, 'route')
       try {
         for (const { name, value, options } of cookiesToSet) {
           cookieStore.set({ name, value, ...options })
@@ -107,7 +104,6 @@ export const createBrowserClient = () => {
   expireStaleBrowserAuthCookies()
   return browserClient<Database, 'public'>(url, anonKey, {
     cookies: {},
-    auth: browserAuthDiagnostics(),
     global: { fetch: createBrowserReadFetch() },
   })
 }
@@ -164,11 +160,6 @@ export const createMiddlewareClient = (request: NextRequest) => {
     cookies: {
       getAll: () => reconcileAuthCookies(request.cookies.getAll()).cookies,
       setAll: (cookiesToSet, headers) => {
-        serverAuthDiagnostics(
-          request.cookies.getAll(),
-          cookiesToSet,
-          request.nextUrl.pathname,
-        )
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value)
         }

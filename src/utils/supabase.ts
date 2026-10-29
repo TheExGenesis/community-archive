@@ -1,4 +1,5 @@
 import { Database } from '@/database-types'
+import { browserAuthDiagnostics } from '@/lib/browserAuthDiagnostics'
 import { devLog } from '@/lib/devLog'
 import {
   createBrowserClient as browserClient,
@@ -60,6 +61,7 @@ export const createBrowserClient = () => {
   const { url, anonKey } = getSupabaseConfig()
   return browserClient<Database, 'public'>(url, anonKey, {
     cookies: {},
+    auth: browserAuthDiagnostics(),
     global: { fetch: createBrowserReadFetch() },
   })
 }

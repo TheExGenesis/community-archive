@@ -1,4 +1,9 @@
 import { Database } from '@/database-types'
+import {
+  authCookieDeletions,
+  parseDocumentCookie,
+  reconcileAuthCookies,
+} from '@/lib/authCookies'
 import { browserAuthDiagnostics } from '@/lib/browserAuthDiagnostics'
 import { serverAuthDiagnostics } from '@/lib/serverAuthDiagnostics'
 import { devLog } from '@/lib/devLog'
@@ -43,24 +48,63 @@ const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   return config
 }
 
+// A stale `sb-<ref>-auth-token` cookie the SDK cannot delete (HttpOnly, or
+// scoped to a parent domain by an earlier deployment) shadows every fresh
+// chunked session: the SDK reads the unchunked name first, its refresh fails,
+// and it then removes all auth cookies including the valid login. Hide the
+// stale shape from the SDK and expire it on every scope we may have used.
 const createCookieHandler = (
   cookieStore: Awaited<ReturnType<typeof cookies>>,
-): CookieMethodsServer => ({
-  getAll: () => cookieStore.getAll(),
-  setAll: (cookiesToSet) => {
-    serverAuthDiagnostics(cookieStore.getAll(), cookiesToSet, 'route')
-    try {
-      for (const { name, value, options } of cookiesToSet) {
-        cookieStore.set({ name, value, ...options })
+): CookieMethodsServer => {
+  let staleCookiesExpired = false
+  return {
+    getAll: () => {
+      const { cookies: current, stale } = reconcileAuthCookies(
+        cookieStore.getAll(),
+      )
+      if (stale.length > 0 && !staleCookiesExpired) {
+        staleCookiesExpired = true
+        try {
+          for (const { name, value, options } of authCookieDeletions(stale)) {
+            cookieStore.set({ name, value, ...options })
+          }
+        } catch {
+          // Server Components cannot mutate cookies; middleware clears them.
+        }
       }
-    } catch {
-      // Server Components cannot mutate cookies; middleware refreshes sessions.
-    }
-  },
-})
+      return current
+    },
+    setAll: (cookiesToSet) => {
+      serverAuthDiagnostics(cookieStore.getAll(), cookiesToSet, 'route')
+      try {
+        for (const { name, value, options } of cookiesToSet) {
+          cookieStore.set({ name, value, ...options })
+        }
+      } catch {
+        // Server Components cannot mutate cookies; middleware refreshes sessions.
+      }
+    },
+  }
+}
+
+// The browser SDK reads document.cookie directly. Clear a stale duplicate
+// session cookie before it is constructed so it never sees the stale shape.
+const expireStaleBrowserAuthCookies = () => {
+  if (typeof document === 'undefined') return
+  const { stale } = reconcileAuthCookies(parseDocumentCookie(document.cookie))
+  for (const { name, options } of authCookieDeletions(
+    stale,
+    window.location.hostname,
+  )) {
+    document.cookie = `${name}=; Path=${options.path}; Max-Age=0${
+      options.domain ? `; Domain=${options.domain}` : ''
+    }`
+  }
+}
 
 export const createBrowserClient = () => {
   const { url, anonKey } = getSupabaseConfig()
+  expireStaleBrowserAuthCookies()
   return browserClient<Database, 'public'>(url, anonKey, {
     cookies: {},
     auth: browserAuthDiagnostics(),
@@ -103,10 +147,22 @@ export const createServerClient = (
 export const createMiddlewareClient = (request: NextRequest) => {
   let response = NextResponse.next({ request: { headers: request.headers } })
 
+  // Expire a stale duplicate session cookie on the host and parent domain so
+  // it stops shadowing the current login (see createCookieHandler).
+  const { stale: staleAuthCookies } = reconcileAuthCookies(
+    request.cookies.getAll(),
+  )
+  for (const { name, value, options } of authCookieDeletions(
+    staleAuthCookies,
+    request.headers.get('x-forwarded-host') ?? request.nextUrl.hostname,
+  )) {
+    response.cookies.set({ name, value, ...options })
+  }
+
   const { url, anonKey } = getSupabaseConfig()
   const supabase = serverClient(url, anonKey, {
     cookies: {
-      getAll: () => request.cookies.getAll(),
+      getAll: () => reconcileAuthCookies(request.cookies.getAll()).cookies,
       setAll: (cookiesToSet, headers) => {
         serverAuthDiagnostics(
           request.cookies.getAll(),

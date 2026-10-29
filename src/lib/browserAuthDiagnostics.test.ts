@@ -5,6 +5,8 @@ afterEach(() => {
   window.sessionStorage.clear()
   window.history.replaceState({}, '', '/')
   document.cookie = 'sb-test-auth-token=; Max-Age=0; Path=/'
+  document.cookie = 'ca_auth_debug=; Max-Age=0; Path=/'
+  Reflect.deleteProperty(document, 'cookie')
   jest.restoreAllMocks()
 })
 
@@ -17,8 +19,10 @@ test('diagnostics retain the opt-in across OAuth and discard SDK credentials', (
   const logger = browserAuthDiagnostics()!.debug
   window.history.replaceState({}, '', '/')
   expect(browserAuthDiagnostics()).toBeDefined()
-  document.cookie = 'sb-test-auth-token=secret-cookie-value; Path=/'
   const output = jest.spyOn(console, 'info').mockImplementation(() => {})
+  document.cookie = 'sb-test-auth-token=secret-cookie-value; Path=/'
+  document.cookie = 'sb-test-auth-token=; Max-Age=0; Path=/'
+  document.cookie = 'sb-test-auth-token=secret-cookie-value; Path=/'
 
   logger('SDK prefix', '#_recoverAndRefresh()', 'secret-token', {
     access_token: 'secret-access-token',
@@ -27,5 +31,7 @@ test('diagnostics retain the opt-in across OAuth and discard SDK credentials', (
   const logged = JSON.stringify(output.mock.calls)
   expect(logged).toContain('#_recoverAndRefresh()')
   expect(logged).toContain('sb-test-auth-token')
+  expect(logged).toContain('browser cookie write')
+  expect(logged).toContain('Cookie write')
   expect(logged).not.toContain('secret')
 })

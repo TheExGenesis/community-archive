@@ -1,5 +1,6 @@
 import { Database } from '@/database-types'
 import { browserAuthDiagnostics } from '@/lib/browserAuthDiagnostics'
+import { serverAuthDiagnostics } from '@/lib/serverAuthDiagnostics'
 import { devLog } from '@/lib/devLog'
 import {
   createBrowserClient as browserClient,
@@ -47,6 +48,7 @@ const createCookieHandler = (
 ): CookieMethodsServer => ({
   getAll: () => cookieStore.getAll(),
   setAll: (cookiesToSet) => {
+    serverAuthDiagnostics(cookieStore.getAll(), cookiesToSet, 'route')
     try {
       for (const { name, value, options } of cookiesToSet) {
         cookieStore.set({ name, value, ...options })
@@ -106,6 +108,11 @@ export const createMiddlewareClient = (request: NextRequest) => {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (cookiesToSet, headers) => {
+        serverAuthDiagnostics(
+          request.cookies.getAll(),
+          cookiesToSet,
+          request.nextUrl.pathname,
+        )
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value)
         }

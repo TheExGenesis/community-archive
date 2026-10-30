@@ -112,24 +112,20 @@ run by `method run`. The question is where `method run` executes.
 | C. Claude Code cloud scheduled routines     | Canary, fixer                                                     | Tokens only            | Prompt-driven, not Method-driven, which your rule forbids as a parallel system; no host access; ephemeral sandbox so memory must be the repo (fine) and secrets must be re-provisioned per run. |
 | D. GitHub Actions cron running Claude Code  | Canary                                                            | Runner minutes         | 6-hour job cap, awkward for a continuous fixer, secrets in Actions, no host access.                                                                                                             |
 
-**Recommendation: A, on the existing `agent-experiments` box** (checked
-2026-10-30, `ssh hetzner`, user `frsc`, no sudo): 2 vCPU, 3.7 GB RAM,
-load near idle. It already runs the cuties production profile service, its
-staging twin, the Alloy collectors and the Delvetown Daily Method on user
-systemd timers, so it is a shared host, not a free one. Before the fleet
-goes on it:
+**Decision (Christine, 2026-10-30): A, on its own box.** `agent-experiments`
+(`ssh hetzner`) was considered and rejected: it is near idle, but it hosts
+the cuties production profile service on 2 vCPU / 3.7 GB with a 93% full
+disk, and a fixer running type-checks next to someone else's production is
+the wrong neighbour. New VM `ca-fleet`, CX32 class (4 vCPU / 8 GB,
+~€7–8/mo), same Hetzner project and private network as `prod-firehose`
+and `ca-autorefresh`, provisioned from the control-panel repo like them:
 
-- Disk is 93% full with 2.6 GB free; 18 GB of that is `~/.cache/method`
-  (Delvetown run evidence) and is reclaimable. Prune it first.
-- Run the fleet units in a memory-capped user slice (`MemoryMax=2G`) so a
-  type-check cannot OOM the cuties production service. If that bites,
-  rescale to 4 vCPU / 8 GB (~€7–8/mo more, one reboot that also restarts
-  cuties prod, so pick the hour).
-- Install `claude` and `method` (Node 22, `gh` and `uv` are already there;
-  the Method SDK copy under `~/services/delve-daily/method/` is Delvetown's,
-  install the CLI properly for the fleet).
-- CA checkout under `~/services/ca-fleet/`, GitHub App token in an `env`
-  file mode 600 like Delvetown's, timers as user units.
+- Node 22, `claude`, `method`, `gh`, `vercel@65`, `pnpm`.
+- CA checkout under `~/services/ca-fleet/`, secrets in an `env` file
+  mode 600, a one-repo GitHub App token (Contents and Issues write).
+- Fleet units as user systemd timers; `MemoryMax` on the fixer anyway so a
+  runaway build fails the run rather than the box.
+- `.method-runs/` rotated weekly; learnings and digests live in the repo.
 
 The runtime on the box is Claude Code CLI itself (Method's `claude` agent
 profile), which is what makes a subscription login an option, below.

@@ -26,6 +26,7 @@ import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 type PostHogClient = Pick<
   PostHog,
   | 'capture'
+  | 'captureException'
   | 'get_property'
   | 'identify'
   | 'init'
@@ -423,6 +424,9 @@ const isEmail = (value: unknown): value is string =>
 
 let authenticatedSession: Session | null = null
 let posthogClient: PostHogClient | null = null
+// True while the SDK is opted in only so signed-out browser errors reach
+// PostHog. Everything else is dropped by the gate below.
+let anonymousExceptionCaptureActive = false
 let initializationPromise: Promise<PostHogClient | null> | null = null
 let postHogIdentifiedUserId: string | null = null
 let isPostHogBootstrapEnabled = true
@@ -544,6 +548,37 @@ export function sanitizePostHogEvent(
   return sanitizedEvent
 }
 
+// Signed-in sessions send every allowed event. Signed-out sessions send only
+// `$exception`, with no person profile and no identity properties, so browser
+// errors hit by public readers are visible without tracking them.
+export function gatePostHogEvent(
+  event: CaptureResult | null,
+): CaptureResult | null {
+  if (!event) return null
+  const userId = authenticatedSession?.user.id
+  if (userId && event.properties.distinct_id === userId)
+    return sanitizePostHogEvent(event)
+  if (event.event === '$exception') return sanitizeAnonymousException(event)
+  return null
+}
+
+export function sanitizeAnonymousException(
+  event: CaptureResult,
+): CaptureResult | null {
+  const sanitized = sanitizePostHogEvent(event)
+  if (!sanitized) return null
+  const properties: Properties = { ...sanitized.properties }
+  for (const key of ['$user_id', '$set', '$set_once']) delete properties[key]
+  properties.$is_identified = false
+  properties.$process_person_profile = false
+  return {
+    ...sanitized,
+    properties,
+    $set: undefined,
+    $set_once: undefined,
+  }
+}
+
 export function createPostHogConfig(
   apiHost: string,
   options: PostHogInitializationOptions = {},
@@ -557,11 +592,7 @@ export function createPostHogConfig(
     advanced_disable_feature_flags: true,
     autocapture: true,
     // Gate every SDK event as well as custom captures, including after logout.
-    before_send: (event) =>
-      authenticatedSession?.user.id &&
-      event?.properties.distinct_id === authenticatedSession.user.id
-        ? sanitizePostHogEvent(event)
-        : null,
+    before_send: gatePostHogEvent,
     capture_pageview: 'history_change',
     capture_pageleave: 'if_capture_pageview',
     capture_dead_clicks: false,
@@ -576,7 +607,9 @@ export function createPostHogConfig(
     disable_external_dependency_loading: true,
     disable_persistence: false,
     disable_product_tours: true,
-    disable_session_recording: false,
+    // Replay starts only for signed-in sessions (startSessionRecording flips
+    // this on login; stopSessionRecording flips it back on logout).
+    disable_session_recording: !options.userId,
     disable_surveys: true,
     disable_web_experiments: true,
     enable_recording_console_log: false,
@@ -636,14 +669,18 @@ export async function initializePostHog(
     ? null
     : initialSession
   if (!authenticatedSession?.user.id) {
-    if (posthogClient) {
+    // Signed-out activity is never retained; identity is settled before the
+    // SDK loads so pending captures drop instead of waiting.
+    markPostHogIdentityReady()
+    const client = await loadPostHogClient()
+    if (client && !authenticatedSession) {
       postHogIdentifiedUserId = syncPostHogIdentity(
-        'SIGNED_OUT',
+        postHogIdentifiedUserId ? 'SIGNED_OUT' : 'INITIAL_SESSION',
         null,
         postHogIdentifiedUserId,
       )
+      enableAnonymousExceptionCapture(client)
     }
-    markPostHogIdentityReady()
     return { enabled: false, identifiedUserId: null }
   }
 
@@ -652,6 +689,11 @@ export async function initializePostHog(
   // An auth change may have occurred while the SDK chunk was loading.
   if (client && initialSession && authenticatedSession === initialSession) {
     const wasIdentified = postHogIdentifiedUserId === initialSession.user.id
+    if (anonymousExceptionCaptureActive) {
+      // Errors sent while signed out stay unlinked from the account.
+      anonymousExceptionCaptureActive = false
+      postHogIdentityActions.reset()
+    }
     postHogIdentifiedUserId = syncPostHogIdentity(
       'SIGNED_IN',
       initialSession,
@@ -667,8 +709,20 @@ export async function initializePostHog(
   }
 }
 
+// Opt in with replay disabled: the SDK must run for `$exception` to be
+// captured, and `gatePostHogEvent` drops every other event.
+function enableAnonymousExceptionCapture(client: PostHogClient) {
+  try {
+    client.stopSessionRecording()
+    client.opt_in_capturing({ captureEventName: false })
+    anonymousExceptionCaptureActive = true
+  } catch (error) {
+    logPostHogError('anonymous exception capture', error)
+  }
+}
+
 async function loadPostHogClient(): Promise<PostHogClient | null> {
-  if (!isPostHogBootstrapEnabled || !authenticatedSession?.user.id) return null
+  if (!isPostHogBootstrapEnabled) return null
   if (posthogClient) return posthogClient
 
   const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
@@ -678,15 +732,14 @@ async function loadPostHogClient(): Promise<PostHogClient | null> {
   if (!initializationPromise) {
     initializationPromise = import('@/lib/posthogRuntime')
       .then(({ default: client, postHogMonitoringExtensions }) => {
-        if (!isPostHogBootstrapEnabled || !authenticatedSession?.user.id)
-          return null
+        if (!isPostHogBootstrapEnabled) return null
         const initialized = initializePostHogClient(
           client,
           projectToken,
           posthogHost,
           {
             extensionClasses: postHogMonitoringExtensions,
-            userId: authenticatedSession.user.id,
+            userId: authenticatedSession?.user.id,
           },
         )
         if (!initialized) return null
@@ -714,7 +767,8 @@ export function capturePostHogEvent(
   const sessionAtCapture = authenticatedSession
   void capturePostHogEventWhenReady(
     () =>
-      sessionAtCapture && authenticatedSession !== sessionAtCapture
+      !authenticatedSession?.user.id ||
+      (sessionAtCapture && authenticatedSession !== sessionAtCapture)
         ? Promise.resolve(null)
         : loadPostHogClient(),
     () => identityReadyPromise,
@@ -727,6 +781,37 @@ export function capturePostHogEvent(
       ...properties,
     },
   )
+}
+
+export type PostHogExceptionContext = { boundary: 'route' | 'global' }
+const IDENTITY_WAIT_FOR_EXCEPTIONS_MS = 2000
+
+// React error boundaries report through here for signed-in and signed-out
+// sessions alike. The global boundary renders without the PostHog provider,
+// so identity may never settle; after a short wait the error is captured
+// anonymously.
+export async function capturePostHogException(
+  error: unknown,
+  context: PostHogExceptionContext,
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const identitySettled = await Promise.race([
+    identityReadyPromise.then(() => true),
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), IDENTITY_WAIT_FOR_EXCEPTIONS_MS)
+    }),
+  ])
+  clearTimeout(timer)
+  if (!identitySettled) await initializePostHog(null)
+  const client = await loadPostHogClient()
+  if (!client) return false
+  try {
+    client.captureException(error, { error_boundary: context.boundary })
+    return true
+  } catch (captureError) {
+    logPostHogError('exception capture', captureError)
+    return false
+  }
 }
 
 export function captureHomepageMapAction(
@@ -757,6 +842,7 @@ export function markPostHogIdentityReady() {
 export function disablePostHogAfterIdentityFailure() {
   isPostHogBootstrapEnabled = false
   authenticatedSession = null
+  anonymousExceptionCaptureActive = false
   posthogClient?.stopSessionRecording()
   posthogClient?.opt_out_capturing()
   markPostHogIdentityReady()

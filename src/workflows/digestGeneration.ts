@@ -23,6 +23,7 @@ import {
   isContentFiltered,
 } from '@/lib/digest/openai'
 import type { DigestEditionContent, DigestRunEvent } from '@/lib/digest/types'
+import { reportServerError } from '@/lib/serverErrors'
 import { getWorkflowMetadata } from 'workflow'
 
 const event = (
@@ -254,6 +255,9 @@ async function executeDigestGeneration(runId: string) {
       model: prompt.model,
       error: describeError(error),
       ...(error instanceof Error ? { stack: error.stack } : {}),
+    })
+    await reportServerError('digest_generation', error, {
+      stage: 'model_generation',
     })
     throw error instanceof Error ? error : new Error(describeError(error))
   }

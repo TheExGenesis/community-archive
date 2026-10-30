@@ -1,4 +1,5 @@
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
+import { reportServerError } from '@/lib/serverErrors'
 import { removeArchiveObjects } from '@/lib/upload-archive/removeArchiveObjects'
 import {
   createServerClient,
@@ -37,6 +38,12 @@ export async function DELETE() {
     return NextResponse.json({ removed })
   } catch (error) {
     console.error('Error deleting archive files:', error)
+    await reportServerError(
+      'archive_delete',
+      error,
+      { stage: 'remove_storage_objects' },
+      user.id,
+    )
     return NextResponse.json(
       { error: 'Failed to delete archive files' },
       { status: 500 },

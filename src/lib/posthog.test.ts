@@ -6,12 +6,14 @@ import type {
 } from 'posthog-js/dist/module.slim'
 import {
   capturePostHogEvent,
+  capturePostHogException,
   initializePostHog,
   capturePostHogEventWhenReady,
   capturePostHogEventWithClient,
   createPostHogConfig,
   getPostHogPersonProperties,
   initializePostHogClient,
+  sanitizeAnonymousException,
   sanitizePostHogEvent,
   syncPostHogIdentity,
 } from './posthog'
@@ -19,6 +21,7 @@ import {
 type TestPostHogClient = Pick<
   PostHog,
   | 'capture'
+  | 'captureException'
   | 'get_property'
   | 'identify'
   | 'init'
@@ -36,6 +39,7 @@ function createClient(): jest.Mocked<TestPostHogClient> {
     stopSessionRecording: jest.fn(),
     startSessionRecording: jest.fn(),
     capture: jest.fn(),
+    captureException: jest.fn(),
     get_property: jest.fn(),
     identify: jest.fn(),
     init: jest.fn(),
@@ -287,6 +291,42 @@ describe('sanitizePostHogEvent', () => {
   })
 })
 
+describe('sanitizeAnonymousException', () => {
+  it('keeps the error and page category but no identity', () => {
+    const event = {
+      ...captureResult('$exception', {
+        token: 'project-token',
+        distinct_id: 'anonymous-device',
+        $user_id: 'stale-user',
+        $is_identified: true,
+        $process_person_profile: true,
+        $current_url: 'https://www.community-archive.org/search?q=private',
+        $exception_list: [{ type: 'TypeError', value: 'boom' }],
+        $set: { email: 'someone@example.com' },
+      }),
+      $set: { email: 'someone@example.com' },
+      $set_once: { $initial_referrer: 'https://example.org/?ref=1' },
+    }
+
+    const sanitized = sanitizeAnonymousException(event)
+    expect(sanitized?.properties).toEqual({
+      $geoip_disable: true,
+      token: 'project-token',
+      distinct_id: 'anonymous-device',
+      $is_identified: false,
+      $process_person_profile: false,
+      $current_url: 'https://www.community-archive.org/search',
+      $exception_list: [{ type: 'TypeError', value: 'boom' }],
+      analytics_version: 2,
+      route_name: 'search',
+      page_group: 'product',
+      feature: 'search',
+    })
+    expect(sanitized?.$set).toBeUndefined()
+    expect(sanitized?.$set_once).toBeUndefined()
+  })
+})
+
 describe('createPostHogConfig', () => {
   it('enables full browser monitoring while retaining explicit safeguards', () => {
     expect(createPostHogConfig('https://analytics.example.com')).toMatchObject({
@@ -308,7 +348,7 @@ describe('createPostHogConfig', () => {
       disable_external_dependency_loading: true,
       disable_persistence: false,
       disable_product_tours: true,
-      disable_session_recording: false,
+      disable_session_recording: true,
       disable_surveys: true,
       disable_web_experiments: true,
       enable_recording_console_log: false,
@@ -324,6 +364,17 @@ describe('createPostHogConfig', () => {
         recordBody: false,
         recordHeaders: false,
       },
+    })
+  })
+
+  it('enables replay only when initialized for a signed-in user', () => {
+    expect(
+      createPostHogConfig('https://analytics.example.com', {
+        userId: 'user-123',
+      }),
+    ).toMatchObject({
+      disable_session_recording: false,
+      bootstrap: { distinctID: 'user-123', isIdentifiedID: true },
     })
   })
 
@@ -368,7 +419,7 @@ describe('initializePostHogClient', () => {
       expect.objectContaining({
         api_host: 'https://analytics.example.com',
         disable_persistence: false,
-        disable_session_recording: false,
+        disable_session_recording: true,
       }),
     )
   })
@@ -629,39 +680,106 @@ describe('authenticated analytics lifecycle', () => {
     else process.env.NEXT_PUBLIC_POSTHOG_HOST = originalHost
   })
 
-  it('does not load the SDK or retain signed-out activity for a later login', async () => {
-    await initializePostHog(null)
-    capturePostHogEvent('archive_deleted')
-    await Promise.resolve()
-    expect(mockRuntimeLoaded).not.toHaveBeenCalled()
-    expect(mockRuntimeClient.capture).not.toHaveBeenCalled()
-    const beforeSend = createPostHogConfig('https://analytics.example.com')
-      .before_send as (event: CaptureResult) => CaptureResult | null
-    expect(
-      beforeSend(captureResult('$pageview', { distinct_id: 'stale-user' })),
-    ).toBeNull()
-  })
+  const beforeSend = createPostHogConfig('https://analytics.example.com')
+    .before_send as (event: CaptureResult) => CaptureResult | null
 
-  it('does not initialize when logout races the SDK import', async () => {
-    const pending = initializePostHog(sessionFor('old-user'))
+  it('sends only browser exceptions for a signed-out visitor', async () => {
     await initializePostHog(null)
-    await pending
-    expect(mockRuntimeClient.init).not.toHaveBeenCalled()
-    expect(mockRuntimeClient.opt_in_capturing).not.toHaveBeenCalled()
-  })
-
-  it('tracks authenticated users, stops on logout, and supports another login', async () => {
-    await initializePostHog(sessionFor('user-123'))
+    expect(mockRuntimeLoaded).toHaveBeenCalled()
+    // Anonymous initialization: no identity bootstrap, replay disabled.
     expect(mockRuntimeClient.init).toHaveBeenCalledWith(
       'test-token',
       expect.objectContaining({
-        opt_out_capturing_by_default: true,
-        bootstrap: { distinctID: 'user-123', isIdentifiedID: true },
+        disable_session_recording: true,
+        person_profiles: 'identified_only',
+        respect_dnt: true,
       }),
     )
+    expect(mockRuntimeClient.init.mock.calls[0][1]).not.toHaveProperty(
+      'bootstrap',
+    )
+    expect(mockRuntimeClient.identify).not.toHaveBeenCalled()
+    expect(mockRuntimeClient.startSessionRecording).not.toHaveBeenCalled()
+    expect(mockRuntimeClient.opt_in_capturing).toHaveBeenCalledWith({
+      captureEventName: false,
+    })
+
+    // Product events are dropped before the SDK sees them.
+    capturePostHogEvent('archive_deleted')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(mockRuntimeClient.capture).not.toHaveBeenCalled()
+
+    // The gate drops every SDK event except $exception.
+    for (const event of [
+      '$pageview',
+      '$pageleave',
+      '$autocapture',
+      '$web_vitals',
+      '$snapshot',
+      '$rageclick',
+      '$identify',
+      '$set',
+    ]) {
+      expect(
+        beforeSend(captureResult(event, { distinct_id: 'anonymous-device' })),
+      ).toBeNull()
+    }
+    expect(
+      beforeSend(captureResult('$pageview', { distinct_id: 'stale-user' })),
+    ).toBeNull()
+    const exception = beforeSend(
+      captureResult('$exception', {
+        distinct_id: 'anonymous-device',
+        $current_url: 'https://www.community-archive.org/user/123?x=1',
+        $exception_list: [{ type: 'Error', value: 'boom' }],
+      }),
+    )
+    expect(exception?.properties).toMatchObject({
+      distinct_id: 'anonymous-device',
+      $process_person_profile: false,
+      $is_identified: false,
+      $current_url: 'https://www.community-archive.org/user/[account_id]',
+      route_name: 'user_profile',
+    })
+    expect(exception?.$set).toBeUndefined()
+
+    // Boundary reports reach the SDK while signed out.
+    const boundaryError = new Error('render failed')
+    await expect(
+      capturePostHogException(boundaryError, { boundary: 'route' }),
+    ).resolves.toBe(true)
+    expect(mockRuntimeClient.captureException).toHaveBeenCalledWith(
+      boundaryError,
+      { error_boundary: 'route' },
+    )
+  })
+
+  it('initializes anonymously when logout races the SDK import', async () => {
+    const pending = initializePostHog(sessionFor('old-user'))
+    await initializePostHog(null)
+    await pending
+    expect(mockRuntimeClient.init).toHaveBeenCalledTimes(1)
+    expect(mockRuntimeClient.init.mock.calls[0][1]).not.toHaveProperty(
+      'bootstrap',
+    )
+    expect(mockRuntimeClient.identify).not.toHaveBeenCalled()
+    expect(mockRuntimeClient.startSessionRecording).not.toHaveBeenCalled()
+  })
+
+  it('tracks authenticated users, stops on logout, and supports another login', async () => {
+    // The SDK was already loaded anonymously by the signed-out case above.
+    mockRuntimeClient.reset.mockClear()
+    mockRuntimeClient.identify.mockClear()
+    await initializePostHog(sessionFor('user-123'))
+    expect(mockRuntimeClient.init).toHaveBeenCalledTimes(1)
     expect(mockRuntimeClient.identify).toHaveBeenCalledWith(
       'user-123',
       expect.any(Object),
+    )
+    // Login after anonymous capture resets first so earlier errors stay unlinked.
+    expect(mockRuntimeClient.reset).toHaveBeenCalledTimes(1)
+    expect(mockRuntimeClient.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRuntimeClient.identify.mock.invocationCallOrder[0],
     )
     expect(mockRuntimeClient.opt_in_capturing).toHaveBeenCalledWith({
       captureEventName: false,
@@ -670,8 +788,6 @@ describe('authenticated analytics lifecycle', () => {
       'archive_deleted',
       expect.anything(),
     )
-    const beforeSend = createPostHogConfig('https://analytics.example.com')
-      .before_send as (event: CaptureResult) => CaptureResult | null
     expect(
       beforeSend(captureResult('$autocapture', { distinct_id: 'anonymous' })),
     ).toBeNull()
@@ -685,20 +801,41 @@ describe('authenticated analytics lifecycle', () => {
       expect.any(Object),
     )
 
+    mockRuntimeClient.opt_in_capturing.mockClear()
     await initializePostHog(null)
+    // Logout: replay stops, identity resets, then the SDK is opted back in
+    // for exceptions only, with replay still off.
     expect(mockRuntimeClient.stopSessionRecording).toHaveBeenCalled()
     expect(mockRuntimeClient.opt_out_capturing).toHaveBeenCalled()
     expect(mockRuntimeClient.reset).toHaveBeenCalled()
+    expect(mockRuntimeClient.opt_in_capturing).toHaveBeenCalledWith({
+      captureEventName: false,
+    })
+    expect(
+      mockRuntimeClient.reset.mock.invocationCallOrder.at(-1),
+    ).toBeLessThan(
+      mockRuntimeClient.opt_in_capturing.mock.invocationCallOrder.at(-1)!,
+    )
+    expect(mockRuntimeClient.startSessionRecording).toHaveBeenCalledTimes(1)
     expect(
       beforeSend(captureResult('$snapshot', { distinct_id: 'user-123' })),
     ).toBeNull()
+    expect(
+      beforeSend(captureResult('$pageview', { distinct_id: 'user-123' })),
+    ).toBeNull()
+    expect(
+      beforeSend(captureResult('$exception', { distinct_id: 'anonymous-2' })),
+    ).toMatchObject({ properties: { $process_person_profile: false } })
     mockRuntimeClient.capture.mockClear()
     capturePostHogEvent('archive_deleted')
     await Promise.resolve()
     expect(mockRuntimeClient.capture).not.toHaveBeenCalled()
 
+    mockRuntimeClient.reset.mockClear()
     await initializePostHog(sessionFor('second-user'))
     expect(mockRuntimeClient.init).toHaveBeenCalledTimes(1)
+    // Anonymous errors sent before login stay unlinked: reset precedes identify.
+    expect(mockRuntimeClient.reset).toHaveBeenCalled()
     expect(mockRuntimeClient.startSessionRecording).toHaveBeenCalledTimes(2)
     expect(mockRuntimeClient.identify).toHaveBeenLastCalledWith(
       'second-user',

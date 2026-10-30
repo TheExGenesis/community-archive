@@ -112,23 +112,54 @@ run by `method run`. The question is where `method run` executes.
 | C. Claude Code cloud scheduled routines     | Canary, fixer                                                     | Tokens only            | Prompt-driven, not Method-driven, which your rule forbids as a parallel system; no host access; ephemeral sandbox so memory must be the repo (fine) and secrets must be re-provisioned per run. |
 | D. GitHub Actions cron running Claude Code  | Canary                                                            | Runner minutes         | 6-hour job cap, awkward for a continuous fixer, secrets in Actions, no host access.                                                                                                             |
 
-**Recommendation: A.** One small Hetzner VM in the same project as
-`prod-firehose` and `ca-autorefresh`, on the private network, provisioned
-from the control-panel repo like the others. It runs:
+**Recommendation: A, on the existing `agent-experiments` box** (checked
+2026-10-30, `ssh hetzner`, user `frsc`, no sudo): 2 vCPU, 3.7 GB RAM,
+load near idle. It already runs the cuties production profile service, its
+staging twin, the Alloy collectors and the Delvetown Daily Method on user
+systemd timers, so it is a shared host, not a free one. Before the fleet
+goes on it:
 
-- Node, `method`, Claude Code CLI logged in with an **API key** (not a
-  subscription seat: unattended server use is API billing, and the Console
-  spend limit is the budget guard), `gh`, `vercel@65`.
-- A GitHub App installation token with Contents write and Issues write on
-  the product repo, scoped to that one repo. Not a personal token.
-- systemd timers: `fleet-fixer` (every 10 min, exits at once if a run is
-  already active or the inbox is empty), `fleet-canary` (15 min),
-  `fleet-pipeline` (hourly), `fleet-recompile` (monthly, manual at first).
-- Each run's evidence in `.method-runs/` on the host, rotated weekly;
-  learnings and digests committed to the repo so they survive the host.
+- Disk is 93% full with 2.6 GB free; 18 GB of that is `~/.cache/method`
+  (Delvetown run evidence) and is reclaimable. Prune it first.
+- Run the fleet units in a memory-capped user slice (`MemoryMax=2G`) so a
+  type-check cannot OOM the cuties production service. If that bites,
+  rescale to 4 vCPU / 8 GB (~€7–8/mo more, one reboot that also restarts
+  cuties prod, so pick the hour).
+- Install `claude` and `method` (Node 22, `gh` and `uv` are already there;
+  the Method SDK copy under `~/services/delve-daily/method/` is Delvetown's,
+  install the CLI properly for the fleet).
+- CA checkout under `~/services/ca-fleet/`, GitHub App token in an `env`
+  file mode 600 like Delvetown's, timers as user units.
+
+The runtime on the box is Claude Code CLI itself (Method's `claude` agent
+profile), which is what makes a subscription login an option, below.
 
 B becomes attractive once the Methods are stable and you want to stop
 owning a box; moving is `method deploy --from-run`, so nothing is wasted.
+
+## Subscription instead of tokens
+
+A Claude Max login on the box instead of an API key is workable and
+cheaper, with two caveats.
+
+- **Use a dedicated account for the fleet**, not Christine's. The weekly
+  cap is per account; a 24/7 fixer on your login eats your own quota, and
+  a separate account keeps "one person's interactive use" true.
+- **Policy.** Anthropic introduced the weekly caps in 2025 specifically to
+  curb Claude Code running in the background around the clock, and steers
+  CI and automation to API keys; subscription credentials are only allowed
+  inside Claude Code itself (Method shelling out to `claude -p` is Claude
+  Code; a third-party harness would not be). Check the current Claude Code
+  docs on subscription use in automation before relying on it, and keep an
+  API key in the Method runtime config as the fallback when the weekly cap
+  is hit or the policy changes.
+
+Sizing: Max 20x ($200/mo) was published at roughly 240–480 Sonnet-hours
+or 24–40 Opus-hours a week. A sequential fixer active ~4 hours a day is
+~28 agent-hours a week: fine on a Sonnet-class model for reproduce and
+classify with the strong model only for the fix step, tight on all-Opus.
+The cap doubles as the spend limit. Measured against the $300–900 token
+estimate below, Max 20x is the floor and the cap is the ceiling.
 
 ## Spend
 

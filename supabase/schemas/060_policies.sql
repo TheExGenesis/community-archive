@@ -268,3 +268,5 @@ CREATE POLICY "Tweet page summaries are publicly readable"
   FOR SELECT
   TO "anon", "authenticated"
   USING (true);
+
+ALTER TABLE public.directory_hidden_users ENABLE ROW LEVEL SECURITY;

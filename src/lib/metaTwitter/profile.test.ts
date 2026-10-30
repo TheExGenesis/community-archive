@@ -51,6 +51,7 @@ test('prefers the authoritative archived profile', async () => {
   resolvePublicProfileIdentityMock.mockResolvedValue({
     accountId: '42',
     username: 'alice',
+    hasArchive: true,
   })
   getCachedProfileHeaderMock.mockResolvedValue(archivedProfile)
 
@@ -60,6 +61,11 @@ test('prefers the authoritative archived profile', async () => {
     profile: archivedProfile,
   })
   expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
+  expect(getCachedProfileHeaderMock).toHaveBeenCalledWith('42', {
+    accountId: '42',
+    username: 'alice',
+    hasArchive: true,
+  })
 })
 
 test('maps the analytical fallback to the shared profile shape', async () => {

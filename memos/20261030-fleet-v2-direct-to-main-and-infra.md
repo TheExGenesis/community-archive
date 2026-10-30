@@ -101,16 +101,41 @@ a year; two areas a month once the first two land cleanly.
 
 ## Infra
 
-Methods are the unit of work regardless of host (`fleet/fixer.method`,
-`fleet/canary.method`, `fleet/pipeline.method`, `fleet/recompile.method`),
-run by `method run`. The question is where `method run` executes.
+**Decision (Christine, 2026-10-30): no Method.** It was the planned unit
+of work, but it is too immature to sit in a loop that pushes to `main`
+unattended. Each routine is instead a bash harness under `fleet/bin/` in
+the product repo that does the deterministic parts itself and calls Claude
+Code headless (`claude -p`) for the one step that needs judgment:
 
-| Option                                      | Fits                                                              | Cost                   | Against                                                                                                                                                                                         |
-| ------------------------------------------- | ----------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A. One Hetzner VM, `ca-fleet`**           | Fixer, canary, pipeline (via private network to `ca-autorefresh`) | ~€8–15/mo (CPX21–CX32) | One more host to patch and monitor; it is in the control-panel repo's ops already, so the marginal cost is small.                                                                               |
-| B. Method's hosted runner (`method deploy`) | Fixer, canary, recompile                                          | Unknown until tried    | Young product in the critical path of production writes; no host access for the pipeline routine; secrets live with a third party.                                                              |
-| C. Claude Code cloud scheduled routines     | Canary, fixer                                                     | Tokens only            | Prompt-driven, not Method-driven, which your rule forbids as a parallel system; no host access; ephemeral sandbox so memory must be the repo (fine) and secrets must be re-provisioned per run. |
-| D. GitHub Actions cron running Claude Code  | Canary                                                            | Runner minutes         | 6-hour job cap, awkward for a continuous fixer, secrets in Actions, no host access.                                                                                                             |
+- `fleet/bin/fixer.sh`: pick the oldest open signal with `gh`, label it,
+  make a run directory under `~/services/ca-fleet/runs/<ts>-<issue>/`, run
+  `claude -p` with `fleet/prompts/fixer.md` and the issue body, in the
+  repo checkout, with an allowed-tools list and a turn cap; then the gate
+  (lint, types, security tests, unit tests) as plain commands; then push
+  or open the PR with `gh`; then **read back** with `gh` that the PR or
+  commit and the issue comment exist before declaring success; write the
+  learning; everything the run printed stays in the run directory.
+- `fleet/bin/canary.sh`: `curl` checks and budgets, rollback via
+  `vercel rollback`, signal via `curl`. No agent.
+- `fleet/bin/pipeline.sh`: health checks over SSH; `claude -p` only to
+  write the signal summary on anomaly.
+- `fleet/bin/recompile.sh`: later; same shape as the fixer with a spec
+  instead of an issue.
+
+What Method would have given (effect observers, resumable runs, evidence
+folders) the harness does by hand in the three places it matters: read
+back after every write, keep the run directory, and `claude -p --resume`
+on the session id when a gate fails and the agent should fix its own
+work. Revisit Method when it is stable.
+
+The question is where the harness executes.
+
+| Option                                      | Fits                                                     | Cost           | Against                                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. One Hetzner VM, `ca-fleet`**           | Fixer, canary, pipeline (public SSH to `ca-autorefresh`) | ~€10/mo (cx33) | One more host to patch and monitor; it is in the control-panel repo's ops already, so the marginal cost is small.                      |
+| B. Method's hosted runner (`method deploy`) | (dropped with Method)                                    | Unknown        | Young product in the critical path of production writes; no host access for the pipeline routine; secrets live with a third party.     |
+| C. Claude Code cloud scheduled routines     | Canary, fixer                                            | Tokens only    | No host access; ephemeral sandbox so memory must be the repo (fine) and secrets must be re-provisioned per run; no subscription login. |
+| D. GitHub Actions cron running Claude Code  | Canary                                                   | Runner minutes | 6-hour job cap, awkward for a continuous fixer, secrets in Actions, no host access.                                                    |
 
 **Decision (Christine, 2026-10-30): A, on its own box.** `agent-experiments`
 (`ssh hetzner`) was considered and rejected: it is near idle, but it hosts
@@ -128,8 +153,9 @@ routine reaches those hosts over public SSH with the same key, as the Mac
 does. Host definition, bootstrap, units and runbook: control-panel PR #302
 (`ops/ca-fleet/`, `docs/ca-fleet-operations.md`).
 
-- Node 22, `pnpm`, `gh`, `vercel@65`, `method`, Claude Code, Docker for
-  Alloy, installed by `ops/ca-fleet/bootstrap-remote.sh` (idempotent).
+- Node 22, `pnpm`, `gh`, `vercel@65`, Claude Code, Docker for Alloy,
+  installed by `ops/ca-fleet/bootstrap-remote.sh` (idempotent). Method was
+  installed by the first bootstrap and is removed again (decision below).
 - CA checkout at `/home/fleet/services/ca-fleet/repo`, secrets in
   `/home/fleet/services/ca-fleet/env` mode 600, a one-repo GitHub App token
   minted per run by `bin/fleet-github-token`.
@@ -137,11 +163,8 @@ does. Host definition, bootstrap, units and runbook: control-panel PR #302
   fixer so a runaway build fails the run rather than the box.
 - `.method-runs/` rotated weekly; learnings and digests live in the repo.
 
-The runtime on the box is Claude Code CLI itself (Method's `claude` agent
-profile), which is what makes a subscription login an option, below.
-
-B becomes attractive once the Methods are stable and you want to stop
-owning a box; moving is `method deploy --from-run`, so nothing is wasted.
+The runtime on the box is Claude Code CLI itself, called headless by the
+bash harness, which is what makes a subscription login an option, below.
 
 ## Subscription instead of tokens
 
@@ -158,8 +181,8 @@ cheaper, with two caveats.
 - **Policy.** Anthropic introduced the weekly caps in 2025 specifically to
   curb Claude Code running in the background around the clock, and steers
   CI and automation to API keys; subscription credentials are only allowed
-  inside Claude Code itself (Method shelling out to `claude -p` is Claude
-  Code; a third-party harness would not be). Check the current Claude Code
+  inside Claude Code itself (a bash harness shelling out to `claude -p` is
+  Claude Code; a third-party agent framework using the login would not be). Check the current Claude Code
   docs on subscription use in automation before relying on it, and keep an
   API key in the Method runtime config as the fallback when the weekly cap
   is hit or the policy changes.
@@ -187,10 +210,10 @@ model for the fix), and the size cap. A rough budget for 3–5 fixes a day:
 
 ## Phase 1, revised
 
-1. `fleet/fixer.method`: inbox → fix → gate → push → close → learning.
-   Start it with a Tier 1-only mode for the first week (opens PRs), flip
-   to direct-to-main once ten PRs in a row needed no change.
-2. `fleet/canary.method` on production with rollback.
+1. `fleet/bin/fixer.sh` + `fleet/prompts/fixer.md`: inbox → fix → gate →
+   push → read back → close → learning. Start it in PR mode for the first
+   week, flip to direct-to-main once ten PRs in a row needed no change.
+2. `fleet/bin/canary.sh` on production with rollback.
 3. `ca-fleet` host in control-panel, GitHub App, API key, timers.
 4. First `vision/VISION.md` draft for you to edit; first two specs.
 

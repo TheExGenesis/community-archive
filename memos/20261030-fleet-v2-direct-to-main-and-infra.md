@@ -116,15 +116,25 @@ run by `method run`. The question is where `method run` executes.
 (`ssh hetzner`) was considered and rejected: it is near idle, but it hosts
 the cuties production profile service on 2 vCPU / 3.7 GB with a 93% full
 disk, and a fixer running type-checks next to someone else's production is
-the wrong neighbour. New VM `ca-fleet`, CX32 class (4 vCPU / 8 GB,
-~€7–8/mo), same Hetzner project and private network as `prod-firehose`
-and `ca-autorefresh`, provisioned from the control-panel repo like them:
+the wrong neighbour.
 
-- Node 22, `claude`, `method`, `gh`, `vercel@65`, `pnpm`.
-- CA checkout under `~/services/ca-fleet/`, secrets in an `env` file
-  mode 600, a one-repo GitHub App token (Contents and Issues write).
-- Fleet units as user systemd timers; `MemoryMax` on the fixer anyway so a
-  runaway build fails the run rather than the box.
+**Created 2026-10-30:** `ca-fleet`, Hetzner `cx33` (4 vCPU / 8 GB / 80 GB,
+€10.44/mo gross; the CX32 name no longer exists), Ubuntu 24.04, `hel1`,
+IPv4 `89.167.70.10`, SSH alias `ca-fleet` (root, key `ca_stream_hetzner`).
+It lives in Christine's personal Hetzner project next to
+`agent-experiments`, not in the project that holds `prod-firehose` and
+`ca-autorefresh`, so there is no shared private network: the pipeline
+routine reaches those hosts over public SSH with the same key, as the Mac
+does. Host definition, bootstrap, units and runbook: control-panel PR #302
+(`ops/ca-fleet/`, `docs/ca-fleet-operations.md`).
+
+- Node 22, `pnpm`, `gh`, `vercel@65`, `method`, Claude Code, Docker for
+  Alloy, installed by `ops/ca-fleet/bootstrap-remote.sh` (idempotent).
+- CA checkout at `/home/fleet/services/ca-fleet/repo`, secrets in
+  `/home/fleet/services/ca-fleet/env` mode 600, a one-repo GitHub App token
+  minted per run by `bin/fleet-github-token`.
+- Fleet units as user systemd timers, shipped disabled; `MemoryMax` on the
+  fixer so a runaway build fails the run rather than the box.
 - `.method-runs/` rotated weekly; learnings and digests live in the repo.
 
 The runtime on the box is Claude Code CLI itself (Method's `claude` agent

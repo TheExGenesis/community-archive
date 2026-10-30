@@ -34,7 +34,8 @@ counts, followed by weekly engaged people, action volume, and action details. Th
 remains available for traffic comparisons. Page visits are not verified humans
 and do not count as meaningful use.
 
-The headline charts cover four complete Monday–Sunday UTC weeks. Detail tables
+The feature-use headline shows the current week so far. New vs returning shows
+four complete Monday–Sunday UTC weeks plus the current partial week. Detail tables
 also include the current partial week. Newly observed people and cohort returns
 use a 90-day lookback; incomplete follow-up is marked Pending. Production host
 and PostHog bot filters apply. The default **Community
@@ -47,8 +48,12 @@ merged October 25, 2026 UTC. Treat its deployment as an audience boundary:
 earlier broad traffic and later signed-in activity are not directly comparable.
 Verify the actual deployment time before choosing comparison windows. A separate
 drop around October 21 coincides with an exhausted free analytics allowance.
-Collection recovery still needs production verification. Missing events do not
-establish zero use or a product decline.
+Billing was reactivated October 28, 2026 Pacific with a $5/month Product Analytics
+spending limit and a $0/month Session Replay spending limit. Production feature
+and homepage-map actions were verified in PostHog on October 29 Pacific. The
+spending limits do not disable included free usage. Counts across the collection
+gap remain incomplete; missing events do not establish zero use or a product
+decline.
 
 Metric definitions:
 

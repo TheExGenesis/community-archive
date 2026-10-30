@@ -259,16 +259,22 @@ export const resolvePublicProfileIdentity = async (
         : baseQuery.ilike('username', decoded).limit(1).maybeSingle()
   }
 
-  // The RPC skips the directory view entirely when neither base table could
-  // contain the identifier, so a miss costs index probes, not a view scan.
+  // Username URLs use the bounded, index-driven membership lookup. The older
+  // identity RPC still evaluates the directory view for members (and is absent
+  // on some deployments, adding an error round trip before the view fallback).
+  // Both RPCs keep the directory's live membership and opt-out semantics.
   const rpcLookup = async () => {
-    const rpc = await supabase.rpc(
-      'resolve_directory_identity',
-      {
-        identifier: decoded,
-      },
-      { get: true },
-    )
+    const rpc = isAccountIdentifier
+      ? await supabase.rpc(
+          'resolve_directory_identity',
+          { identifier: decoded },
+          { get: true },
+        )
+      : await supabase.rpc(
+          'directory_members_by_username',
+          { p_usernames: [decoded.toLowerCase()] },
+          { get: true },
+        )
     // Migration not applied yet: keep serving through the view.
     if (rpc.error && isMissingFunctionError(rpc.error)) return viewLookup()
     return { data: rpc.data?.[0] ?? null, error: rpc.error }

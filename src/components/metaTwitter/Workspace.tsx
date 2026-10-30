@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type FormEvent, type RefObject } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowDown,
@@ -14,7 +13,7 @@ import {
 } from 'lucide-react'
 import ImageLightbox, { type LightboxImage } from '@/components/ImageLightbox'
 import TweetCard from '@/components/TweetCard'
-import { getSmallAvatarUrl } from '@/lib/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
 import { tweetPermalinkHref } from '@/lib/navigation'
@@ -497,29 +496,25 @@ export function Workspace({
                 </div>
               )}
               {people.map((person, index) => {
-                const avatarUrl = getSmallAvatarUrl(person.avatar_media_url)
                 const content = (
                   <div className="flex items-center gap-2.5 pr-1">
-                    {avatarUrl ? (
-                      <Image
-                        src={avatarUrl}
+                    <Avatar className="h-9 w-9 flex-none">
+                      <AvatarImage
+                        src={person.avatar_media_url || undefined}
                         alt=""
-                        width={36}
-                        height={36}
-                        sizes="36px"
-                        unoptimized
-                        className="h-9 w-9 flex-none rounded-full object-cover"
+                        className="object-cover"
                       />
-                    ) : (
-                      <span
-                        className="grid h-9 w-9 flex-none place-items-center rounded-full text-sm font-bold text-black/70"
+                      <AvatarFallback
+                        className="text-sm font-bold text-black/70"
                         style={{
                           background: `hsl(${personHue(person.screen_name)} 45% 80%)`,
                         }}
                       >
-                        {person.screen_name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                        {Array.from(
+                          person.name?.trim() || person.screen_name,
+                        )[0]?.toUpperCase() || '@'}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="min-w-0 flex-1 text-[13px] leading-[1.3]">
                       <b>{person.name ?? person.screen_name}</b>{' '}
                       <span className="text-muted-foreground">

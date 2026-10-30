@@ -182,6 +182,8 @@ export type SortKey =
 export type UserDirectoryPage = {
   users: DirectoryUser[]
   hasMore: boolean
+  /** Next offset in the source, including rows hidden from the directory. */
+  nextOffset?: number
 }
 
 export type FormattedUser = {

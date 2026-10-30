@@ -74,6 +74,7 @@ function ResolvedProfileAvatar({
         width={132}
         height={132}
         sizes="132px"
+        referrerPolicy="no-referrer"
         priority
         // Twitter already serves a sized avatar; re-encoding it on Vercel is a
         // paid transformation per distinct avatar for no visible gain.

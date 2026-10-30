@@ -5,6 +5,10 @@ import {
   type AnalyticsGatewayFetcher,
 } from '@/lib/clickhouseGateway'
 import type { DirectoryUser, UserDirectoryPage } from '@/lib/types'
+import {
+  directoryVisibilityKey,
+  getHiddenDirectoryUsers,
+} from '@/lib/directoryVisibility'
 
 interface ClickHouseMemberDirectoryResponse {
   data: {
@@ -61,10 +65,21 @@ function mapDirectoryUser(
 export async function getUserDirectoryPage(
   searchParams = new URLSearchParams({ limit: '15' }),
   fetcher: AnalyticsGatewayFetcher = fetchAnalyticsGatewayJson,
+  hiddenUsers = getHiddenDirectoryUsers(),
 ): Promise<UserDirectoryPage> {
+  // Keep the source cursor separate from visible row count. A full source page
+  // may be hidden; clients must still be able to advance to the next page.
+  const hidden = new Set((await hiddenUsers).map((user) => user.visibility_key))
+  const params = new URLSearchParams(searchParams)
+  const limit = Math.max(1, Math.min(100, Number(params.get('limit') || 15)))
+  const offset = Math.max(0, Number(params.get('offset') || 0))
+  if (!Number.isSafeInteger(limit) || !Number.isSafeInteger(offset)) {
+    throw new Error('Invalid directory pagination')
+  }
+  params.set('limit', String(Math.min(100, limit + hidden.size)))
   const response = await fetcher<ClickHouseMemberDirectoryResponse>(
     ['member-directory'],
-    searchParams,
+    params,
     { revalidate: 30, timeoutMs: 8_000 },
   )
   if (
@@ -74,8 +89,23 @@ export async function getUserDirectoryPage(
   ) {
     throw new Error('ClickHouse returned an invalid member-directory response')
   }
+  const users: DirectoryUser[] = []
+  let consumed = 0
+  for (const row of response.data.users) {
+    const user = mapDirectoryUser(row)
+    consumed++
+    if (
+      !hidden.has(directoryVisibilityKey(user)) &&
+      !hidden.has(`username:${user.username.toLowerCase()}`)
+    ) {
+      users.push(user)
+    }
+    if (users.length === limit) break
+  }
   return {
-    users: response.data.users.map(mapDirectoryUser),
-    hasMore: response.pagination.hasMore,
+    users,
+    hasMore:
+      consumed < response.data.users.length || response.pagination.hasMore,
+    nextOffset: offset + consumed,
   }
 }

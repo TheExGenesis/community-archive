@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Fake `claude` for fleet tests.
+#   FAKE_CLAUDE_LOG      every invocation (args) appended here; stdin saved next to it
+#   FAKE_CLAUDE_OUTPUT   file printed on the first call
+#   FAKE_CLAUDE_OUTPUT_2 file printed when --resume is present (defaults to FAKE_CLAUDE_OUTPUT)
+#   FAKE_CLAUDE_EDITS    bash snippet run in the cwd before answering (the "fix")
+#   FAKE_CLAUDE_EDITS_2  same, for the resumed call
+set -euo pipefail
+: "${FAKE_CLAUDE_LOG:?FAKE_CLAUDE_LOG must be set}"
+printf '%q ' "$@" >>"$FAKE_CLAUDE_LOG"
+echo >>"$FAKE_CLAUDE_LOG"
+n="$(grep -c . "$FAKE_CLAUDE_LOG")"
+cat >"$FAKE_CLAUDE_LOG.prompt-$n"
+
+resumed=0
+for a in "$@"; do [[ "$a" == "--resume" ]] && resumed=1; done
+
+if [[ $resumed -eq 1 ]]; then
+  [[ -n "${FAKE_CLAUDE_EDITS_2:-}" ]] && bash -c "$FAKE_CLAUDE_EDITS_2"
+  cat "${FAKE_CLAUDE_OUTPUT_2:-$FAKE_CLAUDE_OUTPUT}"
+else
+  [[ -n "${FAKE_CLAUDE_EDITS:-}" ]] && bash -c "$FAKE_CLAUDE_EDITS"
+  cat "$FAKE_CLAUDE_OUTPUT"
+fi

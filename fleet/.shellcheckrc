@@ -1,0 +1,6 @@
+# Applies to everything under fleet/.
+# SC2016: single-quoted node -e programs are intended not to expand.
+# SC2012: ls | sort on run directories whose names we generate ourselves.
+# SC1091: sourced files are checked directly by fleet/test/run.sh.
+# SC2329: cleanup() is invoked through trap.
+disable=SC2016,SC2012,SC1091,SC2329

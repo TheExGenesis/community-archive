@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Fake `curl` for canary tests. FAKE_CURL_DIR holds:
+#   responses.json  {"<path>": {"status": 200, "time": 0.4, "mitigated": null}, ...}
+#   deployments.json  body for api.vercel.com (optional)
+# POST bodies are copied to $FAKE_CURL_DIR/post-<n>.json and answered 200.
+# Every invocation is appended to $FAKE_CURL_DIR/calls.log.
+set -euo pipefail
+: "${FAKE_CURL_DIR:?FAKE_CURL_DIR must be set}"
+printf '%q ' "$@" >>"$FAKE_CURL_DIR/calls.log"
+echo >>"$FAKE_CURL_DIR/calls.log"
+
+url="" out="" headers="" method="GET" data=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    -D) headers="$2"; shift 2 ;;
+    -w) shift 2 ;;
+    -X) method="$2"; shift 2 ;;
+    --data-binary) data="$2"; shift 2 ;;
+    -H | -A | --max-time) shift 2 ;;
+    http://* | https://*) url="$1"; shift ;;
+    *) shift ;;
+  esac
+done
+
+if [[ "$method" == "POST" ]]; then
+  n="$(find "$FAKE_CURL_DIR" -name 'post-*.json' | wc -l | tr -d ' ')"
+  cp "${data#@}" "$FAKE_CURL_DIR/post-$((n + 1)).json"
+  [[ -n "$out" ]] && echo '{"accepted":1,"routed":true}' >"$out"
+  printf '200'
+  exit 0
+fi
+
+if [[ "$url" == https://api.vercel.com/* ]]; then
+  if [[ -f "$FAKE_CURL_DIR/deployments.json" ]]; then
+    if [[ -n "$out" ]]; then cp "$FAKE_CURL_DIR/deployments.json" "$out"; else cat "$FAKE_CURL_DIR/deployments.json"; fi
+    exit 0
+  fi
+  echo "fake curl: no deployments.json" >&2
+  exit 22
+fi
+
+path="${url#https://*/}"
+path="/${path}"
+[[ "$url" == */ ]] && path="/"
+status="$(URL="$path" FILE="$FAKE_CURL_DIR/responses.json" node -e '
+  const r = JSON.parse(require("fs").readFileSync(process.env.FILE, "utf8"))[process.env.URL];
+  if (!r) { process.stderr.write("fake curl: no response for " + process.env.URL + "\n"); process.exit(7); }
+  process.stdout.write(`${r.status} ${r.time} ${r.mitigated || ""}`)')"
+code="${status%% *}"
+rest="${status#* }"
+time="${rest%% *}"
+mitigated="${rest#* }"
+[[ "$mitigated" == "$time" ]] && mitigated=""
+{
+  echo "HTTP/2 $code"
+  echo "server: Vercel"
+  [[ -n "$mitigated" ]] && echo "x-vercel-mitigated: $mitigated"
+  echo
+} >"${headers:-/dev/null}"
+[[ -n "$out" ]] && echo "<html>fake</html>" >"$out"
+if [[ "$code" == "000" ]]; then
+  echo "fake curl: timeout" >&2
+  printf '000 %s' "$time"
+  exit 28
+fi
+printf '%s %s' "$code" "$time"

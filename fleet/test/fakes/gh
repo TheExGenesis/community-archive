@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Fake `gh` for fleet tests. State lives in $FAKE_GH_STATE:
+#   issues.json  [{number,title,body,state,createdAt,labels:[{name}],comments:[{body}]}]
+#   labels.txt   one label name per line
+#   prs.json     [{number,url,title,body,head,base,state}]
+#   calls.log    every invocation, one per line
+# FAKE_GH_REMOTE (optional): bare repo used to answer `api repos/.../compare`.
+set -euo pipefail
+: "${FAKE_GH_STATE:?FAKE_GH_STATE must be set}"
+printf '%q ' "$@" >>"$FAKE_GH_STATE/calls.log"
+echo >>"$FAKE_GH_STATE/calls.log"
+
+# opt <flag> : value of a --flag in the invocation (empty when absent)
+opt() {
+  local prev="" a
+  for a in "${ARGS[@]}"; do
+    if [[ "$prev" == "$1" ]]; then
+      printf '%s' "$a"
+      return
+    fi
+    prev="$a"
+  done
+}
+ARGS=("$@")
+
+mutate() { # mutate <js> : run js over {issues, prs} and write back
+  JS="$1" STATE="$FAKE_GH_STATE" node -e '
+    const fs = require("fs"); const s = process.env.STATE;
+    const issues = JSON.parse(fs.readFileSync(s + "/issues.json", "utf8"));
+    const prs = JSON.parse(fs.readFileSync(s + "/prs.json", "utf8"));
+    const out = Function("issues", "prs", "fs", "env", process.env.JS)(issues, prs, fs, process.env);
+    fs.writeFileSync(s + "/issues.json", JSON.stringify(issues, null, 2));
+    fs.writeFileSync(s + "/prs.json", JSON.stringify(prs, null, 2));
+    if (out !== undefined) process.stdout.write(typeof out === "string" ? out : JSON.stringify(out));
+  '
+}
+
+cmd="${1:-}" sub="${2:-}"
+case "$cmd $sub" in
+  "label list")
+    cat "$FAKE_GH_STATE/labels.txt"
+    ;;
+  "label create")
+    echo "$3" >>"$FAKE_GH_STATE/labels.txt"
+    ;;
+  "issue list")
+    LABEL="$(opt --label)" mutate 'return issues.filter(i => i.state === "OPEN" && i.labels.some(l => l.name === env.LABEL)).map(i => ({number: i.number, title: i.title, body: i.body, labels: i.labels, createdAt: i.createdAt}))'
+    ;;
+  "issue edit")
+    N="$3" ADD="$(opt --add-label)" REMOVE="$(opt --remove-label)" mutate '
+      const i = issues.find(x => x.number === Number(env.N)); if (!i) { process.stderr.write("no issue\n"); process.exit(1); }
+      if (env.ADD && !i.labels.some(l => l.name === env.ADD)) i.labels.push({name: env.ADD});
+      if (env.REMOVE) i.labels = i.labels.filter(l => l.name !== env.REMOVE);'
+    ;;
+  "issue comment")
+    body="$(cat "$(opt --body-file)")"
+    N="$3" BODY="$body" mutate 'const i = issues.find(x => x.number === Number(env.N)); i.comments.push({body: env.BODY});'
+    ;;
+  "issue close")
+    N="$3" BODY="$(opt --comment)" mutate 'const i = issues.find(x => x.number === Number(env.N)); i.state = "CLOSED"; if (env.BODY) i.comments.push({body: env.BODY});'
+    ;;
+  "issue view")
+    field="$(opt --json)"
+    N="$3" FIELD="$field" mutate '
+      const i = issues.find(x => x.number === Number(env.N)); if (!i) { process.stderr.write("no issue\n"); process.exit(1); }
+      if (env.FIELD === "labels") return i.labels.map(l => l.name).join("\n") + "\n";
+      if (env.FIELD === "comments") return i.comments.map(c => c.body).join("\n") + "\n";
+      if (env.FIELD === "state") return i.state + "\n";
+      return JSON.stringify(i);'
+    ;;
+  "pr create")
+    body="$(cat "$(opt --body-file)")"
+    TITLE="$(opt --title)" BODY="$body" HEAD="$(opt --head)" BASE="$(opt --base)" REPO="$(opt --repo)" mutate '
+      const number = 100 + prs.length;
+      const url = "https://github.com/" + env.REPO + "/pull/" + number;
+      prs.push({number, url, title: env.TITLE, body: env.BODY, head: env.HEAD, base: env.BASE, state: "OPEN"});
+      return url + "\n";'
+    ;;
+  "pr view")
+    N="$3" mutate 'const p = prs.find(x => x.number === Number(env.N)); if (!p) { process.stderr.write("no pr\n"); process.exit(1); } return p.state + "\n";'
+    ;;
+  "api "*)
+    # repos/<owner>/<repo>/compare/<sha>...<branch> --jq .status
+    spec="${2##*/compare/}"
+    sha="${spec%%...*}"
+    branch="${spec##*...}"
+    if [[ -n "${FAKE_GH_REMOTE:-}" ]] && git -C "$FAKE_GH_REMOTE" merge-base --is-ancestor "$sha" "$branch" 2>/dev/null; then
+      echo ahead
+    else
+      echo diverged
+    fi
+    ;;
+  *)
+    echo "fake gh: unhandled: $*" >&2
+    exit 1
+    ;;
+esac

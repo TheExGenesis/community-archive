@@ -2,6 +2,9 @@
 Description=Publish the Community Archive nightly digest
 After=network-online.target
 Wants=network-online.target
+# Five starts over 80 minutes, then give up until the next timer run.
+StartLimitIntervalSec=2h
+StartLimitBurst=5
 
 [Service]
 Type=oneshot
@@ -10,6 +13,10 @@ WorkingDirectory=/opt/community-archive-nightly-digest
 EnvironmentFile=/etc/community-archive-nightly-digest.env
 ExecStart=/root/.bun/bin/bun /opt/community-archive-nightly-digest/services/nightly-digest/publish.ts
 TimeoutStartSec=20min
+# A retry never repeats a model call: published dates skip, completed runs only
+# publish, and a failed generation stops at its saved run.
+Restart=on-failure
+RestartSec=20min
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

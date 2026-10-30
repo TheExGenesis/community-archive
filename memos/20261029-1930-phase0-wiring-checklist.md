@@ -9,7 +9,7 @@ Facts checked on 2026-10-29:
 - Vercel project `community-archive`, team `theexgenesis-projects`.
   `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST` are
   already set, so server exception capture needs nothing new.
-- PostHog project 546188 on `us.posthog.com`.
+- PostHog project 546185 on `us.posthog.com`.
 - The GitHub label `signal` already exists on `TheExGenesis/community-archive`.
 - None of `SIGNALS_WEBHOOK_SECRET`, `SIGNALS_GITHUB_TOKEN`,
   `SIGNALS_GITHUB_REPO` exist in Vercel yet.
@@ -74,7 +74,7 @@ the body finds the log line in Vercel.
 
 ## 4. PostHog error tracking → issues
 
-Page: https://us.posthog.com/project/546188/error_tracking/configuration#selectedSetting=error-tracking-alerting
+Page: https://us.posthog.com/project/546185/error_tracking/configuration#selectedSetting=error-tracking-alerting
 
 **New notification → Webhook**, trigger **Issue created**.
 

@@ -1,5 +1,9 @@
 # Running Community Archive as a fleet: Spawn's loop at CA scale
 
+> Superseded in part on 2026-10-30: tiers, fleet roster and phases 1–3 are
+> revised in `memos/20261030-fleet-v2-direct-to-main-and-infra.md`
+> (direct to main, two tiers, one fixer, Hetzner host). Phase 0 stands.
+
 Date: 2026-10-29
 Status: proposal, nothing built yet
 Source essay: "How I Built the Most AI-Pilled Company in the World" (Spawn)
@@ -20,14 +24,14 @@ keeping the gates that CA genuinely needs (consent, prod migrations, spend).
 
 ## Loop audit: what CA has at each stage
 
-| Stage | CA today | Gap |
-| --- | --- | --- |
-| **Observe** | PostHog product events, browser `capture_exceptions`; Grafana Cloud with ten alert rules over `prod-firehose` and `ca-autorefresh`; Vercel runtime logs (no Observability Plus); autorefresh health reports and the duckdns dashboard; GitHub issues filed by hand (15 open, unlabeled). | No server-side exception capture in the Next.js app (no `instrumentation.ts`). Signals land in five places, all designed for human eyes. Nothing is replayable. |
-| **Triage** | xiq and Christine read dashboards and alerts. | No fingerprinting, dedupe, or classification. An alert at 02:00 waits until morning. |
-| **Change** | Claude Code sessions driven by a human; PR gate runs lint, type-check, security tests, unit tests; staging DB sync on schema PRs. | Every change waits on a human to start it and on a human to merge it. |
-| **Verify** | CI before merge; manual poking after deploy; gstack `qa` and `canary` skills installed but not wired to deploys. | No post-deploy check, no automated revert, no "it broke in the last 15 minutes" signal. |
-| **Remember** | `AGENTS.md`, `memos/` (dated decisions since August), `docs/dev-log`, control-panel `worklog.md`, Claude's memory dir. Unusually good. | Not queryable as decisions. Agents cannot ask "has this been decided?" |
-| **Decide (taste)** | Answered live in chat by xiq and Christine. | Answers are not on the record, so the same ones get asked again. |
+| Stage              | CA today                                                                                                                                                                                                                                                                                 | Gap                                                                                                                                                             |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Observe**        | PostHog product events, browser `capture_exceptions`; Grafana Cloud with ten alert rules over `prod-firehose` and `ca-autorefresh`; Vercel runtime logs (no Observability Plus); autorefresh health reports and the duckdns dashboard; GitHub issues filed by hand (15 open, unlabeled). | No server-side exception capture in the Next.js app (no `instrumentation.ts`). Signals land in five places, all designed for human eyes. Nothing is replayable. |
+| **Triage**         | xiq and Christine read dashboards and alerts.                                                                                                                                                                                                                                            | No fingerprinting, dedupe, or classification. An alert at 02:00 waits until morning.                                                                            |
+| **Change**         | Claude Code sessions driven by a human; PR gate runs lint, type-check, security tests, unit tests; staging DB sync on schema PRs.                                                                                                                                                        | Every change waits on a human to start it and on a human to merge it.                                                                                           |
+| **Verify**         | CI before merge; manual poking after deploy; gstack `qa` and `canary` skills installed but not wired to deploys.                                                                                                                                                                         | No post-deploy check, no automated revert, no "it broke in the last 15 minutes" signal.                                                                         |
+| **Remember**       | `AGENTS.md`, `memos/` (dated decisions since August), `docs/dev-log`, control-panel `worklog.md`, Claude's memory dir. Unusually good.                                                                                                                                                   | Not queryable as decisions. Agents cannot ask "has this been decided?"                                                                                          |
+| **Decide (taste)** | Answered live in chat by xiq and Christine.                                                                                                                                                                                                                                              | Answers are not on the record, so the same ones get asked again.                                                                                                |
 
 Vercel already deploys `main` on merge, so "ship on merge" is free. The
 missing pieces are at Observe, Triage, and Verify.
@@ -87,13 +91,13 @@ instructions: ask before prod, ask before merging to main for big changes):
 Each agent is a scheduled routine with a memory file in `memos/fleet/<name>.md`
 that it reads first and appends to last. Helpers are spawned per task.
 
-| Agent | Owns | Reads | May do |
-| --- | --- | --- | --- |
-| **Triage** | The signal inbox | PostHog error tracking, Vercel runtime errors, Grafana alerts, autorefresh health reports, new GitHub issues | Dedupe, fingerprint, classify into bug / wontfix / needs-decision; start a Tier 0 fix session; label Tier 1 for a human |
-| **Janitor** | Repo health | CI, lint, type-check, test flakiness, docs drift, format drift | Tier 0 fixes; `document-release` after merges |
-| **Pipeline** | Ingest and data freshness | autorefresh run logs, ClickHouse canonical lag, digest and Bulletin job outcomes, archive upload phases | Diagnose and write runbook-shaped reports; Tier 1 PRs; never restart or write to prod on its own |
-| **Product** | Funnels and experience | PostHog weekly engaged people, upload acceptance, search failure rate, sign-in success | Open a signal when a metric regresses after a deploy; propose, never ship, product changes |
-| **Steward** | Spend and quotas | Vercel usage and billing, PostHog quota, Anthropic spend, RapidAPI, Hetzner | Alert on anomalies; disable a leaked key; everything else is a report |
+| Agent        | Owns                      | Reads                                                                                                        | May do                                                                                                                  |
+| ------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Triage**   | The signal inbox          | PostHog error tracking, Vercel runtime errors, Grafana alerts, autorefresh health reports, new GitHub issues | Dedupe, fingerprint, classify into bug / wontfix / needs-decision; start a Tier 0 fix session; label Tier 1 for a human |
+| **Janitor**  | Repo health               | CI, lint, type-check, test flakiness, docs drift, format drift                                               | Tier 0 fixes; `document-release` after merges                                                                           |
+| **Pipeline** | Ingest and data freshness | autorefresh run logs, ClickHouse canonical lag, digest and Bulletin job outcomes, archive upload phases      | Diagnose and write runbook-shaped reports; Tier 1 PRs; never restart or write to prod on its own                        |
+| **Product**  | Funnels and experience    | PostHog weekly engaged people, upload acceptance, search failure rate, sign-in success                       | Open a signal when a metric regresses after a deploy; propose, never ship, product changes                              |
+| **Steward**  | Spend and quotas          | Vercel usage and billing, PostHog quota, Anthropic spend, RapidAPI, Hetzner                                  | Alert on anomalies; disable a leaked key; everything else is a report                                                   |
 
 ## Judges (phase 3, but worth naming now)
 

@@ -145,6 +145,10 @@ owning a box; moving is `method deploy --from-run`, so nothing is wasted.
 
 ## Subscription instead of tokens
 
+**Decision (Christine, 2026-10-30): a dedicated Claude Max login on
+`ca-fleet`, `ANTHROPIC_API_KEY` left empty in the env file, with an API key
+kept ready as the fallback for the weekly cap.**
+
 A Claude Max login on the box instead of an API key is workable and
 cheaper, with two caveats.
 

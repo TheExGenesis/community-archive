@@ -13,6 +13,7 @@ import {
 import { renderDigestEmail } from '@/lib/digest/emailTemplate'
 import { prepareDigestBulletinItems } from '@/lib/digest/bulletin'
 import { sendEmail } from '@/lib/email'
+import { reportServerError } from '@/lib/serverErrors'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
 export const dynamic = 'force-dynamic'
@@ -78,8 +79,12 @@ async function handleSend(request: Request) {
 
   const recipients = await listUnsentRecipients(edition.id)
   const bulletin = recipients.length
-    ? await prepareDigestBulletinItems(edition).catch((error) => {
+    ? await prepareDigestBulletinItems(edition).catch(async (error) => {
         console.error('Digest bulletin selection failed:', error)
+        await reportServerError('digest_email', error, {
+          stage: 'bulletin_selection',
+          recipient_count: recipients.length,
+        })
         return null
       })
     : null
@@ -93,10 +98,16 @@ async function handleSend(request: Request) {
     const unsubscribeUrl = digestUnsubscribeUrl(recipient.token)
     const openToken = randomUUID()
     const bulletinItems = bulletin
-      ? await bulletin.itemsForAccount(recipient.accountId).catch((error) => {
-          console.error('Digest bulletin recommendation failed:', error)
-          return []
-        })
+      ? await bulletin
+          .itemsForAccount(recipient.accountId)
+          .catch(async (error) => {
+            console.error('Digest bulletin recommendation failed:', error)
+            await reportServerError('digest_email', error, {
+              stage: 'bulletin_recommendation',
+              personalized: Boolean(recipient.accountId),
+            })
+            return []
+          })
       : []
     const rendered = renderDigestEmail(
       edition,
@@ -122,6 +133,10 @@ async function handleSend(request: Request) {
         `Digest email to subscription ${recipient.id} failed:`,
         result.error,
       )
+      await reportServerError('digest_email', new Error(result.error), {
+        stage: 'send',
+        failure_count: failures.length + 1,
+      })
       failures.push(recipient.id)
       continue
     }

@@ -152,6 +152,72 @@ editing. The actions table distinguishes apps by slug and profile changes by typ
 and section. Tables keep This week leftmost, followed by Last week and older weeks.
 These events start after frontend release; absent historical rows are unmeasured.
 
+## Error tracking
+
+PostHog is the single place Community Archive errors are seen, for signed-in
+members and signed-out visitors alike. Error tracking has its own allowance
+(100k exceptions a month on the free tier), separate from product analytics and
+replay, so exceptions keep arriving when analytics is paused and never consume
+the analytics budget.
+
+What is captured:
+
+- **Browser, signed in:** unhandled errors and promise rejections (SDK
+  autocapture) plus React error boundaries, linked to the account like every
+  other event, with replay available when it was recording.
+- **Browser, signed out:** the SDK initializes without an identity and
+  `before_send` passes only `$exception`. Pageviews, autocapture, Web Vitals,
+  heatmaps, and replay are dropped, replay never starts, no `identify` call is
+  made, and `person_profiles` stays `identified_only`, so no person profile is
+  created. The exception event carries the error type, message, stack, and the
+  sanitized page category; `$set`/`$set_once` and identity properties are
+  stripped. Signing in later resets the SDK before `identify`, so earlier
+  anonymous errors stay unlinked. DNT is still respected.
+- **Server, unhandled:** `src/instrumentation.ts` (`onRequestError`) reports
+  every unhandled error in route handlers, server components, and server
+  actions through `posthog-node`, with bounded context only: the analytics
+  route name and group (or the API route template, never the raw path),
+  HTTP method, router kind, route type, and render source. The signed-in user
+  id from the verified Supabase cookie is the `distinct_id`; otherwise the fixed
+  `server` id, flagged `$process_person_profile: false`. Middleware runs on
+  the edge runtime and is not covered.
+- **Server, deliberate:** `reportServerError(scope, error, context)` in
+  `src/lib/serverErrors.ts` for places that log and continue: archive deletion
+  routes, digest generation, and both digest cron routes. `scope` is an enum;
+  context values must be enum tokens, counts, booleans, or status codes.
+  Free text, emails, usernames, query text, IDs, and URLs are rejected by the
+  sanitizer. Keep the `console.error` beside it; Vercel logs stay the raw
+  record.
+
+Source maps: `withPostHogConfig` in `next.config.js` injects release ids and
+uploads source maps during the Vercel build when `POSTHOG_CLI_TOKEN` (a
+personal API key with source map write access, build-time only) is set. Maps
+are deleted after upload and `productionBrowserSourceMaps` stays off, so no map
+is served publicly. Without the token the build runs unchanged with minified
+frames.
+
+Environment: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST`
+(browser and server capture; both no-ops when unset) and `POSTHOG_CLI_TOKEN`
+(build only).
+
+Verify after a release in [Error tracking](https://us.posthog.com/project/546185/error_tracking):
+
+1. Signed out, open a page that throws (or run `throw new Error('ct test')`
+   in the console) and confirm one `$exception` arrives with
+   `$process_person_profile=false`, a sanitized `$current_url`, and no person.
+   Confirm no `$pageview`, `$autocapture`, `$web_vitals`, or `$snapshot` left
+   the browser in the same session.
+2. Signed in, trigger a route error boundary and confirm the issue lists the
+   account and `error_boundary=route`.
+3. Call an API route with an unhandled failure in preview and confirm the
+   server issue carries `scope=request`, `route_path` as a template, and no
+   query string.
+4. Check that frames resolve to source files once a build with
+   `POSTHOG_CLI_TOKEN` has deployed.
+
+Triage: 15 minutes a week alongside the product review. Sort issues by people
+affected, assign or resolve, and mark noisy ones as ignored.
+
 ## Adding pages and actions
 
 1. Register every page template in `src/lib/analyticsRoutes.ts` with a stable name

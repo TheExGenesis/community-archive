@@ -2,6 +2,7 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 })
 const { withWorkflow } = require('workflow/next')
+const { withPostHogConfig } = require('@posthog/nextjs-config')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -83,4 +84,23 @@ const nextConfig = {
   },
 }
 
-module.exports = withWorkflow(withBundleAnalyzer(nextConfig))
+const baseConfig = withWorkflow(withBundleAnalyzer(nextConfig))
+
+// Source maps are generated and uploaded to PostHog at build time so error
+// stacks resolve to source. The upload needs a personal API key with
+// sourcemap write access (POSTHOG_CLI_TOKEN, build-time only). Without it the
+// build runs unchanged. `productionBrowserSourceMaps` stays off: maps are
+// deleted after upload and never served.
+module.exports = process.env.POSTHOG_CLI_TOKEN
+  ? withPostHogConfig(baseConfig, {
+      personalApiKey: process.env.POSTHOG_CLI_TOKEN,
+      projectId: '546185',
+      host: 'https://us.posthog.com',
+      logLevel: 'info',
+      sourcemaps: {
+        enabled: true,
+        deleteAfterUpload: true,
+        failOnError: false,
+      },
+    })
+  : baseConfig

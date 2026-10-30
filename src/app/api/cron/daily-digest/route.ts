@@ -5,6 +5,7 @@ import {
   isNightlyDigestAutomationEnabled,
   resolveDigestAutomationDate,
 } from '@/lib/digest/cron'
+import { reportServerError } from '@/lib/serverErrors'
 import { publishNightlyDigestWorkflow } from '@/workflows/digestGeneration'
 
 export const dynamic = 'force-dynamic'
@@ -33,7 +34,17 @@ async function queueDigest(request: Request, requestedDate?: unknown) {
       { status: 400 },
     )
   }
-  const workflowRun = await start(publishNightlyDigestWorkflow, [digestDate])
+  let workflowRun: Awaited<ReturnType<typeof start>>
+  try {
+    workflowRun = await start(publishNightlyDigestWorkflow, [digestDate])
+  } catch (error) {
+    console.error('Nightly digest workflow could not be queued:', error)
+    await reportServerError('digest_generation', error, { stage: 'queue' })
+    return NextResponse.json(
+      { error: 'Nightly digest workflow could not be queued.' },
+      { status: 500 },
+    )
+  }
 
   return NextResponse.json(
     { digestDate, status: 'queued', workflowRunId: workflowRun.runId },

@@ -107,24 +107,28 @@ route caps a request at 512 KB and 20 signals.
 
 ### PostHog error tracking → `/api/signals/posthog`
 
-Create a webhook destination on the error tracking "issue created" and
-"issue reopened" triggers with this body template (adjust the variable names
-to what the destination exposes; the adapter also accepts the same keys
-flattened at the top level):
+Error tracking → Configuration → Alerting → New notification → Webhook, one
+alert for the "issue created" trigger and one for "issue reopened". Headers:
+`Authorization: Bearer <secret>` and `Content-Type: application/json`. Body:
 
 ```json
 {
   "issue": {
-    "id": "{issue.id}",
-    "name": "{issue.name}",
-    "description": "{issue.description}",
-    "url": "{issue.url}",
-    "status": "{issue.status}"
+    "id": "{event.distinct_id}",
+    "name": "{event.properties.name}",
+    "description": "{substring(event.properties.description, 1, 600)}",
+    "status": "{event.properties.status}",
+    "url": "{project.url}/error_tracking/{event.distinct_id}"
   },
   "side": "{event.properties.side}",
-  "route": "{event.properties.route}"
+  "route": "{event.properties.route}",
+  "exception_type": "{event.properties.$exception_types}"
 }
 ```
+
+`event.distinct_id` is the issue id on these alert events. `side` and
+`route` are set for server exceptions and empty for browser ones; the
+adapter also accepts the issue keys flattened at the top level.
 
 ### Grafana Cloud → `/api/signals/grafana`
 

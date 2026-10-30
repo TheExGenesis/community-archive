@@ -77,6 +77,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      directory_hidden_users: {
+        Row: {
+          visibility_key: string
+          account_id: string | null
+          username: string
+          hidden_by: string | null
+          hidden_at: string
+        }
+        Insert: {
+          visibility_key: string
+          account_id?: string | null
+          username: string
+          hidden_by?: string | null
+          hidden_at?: string
+        }
+        Update: {
+          visibility_key?: string
+          account_id?: string | null
+          username?: string
+          hidden_by?: string | null
+          hidden_at?: string
+        }
+        Relationships: []
+      }
       account_collection_preferences: {
         Row: {
           account_id: string

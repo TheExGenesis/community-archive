@@ -14,13 +14,28 @@ export FLEET_LIB_DIR FLEET_ROOT
 
 : "${FLEET_REPO:=TheExGenesis/community-archive}"
 : "${CA_URL:=https://www.community-archive.org}"
-: "${FLEET_RUNS_DIR:=$FLEET_ROOT/.fleet-runs}"
-export FLEET_REPO CA_URL FLEET_RUNS_DIR
+# Where runs live: $FLEET_HOME/runs on ca-fleet (the wrapper exports FLEET_HOME
+# and RUN_DIR), the parent of RUN_DIR when only that is given, else ./.fleet-runs.
+if [[ -z "${FLEET_RUNS_DIR:-}" ]]; then
+  if [[ -n "${FLEET_HOME:-}" ]]; then
+    FLEET_RUNS_DIR="$FLEET_HOME/runs"
+  elif [[ -n "${RUN_DIR:-}" ]]; then
+    FLEET_RUNS_DIR="$(dirname "$RUN_DIR")"
+  else
+    FLEET_RUNS_DIR="$FLEET_ROOT/.fleet-runs"
+  fi
+fi
+# Prometheus textfile the node exporter on ca-fleet reads (docs/hyperobservability.md).
+: "${FLEET_METRICS_FILE:=$FLEET_RUNS_DIR/metrics.prom}"
+: "${FLEET_CURL_BIN:=curl}"
+: "${FLEET_DASHBOARD_URL:=https://neatrowan1763.grafana.net/d/ca-fleet}"
+export FLEET_REPO CA_URL FLEET_RUNS_DIR FLEET_METRICS_FILE FLEET_CURL_BIN FLEET_DASHBOARD_URL
 
 FLEET_LABEL_IN_PROGRESS="fleet:in-progress"
 FLEET_LABEL_PR_OPEN="fleet:pr-open"
 FLEET_LABEL_WONTFIX="fleet:wontfix"
 FLEET_LABEL_NEEDS_DECISION="fleet:needs-decision"
+FLEET_LABEL_DIGEST="fleet:digest"
 FLEET_SKIP_LABELS="$FLEET_LABEL_IN_PROGRESS $FLEET_LABEL_NEEDS_DECISION $FLEET_LABEL_WONTFIX"
 
 # ─── Logging ────────────────────────────────────────────────────────────────
@@ -40,7 +55,12 @@ fleet_log() {
 }
 fleet_info() { fleet_log info "$@"; }
 fleet_warn() { fleet_log warn "$@"; }
-fleet_error() { fleet_log error "$@"; }
+# The last error message is what a failure signal carries (fleet_post_signal).
+FLEET_LAST_ERROR=""
+fleet_error() {
+  FLEET_LAST_ERROR="$*"
+  fleet_log error "$@"
+}
 fleet_die() {
   fleet_error "$@"
   exit 1
@@ -91,6 +111,11 @@ fleet_write_result() {
       let extra = {};
       if (e.EXTRA_FILE && fs.existsSync(e.EXTRA_FILE)) {
         extra = JSON.parse(fs.readFileSync(e.EXTRA_FILE, "utf8"));
+      }
+      // claude -p usage, written by fleet_claude_usage when the routine called Claude.
+      const usageFile = require("path").join(e.OUT, "..", "usage.json");
+      if (fs.existsSync(usageFile)) {
+        extra.usage = JSON.parse(fs.readFileSync(usageFile, "utf8"));
       }
       const result = {
         outcome: e.OUTCOME,
@@ -198,6 +223,7 @@ $FLEET_LABEL_IN_PROGRESS|1D76DB|The fleet fixer is working on this issue
 $FLEET_LABEL_PR_OPEN|0E8A16|The fleet fixer opened a PR for this issue
 $FLEET_LABEL_WONTFIX|FFFFFF|The fleet fixer decided not to fix this
 $FLEET_LABEL_NEEDS_DECISION|D93F0B|The fleet fixer needs a human decision
+$FLEET_LABEL_DIGEST|5319E7|Daily digest of what the fleet did
 bug|d73a4a|Something isn't working
 EOF
 }
@@ -386,4 +412,302 @@ fleet_acquire_lock() {
 
 fleet_release_lock() {
   rm -rf "$1"
+}
+
+# ─── Claude usage ───────────────────────────────────────────────────────────
+
+# fleet_claude_usage <claude-output.json>... : sums the usage of one or more
+# `claude -p --output-format json` results into {cost_usd, tokens:{input, output,
+# cache_read, cache_creation}, calls}. Files that are missing or not JSON count
+# as zero. Prints the JSON object.
+fleet_claude_usage() {
+  FILES="$(printf '%s\n' "$@")" node -e '
+    const fs = require("fs");
+    const usage = { cost_usd: 0, tokens: { input: 0, output: 0, cache_read: 0, cache_creation: 0 }, calls: 0 };
+    for (const file of process.env.FILES.split("\n").filter(Boolean)) {
+      let out;
+      try { out = JSON.parse(fs.readFileSync(file, "utf8")); } catch { continue; }
+      if (!out || typeof out !== "object") continue;
+      usage.calls += 1;
+      if (typeof out.total_cost_usd === "number") usage.cost_usd += out.total_cost_usd;
+      const u = out.usage || {};
+      usage.tokens.input += Number(u.input_tokens) || 0;
+      usage.tokens.output += Number(u.output_tokens) || 0;
+      usage.tokens.cache_read += Number(u.cache_read_input_tokens) || 0;
+      usage.tokens.cache_creation += Number(u.cache_creation_input_tokens) || 0;
+    }
+    usage.cost_usd = Math.round(usage.cost_usd * 1e6) / 1e6;
+    process.stdout.write(JSON.stringify(usage));
+  '
+}
+
+# ─── Signals ────────────────────────────────────────────────────────────────
+
+# fleet_post_signals <source> <body-file> <log-name> : POST a signal array to
+# $CA_URL/api/signals/<source> with the bearer. Request and response land in
+# $RUN_DIR/<log-name>.{response,curl-error}. Without SIGNALS_WEBHOOK_SECRET the
+# body stays in the run directory and nothing is sent (returns 0). Returns 1 on
+# a non-2xx answer.
+fleet_post_signals() {
+  local source="$1" file="$2" name="$3"
+  local out="${RUN_DIR:-/dev/null}"
+  [[ "$out" != "/dev/null" ]] && out="$RUN_DIR/$name"
+  if [[ -z "${SIGNALS_WEBHOOK_SECRET:-}" ]]; then
+    fleet_warn "SIGNALS_WEBHOOK_SECRET unset; $name written to $file but not sent"
+    [[ "$out" != "/dev/null" ]] && echo "not sent: SIGNALS_WEBHOOK_SECRET unset" >"$out.response"
+    return 0
+  fi
+  local status
+  status="$("$FLEET_CURL_BIN" -sS --max-time 20 -o "$out.response" -w '%{http_code}' \
+    -X POST "$CA_URL/api/signals/$source" \
+    -H "Authorization: Bearer $SIGNALS_WEBHOOK_SECRET" -H 'content-type: application/json' \
+    -A "ca-fleet/${FLEET_RUN_NAME:-harness} (+https://github.com/$FLEET_REPO)" \
+    --data-binary "@$file" 2>"$out.curl-error" || echo 000)"
+  fleet_info "$name posted to /api/signals/$source → $status"
+  if [[ ! "$status" =~ ^2 ]]; then
+    fleet_warn "signal POST failed with $status (see $name.response)"
+    return 1
+  fi
+}
+
+# fleet_failure_kind [message] : a stable word for why a run broke, from the
+# last error message (default $FLEET_LAST_ERROR). FLEET_FAILURE_KIND overrides.
+fleet_failure_kind() {
+  local msg="${1:-$FLEET_LAST_ERROR}"
+  if [[ -n "${FLEET_FAILURE_KIND:-}" ]]; then
+    printf '%s' "$FLEET_FAILURE_KIND"
+  elif [[ "$msg" == read-back* ]]; then
+    printf 'readback'
+  elif [[ "$msg" == claude* ]]; then
+    printf 'claude'
+  elif [[ "$msg" == "missing required command"* ]]; then
+    printf 'toolchain'
+  else
+    printf 'harness'
+  fi
+}
+
+# fleet_post_signal <kind> <summary> : file the fleet's own failure in the
+# signal inbox (POST /api/signals/generic) so it sits next to production
+# signals. key = fleet:<routine>:<kind>, stable per routine and failure kind,
+# so repeats comment on the open issue instead of opening another. Records the
+# kind for fleet_record_metrics (fleet_failure_signals_total). Never fails the
+# caller: a signal that cannot be sent is logged and left in the run directory.
+FLEET_POSTED_FAILURE_KIND=""
+fleet_post_signal() {
+  local kind="$1" summary="$2"
+  local routine="${FLEET_RUN_NAME:-${FLEET_ROUTINE:-fleet}}"
+  local file="${RUN_DIR:-${TMPDIR:-/tmp}}/signal-failure.json"
+  local log_tail=""
+  if [[ -n "${RUN_DIR:-}" && -f "$RUN_DIR/log.txt" ]]; then
+    log_tail="$(tail -n 20 "$RUN_DIR/log.txt" 2>/dev/null || true)"
+  fi
+  KIND="$kind" SUMMARY="$summary" ROUTINE="$routine" RUN="$(basename "${RUN_DIR:-none}")" \
+    HOST="$(hostname 2>/dev/null || echo unknown)" LOG_TAIL="$log_tail" REPO="$FLEET_REPO" \
+    DASH="$FLEET_DASHBOARD_URL" node -e '
+    const e = process.env;
+    const summary = (e.SUMMARY || "the harness exited with an error").slice(0, 600);
+    process.stdout.write(JSON.stringify([{
+      title: `Fleet ${e.ROUTINE} failed: ${e.KIND}`,
+      key: `fleet:${e.ROUTINE}:${e.KIND}`,
+      severity: "warning",
+      state: "firing",
+      summary: `${summary} (run ${e.RUN} on ${e.HOST}). The fleet routine itself broke; production may be fine.`,
+      link: e.DASH,
+      details: { routine: e.ROUTINE, kind: e.KIND, run: e.RUN, host: e.HOST, message: e.SUMMARY,
+        log_tail: e.LOG_TAIL ? e.LOG_TAIL.split("\n") : [], runbook: "docs/ca-fleet-operations.md (control-panel), section Watching the fleet" },
+    }], null, 2) + "\n");
+  ' >"$file"
+  FLEET_POSTED_FAILURE_KIND="$kind"
+  if ! command -v "$FLEET_CURL_BIN" >/dev/null 2>&1; then
+    fleet_warn "cannot post failure signal: $FLEET_CURL_BIN not found"
+    return 0
+  fi
+  fleet_post_signals generic "$file" signal-failure || true
+}
+
+# ─── Metrics (Prometheus textfile) ──────────────────────────────────────────
+# One file, $FLEET_METRICS_FILE (runs/metrics.prom on ca-fleet), read by the
+# node exporter's textfile collector in Alloy. Every routine calls
+# fleet_record_metrics once, from its exit handler. The file is rewritten
+# whole, under a lock, to a temp file then renamed, so a scrape never sees a
+# half-written file and two routines finishing together cannot lose updates.
+#
+# fleet_record_metrics --outcome <outcome> [--usage-file <claude-output.json>]...
+#                      [--signal-to-fix <seconds>] [--gauges <json-file>]
+#   fleet_run_total{routine,outcome}             +1
+#   fleet_run_duration_seconds{routine}          duration of this run
+#   fleet_last_run_timestamp_seconds{routine}    now
+#   fleet_last_success_timestamp{routine}        now, unless outcome is error
+#   fleet_last_outcome_timestamp{routine,outcome} now
+#   fleet_consecutive_failures{routine}          +1 on error, reset otherwise
+#   fleet_tokens_total{routine,kind}             from --usage-file (input, output, cache_read, cache_creation)
+#   fleet_cost_usd_total{routine}                from --usage-file total_cost_usd
+#   fleet_signal_to_fix_seconds{routine}         --signal-to-fix (last), plus _sum/_count
+#   fleet_failure_signals_total{routine,kind}    +1 when fleet_post_signal ran in this process
+#   <anything in --gauges>                       {"name{labels}": value}; names ending in
+#                                                _total are counters and add, others are set
+fleet_record_metrics() {
+  local outcome="" signal_to_fix="" gauges="" usage_files=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --outcome) outcome="$2"; shift 2 ;;
+      --usage-file) usage_files="$usage_files$2"$'\n'; shift 2 ;;
+      --signal-to-fix) signal_to_fix="$2"; shift 2 ;;
+      --gauges) gauges="$2"; shift 2 ;;
+      *) fleet_warn "fleet_record_metrics: unknown argument $1"; shift ;;
+    esac
+  done
+  [[ -n "$outcome" ]] || { fleet_warn "fleet_record_metrics: --outcome is required"; return 0; }
+  local routine="${FLEET_RUN_NAME:-${FLEET_ROUTINE:-fleet}}"
+  local duration=0
+  [[ -n "${FLEET_RUN_STARTED_EPOCH:-}" ]] && duration="$(fleet_duration_s)"
+  local usage="{}"
+  if [[ -n "$usage_files" ]]; then
+    # shellcheck disable=SC2086
+    usage="$(fleet_claude_usage $usage_files)"
+  fi
+  mkdir -p "$(dirname "$FLEET_METRICS_FILE")"
+  local lock="$FLEET_METRICS_FILE.lock" tries=0
+  until mkdir "$lock" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [[ $tries -ge 100 ]]; then
+      # 10 s: whoever held it is gone or wedged; take it over.
+      rm -rf "$lock"
+      continue
+    fi
+    sleep 0.1
+  done
+  local code=0
+  METRICS_FILE="$FLEET_METRICS_FILE" ROUTINE="$routine" OUTCOME="$outcome" DURATION="$duration" \
+    USAGE="$usage" SIGNAL_TO_FIX="$signal_to_fix" GAUGES_FILE="$gauges" \
+    FAILURE_KIND="$FLEET_POSTED_FAILURE_KIND" node -e '
+    const fs = require("fs"); const path = require("path"); const e = process.env;
+    const now = Math.floor(Date.now() / 1000);
+    // name{labels} → value. Labels are kept as a canonical string.
+    const samples = new Map();
+    const key = (name, labels) => {
+      const parts = Object.keys(labels).sort().map((k) => `${k}=${JSON.stringify(String(labels[k]))}`);
+      return parts.length ? `${name}{${parts.join(",")}}` : name;
+    };
+    const parseLabels = (raw) => {
+      const labels = {};
+      const re = /([a-zA-Z_][a-zA-Z0-9_]*)="((?:[^"\\]|\\.)*)"/g;
+      let m;
+      while ((m = re.exec(raw || ""))) labels[m[1]] = JSON.parse(`"${m[2]}"`);
+      return labels;
+    };
+    if (fs.existsSync(e.METRICS_FILE)) {
+      for (const line of fs.readFileSync(e.METRICS_FILE, "utf8").split("\n")) {
+        const m = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?\s+(-?[0-9.eE+-]+|NaN)\s*$/);
+        if (!m) continue;
+        samples.set(key(m[1], parseLabels(m[2])), Number(m[3]));
+      }
+    }
+    const get = (name, labels) => samples.get(key(name, labels)) || 0;
+    const set = (name, labels, value) => samples.set(key(name, labels), value);
+    const add = (name, labels, value) => set(name, labels, get(name, labels) + value);
+    const r = { routine: e.ROUTINE };
+    add("fleet_run_total", { ...r, outcome: e.OUTCOME }, 1);
+    set("fleet_run_duration_seconds", r, Number(e.DURATION) || 0);
+    set("fleet_last_run_timestamp_seconds", r, now);
+    set("fleet_last_outcome_timestamp", { ...r, outcome: e.OUTCOME }, now);
+    if (e.OUTCOME === "error") {
+      add("fleet_consecutive_failures", r, 1);
+    } else {
+      set("fleet_last_success_timestamp", r, now);
+      set("fleet_consecutive_failures", r, 0);
+    }
+    const usage = JSON.parse(e.USAGE || "{}");
+    if (usage.tokens) {
+      for (const [kind, n] of Object.entries(usage.tokens)) if (n) add("fleet_tokens_total", { ...r, kind }, n);
+      if (usage.cost_usd) add("fleet_cost_usd_total", r, usage.cost_usd);
+    }
+    if (e.SIGNAL_TO_FIX !== "" && Number.isFinite(Number(e.SIGNAL_TO_FIX))) {
+      set("fleet_signal_to_fix_seconds", r, Number(e.SIGNAL_TO_FIX));
+      add("fleet_signal_to_fix_seconds_sum", r, Number(e.SIGNAL_TO_FIX));
+      add("fleet_signal_to_fix_seconds_count", r, 1);
+    }
+    if (e.FAILURE_KIND) add("fleet_failure_signals_total", { ...r, kind: e.FAILURE_KIND }, 1);
+    if (e.GAUGES_FILE && fs.existsSync(e.GAUGES_FILE)) {
+      const gauges = JSON.parse(fs.readFileSync(e.GAUGES_FILE, "utf8"));
+      for (const [spec, value] of Object.entries(gauges)) {
+        const m = spec.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?$/);
+        if (!m || !Number.isFinite(Number(value))) continue;
+        const labels = parseLabels(m[2]);
+        if (m[1].endsWith("_total")) add(m[1], labels, Number(value)); else set(m[1], labels, Number(value));
+      }
+    }
+    set("fleet_metrics_written_timestamp_seconds", {}, now);
+    // Render grouped by metric name with HELP/TYPE headers.
+    const help = {
+      fleet_run_total: "Runs finished, by routine and outcome.",
+      fleet_run_duration_seconds: "Duration of the last run of each routine.",
+      fleet_last_run_timestamp_seconds: "When each routine last finished a run.",
+      fleet_last_success_timestamp: "When each routine last finished without a harness error.",
+      fleet_last_outcome_timestamp: "When each routine last finished with this outcome.",
+      fleet_consecutive_failures: "Runs in a row that ended in a harness error.",
+      fleet_tokens_total: "Claude tokens used, by routine and kind.",
+      fleet_cost_usd_total: "Claude spend in USD as reported by claude -p.",
+      fleet_signal_to_fix_seconds: "Issue created to PR opened or commit pushed, last fix.",
+      fleet_signal_to_fix_seconds_sum: "Sum of signal-to-fix latencies.",
+      fleet_signal_to_fix_seconds_count: "Number of fixes with a signal-to-fix latency.",
+      fleet_failure_signals_total: "Failure signals the fleet posted about itself.",
+      fleet_metrics_written_timestamp_seconds: "When this file was last written.",
+    };
+    const byName = new Map();
+    for (const [k, v] of samples) {
+      const name = k.replace(/\{.*$/, "");
+      if (!byName.has(name)) byName.set(name, []);
+      byName.get(name).push([k, v]);
+    }
+    let text = "";
+    for (const name of [...byName.keys()].sort()) {
+      const type = /_total$|_sum$|_count$/.test(name) ? "counter" : "gauge";
+      text += `# HELP ${name} ${help[name] || "Fleet gauge recorded by a routine."}\n# TYPE ${name} ${type}\n`;
+      for (const [k, v] of byName.get(name).sort((a, b) => (a[0] < b[0] ? -1 : 1))) text += `${k} ${v}\n`;
+    }
+    const tmp = path.join(path.dirname(e.METRICS_FILE), `.metrics.prom.${process.pid}.tmp`);
+    fs.writeFileSync(tmp, text);
+    fs.chmodSync(tmp, 0o644);
+    fs.renameSync(tmp, e.METRICS_FILE);
+  ' || code=$?
+  rm -rf "$lock"
+  if [[ $code -ne 0 ]]; then
+    fleet_warn "fleet_record_metrics failed with $code; $FLEET_METRICS_FILE not updated"
+  else
+    fleet_info "metrics recorded: routine=$routine outcome=$outcome → $FLEET_METRICS_FILE"
+  fi
+  return 0
+}
+
+# fleet_github_gauges <out-file> : repo-wide gauges a routine can hand to
+# fleet_record_metrics --gauges: open needs-decision issues, open fixer PRs,
+# open signals, inbox depth (signal/bug issues without a fleet label). Each
+# gh call that fails is skipped; the file always exists.
+fleet_github_gauges() {
+  local out="$1" nd prs signals candidates
+  nd="$(gh issue list --repo "$FLEET_REPO" --state open --label "$FLEET_LABEL_NEEDS_DECISION" --limit 200 --json number 2>/dev/null || echo null)"
+  prs="$(gh pr list --repo "$FLEET_REPO" --state open --limit 100 --json headRefName 2>/dev/null || echo null)"
+  signals="$(gh issue list --repo "$FLEET_REPO" --state open --label signal --limit 200 --json number 2>/dev/null || echo null)"
+  candidates="$(fleet_list_candidate_issues 2>/dev/null || echo null)"
+  ND="$nd" PRS="$prs" SIGNALS="$signals" CANDIDATES="$candidates" SKIP="$FLEET_SKIP_LABELS" node -e '
+    const e = process.env;
+    const parse = (s) => { try { const v = JSON.parse(s); return Array.isArray(v) ? v : null; } catch { return null; } };
+    const out = {};
+    const nd = parse(e.ND), prs = parse(e.PRS), signals = parse(e.SIGNALS), candidates = parse(e.CANDIDATES);
+    if (nd) out.fleet_needs_decision_issues = nd.length;
+    if (prs) out.fleet_open_fixer_prs = prs.filter((p) => String(p.headRefName || "").startsWith("fleet/fixer-")).length;
+    if (signals) out.fleet_signals_open = signals.length;
+    if (candidates) {
+      const skip = new Set(e.SKIP.split(/\s+/).filter(Boolean));
+      out.fleet_inbox_open = candidates.filter((i) => !(i.labels || []).some((l) => skip.has(typeof l === "string" ? l : l.name))).length;
+    }
+    process.stdout.write(JSON.stringify(out) + "\n");
+  ' >"$out"
+}
+
+# fleet_epoch <iso-8601> : seconds since the epoch, or nothing when unparseable.
+fleet_epoch() {
+  node -e 'const t = Date.parse(process.argv[1]); if (Number.isFinite(t)) process.stdout.write(String(Math.floor(t / 1000)));' "$1"
 }

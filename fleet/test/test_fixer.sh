@@ -27,6 +27,9 @@ run_fixer() {
   export FLEET_WORKTREE_BASE="$base/worktrees"
   export FLEET_GIT_NAME="fleet-test" FLEET_GIT_EMAIL="fleet-test@example.invalid"
   export FLEET_REPO="o/r"
+  export FLEET_METRICS_FILE="$base/metrics.prom"
+  export FAKE_CURL_DIR="$base/curl"
+  mkdir -p "$FAKE_CURL_DIR"
   FIXER_CODE=0
   env "$@" bash "$REPO/fleet/bin/fixer.sh" >"$base/stdout.log" 2>"$base/stderr.log" || FIXER_CODE=$?
 }
@@ -68,6 +71,19 @@ msg="$(git -C "$ORIGIN" log -1 --format=%B "$branch")"
 assert_contains "$msg" "[fleet:fixer] Set the answer to 42. (signal #7)" "commit title"
 assert_contains "$msg" "Co-Authored-By: Claude" "co-author line"
 assert_file_missing "$(cat "$RUN_DIR/worktree-path")" "worktree removed"
+# Usage, signal-to-fix and metrics land in result.json and the textfile.
+assert_eq "$(json_get "$RUN_DIR/result.json" 'd.usage.cost_usd + "|" + d.usage.tokens.input + "|" + d.usage.calls')" "0.42|1200|1" "usage in result.json"
+assert_eq "$(json_get "$RUN_DIR/result.json" 'typeof d.signal_to_fix_s')" "number" "signal_to_fix_s in result.json"
+assert_eq "$(awk '$1 == "fleet_run_total{outcome=\"pr_opened\",routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "1" "metrics: run counted"
+assert_eq "$(awk '$1 == "fleet_cost_usd_total{routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "0.42" "metrics: cost"
+assert_eq "$(awk '$1 == "fleet_tokens_total{kind=\"output\",routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "340" "metrics: tokens"
+assert_eq "$(awk '$1 == "fleet_signal_to_fix_seconds_count{routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "1" "metrics: signal-to-fix recorded"
+# #7 was created 2026-10-01, so the latency is at least 29 days.
+assert_eq "$(node -e 'process.exit(Number(process.argv[1]) > 29*86400 ? 0 : 1)' "$(awk '$1 == "fleet_signal_to_fix_seconds{routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" && echo big)" "big" "metrics: latency from issue createdAt"
+assert_eq "$(awk '$1 == "fleet_needs_decision_issues" {print $2}' "$FLEET_METRICS_FILE")" "1" "metrics: needs-decision gauge (#2)"
+assert_eq "$(awk '$1 == "fleet_inbox_open" {print $2}' "$FLEET_METRICS_FILE")" "2" "metrics: inbox depth before the pick (#7, #10)"
+assert_eq "$(awk '$1 == "fleet_open_fixer_prs" {print $2}' "$FLEET_METRICS_FILE")" "0" "metrics: open fixer PRs counted before this one"
+assert_eq "$(ls "$FAKE_CURL_DIR"/post-*.json 2>/dev/null | wc -l | tr -d ' ')" "0" "no failure signal on success"
 assert_contains "$(cat "$RUN_DIR/worktree-path")" "$TMP/pr/worktrees/" "worktree created outside the checkout"
 assert_eq "$(git -C "$REPO" rev-parse --abbrev-ref HEAD)" "main" "checkout untouched"
 
@@ -112,6 +128,7 @@ run_fixer retry FLEET_MODE=pr FAKE_CLAUDE_OUTPUT="$TMP/bug.json" \
   FAKE_CLAUDE_EDITS_2='printf "export const answer = 42 // lint ok\n" > src/foo.ts' \
   FAKE_PNPM_FAIL=lint FAKE_PNPM_FAIL_TIMES=1
 assert_status "$FIXER_CODE" 0 "retry run exits 0"
+assert_eq "$(json_get "$RUN_DIR/result.json" 'd.usage.calls + "|" + d.usage.cost_usd')" "2|0.84" "usage sums both claude calls"
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.outcome')" "pr_opened" "shipped after one repair"
 assert_eq "$(grep -c -- '--resume 11111111-2222-3333-4444-555555555555' "$FAKE_CLAUDE_LOG")" "1" "resumed the same session once"
 assert_file_contains "$FAKE_CLAUDE_LOG.prompt-2" "fake pnpm: lint failed" "failure output handed back"
@@ -128,13 +145,23 @@ assert_eq "$(json_get "$FAKE_GH_STATE/issues.json" 'd.find(i=>i.number===7).labe
 assert_contains "$(json_get "$FAKE_GH_STATE/issues.json" 'd.find(i=>i.number===7).comments[0].body')" "FAIL type-check" "comment carries the gate summary"
 assert_eq "$(git -C "$ORIGIN" for-each-ref --format='%(refname)' 'refs/heads/fleet/*' | wc -l | tr -d ' ')" "0" "nothing pushed"
 
-# ─── 8. claude infrastructure error frees the issue ─────────────────────────
+# ─── 8. claude infrastructure error frees the issue and files a fleet signal ─
 node -e 'process.stdout.write(JSON.stringify({is_error:true, result:"Failed to authenticate", session_id:"dead"}))' >"$TMP/err.json"
-run_fixer autherr FLEET_MODE=pr FAKE_CLAUDE_OUTPUT="$TMP/err.json"
+run_fixer autherr FLEET_MODE=pr FAKE_CLAUDE_OUTPUT="$TMP/err.json" SIGNALS_WEBHOOK_SECRET=sec CA_URL=https://ca.example
 assert_status "$FIXER_CODE" 1 "error run exits 1"
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.outcome')" "error" "outcome error"
 assert_eq "$(json_get "$FAKE_GH_STATE/issues.json" 'd.find(i=>i.number===7).labels.map(l=>l.name).join(",")')" "bug" "in-progress label removed again"
 assert_eq "$(json_get "$FAKE_GH_STATE/issues.json" 'd.find(i=>i.number===7).comments.length')" "0" "no comment on an infrastructure error"
+post="$FAKE_CURL_DIR/post-1.json"
+assert_file_exists "$post" "failure signal posted"
+assert_eq "$(json_get "$post" 'd[0].key')" "fleet:fixer:claude" "failure kind is claude"
+assert_contains "$(json_get "$post" 'd[0].summary')" "Failed to authenticate" "summary carries claude's error"
+assert_contains "$(json_get "$post" 'd[0].summary')" "while on issue #7" "summary names the issue"
+assert_contains "$(grep -- '-X POST' "$FAKE_CURL_DIR/calls.log")" "https://ca.example/api/signals/generic" "posted to the generic inbox source"
+assert_eq "$(awk '$1 == "fleet_run_total{outcome=\"error\",routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "1" "metrics: error counted"
+assert_eq "$(awk '$1 == "fleet_consecutive_failures{routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "1" "metrics: consecutive failures"
+assert_eq "$(awk '$1 == "fleet_failure_signals_total{kind=\"claude\",routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "1" "metrics: failure signal counted"
+assert_eq "$(grep -c 'fleet_last_success_timestamp' "$FLEET_METRICS_FILE" || true)" "0" "metrics: no last_success after an error"
 
 # ─── 9. empty inbox ─────────────────────────────────────────────────────────
 run_fixer idle FLEET_MODE=pr FAKE_CLAUDE_OUTPUT="$TMP/bug.json"
@@ -148,6 +175,9 @@ code=0; FLEET_MODE=pr FAKE_CLAUDE_OUTPUT="$TMP/bug.json" bash "$REPO/fleet/bin/f
 assert_status "$code" 0 "idle exits 0"
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.outcome')" "idle" "outcome idle"
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.issue')" "" "no issue"
+assert_eq "$(ls "$FAKE_CURL_DIR"/post-*.json 2>/dev/null | wc -l | tr -d ' ')" "0" "idle is not a failure: no signal"
+assert_eq "$(awk '$1 == "fleet_run_total{outcome=\"idle\",routine=\"fixer\"}" {print $2}' "$FLEET_METRICS_FILE")" "1" "metrics: idle counted"
+assert_eq "$(awk '$1 == "fleet_inbox_open" {print $2}' "$FLEET_METRICS_FILE")" "0" "metrics: empty inbox gauge"
 
 # ─── 10. lock held by a live process → exit 0, outcome locked ───────────────
 mkdir -p "$TMP/idle/lock" && echo $$ >"$TMP/idle/lock/pid"

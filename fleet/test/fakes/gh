@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Fake `gh` for fleet tests. State lives in $FAKE_GH_STATE:
-#   issues.json  [{number,title,body,state,createdAt,labels:[{name}],comments:[{body}]}]
+#   issues.json  [{number,title,body,state,createdAt,closedAt?,labels:[{name}],comments:[{body}]}]
 #   labels.txt   one label name per line
-#   prs.json     [{number,url,title,body,head,base,state}]
+#   prs.json     [{number,url,title,body,head,base,state,createdAt?,mergedAt?,closedAt?}]
+#   commits.json optional GitHub API shape, answers `api repos/.../commits?...`
 #   calls.log    every invocation, one per line
 # FAKE_GH_REMOTE (optional): bare repo used to answer `api repos/.../compare`.
+# `issue list` and `pr list` honour --state (open|closed|all), --label, --json
+# (field projection) and a `created:>=<iso>` qualifier in --search.
 set -euo pipefail
 : "${FAKE_GH_STATE:?FAKE_GH_STATE must be set}"
 printf '%q ' "$@" >>"$FAKE_GH_STATE/calls.log"
@@ -44,7 +47,36 @@ case "$cmd $sub" in
     echo "$3" >>"$FAKE_GH_STATE/labels.txt"
     ;;
   "issue list")
-    LABEL="$(opt --label)" mutate 'return issues.filter(i => i.state === "OPEN" && i.labels.some(l => l.name === env.LABEL)).map(i => ({number: i.number, title: i.title, body: i.body, labels: i.labels, createdAt: i.createdAt}))'
+    LABEL="$(opt --label)" WANT_STATE="$(opt --state)" SEARCH="$(opt --search)" FIELDS="$(opt --json)" REPO="$(opt --repo)" mutate '
+      const state = (env.WANT_STATE || "open").toUpperCase();
+      const since = (env.SEARCH.match(/created:>=(\S+)/) || [])[1];
+      const fields = env.FIELDS ? env.FIELDS.split(",") : ["number", "title", "body", "labels", "createdAt"];
+      return issues
+        .filter(i => state === "ALL" || i.state === state)
+        .filter(i => !env.LABEL || i.labels.some(l => l.name === env.LABEL))
+        .filter(i => !since || Date.parse(i.createdAt) >= Date.parse(since))
+        .map(i => Object.fromEntries(fields.map(f => [f,
+          f === "url" ? "https://github.com/" + (env.REPO || "o/r") + "/issues/" + i.number
+          : f === "closedAt" ? (i.closedAt || null)
+          : f === "updatedAt" ? (i.updatedAt || i.createdAt)
+          : i[f] === undefined ? null : i[f]])));'
+    ;;
+  "issue create")
+    body="$(cat "$(opt --body-file)")"
+    TITLE="$(opt --title)" BODY="$body" LABEL="$(opt --label)" REPO="$(opt --repo)" mutate '
+      const number = 1000 + issues.length;
+      issues.push({number, title: env.TITLE, body: env.BODY, state: "OPEN", createdAt: new Date().toISOString(),
+        labels: env.LABEL ? env.LABEL.split(",").map(name => ({name})) : [], comments: []});
+      return "https://github.com/" + (env.REPO || "o/r") + "/issues/" + number + "\n";'
+    ;;
+  "pr list")
+    WANT_STATE="$(opt --state)" FIELDS="$(opt --json)" mutate '
+      const state = (env.WANT_STATE || "open").toUpperCase();
+      const fields = env.FIELDS ? env.FIELDS.split(",") : ["number", "title", "url", "headRefName", "state"];
+      return prs
+        .filter(p => state === "ALL" || p.state === state)
+        .map(p => Object.fromEntries(fields.map(f => [f,
+          f === "headRefName" ? p.head : f === "baseRefName" ? p.base : p[f] === undefined ? null : p[f]])));'
     ;;
   "issue edit")
     N="$3" ADD="$(opt --add-label)" REMOVE="$(opt --remove-label)" mutate '
@@ -80,6 +112,10 @@ case "$cmd $sub" in
     N="$3" mutate 'const p = prs.find(x => x.number === Number(env.N)); if (!p) { process.stderr.write("no pr\n"); process.exit(1); } return p.state + "\n";'
     ;;
   "api "*)
+    if [[ "$2" == */commits\?* || "$2" == */commits ]]; then
+      if [[ -f "$FAKE_GH_STATE/commits.json" ]]; then cat "$FAKE_GH_STATE/commits.json"; else echo '[]'; fi
+      exit 0
+    fi
     # repos/<owner>/<repo>/compare/<sha>...<branch> --jq .status
     spec="${2##*/compare/}"
     sha="${spec%%...*}"

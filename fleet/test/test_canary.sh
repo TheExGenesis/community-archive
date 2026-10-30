@@ -9,7 +9,9 @@ export PATH="$FAKES_DIR:$PATH"
 export FLEET_RUNS_DIR="$TMP/runs"
 export FAKE_CURL_DIR="$TMP/curl"
 export FAKE_NPX_LOG="$TMP/npx.log"
+export FLEET_METRICS_FILE="$TMP/metrics.prom"
 mkdir -p "$FAKE_CURL_DIR"
+metric() { awk -v k="$2" '$1 == k { print $2 }' "$1"; }
 : >"$FAKE_NPX_LOG"
 
 green() {
@@ -47,6 +49,10 @@ assert_eq "$(ls "$FAKE_CURL_DIR"/post-*.json 2>/dev/null | wc -l | tr -d ' ')" "
 assert_file_contains "$FAKE_CURL_DIR/calls.log" "Cookie:\ __cc=" "challenge cookie sent"
 assert_file_contains "$FAKE_CURL_DIR/calls.log" "Accept-Language:\ en" "browser-like headers"
 assert_file_missing "$RUN_DIR/home.body" "bodies not kept"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_run_total{outcome="ok",routine="canary"}')" "1" "metrics: ok run counted"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_check_ok{check="home"}')" "1" "metrics: home ok"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_failed_checks')" "0" "metrics: no failing checks"
+assert_eq "$(grep -c '^fleet_canary_check_ok{' "$FLEET_METRICS_FILE")" "6" "metrics: six per-check gauges"
 
 # ─── 2. one check slow + one 5xx → new failures, signal posted, rollback off ─
 deployments 2000000000000
@@ -77,6 +83,12 @@ assert_eq "$(json_get "$post" 'd.find(s=>s.key==="canary:search").route')" "/sea
 assert_contains "$(grep -- '-X POST' "$FAKE_CURL_DIR/calls.log")" "/api/signals/canary" "posted to the canary source"
 assert_contains "$(grep -- '-X POST' "$FAKE_CURL_DIR/calls.log")" "Authorization:\ Bearer\ sec" "bearer secret"
 assert_eq "$(grep -c . "$FAKE_NPX_LOG")" "0" "vercel not called"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_run_total{outcome="failed",routine="canary"}')" "1" "metrics: failed run counted"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_check_ok{check="search"}')" "0" "metrics: search failing"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_failed_checks')" "2" "metrics: two failing checks"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_new_failures_total')" "2" "metrics: new failures counted"
+success="$(metric "$FLEET_METRICS_FILE" 'fleet_last_success_timestamp{routine="canary"}')"
+assert_eq "$(node -e 'process.exit(Math.abs(Number(process.argv[1]) - Date.now()/1000) < 10 ? 0 : 1)' "$success" && echo fresh)" "fresh" "metrics: a failed canary still counts as the canary succeeding"
 
 # ─── 3. still failing → no new signal; recovery → resolved signal ───────────
 export RUN_DIR="$TMP/runs/20261030T000003Z-canary"
@@ -107,6 +119,7 @@ assert_eq "$(json_get "$RUN_DIR/result.json" 'd.rollback.from.uid + ">" + d.roll
 assert_contains "$(cat "$FAKE_NPX_LOG")" "vercel@65 rollback dpl_old --scope theexgenesis-projects --token tok --yes" "vercel rollback command"
 assert_file_contains "$RUN_DIR/rollback-command.txt" "<VERCEL_TOKEN>" "token redacted in the recorded command"
 assert_eq "$(json_get "$FAKE_CURL_DIR/post-4.json" 'd[0].key')" "canary:rollback:dpl_new" "second signal about the rollback"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_rollbacks_total')" "1" "metrics: rollback counted"
 assert_contains "$(json_get "$FAKE_CURL_DIR/post-4.json" 'd[0].summary')" "Rolled back production from ca-new.vercel.app (aaaaaaaa) to ca-old.vercel.app (bbbbbbbb)" "rollback summary"
 
 # ─── 5. rollback on but deployment not newer than the last green run → skipped ─
@@ -136,6 +149,8 @@ posts_before="$(ls "$FAKE_CURL_DIR"/post-*.json | wc -l | tr -d ' ')"
 run_canary VERCEL_TOKEN=tok SIGNALS_WEBHOOK_SECRET=sec
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.checks.search.verdict')" "inconclusive" "challenge → inconclusive"
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.outcome')" "inconclusive" "outcome inconclusive"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_check_ok{check="search"}')" "1" "metrics: inconclusive leaves the last known value (ok from run 7)"
+assert_eq "$(metric "$FLEET_METRICS_FILE" 'fleet_canary_inconclusive_checks')" "1" "metrics: inconclusive count"
 # user recovered from the timeout in run 7, so one resolved POST is expected and nothing firing
 assert_eq "$(json_get "$FAKE_CURL_DIR/post-$((posts_before + 1)).json" 'd.map(s=>s.state).join(",")')" "resolved" "only the recovery was posted"
 

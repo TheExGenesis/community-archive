@@ -1,5 +1,5 @@
 import { createRef, type ReactNode } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BANGER_SCORE_EXPLANATION, Workspace } from './Workspace'
 import type { ArchiveMediaItem, BangerTweet } from '@/lib/metaTwitter/types'
@@ -247,4 +247,88 @@ test('opens chapter media in a gallery over every loaded item instead of navigat
   )
   expect(tiles[5]).toHaveTextContent('+18')
   expect(tiles[4]).toBeEmptyDOMElement()
+})
+
+test('top people show initials for missing or failed avatars and photos when loaded', () => {
+  const preloads: HTMLImageElement[] = []
+  const imageSpy = jest.spyOn(window, 'Image').mockImplementation(() => {
+    const image = document.createElement('img')
+    preloads.push(image)
+    return image
+  })
+  try {
+    render(
+      <Workspace
+        avatarUrl={null}
+        contextTitle="Best of Alice"
+        tweets={[]}
+        bangersAvailable
+        bangersLoading={false}
+        media={[]}
+        mediaCount={0}
+        people={[
+          {
+            user_id: '1',
+            screen_name: 'romy',
+            name: 'Romy',
+            avatar_media_url:
+              'https://pbs.twimg.com/profile_images/1/old_400x400.jpg',
+            interactions: 78,
+            in_archive: true,
+          },
+          {
+            user_id: '2',
+            screen_name: 'no_photo',
+            name: '𒐪',
+            avatar_media_url: null,
+            interactions: 59,
+            in_archive: false,
+          },
+          {
+            user_id: '3',
+            screen_name: 'brangus',
+            name: 'Brangus',
+            avatar_media_url:
+              'https://pbs.twimg.com/profile_images/3/current_normal.jpg',
+            interactions: 33,
+            in_archive: false,
+          },
+        ]}
+        peopleTitle="Top people"
+        mediaLoading={false}
+        mediaFailed={false}
+        onRetryMedia={jest.fn()}
+        peopleLoading={false}
+        peopleFailed={false}
+        onRetryPeople={jest.fn()}
+        sort="quotes"
+        onSortChange={jest.fn()}
+        hasMore={false}
+        loadMoreFailed={false}
+        onLoadMore={jest.fn()}
+        loadMoreRef={createRef<HTMLDivElement>()}
+        returnTo="/user/alice"
+      />,
+    )
+
+    const panel = screen.getByRole('region', { name: 'Top people' })
+    expect(preloads).toHaveLength(2)
+    preloads.forEach((image) =>
+      expect(image.referrerPolicy).toBe('no-referrer'),
+    )
+    expect(preloads[0].src).toContain('/old_normal.jpg')
+    fireEvent.error(preloads[0])
+    fireEvent.load(preloads[1])
+
+    expect(within(panel).getByText('R')).toBeVisible()
+    expect(within(panel).getAllByText('𒐪')).toHaveLength(2)
+    expect(within(panel).queryByText('B')).not.toBeInTheDocument()
+    const images = panel.querySelectorAll('img')
+    expect(images).toHaveLength(1)
+    expect(images[0]).toHaveAttribute('src', preloads[1].src)
+    expect(images[0]).toHaveAttribute('referrerpolicy', 'no-referrer')
+    expect(within(panel).getByRole('link')).toHaveAttribute('href', '/user/1')
+  } finally {
+    imageSpy.mockRestore()
+  }
 })

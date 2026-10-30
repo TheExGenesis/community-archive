@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import { getStrandPage } from '@/lib/community-apps/strand-list'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -15,10 +16,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(await getStrandPage(query, Number(rawOffset)), {
       headers,
     })
-  } catch {
-    return NextResponse.json(
-      { error: 'Strands could not load. Please try again.' },
-      { status: 503, headers },
-    )
+  } catch (error) {
+    return reportApiError({
+      request,
+      route: '/api/strands',
+      status: 503,
+      message: 'Strands could not load. Please try again.',
+      upstream: 'unknown',
+      error,
+      headers,
+    })
   }
 }

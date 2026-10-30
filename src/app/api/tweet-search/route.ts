@@ -1,5 +1,6 @@
 import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import {
   analyticsGatewayRequestUrl,
   clickHouseSearchGatewayBaseUrl,
@@ -19,11 +20,14 @@ export async function GET(request: NextRequest) {
 
   const token = process.env.CLICKHOUSE_ANALYTICS_API_TOKEN
   if (!token) {
-    console.error('CLICKHOUSE_ANALYTICS_API_TOKEN is not configured')
-    return NextResponse.json(
-      { error: 'Tweet search is not configured' },
-      { status: 503 },
-    )
+    return reportApiError({
+      request,
+      route: '/api/tweet-search',
+      status: 503,
+      message: 'Tweet search is not configured',
+      upstream: 'none',
+      error: new Error('CLICKHOUSE_ANALYTICS_API_TOKEN is not configured'),
+    })
   }
 
   let target: URL
@@ -60,11 +64,14 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (request.signal.aborted) return new NextResponse(null, { status: 499 })
-    console.error('ClickHouse tweet search request failed:', error)
-    return NextResponse.json(
-      { error: 'Tweet search is temporarily unavailable' },
-      { status: 502 },
-    )
+    return reportApiError({
+      request,
+      route: '/api/tweet-search',
+      status: 502,
+      message: 'Tweet search is temporarily unavailable',
+      upstream: 'gateway',
+      error,
+    })
   } finally {
     clearTimeout(timeout)
     request.signal.removeEventListener('abort', cancel)

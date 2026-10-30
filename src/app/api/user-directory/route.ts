@@ -1,5 +1,6 @@
 import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 
 import { getUserDirectoryPage } from '@/lib/userDirectory'
 
@@ -18,13 +19,13 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('ClickHouse member-directory request failed:', error)
-    return NextResponse.json(
-      { error: 'The user directory is temporarily unavailable' },
-      {
-        status: 502,
-        headers: { 'Cache-Control': 'private, no-store' },
-      },
-    )
+    return reportApiError({
+      request,
+      route: '/api/user-directory',
+      status: 502,
+      message: 'The user directory is temporarily unavailable',
+      upstream: 'gateway',
+      error,
+    })
   }
 }

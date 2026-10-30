@@ -1,5 +1,6 @@
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import { mapGateway, type MapHeat } from '@/lib/hexMap/gateway'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -21,10 +22,15 @@ export async function GET(request: NextRequest) {
       await mapGateway<MapHeat>('hex-word-heat', { q }),
       { headers },
     )
-  } catch {
-    return NextResponse.json(
-      { error: 'Term heat map is temporarily unavailable' },
-      { status: 503, headers },
-    )
+  } catch (error) {
+    return reportApiError({
+      request,
+      route: '/api/hex-map/heat',
+      status: 503,
+      message: 'Term heat map is temporarily unavailable',
+      upstream: 'gateway',
+      error,
+      headers,
+    })
   }
 }

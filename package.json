@@ -107,6 +107,7 @@
     "node-fetch": "^3.3.2",
     "postgres": "^3.4.7",
     "posthog-js": "^1.413.2",
+    "posthog-node": "5.57.2",
     "react": "19.3.1",
     "react-day-picker": "9.14.0",
     "react-dom": "19.3.1",

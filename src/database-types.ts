@@ -392,6 +392,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"directory_hidden_users": {
+                  Row: {
+                    "account_id": string | null,"hidden_at": string,"hidden_by": string | null,"username": string,"visibility_key": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id"?: string | null,"hidden_at"?: string,"hidden_by"?: string | null,"username": string,"visibility_key": string
+                  }
+                  Update: {
+                    "account_id"?: string | null,"hidden_at"?: string,"hidden_by"?: string | null,"username"?: string,"visibility_key"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"followers": {
                   Row: {
                     "account_id": string,"archive_upload_id": number | null,"follower_account_id": string,"id": number,"updated_at": string | null

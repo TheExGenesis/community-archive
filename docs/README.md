@@ -10,6 +10,7 @@
 - [Website architecture](./website-architecture.md) feature ownership, tweet contracts, and client state boundaries.
 - [Companion API](./companion-api.md) shared feature services, extension authentication, and versioned client contracts.
 - [Website performance](./website-performance.md) loading boundaries, selective prefetch, and measurement semantics.
+- [Hyperobservability](./hyperobservability.md) server exception capture, the replayable API error log line, and the `signal` issue inbox that PostHog, Grafana, Vercel and the autorefresh host feed.
 - [Archive insertion performance plan](./archive-insertion-performance-plan.md) testable staged/COPY and membership design that preserves the Supabase contract.
 - [Quickstart Jupyter notebook](https://colab.research.google.com/drive/109XOgTWj-sajpAYhDCNPfts5zvdkpi_s) that you can run in your browser. Shows how to fetch all tweets for a given user in Python, and do some basic analysis like find the most common used phrases, and plot the amount of likes over time.
 

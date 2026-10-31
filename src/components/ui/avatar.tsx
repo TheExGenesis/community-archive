@@ -21,6 +21,8 @@ const Avatar = React.forwardRef<
 ))
 Avatar.displayName = AvatarPrimitive.Root.displayName
 
+// Twitter's CDN can reject hotlinked avatars with a Referer header. Radix
+// applies referrerPolicy to both its off-DOM preload and the rendered image.
 const AvatarImage = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Image>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image> & {
@@ -31,6 +33,7 @@ const AvatarImage = React.forwardRef<
     ref={ref}
     src={typeof src === 'string' ? getAvatarUrl(src, avatarSize) : src}
     className={cn('aspect-square h-full w-full', className)}
+    referrerPolicy="no-referrer"
     {...props}
   />
 ))

@@ -54,7 +54,8 @@
     "docker:build:process-archive": "docker build -f services/process_archive/Dockerfile -t process-archive:latest .",
     "docker:run:process-archive": "docker compose -f services/process_archive/docker-compose.yml run --rm process-archive",
     "test:security:nanoid": "node --test tests/security/nanoid-workflow-compat.test.mjs",
-    "test:security": "node --test tests/security/nanoid-workflow-compat.test.mjs tests/security/zod-compat.test.mjs tests/security/workflow-cache-boundary.mjs"
+    "test:security": "node --test tests/security/nanoid-workflow-compat.test.mjs tests/security/zod-compat.test.mjs tests/security/workflow-cache-boundary.mjs",
+    "fleet:test": "bash fleet/test/run.sh"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.74",
@@ -113,6 +114,7 @@
     "node-fetch": "^3.3.2",
     "postgres": "^3.4.7",
     "posthog-js": "^1.413.2",
+    "posthog-node": "5.57.2",
     "react": "19.3.1",
     "react-day-picker": "9.14.0",
     "react-dom": "19.3.1",

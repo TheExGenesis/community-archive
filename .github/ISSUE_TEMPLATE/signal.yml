@@ -1,0 +1,37 @@
+name: Production signal
+description: Something production said that may need a change (error, alert, metric regression). Same shape the automated feeds use.
+title: "[signal:human] "
+labels: ["signal"]
+body:
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - warning
+        - critical
+        - info
+    validations:
+      required: true
+  - type: input
+    id: route
+    attributes:
+      label: Route or page
+      description: Route pattern, not a URL with query or usernames. Example `/api/tweet-search` or `/user/[account_id]`.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What production said
+      description: The error text, alert, or the number that moved. Request id from the response body if you have one. No cookies, tokens, or other people's data.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to see it again
+      description: Steps, or "every time", or "seen once".
+  - type: input
+    id: link
+    attributes:
+      label: Link to the source
+      description: PostHog issue, Grafana panel, Vercel log, or a tweet.

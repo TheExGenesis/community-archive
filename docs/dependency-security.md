@@ -71,8 +71,10 @@ and `guarded-fetch@0.1.3` (from just-bash) to **undici 7.30.1**.
 
 ## Release and rollback
 
-These changes require no database migration or persisted-data rewrite. Workflow
-runs are pinned to the deployment that started them, so runs started on Workflow
-4.8.2 finish there. Synthetic local tests do not establish every hosted runtime
+These changes require no database migration or persisted-data rewrite. On Vercel,
+Workflow 4 queues each message to the deployment that produced it and Workflow 5
+enforces deployment affinity, so a run started on 4.8.2 finishes on its original
+deployment while that deployment is retained. That comes from reading the
+package source; no live cross-version run was exercised. Synthetic local tests do not establish every hosted runtime
 or deployment-skew behavior. Reverting the dependency remediation restores the
 previous vulnerable graph, so evaluate that security tradeoff explicitly.

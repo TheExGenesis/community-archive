@@ -476,7 +476,7 @@ function toRow(run: AgentSearchRun): RunInsert {
     answer: run.answer,
     cited_tweet_ids: run.citedTweetIds,
     invalid_citation_ids: run.invalidCitationIds,
-    tool_calls: run.toolCalls as Json,
+    tool_calls: run.toolCalls as NonNullable<Json>,
     input_tokens: run.inputTokens,
     output_tokens: run.outputTokens,
     cost_usd: run.costUsd,
@@ -502,7 +502,8 @@ function toRowPatch(patch: RunPatch): RunUpdate {
     row.cited_tweet_ids = patch.citedTweetIds
   if (patch.invalidCitationIds !== undefined)
     row.invalid_citation_ids = patch.invalidCitationIds
-  if (patch.toolCalls !== undefined) row.tool_calls = patch.toolCalls as Json
+  if (patch.toolCalls !== undefined)
+    row.tool_calls = patch.toolCalls as NonNullable<Json>
   if (patch.error !== undefined) row.error = patch.error
   if (patch.conversationId !== undefined)
     row.conversation_id = patch.conversationId

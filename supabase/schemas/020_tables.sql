@@ -1083,3 +1083,18 @@ REVOKE ALL ON public.account_collection_preferences FROM PUBLIC, anon, authentic
 GRANT SELECT, INSERT, UPDATE ON public.account_collection_preferences TO service_role;
 COMMENT ON TABLE public.account_collection_preferences IS
   'Owner collection preference. False discards automatic observations without deleting content or blocking owner uploads. Absent rows preserve legacy behavior.';
+
+-- Editorial directory visibility only; never changes membership or consent.
+CREATE TABLE public.directory_hidden_users (
+    visibility_key text PRIMARY KEY,
+    account_id text,
+    username text NOT NULL,
+    hidden_by uuid,
+    hidden_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT directory_hidden_users_identity CHECK (
+        username ~ '^[a-z0-9_]{1,15}$' AND
+        ((account_id IS NOT NULL AND account_id ~ '^[0-9]{1,20}$'
+          AND visibility_key = 'id:' || account_id)
+         OR (account_id IS NULL AND visibility_key = 'username:' || username))
+    )
+);

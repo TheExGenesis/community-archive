@@ -54,7 +54,8 @@
     "docker:build:process-archive": "docker build -f services/process_archive/Dockerfile -t process-archive:latest .",
     "docker:run:process-archive": "docker compose -f services/process_archive/docker-compose.yml run --rm process-archive",
     "test:security:nanoid": "node --test tests/security/nanoid-workflow-compat.test.mjs",
-    "test:security": "node --test tests/security/nanoid-workflow-compat.test.mjs tests/security/zod-compat.test.mjs tests/security/workflow-cache-boundary.mjs"
+    "test:security": "node --test tests/security/nanoid-workflow-compat.test.mjs tests/security/zod-compat.test.mjs tests/security/workflow-cache-boundary.mjs",
+    "fleet:test": "bash fleet/test/run.sh"
   },
   "dependencies": {
     "@next/bundle-analyzer": "15.5.28",

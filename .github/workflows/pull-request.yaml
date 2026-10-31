@@ -60,3 +60,8 @@ jobs:
 
       - name: Run unit and component tests
         run: pnpm test:ci
+
+      # Bash harnesses for the autonomous fleet (fleet/): shellcheck plus
+      # their tests with fake gh/claude/curl. shellcheck ships on ubuntu-latest.
+      - name: Run fleet harness tests
+        run: pnpm fleet:test

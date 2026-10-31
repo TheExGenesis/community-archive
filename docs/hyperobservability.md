@@ -2,8 +2,9 @@
 
 Goal: everything production says is readable by an agent, in text, in one
 place, with enough context to replay it. This is the first stage of the loop
-described in `memos/20261029-1830-autonomous-fleet-roadmap.md`. Phase 1 (a
-triage routine that turns signals into fix PRs) builds on the contracts here.
+described in `memos/20261029-1830-autonomous-fleet-roadmap.md` and revised in
+`memos/20261030-fleet-v2-direct-to-main-and-infra.md`. Phase 1 (the fixer
+and the canary, below) builds on the contracts here.
 
 ## The three pieces
 
@@ -177,8 +178,179 @@ Humans file the same shape through the "Production signal" issue template.
 
 ## What phase 1 adds
 
-A triage routine reads open `signal` issues every 30 minutes, dedupes
-against each other, classifies (bug / wontfix / needs-decision), and for
-Tier 0 paths starts a fix session with the issue as the brief; the fix PR
-closes the issue with `Fixes #n`. A post-deploy canary posts to
-`/api/signals/canary`. Neither exists yet.
+Two bash harnesses under `fleet/` in this repository, run by user timers on
+the `ca-fleet` host (control-panel repo, `ops/ca-fleet/`,
+`docs/ca-fleet-operations.md`). The **fixer** takes the oldest open `signal`
+or `bug` issue, has Claude Code reproduce, classify and fix it in a worktree,
+runs the CI gate, ships (a PR by default, straight to `main` once trusted),
+closes the loop on the issue and writes a learning. The **canary** fetches six
+production URLs every 15 minutes, posts a signal to `/api/signals/canary` on
+a new failure, and can roll production back to the previous Vercel
+deployment. Neither needs Method; the canary uses no LLM at all. Details in
+the next section; `fleet/README.md` has the operator reference.
+
+## Phase 1: the fixer and the canary
+
+### The fixer (`fleet/bin/fixer.sh`)
+
+One run handles one issue:
+
+1. Creates the `fleet:*` labels if missing, lists open `signal` and `bug`
+   issues with `gh issue list --json number,title,body,labels,createdAt` and
+   picks the oldest that carries none of `fleet:in-progress`,
+   `fleet:needs-decision`, `fleet:wontfix`. Empty inbox: exits 0 with
+   `outcome: idle`.
+2. Labels it `fleet:in-progress` (read back), creates a git worktree from
+   `origin/main` under the run directory with `node_modules` linked from the
+   checkout.
+3. Runs `claude -p` in that worktree with `fleet/prompts/fixer.md` plus the
+   issue body on stdin, `--output-format json`, `--max-turns 80`,
+   `--permission-mode dontAsk`, `--allowedTools` Read, Edit, Write, Grep,
+   Glob and Bash for lint/type-check/test commands and `git status|diff|log`
+   only; `git push`, `git commit`, `gh`, `curl` and web tools are disallowed.
+   The session id from the JSON result is recorded.
+4. Reads the verdict: the last fenced ` ```json ` block of the final message,
+   `{classification, summary, root_cause, fix, check_next_time, files}`.
+   - `wontfix` / `needs-decision`: comments the reasoning, swaps the label,
+     removes the worktree. Done.
+   - `bug`: stages the diff and checks it against Tier 0 (no `supabase/**`,
+     opt-in/opt-out, email, data deletion, workflows, dependency files; no
+     added service-role, consent, delete, key or email code; no renames;
+     ≤ 300 changed lines). A violation becomes a `fleet:needs-decision`
+     comment and the patch stays in the run directory.
+   - No verdict: `fleet:needs-decision` with the tail of the agent's message.
+     `is_error` from Claude (auth, API): the label is removed again and the
+     run fails, because that is our failure, not the issue's.
+5. Gate: `pnpm lint`, `pnpm type-check`, `pnpm test:security`, `pnpm test:ci`
+   in the worktree, the same four checks as CI. On failure, one
+   `claude -p --resume <session_id>` with the failing output, then the gate
+   again; a second failure is a `fleet:needs-decision` comment.
+6. Green: writes `memos/fleet/learnings/<date>-<issue>.md` (signal, root
+   cause, fix, what to check next time) into the same change, commits as
+   `[fleet:fixer] <summary> (signal #n)` with the Co-Authored-By line and
+   `--no-verify` (the pre-commit hook regenerates production types).
+   - `FLEET_MODE=pr`: pushes `fleet/fixer-<n>-<ts>`, opens a PR whose body
+     contains `Fixes #n`, comments the PR link on the issue, swaps the label
+     to `fleet:pr-open`.
+   - `FLEET_MODE=main`: `git push origin HEAD:main`, closes the issue with a
+     comment naming the commit, removes `fleet:in-progress`.
+7. Reads back with `gh` that the PR is open (or the commit is on `main`) and
+   that the issue shows the label and comment. If GitHub does not show it,
+   the run exits non-zero.
+
+A `mkdir` lock (`FLEET_LOCK_DIR`) makes a second concurrent fixer exit 0
+with `outcome: locked`; the timer on `ca-fleet` also serialises runs.
+
+### The canary (`fleet/bin/canary.sh`)
+
+Plain `curl`, no LLM. Each run fetches on `$CA_URL`:
+
+| Check                | Path                  | Accepted            | Budget |
+| -------------------- | --------------------- | ------------------- | ------ |
+| `home`               | `/`                   | 2xx                 | 5 s    |
+| `search`             | `/search`             | 2xx                 | 5 s    |
+| `user`               | `/user/<user>`        | 2xx                 | 5 s    |
+| `user_directory_api` | `/api/user-directory` | 2xx or 401 (guest)  | 3 s    |
+| `sign_in`            | `/login`              | 2xx                 | 5 s    |
+| `upload`             | `/profile`            | 2xx or 307 to login | 5 s    |
+
+Requests carry browser-like headers and the middleware's hourly `__cc`
+challenge cookie, so `src/middleware.ts` serves the page instead of the JS
+challenge. Vercel's own bot protection sits in front of the middleware and
+can still answer with `x-vercel-mitigated: challenge`; such a check is
+recorded as `inconclusive` (not a failure, no signal). Set
+`VERCEL_PROTECTION_BYPASS` to the project's protection-bypass secret to get
+through it; the same secret already protects previews.
+
+The run compares each check with the previous run's `result.json` in the runs
+directory. A check that fails now and did not fail before is a **new
+failure**; one that passes again is a **recovery**. New failures are posted
+as one request to `POST $CA_URL/api/signals/canary` with
+`Authorization: Bearer $SIGNALS_WEBHOOK_SECRET`, in the generic body shape
+above (`key: canary:<check>`, `severity: critical`, `route`, `link`,
+`details.status/time_s/budget_s/run/deployment`); recoveries are posted as
+`state: resolved` on the same key so the inbox comments on the open issue.
+
+Rollback happens only when all of these hold: `FLEET_ROLLBACK=true`, a new
+failure, `VERCEL_TOKEN` set, and the current production deployment (from
+`api.vercel.com/v6/deployments?target=production`) is newer than the one the
+last green run recorded. Then
+`npx vercel@65 rollback <previous deployment> --scope theexgenesis-projects --token "$VERCEL_TOKEN" --yes`
+restores the previous production deployment (the last green run's deployment
+when it is still listed, otherwise the newest other READY one), and a second
+signal (`key: canary:rollback:<deployment>`) says what was rolled back and
+which commit the fixer should treat as the bug.
+
+### Environment
+
+| Variable                                                                                        | Fixer | Canary | Notes                                                                           |
+| ----------------------------------------------------------------------------------------------- | ----- | ------ | ------------------------------------------------------------------------------- |
+| `FLEET_MODE`                                                                                    | ✓     |        | `pr` (default) or `main`.                                                       |
+| `FLEET_ROLLBACK`                                                                                |       | ✓      | `false` (default) or `true`.                                                    |
+| `RUN_DIR`                                                                                       | ✓     | ✓      | Default `./.fleet-runs/<UTC ts>-<name>/`. On `ca-fleet` the wrapper exports it. |
+| `GH_TOKEN`                                                                                      | ✓     |        | The per-run `FLEET_GITHUB_TOKEN` (contents + issues write, one repo).           |
+| `SIGNALS_WEBHOOK_SECRET`                                                                        |       | ✓      | Same secret the inbox route checks. Unset: signals written, not sent.           |
+| `VERCEL_TOKEN`                                                                                  |       | ✓      | Deployment listing and rollback.                                                |
+| `VERCEL_PROTECTION_BYPASS`                                                                      |       | ✓      | Optional; see above.                                                            |
+| `CA_URL`                                                                                        |       | ✓      | Default `https://www.community-archive.org`.                                    |
+| `FLEET_MAX_TURNS`, `FLEET_CLAUDE_MODEL`, `FLEET_GIT_NAME/EMAIL`, `FLEET_REPO`, `FLEET_LOCK_DIR` | ✓     |        | Tuning; see `fleet/README.md`.                                                  |
+
+Claude Code on the host authenticates with the dedicated Max login or
+`ANTHROPIC_API_KEY`; the harness passes nothing about auth.
+
+### Labels
+
+`fleet:in-progress`, `fleet:pr-open`, `fleet:wontfix`,
+`fleet:needs-decision`, created by the fixer with `gh label create` when
+missing (plus `bug` if it ever disappears). To hand an issue back to the
+fixer, remove the `fleet:*` label; to keep it away from the fixer, leave one
+on.
+
+### The run directory
+
+Every run writes `result.json` with `{outcome, issue, pr_or_commit,
+session_id, duration_s}` plus routine-specific fields, and keeps the picked
+issue, the exact `claude -p` invocations and their JSON output, every gate
+log, the staged patch, the signal bodies and responses, the rollback command
+(token redacted) and `log.txt`. `fleet/README.md` lists the files and the
+outcome values. Runs under `./.fleet-runs/` are gitignored; on `ca-fleet`
+the wrapper puts them under `~/services/ca-fleet/runs/` and rotates them
+after seven days.
+
+### Flipping the flags
+
+Both live in the host env file `/home/fleet/services/ca-fleet/env`
+(control-panel runbook `docs/ca-fleet-operations.md`), not in this repo.
+
+- `FLEET_MODE=pr` → `main`: the memo's rule is ten fleet PRs in a row that
+  needed no change. Flip the line, and the next fixer run pushes to `main`
+  and closes issues itself. Flip it back the same way; in-flight PRs are
+  unaffected.
+- `FLEET_ROLLBACK=false` → `true`: needs `VERCEL_TOKEN` in the env file with
+  deployment write access. Before flipping, check a few green canary
+  `result.json` files show a `deployment` object, since the rollback compares
+  against the last green run.
+
+### Cadence on `ca-fleet`
+
+User timers call `bin/fleet-run <name>`, which sources the env file, exports
+`RUN_DIR`, and executes `fleet/bin/<name>.sh` from the repo checkout at
+`/home/fleet/services/ca-fleet/repo`:
+
+| Routine | Timer            | Lock                                                    | Limits                     |
+| ------- | ---------------- | ------------------------------------------------------- | -------------------------- |
+| fixer   | every 10 minutes | the unit does not overlap itself; the script also locks | `MemoryMax=4G`, 90 minutes |
+| canary  | every 15 minutes | none needed                                             | 12 minutes                 |
+
+Ten minutes is the pause between issues, not a deadline: a fixer run that is
+still working holds the lock and the next tick exits with `outcome: locked`.
+Units ship disabled and the flags ship as `pr` / `false`; enabling the
+timers is a host operation.
+
+### Tests
+
+`pnpm fleet:test` runs `shellcheck` over `fleet/` and the tests in
+`fleet/test/` (issue selection, verdict parsing, read-back checks, the Tier 1
+guard, full fixer runs in both modes against a bare git remote with fake
+`gh`/`claude`/`pnpm`, and canary runs with a fake `curl`/`npx` including the
+rollback path). CI runs it in the pull-request workflow after the unit tests.

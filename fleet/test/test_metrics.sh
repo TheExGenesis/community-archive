@@ -85,18 +85,25 @@ assert_eq "$(metric "$M" 'fleet_run_total{outcome="error",routine="fixer"}')" "3
 assert_eq "$(grep -c '^fleet_run_total{' "$M")" "4" "four run_total series"
 
 # ─── 6. concurrent writers do not lose updates ──────────────────────────────
-for i in 1 2 3 4 5 6 7 8; do
-  RUN_DIR="$TMP/par$i" bash -c 'source "$1"; fleet_init_run canary; fleet_record_metrics --outcome ok' _ "$FLEET_SRC_ROOT/fleet/lib/common.sh" >/dev/null 2>&1 &
+for i in $(seq 1 16); do
+  RUN_DIR="$TMP/par$i" bash -c 'source "$1"; fleet_init_run canary; fleet_record_metrics --outcome ok' _ "$FLEET_SRC_ROOT/fleet/lib/common.sh" >"$TMP/par$i.log" 2>&1 &
 done
 wait
-assert_eq "$(metric "$M" 'fleet_run_total{outcome="ok",routine="canary"}')" "9" "eight parallel runs all counted"
+assert_eq "$(metric "$M" 'fleet_run_total{outcome="ok",routine="canary"}')" "17" "sixteen parallel runs all counted"
+assert_eq "$(cat "$TMP"/par*.log | grep -c 'not updated' || true)" "0" "no writer gave up"
 assert_eq "$(ls "$TMP/metrics")" "metrics.prom" "lock released"
+# A stale lock (dead holder) is taken over.
+echo 99999999 >"$M.lock"
+touch -t 202001010000 "$M.lock"
+fleet_record_metrics --outcome ok 2>/dev/null
+assert_eq "$(metric "$M" 'fleet_run_total{outcome="ok",routine="canary"}')" "18" "stale lock taken over"
+assert_eq "$(ls "$TMP/metrics")" "metrics.prom" "stale lock removed"
 
 # ─── 7. a corrupt line is dropped, the rest survives ────────────────────────
 echo 'garbage here' >>"$M"
 fleet_record_metrics --outcome ok 2>/dev/null
 assert_eq "$(grep -c garbage "$M")" "0" "garbage dropped on rewrite"
-assert_eq "$(metric "$M" 'fleet_run_total{outcome="ok",routine="canary"}')" "10" "counters intact"
+assert_eq "$(metric "$M" 'fleet_run_total{outcome="ok",routine="canary"}')" "19" "counters intact"
 
 # ─── 8. failure kind ────────────────────────────────────────────────────────
 assert_eq "$(fleet_failure_kind "read-back failed: PR #3 is not open")" "readback" "readback kind"

@@ -530,8 +530,9 @@ fleet_post_signal() {
 # One file, $FLEET_METRICS_FILE (runs/metrics.prom on ca-fleet), read by the
 # node exporter's textfile collector in Alloy. Every routine calls
 # fleet_record_metrics once, from its exit handler. The file is rewritten
-# whole, under a lock, to a temp file then renamed, so a scrape never sees a
-# half-written file and two routines finishing together cannot lose updates.
+# whole, under an O_EXCL lock file (metrics.prom.lock, stale after 60 s), to a
+# temp file then renamed, so a scrape never sees a half-written file and two
+# routines finishing together cannot lose updates.
 #
 # fleet_record_metrics --outcome <outcome> [--usage-file <claude-output.json>]...
 #                      [--signal-to-fix <seconds>] [--gauges <json-file>]
@@ -568,21 +569,34 @@ fleet_record_metrics() {
     usage="$(fleet_claude_usage $usage_files)"
   fi
   mkdir -p "$(dirname "$FLEET_METRICS_FILE")"
-  local lock="$FLEET_METRICS_FILE.lock" tries=0
-  until mkdir "$lock" 2>/dev/null; do
-    tries=$((tries + 1))
-    if [[ $tries -ge 100 ]]; then
-      # 10 s: whoever held it is gone or wedged; take it over.
-      rm -rf "$lock"
-      continue
-    fi
-    sleep 0.1
-  done
   local code=0
   METRICS_FILE="$FLEET_METRICS_FILE" ROUTINE="$routine" OUTCOME="$outcome" DURATION="$duration" \
     USAGE="$usage" SIGNAL_TO_FIX="$signal_to_fix" GAUGES_FILE="$gauges" \
     FAILURE_KIND="$FLEET_POSTED_FAILURE_KIND" node -e '
     const fs = require("fs"); const path = require("path"); const e = process.env;
+    // Lock: an O_EXCL file beside the metrics file, held for the read-modify-
+    // rename below. A lock older than 60 s belongs to a dead run; it is taken
+    // over by renaming it first, so only one waiter can claim a stale lock.
+    const lock = e.METRICS_FILE + ".lock";
+    const deadline = Date.now() + 20000;
+    const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+    let fd;
+    for (;;) {
+      try { fd = fs.openSync(lock, "wx"); fs.writeSync(fd, String(process.pid)); break; } catch (err) {
+        if (err.code !== "EEXIST") throw err;
+      }
+      let age = 0;
+      try { age = Date.now() - fs.statSync(lock).mtimeMs; } catch { continue; }
+      if (age > 60000) {
+        const stale = `${lock}.${process.pid}.stale`;
+        try { fs.renameSync(lock, stale); fs.unlinkSync(stale); } catch { /* someone else took it */ }
+        continue;
+      }
+      if (Date.now() > deadline) throw new Error(`metrics lock ${lock} held for 20 s`);
+      pause(20 + Math.floor(Math.random() * 40));
+    }
+    const release = () => { try { fs.closeSync(fd); } catch {} try { fs.unlinkSync(lock); } catch {} };
+    process.on("exit", release);
     const now = Math.floor(Date.now() / 1000);
     // name{labels} → value. Labels are kept as a canonical string.
     const samples = new Map();
@@ -672,7 +686,6 @@ fleet_record_metrics() {
     fs.chmodSync(tmp, 0o644);
     fs.renameSync(tmp, e.METRICS_FILE);
   ' || code=$?
-  rm -rf "$lock"
   if [[ $code -ne 0 ]]; then
     fleet_warn "fleet_record_metrics failed with $code; $FLEET_METRICS_FILE not updated"
   else

@@ -50,7 +50,7 @@ mkrun() { # <dir-name> <json>
   printf '%s\n' "$2" >"$FLEET_RUNS_DIR/$1/result.json"
 }
 mkrun 20261030T091500Z-fixer '{"outcome":"pr_opened","issue":20,"pr_or_commit":"https://github.com/o/r/pull/101","session_id":"s1","duration_s":912,"run":"fixer","finished_at":"2026-10-30T09:31:00Z","mode":"pr","classification":"bug","branch":"fleet/fixer-20-20261030091500","learning":"memos/fleet/learnings/2026-10-30-20.md","signal_to_fix_s":1140,"usage":{"cost_usd":1.25,"tokens":{"input":5000,"output":900,"cache_read":200000,"cache_creation":12000},"calls":1}}'
-mkrun 20261030T100000Z-fixer '{"outcome":"pushed_main","issue":7,"pr_or_commit":"feedfacefeedface","session_id":"s2","duration_s":600,"run":"fixer","finished_at":"2026-10-30T10:10:00Z","mode":"main","classification":"bug","learning":"memos/fleet/learnings/2026-10-30-7.md","usage":{"cost_usd":0.75,"tokens":{"input":1000,"output":100,"cache_read":1000,"cache_creation":0},"calls":2}}'
+mkrun 20261030T100000Z-fixer '{"outcome":"pushed_main","issue":7,"pr_or_commit":"feedfacefeedface","session_id":"s2","duration_s":600,"run":"fixer","finished_at":"2026-10-30T10:10:00Z","mode":"main","classification":"bug","learning":"memos/fleet/learnings/2026-10-30-7.md","run_id":"20261030T100000Z-fixer","transcript_url":"https://g.example/explore?run=20261030T100000Z-fixer","usage":{"cost_usd":0.75,"tokens":{"input":1000,"output":100,"cache_read":1000,"cache_creation":0},"calls":2}}'
 mkrun 20261030T120000Z-fixer '{"outcome":"needs_decision","issue":22,"pr_or_commit":null,"session_id":"s3","duration_s":300,"run":"fixer","finished_at":"2026-10-30T12:05:00Z","classification":"needs-decision","usage":{"cost_usd":0.2,"tokens":{"input":10,"output":10,"cache_read":0,"cache_creation":0},"calls":1}}'
 mkrun 20261030T130000Z-fixer '{"outcome":"idle","issue":null,"pr_or_commit":null,"session_id":null,"duration_s":4,"run":"fixer","finished_at":"2026-10-30T13:00:04Z"}'
 mkrun 20261030T140000Z-fixer '{"outcome":"error","issue":22,"pr_or_commit":null,"session_id":null,"duration_s":30,"run":"fixer","finished_at":"2026-10-30T14:00:30Z"}'
@@ -80,8 +80,10 @@ assert_eq "$(grep -c '#22 \[signal:posthog\]' "$D")" "0" "older signal not liste
 assert_file_contains "$D" "Open signals in total: **3**" "open signals total (10, 20, 22)"
 # Fixer runs: 5 in window, the 10-29 one excluded, idle not in the table.
 assert_file_contains "$D" "## Fixer · 5 runs (" "five fixer runs"
-assert_file_contains "$D" "| 09:31Z | [#20](https://github.com/o/r/issues/20) | pr_opened | [PR #101](https://github.com/o/r/pull/101) | [2026-10-30-20](https://github.com/o/r/blob/fleet/fixer-20-20261030091500/memos/fleet/learnings/2026-10-30-20.md) | 15m | \$1.25 |" "pr row links PR and learning on the branch"
+assert_file_contains "$D" "| 09:31Z | [#20](https://github.com/o/r/issues/20) | pr_opened | [PR #101](https://github.com/o/r/pull/101) | [2026-10-30-20](https://github.com/o/r/blob/fleet/fixer-20-20261030091500/memos/fleet/learnings/2026-10-30-20.md) | 15m | \$1.25 | \`20261030T091500Z-fixer\` |" "pr row links PR and learning on the branch, names the run without a transcript url"
 assert_file_contains "$D" "| pushed_main | [feedface](https://github.com/o/r/commit/feedfacefeedface) | [2026-10-30-7](https://github.com/o/r/blob/main/memos/fleet/learnings/2026-10-30-7.md) |" "main row links commit and learning on main"
+assert_file_contains "$D" "| \$0.75 | [transcript](https://g.example/explore?run=20261030T100000Z-fixer) |" "main row links the transcript from result.json"
+assert_file_contains "$D" "| Finished | Issue | Outcome | Shipped | Learning | Took | Cost | Run |" "run column in the fixer table"
 assert_file_contains "$D" "| needs_decision (needs-decision) | — | — |" "needs-decision row"
 assert_eq "$(grep -c '| idle |' "$D")" "0" "idle runs stay out of the table"
 assert_file_contains "$D" "opened **3** · merged **1** · closed without merge **1**" "fleet PR counts in the window (101, 102, 103 opened; 90 is older)"

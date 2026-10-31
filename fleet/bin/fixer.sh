@@ -17,6 +17,8 @@
 #                             ${TMPDIR:-/tmp}/ca-fleet-worktrees (outside the checkout:
 #                             `next lint` breaks on a nested worktree's parent .eslintrc)
 #   FLEET_MAX_CHANGED_LINES   default 300
+#   FLEET_RUNS_EXPLORE_URL    Grafana Explore link template for the run's transcript
+#                             ({run_id} is replaced); unset: comments carry no link
 set -euo pipefail
 
 FLEET_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -150,9 +152,14 @@ fleet_info "worktree $WORKTREE on $BRANCH from origin/$FLEET_BASE_BRANCH ($BASE_
 } >"$RUN_DIR/prompt.md"
 
 # ─── Claude, headless ───────────────────────────────────────────────────────
+# stream-json (which needs --verbose in print mode) gives the whole session,
+# one event per line: every assistant turn, tool call and tool result, then the
+# final result event. It is scrubbed and appended to $RUN_DIR/transcript.jsonl;
+# the result event alone is what --output-format json would have printed.
 CLAUDE_ARGS=(
   -p
-  --output-format json
+  --output-format stream-json
+  --verbose
   --max-turns "$FLEET_MAX_TURNS"
   --permission-mode dontAsk
   --allowedTools
@@ -169,6 +176,11 @@ if [[ -n "$FLEET_CLAUDE_MODEL" ]]; then
 fi
 
 # run_claude <output-file> <prompt-file> [extra args...]
+# The scrubbed event stream is appended to $RUN_DIR/transcript.jsonl (a resumed
+# call continues the same file), transcript.md is re-rendered from it, and
+# <output-file> receives this call's result event (empty when claude never
+# produced one, which fleet_parse_verdict reports as a failed run).
+TRANSCRIPT="$RUN_DIR/transcript.jsonl"
 run_claude() {
   local out="$1" prompt="$2"
   shift 2
@@ -176,13 +188,17 @@ run_claude() {
   {
     printf 'cd %q && ' "$WORKTREE"
     printf '%q ' "${cmd[@]}"
-    printf '< %q > %q\n' "$prompt" "$out"
+    printf '< %q | transcript.mjs scrub >> %q\n' "$prompt" "$TRANSCRIPT"
   } >>"$RUN_DIR/claude-invocations.txt"
   local code=0
-  (cd "$WORKTREE" && "${cmd[@]}" <"$prompt" >"$out" 2>>"$RUN_DIR/claude-stderr.txt") || code=$?
+  (cd "$WORKTREE" && "${cmd[@]}" <"$prompt" 2>>"$RUN_DIR/claude-stderr.txt" | fleet_transcript_scrub >>"$TRANSCRIPT") || code=$?
   if [[ $code -ne 0 ]]; then
     fleet_warn "claude exited with $code (see claude-stderr.txt)"
   fi
+  fleet_transcript_last_result "$TRANSCRIPT" >"$out" 2>/dev/null || true
+  fleet_transcript_render "$TRANSCRIPT" "$RUN_DIR/transcript.md" \
+    "Fleet fixer · $(basename "$RUN_DIR") · issue #$ISSUE_NUMBER" 2>/dev/null \
+    || fleet_warn "transcript.md could not be rendered"
   if [[ -s "$out" ]]; then
     SESSION_ID="$(fleet_json_get "$out" 'd.session_id' 2>/dev/null || true)"
   fi
@@ -199,15 +215,16 @@ fleet_parse_verdict "$RUN_DIR/claude-output.json" >"$VERDICT_FILE" 2>"$RUN_DIR/v
 VERDICT_CODE=$?
 set -e
 
-# comment_and_label <label> <heading> <body-file>
+# comment_and_label <label> <heading> <body-file> <outcome>
 comment_and_label() {
-  local label="$1" heading="$2" body="$3" comment="$RUN_DIR/comment.md"
+  local label="$1" heading="$2" body="$3" outcome="$4" comment="$RUN_DIR/comment.md"
   {
     echo "**[fleet:fixer] $heading**"
     echo
     cat "$body"
     echo
-    echo "_Run: \`$(basename "$RUN_DIR")\`, session \`${SESSION_ID:-none}\`._"
+    fleet_run_line "$outcome"
+    echo "_Session \`${SESSION_ID:-none}\`._"
   } >"$comment"
   fleet_issue_comment "$ISSUE_NUMBER" "$comment"
   fleet_issue_swap_label "$ISSUE_NUMBER" "$FLEET_LABEL_IN_PROGRESS" "$label"
@@ -230,7 +247,7 @@ if [[ $VERDICT_CODE -ne 0 ]]; then
     fleet_json_get "$RUN_DIR/claude-output.json" 'String(d.result||"").slice(-1500)' 2>/dev/null || echo "(no result text)"
     echo '```'
   } >"$RUN_DIR/reason.md"
-  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: no verdict" "$RUN_DIR/reason.md"
+  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: no verdict" "$RUN_DIR/reason.md" needs_decision
   OUTCOME="needs_decision"
   exit 0
 fi
@@ -252,13 +269,13 @@ verdict_as_markdown() {
 
 if [[ "$CLASSIFICATION" == "wontfix" ]]; then
   verdict_as_markdown >"$RUN_DIR/reason.md"
-  comment_and_label "$FLEET_LABEL_WONTFIX" "wontfix" "$RUN_DIR/reason.md"
+  comment_and_label "$FLEET_LABEL_WONTFIX" "wontfix" "$RUN_DIR/reason.md" wontfix
   OUTCOME="wontfix"
   exit 0
 fi
 if [[ "$CLASSIFICATION" == "needs-decision" ]]; then
   verdict_as_markdown >"$RUN_DIR/reason.md"
-  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision" "$RUN_DIR/reason.md"
+  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision" "$RUN_DIR/reason.md" needs_decision
   OUTCOME="needs_decision"
   exit 0
 fi
@@ -269,7 +286,7 @@ git -C "$WORKTREE" diff --cached >"$RUN_DIR/fix.patch"
 if git -C "$WORKTREE" diff --cached --quiet; then
   echo "Classified as a bug but changed no files. A human has to look." >"$RUN_DIR/reason.md"
   verdict_as_markdown >>"$RUN_DIR/reason.md"
-  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: bug without a change" "$RUN_DIR/reason.md"
+  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: bug without a change" "$RUN_DIR/reason.md" needs_decision
   OUTCOME="needs_decision"
   exit 0
 fi
@@ -290,7 +307,7 @@ if [[ -n "$VIOLATIONS" ]]; then
     echo
     echo "The patch is in the run directory (\`fix.patch\`)."
   } >"$RUN_DIR/reason.md"
-  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: outside Tier 0" "$RUN_DIR/reason.md"
+  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: outside Tier 0" "$RUN_DIR/reason.md" needs_decision
   OUTCOME="needs_decision"
   exit 0
 fi
@@ -370,7 +387,7 @@ if [[ $GATE_OK -ne 1 ]]; then
     echo
     echo "The patch is in the run directory (\`fix.patch\`)."
   } >"$RUN_DIR/reason.md"
-  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: gate failed" "$RUN_DIR/reason.md"
+  comment_and_label "$FLEET_LABEL_NEEDS_DECISION" "needs a decision: gate failed" "$RUN_DIR/reason.md" gate_failed
   OUTCOME="gate_failed"
   exit 0
 fi
@@ -383,7 +400,7 @@ mkdir -p "$WORKTREE/$(dirname "$LEARNING")"
   echo
   echo "- Date: $(fleet_ts)"
   echo "- Issue: https://github.com/$FLEET_REPO/issues/$ISSUE_NUMBER"
-  echo "- Run: \`$(basename "$RUN_DIR")\`, session \`${SESSION_ID:-none}\`"
+  echo "- Run: \`$(basename "$RUN_DIR")\`, session \`${SESSION_ID:-none}\`$(url="$(fleet_run_transcript_url "$(basename "$RUN_DIR")")"; [[ -n "$url" ]] && echo ", [transcript]($url)")"
   echo
   echo "## Signal"
   echo
@@ -448,8 +465,10 @@ if [[ "$FLEET_MODE" == "pr" ]]; then
     fleet_json_get "$VERDICT_FILE" 'd.fix || "(see summary)"'
     echo
     echo
-    echo "Gate: lint, type-check, security tests and unit tests passed locally (\`$(basename "$RUN_DIR")\`)."
+    echo "Gate: lint, type-check, security tests and unit tests passed locally."
     echo "Learning: \`$LEARNING\`."
+    echo
+    fleet_run_line pr_opened
     echo
     echo "🤖 Generated with [Claude Code](https://claude.com/claude-code) by the fleet fixer"
   } >"$RUN_DIR/pr-body.md"
@@ -459,7 +478,7 @@ if [[ "$FLEET_MODE" == "pr" ]]; then
   REF="$PR_URL"
   fleet_info "opened PR $PR_URL"
   printf 'The fixer opened %s for this issue.\n' "$PR_URL" >"$RUN_DIR/reason.md"
-  comment_and_label "$FLEET_LABEL_PR_OPEN" "PR opened" "$RUN_DIR/reason.md"
+  comment_and_label "$FLEET_LABEL_PR_OPEN" "PR opened" "$RUN_DIR/reason.md" pr_opened
   fleet_readback_pr "$PR_NUMBER" || fleet_die "read-back failed: PR #$PR_NUMBER is not open on GitHub"
   OUTCOME="pr_opened"
 else
@@ -472,7 +491,8 @@ else
     echo
     echo "$SUMMARY"
     echo
-    echo "_Run: \`$(basename "$RUN_DIR")\`, session \`${SESSION_ID:-none}\`._"
+    fleet_run_line pushed_main
+    echo "_Session \`${SESSION_ID:-none}\`._"
   } >"$RUN_DIR/comment.md"
   gh issue close "$ISSUE_NUMBER" --repo "$FLEET_REPO" --comment "$(cat "$RUN_DIR/comment.md")" >/dev/null
   fleet_issue_remove_label "$ISSUE_NUMBER" "$FLEET_LABEL_IN_PROGRESS"

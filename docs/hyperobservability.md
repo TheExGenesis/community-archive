@@ -204,11 +204,14 @@ One run handles one issue:
    `origin/main` under the run directory with `node_modules` linked from the
    checkout.
 3. Runs `claude -p` in that worktree with `fleet/prompts/fixer.md` plus the
-   issue body on stdin, `--output-format json`, `--max-turns 80`,
-   `--permission-mode dontAsk`, `--allowedTools` Read, Edit, Write, Grep,
-   Glob and Bash for lint/type-check/test commands and `git status|diff|log`
-   only; `git push`, `git commit`, `gh`, `curl` and web tools are disallowed.
-   The session id from the JSON result is recorded.
+   issue body on stdin, `--output-format stream-json --verbose`,
+   `--max-turns 80`, `--permission-mode dontAsk`, `--allowedTools` Read,
+   Edit, Write, Grep, Glob and Bash for lint/type-check/test commands and
+   `git status|diff|log` only; `git push`, `git commit`, `gh`, `curl` and web
+   tools are disallowed. The event stream (every assistant turn, tool call
+   and tool result) is scrubbed of secrets and appended to
+   `$RUN_DIR/transcript.jsonl`, rendered to `transcript.md`, and its final
+   `result` event (session id, cost, tokens) is kept as `claude-output.json`.
 4. Reads the verdict: the last fenced ` ```json ` block of the final message,
    `{classification, summary, root_cause, fix, check_next_time, files}`.
    - `wontfix` / `needs-decision`: comments the reasoning, swaps the label,
@@ -240,6 +243,24 @@ One run handles one issue:
 
 A `mkdir` lock (`FLEET_LOCK_DIR`) makes a second concurrent fixer exit 0
 with `outcome: locked`; the timer on `ca-fleet` also serialises runs.
+
+**Reading a run.** Each run's `result.json` names the issue (`issue_url`,
+`signal_fingerprint`), what shipped (`pr_url` or `commit_url`,
+`learning_path`), the transcript (`transcript_path`, `transcript_url`) and
+what it cost (`cost_usd`, `tokens`, `calls`); `fleet/README.md` lists the
+fields. The harness then writes `loki.jsonl`, which Alloy on `ca-fleet` ships
+to Grafana Cloud Loki with labels `routine`, `issue`, `outcome`, `run_id`
+and `file`, so the Fleet dashboard's "Runs" row lists every run with links to
+its issue, PR and transcript, and Explore shows a whole run with
+`{job="fleet-runs", run_id="<run id>"}`. The fixer's issue comments and PR
+bodies end with a Run line (run id, outcome, duration, cost, transcript
+link when `FLEET_RUNS_EXPLORE_URL` is set). Before Grafana is wired, or on
+the host, `fleet/bin/runs.sh list` and `fleet/bin/runs.sh show <run-id>`
+print the same from the runs directory. Transcripts hold code and issue text,
+never secrets (`fleet/lib/transcript.mjs scrub`), and never enter this
+public repository; they live seven days on the host and as long as Loki
+keeps them. Operator steps: control-panel `docs/ca-fleet-operations.md`,
+section "Reading a run".
 
 ### The canary (`fleet/bin/canary.sh`)
 

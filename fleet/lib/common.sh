@@ -15,7 +15,10 @@ export FLEET_LIB_DIR FLEET_ROOT
 : "${FLEET_REPO:=TheExGenesis/community-archive}"
 : "${CA_URL:=https://www.community-archive.org}"
 : "${FLEET_RUNS_DIR:=$FLEET_ROOT/.fleet-runs}"
-export FLEET_REPO CA_URL FLEET_RUNS_DIR
+# Grafana Explore deep link to a run's transcript in Loki; `{run_id}` is
+# replaced with the run id. Empty: comments and PR bodies carry no link.
+: "${FLEET_RUNS_EXPLORE_URL:=}"
+export FLEET_REPO CA_URL FLEET_RUNS_DIR FLEET_RUNS_EXPLORE_URL
 
 FLEET_LABEL_IN_PROGRESS="fleet:in-progress"
 FLEET_LABEL_PR_OPEN="fleet:pr-open"
@@ -75,16 +78,44 @@ fleet_duration_s() {
   echo $(($(date +%s) - FLEET_RUN_STARTED_EPOCH))
 }
 
+# fleet_fmt_duration <seconds> : 42s, 12m 3s, 1h 30m
+fleet_fmt_duration() {
+  local s="${1:-0}"
+  if ((s < 60)); then
+    printf '%ds' "$s"
+  elif ((s < 3600)); then
+    printf '%dm %ds' "$((s / 60))" "$((s % 60))"
+  else
+    printf '%dh %dm' "$((s / 3600))" "$((s % 3600 / 60))"
+  fi
+}
+
 # fleet_write_result <outcome> <issue|null> <pr_or_commit|null> <session_id|null> [extra-json-file]
-# Writes $RUN_DIR/result.json: {outcome, issue, pr_or_commit, session_id, duration_s, ...extra}.
+# Writes $RUN_DIR/result.json: {outcome, issue, pr_or_commit, session_id, duration_s, ...extra}
+# plus what links the run to its context and evidence: run_id, issue_url,
+# signal_fingerprint (from $RUN_DIR/issue.json), pr_url or commit_url (from
+# pr_or_commit), learning_path (from extra.learning), transcript_path,
+# transcript_url (FLEET_RUNS_EXPLORE_URL) and, when $RUN_DIR/transcript.jsonl
+# exists, cost_usd, tokens{input,output,cache_read,cache_creation} and calls
+# summed over every claude -p call of the run. Then writes $RUN_DIR/loki.jsonl
+# (fleet_write_run_export) for Alloy to ship.
 fleet_write_result() {
   local outcome="$1" issue="${2:-}" ref="${3:-}" session="${4:-}" extra="${5:-}"
-  local duration
+  local duration summary="" fingerprint=""
   duration="$(fleet_duration_s)"
+  if [[ -s "$RUN_DIR/transcript.jsonl" ]]; then
+    summary="$(fleet_transcript_summary "$RUN_DIR/transcript.jsonl" 2>/dev/null || true)"
+  fi
+  if [[ -s "$RUN_DIR/issue.json" ]]; then
+    fingerprint="$(fleet_signal_fingerprint "$RUN_DIR/issue.json" 2>/dev/null || true)"
+  fi
   OUTCOME="$outcome" ISSUE="$issue" REF="$ref" SESSION="$session" DURATION="$duration" \
     EXTRA_FILE="$extra" RUN_NAME="${FLEET_RUN_NAME:-}" OUT="$RUN_DIR/result.json" \
+    RUN_DIR_PATH="$RUN_DIR" REPO="$FLEET_REPO" SUMMARY="$summary" FINGERPRINT="$fingerprint" \
+    TRANSCRIPT_URL="$(fleet_run_transcript_url "$(basename "$RUN_DIR")")" \
     node -e '
       const fs = require("fs");
+      const path = require("path");
       const e = process.env;
       const numOrNull = (v) => (v && /^\d+$/.test(v) ? Number(v) : null);
       const strOrNull = (v) => (v ? v : null);
@@ -92,19 +123,40 @@ fleet_write_result() {
       if (e.EXTRA_FILE && fs.existsSync(e.EXTRA_FILE)) {
         extra = JSON.parse(fs.readFileSync(e.EXTRA_FILE, "utf8"));
       }
+      let summary = null;
+      try { summary = e.SUMMARY ? JSON.parse(e.SUMMARY) : null; } catch { summary = null; }
+      const issue = numOrNull(e.ISSUE);
+      const ref = strOrNull(e.REF);
+      const isPr = ref && /\/pull\/\d+$/.test(ref);
+      const isSha = ref && /^[0-9a-f]{7,40}$/.test(ref);
+      const startedFile = path.join(e.RUN_DIR_PATH, "started_at");
+      const transcript = path.join(e.RUN_DIR_PATH, "transcript.jsonl");
       const result = {
         outcome: e.OUTCOME,
-        issue: numOrNull(e.ISSUE),
-        pr_or_commit: strOrNull(e.REF),
-        session_id: strOrNull(e.SESSION),
+        issue,
+        pr_or_commit: ref,
+        session_id: strOrNull(e.SESSION) || (summary && summary.session_id) || null,
         duration_s: Number(e.DURATION),
         run: e.RUN_NAME || null,
+        run_id: path.basename(e.RUN_DIR_PATH),
+        started_at: fs.existsSync(startedFile) ? fs.readFileSync(startedFile, "utf8").trim() || null : null,
         finished_at: new Date().toISOString(),
+        issue_url: issue ? `https://github.com/${e.REPO}/issues/${issue}` : null,
+        signal_fingerprint: strOrNull(e.FINGERPRINT),
+        pr_url: isPr ? ref : null,
+        commit_url: isSha ? `https://github.com/${e.REPO}/commit/${ref}` : null,
+        learning_path: typeof extra.learning === "string" && extra.learning ? extra.learning : null,
+        transcript_path: fs.existsSync(transcript) ? transcript : null,
+        transcript_url: strOrNull(e.TRANSCRIPT_URL),
+        cost_usd: summary ? summary.cost_usd : null,
+        tokens: summary ? summary.tokens : null,
+        calls: summary ? summary.calls : 0,
         ...extra,
       };
       fs.writeFileSync(e.OUT, JSON.stringify(result, null, 2) + "\n");
     '
   fleet_info "result: outcome=$outcome issue=${issue:-none} ref=${ref:-none} duration_s=$duration"
+  fleet_write_run_export || fleet_warn "run export for Loki not written"
 }
 
 # fleet_previous_result <name> : path of the newest other run's result.json for <name>, or nothing.
@@ -386,4 +438,147 @@ fleet_acquire_lock() {
 
 fleet_release_lock() {
   rm -rf "$1"
+}
+
+# ─── Transcripts (claude -p --output-format stream-json) ───────────────────
+# The fixer pipes claude's stdout through fleet_transcript_scrub into
+# $RUN_DIR/transcript.jsonl (every call of the run, resumes appended) and
+# renders $RUN_DIR/transcript.md from it. fleet/lib/transcript.mjs does the
+# work; these are the bash faces of its subcommands.
+
+# fleet_transcript_scrub : stdin → stdout, one stream-json event per line, secrets redacted.
+fleet_transcript_scrub() {
+  node "$FLEET_LIB_DIR/transcript.mjs" scrub
+}
+
+# fleet_transcript_render <transcript.jsonl> <out.md> [title]
+fleet_transcript_render() {
+  FLEET_TRANSCRIPT_TITLE="${3:-Fleet transcript · $(basename "${RUN_DIR:-run}")}" \
+    node "$FLEET_LIB_DIR/transcript.mjs" render "$1" "$2"
+}
+
+# fleet_transcript_summary <transcript.jsonl> : JSON {session_id, model, calls, num_turns,
+# duration_ms, cost_usd, tokens{input,output,cache_read,cache_creation}, is_error, result}.
+fleet_transcript_summary() {
+  node "$FLEET_LIB_DIR/transcript.mjs" summary "$1"
+}
+
+# fleet_transcript_last_result <transcript.jsonl> : the last `result` event as one JSON
+# object (the shape `--output-format json` prints), or nothing when the call never finished.
+fleet_transcript_last_result() {
+  node "$FLEET_LIB_DIR/transcript.mjs" result "$1"
+}
+
+# fleet_signal_fingerprint <issue.json> : the signal fingerprint of an inbox issue,
+# from the `<!-- fp:… -->` marker the signal inbox writes, else from the
+# `fingerprint` field of the fenced ```json signal block. Prints nothing when absent.
+fleet_signal_fingerprint() {
+  FILE="$1" node -e '
+    const fs = require("fs");
+    const d = JSON.parse(fs.readFileSync(process.env.FILE, "utf8"));
+    const body = String(d.body || "");
+    const marker = body.match(/\bfp:([0-9a-f]{12})\b/);
+    if (marker) { process.stdout.write(marker[1]); process.exit(0); }
+    const block = body.match(/```json signal\s*\n([\s\S]*?)\n\s*```/);
+    if (block) {
+      try {
+        const v = JSON.parse(block[1]);
+        if (v && typeof v.fingerprint === "string" && v.fingerprint) process.stdout.write(v.fingerprint);
+      } catch {}
+    }
+  '
+}
+
+# fleet_run_transcript_url <run-id> : FLEET_RUNS_EXPLORE_URL with {run_id} filled in, or nothing.
+fleet_run_transcript_url() {
+  [[ -n "$FLEET_RUNS_EXPLORE_URL" ]] || return 0
+  printf '%s' "${FLEET_RUNS_EXPLORE_URL//\{run_id\}/$1}"
+}
+
+# fleet_run_line <outcome> : one markdown line for issue comments and PR bodies:
+# run id, outcome, duration so far, Claude cost so far and, when
+# FLEET_RUNS_EXPLORE_URL is set, the Grafana Explore link to the transcript.
+fleet_run_line() {
+  local outcome="$1" run_id cost="" url
+  run_id="$(basename "${RUN_DIR:-unknown}")"
+  if [[ -s "${RUN_DIR:-}/transcript.jsonl" ]]; then
+    cost="$(fleet_transcript_summary "$RUN_DIR/transcript.jsonl" 2>/dev/null \
+      | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{try{const v=JSON.parse(s);process.stdout.write("$"+Number(v.cost_usd||0).toFixed(2))}catch{}})' || true)"
+  fi
+  url="$(fleet_run_transcript_url "$run_id")"
+  local line took
+  took="$(fleet_fmt_duration "$(fleet_duration_s)")"
+  line="_Run \`$run_id\` · outcome \`$outcome\` · $took"
+  [[ -n "$cost" ]] && line="$line · $cost"
+  if [[ -n "$url" ]]; then
+    line="$line · [transcript]($url)"
+  else
+    line="$line · transcript in the run directory"
+  fi
+  printf '%s_\n' "$line"
+}
+
+# fleet_write_run_export : writes $RUN_DIR/loki.jsonl, what Alloy on ca-fleet
+# ships to Loki (control-panel ops/monitoring/alloy/config-fleet.alloy): one
+# JSON object per line, {ts, routine, issue, outcome, run_id, file, line}, for
+# result.json (as one compact line), log.txt, transcript.md and
+# transcript.jsonl. Written once, after result.json, so every line carries the
+# run's outcome. Lines over 128 KiB are cut (Loki rejects whole batches over
+# its line limit). Timestamps: the event's own for transcript.jsonl, otherwise
+# spread evenly between started_at and finished_at so Explore shows the run
+# in order.
+fleet_write_run_export() {
+  [[ -n "${RUN_DIR:-}" && -s "$RUN_DIR/result.json" ]] || return 0
+  RUN_DIR_PATH="$RUN_DIR" node -e '
+    const fs = require("fs"); const path = require("path");
+    const dir = process.env.RUN_DIR_PATH;
+    const result = JSON.parse(fs.readFileSync(path.join(dir, "result.json"), "utf8"));
+    const labels = {
+      routine: String(result.run || path.basename(dir).replace(/^[0-9TZ]+-/, "")),
+      issue: result.issue == null ? "" : String(result.issue),
+      outcome: String(result.outcome || ""),
+      run_id: result.run_id || path.basename(dir),
+    };
+    const start = Date.parse(result.started_at) || Date.now();
+    const end = Math.max(Date.parse(result.finished_at) || Date.now(), start + 1);
+    const MAX = 128 * 1024;
+    const cut = (s) => (s.length > MAX ? s.slice(0, MAX) + " …[cut by fleet_write_run_export]" : s);
+    const out = [];
+    const emit = (file, line, ts) => out.push(JSON.stringify({ ts: new Date(ts).toISOString(), ...labels, file, line: cut(line) }));
+    emit("result.json", JSON.stringify(result), end);
+    for (const file of ["log.txt", "transcript.md", "transcript.jsonl"]) {
+      const p = path.join(dir, file);
+      if (!fs.existsSync(p)) continue;
+      const lines = fs.readFileSync(p, "utf8").split("\n");
+      while (lines.length && lines[lines.length - 1] === "") lines.pop();
+      const step = lines.length > 1 ? (end - start) / (lines.length - 1) : 0;
+      let stamps = lines.map((_, i) => start + step * i);
+      if (file === "transcript.jsonl") {
+        // Events carry their own timestamps (not every one: init does not);
+        // an event without one sits just after the previous, or just before
+        // the first one that has it.
+        const own = lines.map((line) => { try { const t = Date.parse(JSON.parse(line).timestamp); return Number.isFinite(t) ? t : null; } catch { return null; } });
+        if (own.some((t) => t !== null)) {
+          const firstKnown = own.find((t) => t !== null);
+          let prev = null;
+          stamps = own.map((t, i) => {
+            if (t !== null) { prev = t; return t; }
+            if (prev === null) return firstKnown - (own.slice(i).findIndex((x) => x !== null));
+            prev += 1;
+            return prev;
+          });
+        }
+      }
+      let last = 0;
+      lines.forEach((line, i) => {
+        let ts = stamps[i];
+        if (ts <= last) ts = last + 1;
+        last = ts;
+        emit(file, line, ts);
+      });
+    }
+    const tmp = path.join(dir, ".loki.jsonl.tmp");
+    fs.writeFileSync(tmp, out.join("\n") + "\n");
+    fs.renameSync(tmp, path.join(dir, "loki.jsonl"));
+  '
 }

@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Fake `claude` for fleet tests.
 #   FAKE_CLAUDE_LOG      every invocation (args) appended here; stdin saved next to it
-#   FAKE_CLAUDE_OUTPUT   file printed on the first call
+#   FAKE_CLAUDE_OUTPUT   file with the canned `result` object printed on the first call
 #   FAKE_CLAUDE_OUTPUT_2 file printed when --resume is present (defaults to FAKE_CLAUDE_OUTPUT)
 #   FAKE_CLAUDE_EDITS    bash snippet run in the cwd before answering (the "fix")
 #   FAKE_CLAUDE_EDITS_2  same, for the resumed call
+#   FAKE_CLAUDE_LEAK     text put into a tool result of the stream (to test scrubbing)
+# With --output-format stream-json the canned result object becomes a short
+# event stream (init, an assistant turn with a Read tool call, its result, the
+# final assistant text, the result event); with --output-format json the
+# object is printed as is.
 set -euo pipefail
 : "${FAKE_CLAUDE_LOG:?FAKE_CLAUDE_LOG must be set}"
 printf '%q ' "$@" >>"$FAKE_CLAUDE_LOG"
@@ -13,12 +18,50 @@ n="$(grep -c . "$FAKE_CLAUDE_LOG")"
 cat >"$FAKE_CLAUDE_LOG.prompt-$n"
 
 resumed=0
-for a in "$@"; do [[ "$a" == "--resume" ]] && resumed=1; done
+stream=0
+prev=""
+for a in "$@"; do
+  [[ "$a" == "--resume" ]] && resumed=1
+  [[ "$prev" == "--output-format" && "$a" == "stream-json" ]] && stream=1
+  prev="$a"
+done
 
 if [[ $resumed -eq 1 ]]; then
   [[ -n "${FAKE_CLAUDE_EDITS_2:-}" ]] && bash -c "$FAKE_CLAUDE_EDITS_2"
-  cat "${FAKE_CLAUDE_OUTPUT_2:-$FAKE_CLAUDE_OUTPUT}"
+  output="${FAKE_CLAUDE_OUTPUT_2:-$FAKE_CLAUDE_OUTPUT}"
 else
   [[ -n "${FAKE_CLAUDE_EDITS:-}" ]] && bash -c "$FAKE_CLAUDE_EDITS"
-  cat "$FAKE_CLAUDE_OUTPUT"
+  output="$FAKE_CLAUDE_OUTPUT"
 fi
+
+if [[ $stream -eq 0 ]]; then
+  cat "$output"
+  exit 0
+fi
+
+OUT="$output" RESUMED="$resumed" LEAK="${FAKE_CLAUDE_LEAK:-}" node -e '
+  const fs = require("fs");
+  const e = process.env;
+  const result = JSON.parse(fs.readFileSync(e.OUT, "utf8"));
+  const sid = result.session_id || "fake-session";
+  const ts = (i) => new Date(Date.UTC(2026, 9, 30, 12, 0, i)).toISOString();
+  const line = (o) => process.stdout.write(JSON.stringify(o) + "\n");
+  line({ type: "system", subtype: "init", session_id: sid, model: "fake-model", cwd: process.cwd(), tools: ["Read", "Edit"], permissionMode: "dontAsk" });
+  if (result.is_error) {
+    line({ type: "assistant", session_id: sid, timestamp: ts(1), error: "authentication_failed",
+      message: { role: "assistant", content: [{ type: "text", text: String(result.result || "error") }] } });
+    line({ ...result, type: "result" });
+    process.exit(0);
+  }
+  line({ type: "assistant", session_id: sid, timestamp: ts(1), message: { role: "assistant", content: [
+    { type: "text", text: e.RESUMED === "1" ? "Looking at the gate failure." : "Let me look at the file." },
+    { type: "tool_use", id: "toolu_01", name: "Read", input: { file_path: "src/foo.ts" } },
+  ] } });
+  line({ type: "user", session_id: sid, timestamp: ts(2), message: { role: "user", content: [
+    { type: "tool_result", tool_use_id: "toolu_01", content: "export const answer = 41\n" + (e.LEAK ? e.LEAK + "\n" : "") },
+  ] } });
+  line({ type: "assistant", session_id: sid, timestamp: ts(3), message: { role: "assistant", content: [
+    { type: "text", text: String(result.result || "") },
+  ] } });
+  line({ ...result, type: "result" });
+'

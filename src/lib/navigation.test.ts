@@ -55,6 +55,7 @@ describe('site navigation', () => {
         ['Strands', '/strands'],
       ],
       'Explore archive': [
+        ['Ask the archive', '/search/ask'],
         ['Explore by user', '/user-dir'],
         ['Live Stream', '/stream'],
         ['Trends', '/trends'],

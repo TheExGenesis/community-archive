@@ -1,0 +1,781 @@
+import 'server-only'
+import { randomUUID } from 'crypto'
+import {
+  appendFile,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from 'fs/promises'
+import path from 'path'
+import type { Database, Json } from '@/database-types'
+import { createServerServiceRoleClient } from '@/utils/supabase'
+import { startOfUtcDay, startOfUtcMonth } from './day'
+import type { KeySource } from './ownKey'
+import type { AgentSearchRun } from './types'
+
+export const MAX_CONVERSATION_RUNS = 50
+
+/** Tokens and spend to add to a run; every field is an increment. */
+export interface RunUsageDelta {
+  inputTokens?: number
+  outputTokens?: number
+  costUsd?: number
+}
+
+/** One planner call, as the local call log keeps it. */
+export interface ModelCallLogEntry {
+  at: string
+  model: string
+  ms: number
+  finishReason?: string
+  inputTokens: number
+  cachedInputTokens: number
+  outputTokens: number
+  reasoningTokens?: number
+  /** From our price table; what the run's cost and the daily cap count. */
+  estimatedCostUsd: number
+  /** OpenRouter only: the upstream provider that served the call. */
+  servedBy?: string
+  /** OpenRouter only: what it actually charged. */
+  providerCostUsd?: number
+  /** Paid with the member's own key, so not counted in the run's cost. */
+  ownKey?: boolean
+}
+
+/** Fields only addUsage may change, so a status patch never resets spend. */
+type UsageFields = 'inputTokens' | 'outputTokens' | 'costUsd'
+export type RunPatch = Partial<Omit<AgentSearchRun, UsageFields | 'id'>>
+
+/** A question asking to start, with the limits it must fit under. */
+export interface AdmissionRequest {
+  runId: string
+  accountId: string
+  conversationId: string
+  question: string
+  model: string
+  /**
+   * Who pays for the planner. A house question counts against the member's
+   * house questions today; an own-key question against all their questions
+   * today, under its own, higher daily limit.
+   */
+  keySource: KeySource
+  /** The limit for this question's key source. */
+  dailyLimit: number
+  /** The monthly limit for this question's key source, counted the same way. */
+  monthlyLimit: number
+  globalDailyUsd: number
+  /** A running run older than this no longer blocks a new one. */
+  staleRunMs: number
+  /** The file store's clock; the Supabase store uses the database's. */
+  now?: Date
+}
+
+export type AdmissionResult =
+  | 'ok'
+  | 'not_found'
+  | 'daily_limit'
+  | 'monthly_limit'
+  | 'run_in_progress'
+  | 'global_budget'
+
+export interface AgentSearchRunStore {
+  create(run: AgentSearchRun): Promise<void>
+  update(id: string, patch: RunPatch): Promise<void>
+  /** Adds to the run's tokens and cost in one atomic write. */
+  addUsage(id: string, delta: RunUsageDelta): Promise<void>
+  /**
+   * Checks the conversation's owner, the member's daily count and running
+   * run, and the global daily spend, and on 'ok' inserts the run as running,
+   * all as one step: two requests can never both take the last slot.
+   */
+  admit(request: AdmissionRequest): Promise<AdmissionResult>
+  get(id: string): Promise<AgentSearchRun | null>
+  /** The member's runs since then; only house-paid ones when asked. */
+  countSince(
+    accountId: string,
+    sinceIso: string,
+    keySource?: KeySource,
+  ): Promise<number>
+  /** The member's runs still marked running, whatever their age. */
+  listRunning(accountId: string): Promise<AgentSearchRun[]>
+  costSince(sinceIso: string): Promise<number>
+  /** The member's runs, newest first, for the history list. */
+  listRecent(accountId: string, limit: number): Promise<AgentSearchRun[]>
+  /**
+   * One conversation's newest MAX_CONVERSATION_RUNS runs, oldest first, for
+   * any account.
+   */
+  listConversation(conversationId: string): Promise<AgentSearchRun[]>
+  /**
+   * Appends one planner call to a log beside the run, for comparing models
+   * in development. Only the file store keeps it (`<id>.calls.jsonl`).
+   */
+  logModelCall?(id: string, entry: ModelCallLogEntry): Promise<void>
+  /**
+   * Deletes what the member asked and was answered in one conversation of
+   * theirs, keeping each run's accounting (when it ran, its status, tokens,
+   * cost, who paid) so deleting never frees a question or spend. Deleted
+   * runs drop out of lists and conversations. Returns how many it cleared.
+   */
+  deleteConversation(accountId: string, conversationId: string): Promise<number>
+  /** The same for every conversation of the member's. */
+  deleteAllConversations(accountId: string): Promise<number>
+}
+
+/** What deleting a run clears: everything the member wrote or was shown. */
+const CONTENT_FIELDS = [
+  'question',
+  'answer',
+  'parts',
+  'citedTweetIds',
+  'invalidCitationIds',
+  'toolCalls',
+  'error',
+] as const satisfies readonly (keyof AgentSearchRun)[]
+
+function clearedContent(deletedAt: string) {
+  return {
+    question: '',
+    answer: null,
+    parts: null,
+    citedTweetIds: [],
+    invalidCitationIds: [],
+    toolCalls: [],
+    error: null,
+    deletedAt,
+  } satisfies Partial<AgentSearchRun>
+}
+
+/** A patch without the content fields, for a run already deleted. */
+function withoutContent<T extends Partial<AgentSearchRun>>(patch: T): T {
+  const rest = { ...patch }
+  for (const field of CONTENT_FIELDS) delete rest[field]
+  return rest
+}
+
+type RunRow = Database['public']['Tables']['agent_search_runs']['Row']
+type RunInsert = Database['public']['Tables']['agent_search_runs']['Insert']
+type RunUpdate = Database['public']['Tables']['agent_search_runs']['Update']
+
+const DEFAULT_RUN_DIR = path.join(process.cwd(), '.agent-search-runs')
+
+// Workflow run ids are short alphanumeric tokens. Anything else would let a
+// caller-supplied id escape the run directory, so refuse it outright.
+const RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,200}$/
+
+function assertRunId(id: string) {
+  if (!RUN_ID_PATTERN.test(id)) throw new Error('Invalid agent search run id')
+}
+
+const usageInt = (value: number | undefined) =>
+  Number.isFinite(value) && (value as number) > 0 ? Math.round(value!) : 0
+const usageUsd = (value: number | undefined) =>
+  Number.isFinite(value) && (value as number) > 0 ? value! : 0
+const roundUsd = (value: number) => Math.round(value * 1e6) / 1e6
+
+// Not a valid run id, so it can never collide with a run's own lock.
+const ADMISSION_LOCK = ':admission'
+
+/** A new run as admission inserts it. */
+export function newRunRecord(
+  request: AdmissionRequest,
+  startedAt: string,
+): AgentSearchRun {
+  return {
+    id: request.runId,
+    workflowRunId: null,
+    accountId: request.accountId,
+    conversationId: request.conversationId,
+    question: request.question,
+    status: 'running',
+    model: request.model,
+    startedAt,
+    completedAt: null,
+    answer: null,
+    citedTweetIds: [],
+    invalidCitationIds: [],
+    toolCalls: [],
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+    error: null,
+    keySource: request.keySource,
+  }
+}
+
+const keySourceOf = (run: Pick<AgentSearchRun, 'keySource'>): KeySource =>
+  run.keySource ?? 'house'
+
+/** The admission rules, shared by the file store and its tests. */
+export function admissionDecision(
+  runs: AgentSearchRun[],
+  request: AdmissionRequest,
+  now: Date,
+): AdmissionResult {
+  const since = Date.parse(startOfUtcDay(now))
+  const staleCutoff = now.getTime() - request.staleRunMs
+  const own = runs.filter((run) => run.accountId === request.accountId)
+  if (
+    runs.some(
+      (run) =>
+        run.conversationId === request.conversationId &&
+        run.accountId !== request.accountId,
+    )
+  ) {
+    return 'not_found'
+  }
+  const today = own.filter(
+    (run) =>
+      Date.parse(run.startedAt) >= since &&
+      (request.keySource === 'own' || keySourceOf(run) === 'house'),
+  )
+  if (today.length >= request.dailyLimit) return 'daily_limit'
+  // Deleted runs keep their accounting, so they still count here.
+  const monthStart = Date.parse(startOfUtcMonth(now))
+  const thisMonth = own.filter(
+    (run) =>
+      Date.parse(run.startedAt) >= monthStart &&
+      (request.keySource === 'own' || keySourceOf(run) === 'house'),
+  )
+  if (thisMonth.length >= request.monthlyLimit) return 'monthly_limit'
+  if (
+    own.some(
+      (run) =>
+        run.status === 'running' && Date.parse(run.startedAt) > staleCutoff,
+    )
+  ) {
+    return 'run_in_progress'
+  }
+  const spent = runs
+    .filter((run) => Date.parse(run.startedAt) >= since)
+    .reduce((sum, run) => sum + (Number(run.costUsd) || 0), 0)
+  if (spent >= request.globalDailyUsd) return 'global_budget'
+  return 'ok'
+}
+
+/**
+ * One JSON file per run. Used in development and tests so local work never
+ * writes production Supabase.
+ */
+export function createFileRunStore(
+  dir: string = DEFAULT_RUN_DIR,
+): AgentSearchRunStore {
+  // Serialize read-modify-write per run so concurrent patches from one
+  // process (stream progress plus completion) do not overwrite each other.
+  const queues = new Map<string, Promise<unknown>>()
+
+  const fileFor = (id: string) => {
+    assertRunId(id)
+    return path.join(dir, `${id}.json`)
+  }
+
+  const withLock = <T>(id: string, task: () => Promise<T>): Promise<T> => {
+    const previous = queues.get(id) ?? Promise.resolve()
+    const next = previous.then(task, task)
+    const settled = next.catch(() => undefined)
+    queues.set(id, settled)
+    void settled.then(() => {
+      if (queues.get(id) === settled) queues.delete(id)
+    })
+    return next
+  }
+
+  // Write to a temp file and rename, so readers never see a partial file.
+  const writeAtomic = async (id: string, run: AgentSearchRun) => {
+    await mkdir(dir, { recursive: true })
+    const target = fileFor(id)
+    const temp = `${target}.${process.pid}.${randomUUID()}.tmp`
+    try {
+      await writeFile(temp, JSON.stringify(run, null, 2), 'utf8')
+      await rename(temp, target)
+    } catch (error) {
+      await unlink(temp).catch(() => undefined)
+      throw error
+    }
+  }
+
+  // Parsed runs by file, reused while the file is unchanged. Lists and
+  // counts read every run, and some runs are megabytes of JSON; a write
+  // renames a new file into place, so its inode, size or time changes.
+  const parsed = new Map<string, { key: string; run: AgentSearchRun }>()
+
+  const read = async (id: string): Promise<AgentSearchRun | null> => {
+    const file = fileFor(id)
+    try {
+      const info = await stat(file)
+      const key = `${info.ino}:${info.size}:${Math.trunc(info.mtimeMs)}`
+      const cached = parsed.get(file)
+      if (cached?.key === key) return cached.run
+      const run = JSON.parse(await readFile(file, 'utf8')) as AgentSearchRun
+      parsed.set(file, { key, run })
+      return run
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        parsed.delete(file)
+        return null
+      }
+      throw error
+    }
+  }
+
+  const readAll = async (): Promise<AgentSearchRun[]> => {
+    let names: string[]
+    try {
+      names = await readdir(dir)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+      throw error
+    }
+    const runs = await Promise.all(
+      names
+        .filter((name) => name.endsWith('.json'))
+        .map((name) => read(name.slice(0, -'.json'.length)).catch(() => null)),
+    )
+    return runs.filter((run): run is AgentSearchRun => run !== null)
+  }
+
+  return {
+    create: (run) =>
+      withLock(run.id, async () => {
+        if (await read(run.id)) {
+          throw new Error(`Agent search run ${run.id} already exists`)
+        }
+        await writeAtomic(run.id, run)
+      }),
+    update: (id, patch) =>
+      withLock(id, async () => {
+        const current = await read(id)
+        if (!current) throw new Error(`Agent search run ${id} not found`)
+        const {
+          inputTokens: _input,
+          outputTokens: _output,
+          costUsd: _cost,
+          ...fields
+        } = patch as Partial<AgentSearchRun>
+        // A run deleted while it went on keeps its status updates, never
+        // its content: the finishing step must not write the answer back.
+        const allowed = current.deletedAt ? withoutContent(fields) : fields
+        await writeAtomic(id, { ...current, ...allowed, id })
+      }),
+    addUsage: (id, delta) =>
+      withLock(id, async () => {
+        const current = await read(id)
+        if (!current) throw new Error(`Agent search run ${id} not found`)
+        await writeAtomic(id, {
+          ...current,
+          inputTokens: current.inputTokens + usageInt(delta.inputTokens),
+          outputTokens: current.outputTokens + usageInt(delta.outputTokens),
+          costUsd: roundUsd(current.costUsd + usageUsd(delta.costUsd)),
+        })
+      }),
+    get: (id) => read(id),
+    async logModelCall(id, entry) {
+      assertRunId(id)
+      await mkdir(dir, { recursive: true })
+      await appendFile(
+        path.join(dir, `${id}.calls.jsonl`),
+        `${JSON.stringify(entry)}\n`,
+        'utf8',
+      )
+    },
+    async countSince(accountId, sinceIso, keySource) {
+      const since = Date.parse(sinceIso)
+      return (await readAll()).filter(
+        (run) =>
+          run.accountId === accountId &&
+          Date.parse(run.startedAt) >= since &&
+          (!keySource || keySourceOf(run) === keySource),
+      ).length
+    },
+    // One admission at a time in this process, like the database function's
+    // lock. (The file store serves one local process.)
+    admit: (request) =>
+      withLock(ADMISSION_LOCK, async () => {
+        const now = request.now ?? new Date()
+        const decision = admissionDecision(await readAll(), request, now)
+        if (decision !== 'ok') return decision
+        if (await read(request.runId)) {
+          throw new Error(`Agent search run ${request.runId} already exists`)
+        }
+        await writeAtomic(
+          request.runId,
+          newRunRecord(request, now.toISOString()),
+        )
+        return decision
+      }),
+    async listRunning(accountId) {
+      return (await readAll()).filter(
+        (run) => run.accountId === accountId && run.status === 'running',
+      )
+    },
+    async costSince(sinceIso) {
+      const since = Date.parse(sinceIso)
+      return (await readAll())
+        .filter((run) => Date.parse(run.startedAt) >= since)
+        .reduce((sum, run) => sum + (Number(run.costUsd) || 0), 0)
+    },
+    async listRecent(accountId, limit) {
+      return (await readAll())
+        .filter((run) => run.accountId === accountId && !run.deletedAt)
+        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+        .slice(0, limit)
+    },
+    async listConversation(conversationId) {
+      return (await readAll())
+        .filter(
+          (run) => run.conversationId === conversationId && !run.deletedAt,
+        )
+        .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+        .slice(-MAX_CONVERSATION_RUNS)
+    },
+    deleteConversation: (accountId, conversationId) =>
+      clearRuns(
+        (run) =>
+          run.accountId === accountId && run.conversationId === conversationId,
+      ),
+    deleteAllConversations: (accountId) =>
+      clearRuns((run) => run.accountId === accountId),
+  }
+
+  async function clearRuns(match: (run: AgentSearchRun) => boolean) {
+    const deletedAt = new Date().toISOString()
+    const targets = (await readAll()).filter(
+      (run) => match(run) && !run.deletedAt,
+    )
+    await Promise.all(
+      targets.map((run) =>
+        withLock(run.id, async () => {
+          const current = await read(run.id)
+          if (!current || current.deletedAt) return
+          await writeAtomic(run.id, {
+            ...current,
+            ...clearedContent(deletedAt),
+          })
+        }),
+      ),
+    )
+    return targets.length
+  }
+}
+
+function toRow(run: AgentSearchRun): RunInsert {
+  return {
+    id: run.id,
+    workflow_run_id: run.workflowRunId ?? null,
+    account_id: run.accountId,
+    conversation_id: run.conversationId ?? null,
+    question: run.question,
+    status: run.status,
+    model: run.model,
+    started_at: run.startedAt,
+    completed_at: run.completedAt,
+    answer: run.answer,
+    cited_tweet_ids: run.citedTweetIds,
+    invalid_citation_ids: run.invalidCitationIds,
+    tool_calls: run.toolCalls as NonNullable<Json>,
+    input_tokens: run.inputTokens,
+    output_tokens: run.outputTokens,
+    cost_usd: run.costUsd,
+    error: run.error,
+    parts: (run.parts ?? null) as Json,
+    key_source: run.keySource ?? 'house',
+    deleted_at: run.deletedAt ?? null,
+  }
+}
+
+function toRowPatch(patch: RunPatch): RunUpdate {
+  const row: RunUpdate = {}
+  if (patch.workflowRunId !== undefined)
+    row.workflow_run_id = patch.workflowRunId
+  if (patch.accountId !== undefined) row.account_id = patch.accountId
+  if (patch.question !== undefined) row.question = patch.question
+  if (patch.status !== undefined) row.status = patch.status
+  if (patch.model !== undefined) row.model = patch.model
+  if (patch.startedAt !== undefined) row.started_at = patch.startedAt
+  if (patch.completedAt !== undefined) row.completed_at = patch.completedAt
+  if (patch.answer !== undefined) row.answer = patch.answer
+  if (patch.citedTweetIds !== undefined)
+    row.cited_tweet_ids = patch.citedTweetIds
+  if (patch.invalidCitationIds !== undefined)
+    row.invalid_citation_ids = patch.invalidCitationIds
+  if (patch.toolCalls !== undefined)
+    row.tool_calls = patch.toolCalls as NonNullable<Json>
+  if (patch.error !== undefined) row.error = patch.error
+  if (patch.conversationId !== undefined)
+    row.conversation_id = patch.conversationId
+  if (patch.parts !== undefined) row.parts = patch.parts as Json
+  if (patch.deletedAt !== undefined) row.deleted_at = patch.deletedAt
+  return row
+}
+
+/** Row columns that hold content, cleared on delete (CONTENT_FIELDS). */
+const CONTENT_COLUMNS = [
+  'question',
+  'answer',
+  'parts',
+  'cited_tweet_ids',
+  'invalid_citation_ids',
+  'tool_calls',
+  'error',
+] as const satisfies readonly (keyof RunUpdate)[]
+
+function fromRow(row: RunRow): AgentSearchRun {
+  return {
+    id: row.id,
+    workflowRunId: row.workflow_run_id,
+    accountId: row.account_id,
+    conversationId: row.conversation_id,
+    parts: Array.isArray(row.parts) ? (row.parts as unknown[]) : null,
+    question: row.question,
+    status: row.status as AgentSearchRun['status'],
+    model: row.model,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    answer: row.answer,
+    citedTweetIds: row.cited_tweet_ids ?? [],
+    invalidCitationIds: row.invalid_citation_ids ?? [],
+    toolCalls: (Array.isArray(row.tool_calls)
+      ? row.tool_calls
+      : []) as unknown as AgentSearchRun['toolCalls'],
+    inputTokens: row.input_tokens ?? 0,
+    outputTokens: row.output_tokens ?? 0,
+    // PostgREST may return numeric as a string when it exceeds JS precision.
+    costUsd: Number(row.cost_usd) || 0,
+    error: row.error,
+    keySource: row.key_source === 'own' ? 'own' : 'house',
+    deletedAt: row.deleted_at ?? null,
+  }
+}
+
+const COST_PAGE_SIZE = 1000
+
+const ADMISSION_RESULTS: AdmissionResult[] = [
+  'ok',
+  'not_found',
+  'daily_limit',
+  'monthly_limit',
+  'run_in_progress',
+  'global_budget',
+]
+
+// Lists need no answer bodies, message parts or usage.
+const SUMMARY_COLUMNS =
+  'id, workflow_run_id, account_id, conversation_id, question, status, model, started_at, completed_at, error, key_source, deleted_at'
+
+type SummaryRow = Pick<
+  RunRow,
+  | 'id'
+  | 'workflow_run_id'
+  | 'account_id'
+  | 'conversation_id'
+  | 'question'
+  | 'status'
+  | 'model'
+  | 'started_at'
+  | 'completed_at'
+  | 'error'
+  | 'key_source'
+  | 'deleted_at'
+>
+
+const withoutBodies = (row: SummaryRow): RunRow => ({
+  ...row,
+  answer: null,
+  cited_tweet_ids: [],
+  invalid_citation_ids: [],
+  tool_calls: [],
+  input_tokens: 0,
+  output_tokens: 0,
+  cost_usd: 0,
+  parts: null,
+})
+
+/** Production store on public.agent_search_runs, service role only. */
+export function createSupabaseRunStore(
+  client: ReturnType<
+    typeof createServerServiceRoleClient
+  > = createServerServiceRoleClient(),
+): AgentSearchRunStore {
+  const table = () => client.from('agent_search_runs')
+
+  return {
+    async create(run) {
+      const { error } = await table().insert(toRow(run))
+      if (error)
+        throw new Error(`Agent search run insert failed: ${error.message}`)
+    },
+    async update(id, patch) {
+      const row = toRowPatch(patch)
+      // Content is written only to runs not deleted, so a run deleted while
+      // it went on never gets its answer back; status updates always apply.
+      const content: RunUpdate = {}
+      const rest: RunUpdate = { ...row }
+      for (const column of CONTENT_COLUMNS) {
+        if (column in row) {
+          ;(content as Record<string, unknown>)[column] = row[column]
+          delete rest[column]
+        }
+      }
+      if (Object.keys(rest).length > 0) {
+        const { error } = await table().update(rest).eq('id', id)
+        if (error)
+          throw new Error(`Agent search run update failed: ${error.message}`)
+      }
+      if (Object.keys(content).length > 0) {
+        const { error } = await table()
+          .update(content)
+          .eq('id', id)
+          .is('deleted_at', null)
+        if (error)
+          throw new Error(`Agent search run update failed: ${error.message}`)
+      }
+    },
+    async addUsage(id, delta) {
+      const { error } = await client.rpc('agent_search_add_usage', {
+        p_run_id: id,
+        p_input_tokens: usageInt(delta.inputTokens),
+        p_output_tokens: usageInt(delta.outputTokens),
+        p_cost_usd: usageUsd(delta.costUsd),
+      })
+      if (error)
+        throw new Error(`Agent search usage update failed: ${error.message}`)
+    },
+    async get(id) {
+      const { data, error } = await table()
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+      if (error)
+        throw new Error(`Agent search run read failed: ${error.message}`)
+      return data ? fromRow(data) : null
+    },
+    async countSince(accountId, sinceIso, keySource) {
+      let query = table()
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .gte('started_at', sinceIso)
+      if (keySource) query = query.eq('key_source', keySource)
+      const { count, error } = await query
+      if (error)
+        throw new Error(`Agent search run count failed: ${error.message}`)
+      return count ?? 0
+    },
+    async admit(request) {
+      const { data, error } = await client.rpc('agent_search_admit', {
+        p_run_id: request.runId,
+        p_account_id: request.accountId,
+        p_conversation_id: request.conversationId,
+        p_question: request.question,
+        p_model: request.model,
+        p_daily_limit: Math.floor(request.dailyLimit),
+        p_global_daily_usd: request.globalDailyUsd,
+        p_stale_after_seconds: Math.ceil(request.staleRunMs / 1000),
+        p_key_source: request.keySource,
+        p_monthly_limit: Math.floor(request.monthlyLimit),
+      })
+      if (error)
+        throw new Error(`Agent search admission failed: ${error.message}`)
+      if (!ADMISSION_RESULTS.includes(data as AdmissionResult)) {
+        throw new Error(`Agent search admission returned ${String(data)}`)
+      }
+      return data as AdmissionResult
+    },
+    async listRunning(accountId) {
+      const { data, error } = await table()
+        .select(SUMMARY_COLUMNS)
+        .eq('account_id', accountId)
+        .eq('status', 'running')
+        .order('started_at', { ascending: true })
+        .limit(20)
+      if (error)
+        throw new Error(`Agent search run check failed: ${error.message}`)
+      return (data ?? []).map((row) => fromRow(withoutBodies(row)))
+    },
+    async costSince(sinceIso) {
+      // PostgREST caps result sets, so page through with a stable order
+      // rather than trusting one response to hold the whole day.
+      let total = 0
+      for (let offset = 0; ; offset += COST_PAGE_SIZE) {
+        const { data, error } = await table()
+          .select('id, cost_usd')
+          .gte('started_at', sinceIso)
+          .order('id', { ascending: true })
+          .range(offset, offset + COST_PAGE_SIZE - 1)
+        if (error)
+          throw new Error(`Agent search cost read failed: ${error.message}`)
+        const rows = data ?? []
+        for (const row of rows) total += Number(row.cost_usd) || 0
+        if (rows.length < COST_PAGE_SIZE) return total
+      }
+    },
+    async listRecent(accountId, limit) {
+      // The list needs no answer bodies or message parts.
+      const { data, error } = await table()
+        .select(SUMMARY_COLUMNS)
+        .eq('account_id', accountId)
+        .is('deleted_at', null)
+        .order('started_at', { ascending: false })
+        .limit(limit)
+      if (error)
+        throw new Error(`Agent search history read failed: ${error.message}`)
+      return (data ?? []).map((row) => fromRow(withoutBodies(row)))
+    },
+    async listConversation(conversationId) {
+      // The newest runs, so a long conversation keeps its latest turns.
+      const { data, error } = await table()
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
+        .order('started_at', { ascending: false })
+        .limit(MAX_CONVERSATION_RUNS)
+      if (error)
+        throw new Error(
+          `Agent search conversation read failed: ${error.message}`,
+        )
+      return (data ?? []).map(fromRow).reverse()
+    },
+    async deleteConversation(accountId, conversationId) {
+      const { data, error } = await table()
+        .update(clearedRow())
+        .eq('account_id', accountId)
+        .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
+        .select('id')
+      if (error) throw new Error(`Agent search delete failed: ${error.message}`)
+      return data?.length ?? 0
+    },
+    async deleteAllConversations(accountId) {
+      const { data, error } = await table()
+        .update(clearedRow())
+        .eq('account_id', accountId)
+        .is('deleted_at', null)
+        .select('id')
+      if (error) throw new Error(`Agent search delete failed: ${error.message}`)
+      return data?.length ?? 0
+    },
+  }
+}
+
+function clearedRow(): RunUpdate {
+  return toRowPatch(clearedContent(new Date().toISOString()))
+}
+
+let cachedStore: AgentSearchRunStore | null = null
+
+/**
+ * File store whenever NODE_ENV is not production or AGENT_SEARCH_RUN_STORE is
+ * 'file'. There is deliberately no override the other way: local development
+ * must never write production Supabase.
+ */
+export function getAgentSearchRunStore(): AgentSearchRunStore {
+  if (cachedStore) return cachedStore
+  const useFile =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.AGENT_SEARCH_RUN_STORE === 'file'
+  cachedStore = useFile ? createFileRunStore() : createSupabaseRunStore()
+  return cachedStore
+}

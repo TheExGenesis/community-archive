@@ -20,18 +20,20 @@ export function TweetAvatar({
   tweet: Pick<PortalTweet, 'id' | 'username' | 'avatar'>
   size?: number
 }) {
-  const initials = tweet.username.slice(0, 2).toUpperCase()
+  // A partial tweet object must never take the page down with it.
+  const username = tweet.username ?? ''
+  const initials = username.slice(0, 2).toUpperCase()
   return (
     <Avatar className="flex-shrink-0" style={{ width: size, height: size }}>
       <TweetAvatarImage
         src={tweet.avatar}
         alt=""
-        username={tweet.username}
+        username={username}
         tweetId={tweet.id}
       />
       <AvatarFallback
         className="text-[12px] font-extrabold text-white"
-        style={{ background: `hsl(${avatarHue(tweet.username)},42%,42%)` }}
+        style={{ background: `hsl(${avatarHue(username)},42%,42%)` }}
       >
         {initials}
       </AvatarFallback>

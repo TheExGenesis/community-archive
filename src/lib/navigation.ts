@@ -151,6 +151,7 @@ export type NavIcon =
   | 'graph'
   | 'bulletin'
   | 'apps'
+  | 'ask'
 
 export interface NavMenuItem extends NavItem {
   description: string
@@ -194,6 +195,13 @@ export const getPrimaryNav = (): NavEntry[] => [
   {
     label: 'Explore archive',
     items: [
+      {
+        href: '/search/ask',
+        label: 'Ask the archive',
+        description:
+          'Ask a question; an agent searches members’ tweets and cites them.',
+        icon: 'ask',
+      },
       {
         href: '/user-dir',
         label: 'Explore by user',

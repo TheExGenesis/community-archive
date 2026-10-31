@@ -110,19 +110,19 @@ async function verifyRemoval() {
   const { readPackage } = require(path.join(root, '.pnpmfile.cjs')).hooks
   const metadata = {
     name: 'workflow',
-    version: '4.8.2',
+    version: '5.2.2',
     dependencies: {
-      '@workflow/nest': '4.0.18',
-      '@workflow/next': '4.1.6',
+      '@workflow/nest': '5.1.3',
+      '@workflow/next': '5.0.5',
     },
   }
   assert.deepEqual(readPackage(metadata).dependencies, {
-    '@workflow/next': '4.1.6',
+    '@workflow/next': '5.0.5',
   })
   const unrelated = { name: 'another-package', version: '1.0.0' }
   assert.equal(readPackage(unrelated), unrelated)
   assert.throws(
-    () => readPackage({ name: 'workflow', version: '4.8.3' }),
+    () => readPackage({ name: 'workflow', version: '5.2.3' }),
     /Review/,
   )
   const lock = await readFile(path.join(root, 'pnpm-lock.yaml'), 'utf8')
@@ -200,13 +200,14 @@ export async function GET() { return new Response('fixture'); }
     assert.ok(JSON.stringify(manifest).includes('syntheticStep'))
     for (const file of [
       'flow/route.js',
-      'step/route.js',
+      // Workflow 5 registers steps beside the flow route.
+      'flow/__step_registrations.js',
       'webhook/[token]/route.js',
     ]) {
       assert.ok((await readFile(path.join(generated, file), 'utf8')).length > 0)
     }
     console.log(
-      'PASS actual Next Workflow builder emits flow, step, webhook, and manifest',
+      'PASS actual Next Workflow builder emits flow, step registrations, webhook, and manifest',
     )
   } finally {
     process.chdir(previousCwd)

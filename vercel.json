@@ -4,6 +4,10 @@
   "functions": {
     "src/app/**/*": {
       "maxDuration": 15
+    },
+    "src/app/api/agent-search/*/stream/route.ts": {
+      "maxDuration": 300,
+      "supportsCancellation": true
     }
   },
   "crons": [

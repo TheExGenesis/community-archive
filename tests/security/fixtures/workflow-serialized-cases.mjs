@@ -50,6 +50,9 @@ export function serializedFieldCases() {
           schema: 'CreateEventSchema',
           field: key,
           valueName,
+          // Workflow 5 world requires these event keys; stock Zod 4.5.4 and
+          // 4.6.6 both reject them when absent, so the override keeps parity.
+          requiredKey: true,
           input: {
             eventType,
             correlationId: 'correlation_fixture',
@@ -107,5 +110,7 @@ export function normalized(input) {
   for (const key of ['createdAt', 'updatedAt', 'completedAt']) {
     if (key in result) result[key] = new Date(result[key])
   }
+  // Workflow 5 run records default their attributes to an empty object.
+  if ('status' in result && !('attributes' in result)) result.attributes = {}
   return result
 }

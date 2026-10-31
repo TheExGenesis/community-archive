@@ -124,6 +124,10 @@ const IN_MEMORY_MAX_PUBLIC_API_VERIFIER = 600
 // Staging can fan out several reads per page from one server IP. The bridge
 // authenticates every request itself; keep its budget separate and bounded.
 const IN_MEMORY_MAX_PRODUCTION_READ_BRIDGE = 600
+// Signal inbox (/api/signals/*): the Vercel log drain batches deliveries from
+// a few IPs and bursts during exactly the incidents the inbox exists for.
+// The route authenticates and caps each body itself.
+const IN_MEMORY_MAX_SIGNAL_INBOX = 120
 const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 let lastCleanup = Date.now()
@@ -172,6 +176,12 @@ function getApiRateLimitPolicy(
           : isSG
             ? IN_MEMORY_MAX_API_SG
             : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
+  if (method === 'POST' && pathname.startsWith('/api/signals/')) {
+    return {
+      bucket: 'api:signal-inbox',
+      maxRequests: IN_MEMORY_MAX_SIGNAL_INBOX,
     }
   }
   if (method === 'GET' && pathname.startsWith('/api/companion/v1/')) {
@@ -304,8 +314,7 @@ function isBotUA(ua: string): boolean {
 function getIp(request: NextRequest): string {
   // Next 15 removed request.ip. Vercel sets this header at its trusted edge.
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   )
 }
 
@@ -460,13 +469,17 @@ export async function middleware(request: NextRequest) {
   // non-browser UA), and one-click unsubscribe POSTs come from mailbox
   // provider servers holding a per-subscription token. The Bulletin preview
   // source and the public API key verifier require their own bearer secrets
-  // and are called from other servers.
+  // and are called from other servers. The signal inbox receives webhooks
+  // from PostHog, Grafana, the Vercel log drain and the fleet host, each
+  // with a short non-browser UA; it verifies a bearer secret or Vercel's
+  // HMAC signature itself (src/lib/signals/auth.ts).
   const machineAuthRoute =
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
     pathname === '/api/bulletin/preview-board' ||
     pathname === '/api/internal/public-api/keys/verify' ||
-    (pathname === '/api/public-data' && request.method === 'POST')
+    (pathname === '/api/public-data' && request.method === 'POST') ||
+    (pathname.startsWith('/api/signals/') && request.method === 'POST')
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (

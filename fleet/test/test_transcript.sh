@@ -155,7 +155,7 @@ export RUN_DIR="$FLEET_RUNS_DIR/20261030T131500Z-canary"
 fleet_init_run canary 2>/dev/null
 fleet_write_result ok "" "" "" 2>/dev/null
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.issue_url')" "" "no issue_url"
-assert_contains "$(head -n 1 "$RUN_DIR/loki.jsonl")" '"issue":""' "empty issue label"
+assert_not_contains "$(head -n 1 "$RUN_DIR/loki.jsonl")" '"issue"' "no issue key without an issue"
 assert_eq "$(json_get "$RUN_DIR/result.json" 'd.transcript_url')" "https://g.example/explore?run=20261030T131500Z-canary&x=1" "transcript_url for every routine"
 # Without the template there is no URL.
 export RUN_DIR="$FLEET_RUNS_DIR/20261030T132000Z-canary"

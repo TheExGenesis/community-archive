@@ -520,7 +520,8 @@ fleet_run_line() {
 
 # fleet_write_run_export : writes $RUN_DIR/loki.jsonl, what Alloy on ca-fleet
 # ships to Loki (control-panel ops/monitoring/alloy/config-fleet.alloy): one
-# JSON object per line, {ts, routine, issue, outcome, run_id, file, line}, for
+# JSON object per line, {ts, routine, issue (absent when the run had none),
+# outcome, run_id, file, line}, for
 # result.json (as one compact line), log.txt, transcript.md and
 # transcript.jsonl. Written once, after result.json, so every line carries the
 # run's outcome. Lines over 128 KiB are cut (Loki rejects whole batches over
@@ -533,9 +534,10 @@ fleet_write_run_export() {
     const fs = require("fs"); const path = require("path");
     const dir = process.env.RUN_DIR_PATH;
     const result = JSON.parse(fs.readFileSync(path.join(dir, "result.json"), "utf8"));
+    // No `issue` key at all for runs without one: Loki labels have no empty value.
     const labels = {
       routine: String(result.run || path.basename(dir).replace(/^[0-9TZ]+-/, "")),
-      issue: result.issue == null ? "" : String(result.issue),
+      ...(result.issue == null ? {} : { issue: String(result.issue) }),
       outcome: String(result.outcome || ""),
       run_id: result.run_id || path.basename(dir),
     };

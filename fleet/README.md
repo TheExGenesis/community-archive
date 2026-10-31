@@ -73,7 +73,7 @@ signal issue, else the `fingerprint` of its fenced `json signal` block),
 `$RUN_DIR/loki.jsonl` is written right after `result.json` by every routine:
 one JSON line per line of `result.json` (compacted to one line), `log.txt`,
 `transcript.md` and `transcript.jsonl`, each carrying `{ts, routine, issue,
-outcome, run_id, file}`. Alloy on `ca-fleet` tails these files and ships them
+outcome, run_id, file}` (`issue` only when the run had one). Alloy on `ca-fleet` tails these files and ships them
 to Grafana Cloud Loki with those keys as labels (control-panel
 `ops/monitoring/alloy/config-fleet.alloy`), so Explore shows one run with
 `{job="fleet-runs", run_id="<run id>"}`. It is written once, at the end, so

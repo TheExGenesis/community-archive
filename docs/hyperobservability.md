@@ -362,16 +362,53 @@ User timers call `bin/fleet-run <name>`, which sources the env file, exports
 | ------- | ---------------- | ------------------------------------------------------- | -------------------------- |
 | fixer   | every 10 minutes | the unit does not overlap itself; the script also locks | `MemoryMax=4G`, 90 minutes |
 | canary  | every 15 minutes | none needed                                             | 12 minutes                 |
+| digest  | daily 07:00 UTC  | none needed                                             | 10 minutes                 |
 
 Ten minutes is the pause between issues, not a deadline: a fixer run that is
 still working holds the lock and the next tick exits with `outcome: locked`.
 Units ship disabled and the flags ship as `pr` / `false`; enabling the
 timers is a host operation.
 
+### Watching the fleet
+
+Three things make the fleet legible without reading run directories, all
+written by the harnesses themselves (`fleet/lib/common.sh`):
+
+- **Its own failures are signals.** A run that ends in `outcome: error` posts
+  `[signal:generic] Fleet <routine> failed: <kind>` to `/api/signals/generic`
+  (`key: fleet:<routine>:<kind>`, `severity: warning`), so a fixer that cannot
+  authenticate or a read-back that fails shows up in the same inbox as a
+  production 502. Handled outcomes (empty inbox, `wontfix`, `needs-decision`,
+  a canary that found production broken) are not fleet failures.
+- **Per-run metrics.** Every run rewrites
+  `/home/fleet/services/ca-fleet/runs/metrics.prom` (Prometheus textfile):
+  `fleet_run_total{routine,outcome}`, `fleet_run_duration_seconds`,
+  `fleet_last_success_timestamp`, `fleet_tokens_total{kind}` and
+  `fleet_cost_usd_total` from `claude -p`'s usage fields,
+  `fleet_signal_to_fix_seconds` (issue created → PR opened or commit pushed),
+  per-check canary state, and "what waits on a human" gauges. Alloy on
+  `ca-fleet` ships them to Grafana Cloud, where the **Fleet** dashboard
+  (control-panel `ops/monitoring/dashboards/fleet.json`) reads top to bottom:
+  what happened today, how fast, how well, how much, what waits on a human.
+  Two alerts exist, published paused: fixer failed three runs in a row, canary
+  not succeeded in 45 minutes. `fleet/README.md` lists every series.
+- **The daily digest.** `fleet/bin/digest.sh` (timer `fleet-digest`, 07:00
+  UTC, shipped disabled) opens one issue `[fleet:digest] <date>` with the
+  `fleet:digest` label: signals received and their state, fixer runs with
+  PR/commit/learning links, fleet PRs merged or closed and reverts on `main`,
+  canary status, the day's cost, the fleet's own failures, and what needs
+  Christine. It closes the previous day's digest. No LLM;
+  `FLEET_DRY_RUN=true` prints instead of posting.
+
+Operator view, in reading order: dashboard → digest → inbox → run directory
+(control-panel `docs/ca-fleet-operations.md`, "Watching the fleet").
+
 ### Tests
 
 `pnpm fleet:test` runs `shellcheck` over `fleet/` and the tests in
 `fleet/test/` (issue selection, verdict parsing, read-back checks, the Tier 1
 guard, full fixer runs in both modes against a bare git remote with fake
-`gh`/`claude`/`pnpm`, and canary runs with a fake `curl`/`npx` including the
-rollback path). CI runs it in the pull-request workflow after the unit tests.
+`gh`/`claude`/`pnpm`, canary runs with a fake `curl`/`npx` including the
+rollback path, the metrics textfile and failure signals, and the digest in
+dry-run and posting mode). CI runs it in the pull-request workflow after the
+unit tests.

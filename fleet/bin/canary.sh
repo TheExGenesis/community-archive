@@ -47,10 +47,38 @@ cleanup() {
   local code=$?
   trap - EXIT
   if [[ $code -ne 0 && "$OUTCOME" == "error" ]]; then
+    local reason="${FLEET_LAST_ERROR:-canary failed with exit code $code}"
     fleet_error "canary failed with exit code $code"
+    fleet_post_signal "$(fleet_failure_kind "$reason")" "$reason"
   fi
   if [[ -n "${RUN_DIR:-}" ]]; then
     fleet_write_result "$OUTCOME" "" "" "" "$EXTRA_FILE"
+    # Per-check state and counters for the Fleet dashboard. Inconclusive checks
+    # leave their last known value alone.
+    if [[ -s "$RUN_DIR/checks.json" ]]; then
+      CHECKS_FILE="$RUN_DIR/checks.json" RESULT="$RUN_DIR/result.json" node -e '
+        const fs = require("fs");
+        const checks = JSON.parse(fs.readFileSync(process.env.CHECKS_FILE, "utf8"));
+        let result = {}; try { result = JSON.parse(fs.readFileSync(process.env.RESULT, "utf8")); } catch {}
+        const g = {};
+        let failed = 0, inconclusive = 0;
+        for (const [name, c] of Object.entries(checks)) {
+          if (c.verdict === "ok") g[`fleet_canary_check_ok{check="${name}"}`] = 1;
+          if (c.verdict === "failed") { g[`fleet_canary_check_ok{check="${name}"}`] = 0; failed += 1; }
+          if (c.verdict === "inconclusive") inconclusive += 1;
+        }
+        g.fleet_canary_failed_checks = failed;
+        g.fleet_canary_inconclusive_checks = inconclusive;
+        g.fleet_canary_new_failures_total = (result.new_failures || []).length;
+        g.fleet_canary_rollbacks_total = result.rollback && result.rollback.attempted ? 1 : 0;
+        fs.writeFileSync(process.env.CHECKS_FILE.replace(/checks\.json$/, "gauges.json"), JSON.stringify(g) + "\n");
+      ' || true
+    fi
+    if [[ -s "$RUN_DIR/gauges.json" ]]; then
+      fleet_record_metrics --outcome "$OUTCOME" --gauges "$RUN_DIR/gauges.json"
+    else
+      fleet_record_metrics --outcome "$OUTCOME"
+    fi
   fi
   exit "$code"
 }
@@ -239,24 +267,9 @@ build_signals() {
   '
 }
 
-# post_signal <file> <log-name> : POST a signal array; records request and response in RUN_DIR.
+# post_signal <file> <log-name> : POST a signal array to /api/signals/canary (fleet/lib/common.sh).
 post_signal() {
-  local file="$1" name="$2"
-  if [[ -z "$SIGNALS_WEBHOOK_SECRET" ]]; then
-    fleet_warn "SIGNALS_WEBHOOK_SECRET unset; $name written to $file but not sent"
-    echo "not sent: SIGNALS_WEBHOOK_SECRET unset" >"$RUN_DIR/$name.response"
-    return 0
-  fi
-  local status
-  status="$("$FLEET_CURL_BIN" -sS --max-time 20 -o "$RUN_DIR/$name.response" -w '%{http_code}' \
-    -X POST "$CA_URL/api/signals/canary" \
-    -H "Authorization: Bearer $SIGNALS_WEBHOOK_SECRET" -H 'content-type: application/json' \
-    -A "$USER_AGENT" --data-binary "@$file" 2>"$RUN_DIR/$name.curl-error" || echo 000)"
-  fleet_info "$name posted to /api/signals/canary → $status"
-  if [[ ! "$status" =~ ^2 ]]; then
-    fleet_warn "signal POST failed with $status (see $name.response)"
-    return 1
-  fi
+  fleet_post_signals canary "$1" "$2"
 }
 
 SIGNAL_POSTED=false

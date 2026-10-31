@@ -135,6 +135,7 @@ claude_output() {
       fix: "Set the answer to 42.", check_next_time: "Grep for the constant first.", files: JSON.parse(e.FILES) };
     const result = "I looked at it.\n\n```json\n" + JSON.stringify(verdict, null, 2) + "\n```";
     process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, num_turns: 7,
-      duration_ms: 1234, session_id: "11111111-2222-3333-4444-555555555555", result, total_cost_usd: 0.42 }));
+      duration_ms: 1234, session_id: "11111111-2222-3333-4444-555555555555", result, total_cost_usd: 0.42,
+      usage: { input_tokens: 1200, output_tokens: 340, cache_creation_input_tokens: 5000, cache_read_input_tokens: 80000 } }));
   '
 }

@@ -45,16 +45,20 @@ WORKTREE=""
 BRANCH=""
 EXTRA_FILE=""
 LOCK_HELD=0
+SIGNAL_TO_FIX_S=""
 
 cleanup() {
   local code=$?
   trap - EXIT
   if [[ $code -ne 0 && "$OUTCOME" == "error" ]]; then
+    local reason="${FLEET_LAST_ERROR:-fixer failed with exit code $code}"
     fleet_error "fixer failed with exit code $code"
     # Leave the issue free for the next run; a crash is ours, not the issue's.
     if [[ -n "$ISSUE_NUMBER" && $ISSUE_LABELLED -eq 1 ]]; then
       fleet_issue_remove_label "$ISSUE_NUMBER" "$FLEET_LABEL_IN_PROGRESS"
     fi
+    # The fleet's own failure goes to the same inbox as production signals.
+    fleet_post_signal "$(fleet_failure_kind "$reason")" "$reason${ISSUE_NUMBER:+ (while on issue #$ISSUE_NUMBER)}"
   fi
   if [[ -n "$WORKTREE" && -d "$WORKTREE" ]]; then
     git -C "$WORKTREE" diff HEAD >"$RUN_DIR/final-diff.patch" 2>/dev/null || true
@@ -65,7 +69,19 @@ cleanup() {
     git -C "$FLEET_ROOT" branch -D "$BRANCH" >/dev/null 2>&1 || true
   fi
   if [[ -n "${RUN_DIR:-}" ]]; then
+    local usage_files=()
+    for f in "$RUN_DIR/claude-output.json" "$RUN_DIR/claude-output-2.json"; do
+      [[ -s "$f" ]] && usage_files+=("$f")
+    done
+    if [[ ${#usage_files[@]} -gt 0 ]]; then
+      fleet_claude_usage "${usage_files[@]}" >"$RUN_DIR/usage.json"
+    fi
     fleet_write_result "$OUTCOME" "$ISSUE_NUMBER" "$REF" "$SESSION_ID" "$EXTRA_FILE"
+    local metrics_args=(--outcome "$OUTCOME")
+    for f in ${usage_files[@]+"${usage_files[@]}"}; do metrics_args+=(--usage-file "$f"); done
+    [[ -n "$SIGNAL_TO_FIX_S" ]] && metrics_args+=(--signal-to-fix "$SIGNAL_TO_FIX_S")
+    [[ -s "$RUN_DIR/gauges.json" ]] && metrics_args+=(--gauges "$RUN_DIR/gauges.json")
+    fleet_record_metrics "${metrics_args[@]}"
   fi
   [[ $LOCK_HELD -eq 1 ]] && fleet_release_lock "$FLEET_LOCK_DIR"
   exit "$code"
@@ -88,6 +104,8 @@ fleet_ensure_labels
 
 # ─── Pick an issue ──────────────────────────────────────────────────────────
 fleet_list_candidate_issues >"$RUN_DIR/candidates.json"
+# What waits on a human, for the Fleet dashboard (recorded with the run's metrics).
+fleet_github_gauges "$RUN_DIR/gauges.json" || true
 fleet_pick_issue <"$RUN_DIR/candidates.json" >"$RUN_DIR/issue.json"
 if [[ ! -s "$RUN_DIR/issue.json" ]]; then
   fleet_info "inbox empty: no open signal/bug issue without a fleet label"
@@ -96,6 +114,7 @@ if [[ ! -s "$RUN_DIR/issue.json" ]]; then
 fi
 ISSUE_NUMBER="$(fleet_json_get "$RUN_DIR/issue.json" 'd.number')"
 ISSUE_TITLE="$(fleet_json_get "$RUN_DIR/issue.json" 'd.title')"
+ISSUE_CREATED_EPOCH="$(fleet_epoch "$(fleet_json_get "$RUN_DIR/issue.json" 'd.createdAt')")"
 fleet_info "picked issue #$ISSUE_NUMBER: $ISSUE_TITLE"
 
 fleet_issue_add_label "$ISSUE_NUMBER" "$FLEET_LABEL_IN_PROGRESS"
@@ -466,7 +485,12 @@ else
   OUTCOME="pushed_main"
 fi
 
-printf '{"mode":"%s","classification":"%s","branch":"%s","commit":"%s","changed_lines":%s,"learning":"%s"}\n' \
-  "$FLEET_MODE" "$CLASSIFICATION" "$BRANCH" "$COMMIT_SHA" "$CHANGED" "$LEARNING" >"$EXTRA_FILE"
+# Signal-to-fix latency: issue created → PR opened or commit pushed.
+if [[ -n "$ISSUE_CREATED_EPOCH" ]]; then
+  SIGNAL_TO_FIX_S=$(($(date +%s) - ISSUE_CREATED_EPOCH))
+  [[ $SIGNAL_TO_FIX_S -lt 0 ]] && SIGNAL_TO_FIX_S=0
+fi
+printf '{"mode":"%s","classification":"%s","branch":"%s","commit":"%s","changed_lines":%s,"learning":"%s","signal_to_fix_s":%s}\n' \
+  "$FLEET_MODE" "$CLASSIFICATION" "$BRANCH" "$COMMIT_SHA" "$CHANGED" "$LEARNING" "${SIGNAL_TO_FIX_S:-null}" >"$EXTRA_FILE"
 fleet_info "done: $OUTCOME $REF"
 exit 0

@@ -31,9 +31,9 @@ assert_eq "$picked" "" "empty inbox"
 # Label creation is idempotent and only creates what is missing.
 fleet_ensure_labels
 created="$(grep -c '^label create' "$TMP/gh/calls.log" || true)"
-assert_eq "$created" "4" "creates the four fleet labels, bug already exists"
+assert_eq "$created" "5" "creates the five fleet labels, bug already exists"
 fleet_ensure_labels
 created="$(grep -c '^label create' "$TMP/gh/calls.log" || true)"
-assert_eq "$created" "4" "second call creates nothing"
+assert_eq "$created" "5" "second call creates nothing"
 
 t_done

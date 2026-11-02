@@ -29,6 +29,17 @@ export interface TubeData {
   videos: TubeVideo[]
 }
 
+/** The archived tweet a reply comment answers. */
+export interface TubeParent {
+  t: string
+  u: string
+  n: string
+  av: string
+  x: string
+  f: number
+  c: number
+}
+
 /** One archived tweet that shared a video, shown as a comment. */
 export interface TubeComment {
   t: string
@@ -40,6 +51,7 @@ export interface TubeComment {
   c: number
   ru: string | null
   st: 'strong' | 'rec' | 'ref' | 'neg' | null
+  p?: TubeParent
 }
 
 export interface TubeDetail {

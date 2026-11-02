@@ -7,6 +7,7 @@ Inputs, all produced by read-only queries (see README.md next to this file):
   meta.json   {video id: {title, channel, channel_url} | null}   (YouTube oEmbed)
   texts*.json [{t: tweet id, x: full text, ru: reply-to username, z: tombstone}]
   av.json     [{a: account id, p: avatar url}]
+  parents.json  optional [{t: reply tweet id, pt, pa, px, pf, pc: the parent tweet}]
   enrich/*.json  optional LLM fields from enrich.py
 
 Writes <out dir>/videos.json (catalogue) and <out dir>/c/<shard>.json (per-video
@@ -44,6 +45,9 @@ texts = {}
 for f in glob.glob(f'{src}/texts*.json'):
     for t in json.load(open(f)):
         texts[t['t']] = t
+parents = {}
+if os.path.exists(f'{src}/parents.json'):
+    parents = {p['t']: p for p in json.load(open(f'{src}/parents.json'))}
 enriched = {}
 for f in sorted(glob.glob(f'{src}/enrich/*.json')):
     for e in json.load(open(f)):
@@ -72,6 +76,13 @@ for vid, shares in by_video.items():
             'av': avatars.get(s['a'], ''), 'x': s['x'], 'f': s['f'] or 0,
             'c': s['c'], 'ru': s['ru'], 'st': stance.get(s['t']),
         })
+        p = parents.get(s['t'])
+        if p:
+            pa = accounts.get(p['pa'], {})
+            comments[-1]['p'] = {
+                't': p['pt'], 'u': pa.get('u', ''), 'n': pa.get('n', ''),
+                'av': avatars.get(p['pa'], ''), 'x': p['px'], 'f': p['pf'] or 0, 'c': p['pc'],
+            }
     v = {
         'id': vid,
         'title': m['title'],

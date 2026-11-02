@@ -20,9 +20,12 @@ Regenerate in a scratch directory (these are read-only production reads):
 3. `select account_id a, avatar_media_url p from public.all_profile where avatar_media_url is not null;` → `av.json`.
 4. `select tweet_id t, full_text x, reply_to_username ru, is_tombstone z from public.tweets where tweet_id = any(array[...])`
    for the tweet ids in `rows.json`, in chunks of ~8,000 → `texts0.json`, `texts1.json`, ...
-5. `python3 -I fetch-oembed.py` (run from the scratch directory) → `meta.json`.
+5. Parents of reply comments: for comment tweet ids with a reply-to, join
+   `public.tweets c` to `public.tweets p on p.tweet_id = c.reply_to_tweet_id`
+   (skipping tombstones) → `parents.json` with `t, pt, pa, px, pf, pc`.
+6. `python3 -I fetch-oembed.py` (run from the scratch directory) → `meta.json`.
    Deleted and private videos come back empty and are dropped.
-6. Optional: `python3 -I scripts/tube/enrich.py <scratch dir> public/tube/videos.json`
+7. Optional: `python3 -I scripts/tube/enrich.py <scratch dir> public/tube/videos.json`
    runs batched `claude -p` calls (needs a logged-in Claude Code CLI) and writes
    `enrich/*.json`. It is resumable.
-7. `python3 -I scripts/tube/build-tube-data.py <scratch dir> public/tube`.
+8. `python3 -I scripts/tube/build-tube-data.py <scratch dir> public/tube`.

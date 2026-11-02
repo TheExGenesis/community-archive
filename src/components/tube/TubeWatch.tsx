@@ -13,6 +13,7 @@ import {
   upNext,
   type TubeComment,
   type TubeDetail,
+  type TubeParent,
 } from '@/lib/tube'
 import { useTube } from './TubeProvider'
 import { usePlaylists, type TubePlaylist } from './usePlaylists'
@@ -300,43 +301,86 @@ function TweetText({ text }: { text: string }) {
   )
 }
 
+function Avatar({ u, n, av, small = false }: { u: string; n: string; av: string; small?: boolean }) {
+  const size = small ? 'h-8 w-8' : 'h-10 w-10'
+  return (
+    <Link href={userProfileHref(u)} className="shrink-0">
+      {av ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={av}
+          alt=""
+          loading="lazy"
+          className={`${size} rounded-full bg-muted object-cover`}
+          onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+        />
+      ) : (
+        <div className={`${size} flex items-center justify-center rounded-full bg-muted text-sm font-medium`}>
+          {(n || u || '?').slice(0, 1).toUpperCase()}
+        </div>
+      )}
+    </Link>
+  )
+}
+
+function Byline({ u, n, c, extra }: { u: string; n: string; c: number; extra?: string }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+      <Link href={userProfileHref(u)} className="font-semibold hover:underline">
+        {n || `@${u}`}
+      </Link>
+      {n && <span className="text-muted-foreground">@{u}</span>}
+      <span className="text-muted-foreground">· {timeAgo(c)}</span>
+      {extra && <span className="text-muted-foreground">· {extra}</span>}
+    </div>
+  )
+}
+
+/** The post a reply answers, drawn above it and joined by a thread line. */
+function ParentItem({ p }: { p: TubeParent }) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex w-10 shrink-0 flex-col items-center">
+        <Avatar u={p.u} n={p.n} av={p.av} small />
+        <div className="mt-1 w-0.5 flex-1 bg-border" />
+      </div>
+      <div className="min-w-0 flex-1 pb-3 text-muted-foreground">
+        <Byline u={p.u} n={p.n} c={p.c} />
+        <TweetText text={p.x} />
+        <Link
+          href={tweetPermalinkHref(p.t)}
+          className="mt-1 inline-block text-xs hover:text-foreground hover:underline"
+        >
+          View tweet
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 function CommentItem({ c }: { c: TubeComment }) {
   return (
-    <li className="flex gap-3">
-      <Link href={userProfileHref(c.u)} className="shrink-0">
-        {c.av ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={c.av}
-            alt=""
-            loading="lazy"
-            className="h-10 w-10 rounded-full bg-muted object-cover"
-            onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+    <li>
+      {c.p && <ParentItem p={c.p} />}
+      <div className="flex gap-3">
+        <Avatar u={c.u} n={c.n} av={c.av} />
+        <div className="min-w-0 flex-1">
+          <Byline
+            u={c.u}
+            n={c.n}
+            c={c.c}
+            extra={c.ru && !c.p ? `replying to @${c.ru}` : undefined}
           />
-        ) : (
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-medium">
-            {(c.n || c.u || '?').slice(0, 1).toUpperCase()}
+          <TweetText text={c.x} />
+          <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Heart className="h-3.5 w-3.5" /> {c.f.toLocaleString()}
+            </span>
+            {c.st && <span>{STANCE[c.st]}</span>}
+            <Link href={tweetPermalinkHref(c.t)} className="hover:text-foreground hover:underline">
+              View tweet
+            </Link>
           </div>
-        )}
-      </Link>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-          <Link href={userProfileHref(c.u)} className="font-semibold hover:underline">
-            {c.n || `@${c.u}`}
-          </Link>
-          {c.n && <span className="text-muted-foreground">@{c.u}</span>}
-          <span className="text-muted-foreground">· {timeAgo(c.c)}</span>
-          {c.ru && <span className="text-muted-foreground">· replying to @{c.ru}</span>}
-        </div>
-        <TweetText text={c.x} />
-        <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Heart className="h-3.5 w-3.5" /> {c.f.toLocaleString()}
-          </span>
-          {c.st && <span>{STANCE[c.st]}</span>}
-          <Link href={tweetPermalinkHref(c.t)} className="hover:text-foreground hover:underline">
-            View tweet
-          </Link>
         </div>
       </div>
     </li>

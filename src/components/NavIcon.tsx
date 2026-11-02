@@ -7,6 +7,7 @@ import {
   Radio,
   Star,
   TrendingUp,
+  Tv,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   graph: Network,
   bulletin: Megaphone,
   apps: LayoutGrid,
+  tube: Tv,
   ask: MessageSquareText,
 }
 

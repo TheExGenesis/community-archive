@@ -13,6 +13,7 @@ export const analyticsRoutes = {
   '/settings/api-keys': ['api_keys', 'product'],
   '/profile': ['settings', 'product'],
   '/trends': ['trends', 'product'],
+  '/tube': ['tube', 'product'],
   '/user-dir': ['user_directory', 'product'],
   '/user/[account_id]': ['user_profile', 'product'],
   // Cached signed-out views; the browser URL stays /user/... or /tweets/...

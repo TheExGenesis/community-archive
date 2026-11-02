@@ -1,6 +1,7 @@
 import {
   GitBranch,
   LayoutGrid,
+  MessageSquareText,
   Megaphone,
   Network,
   Radio,
@@ -22,6 +23,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   bulletin: Megaphone,
   apps: LayoutGrid,
   tube: Tv,
+  ask: MessageSquareText,
 }
 
 /** The bordered icon tile shown beside each submenu item. */

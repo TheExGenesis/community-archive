@@ -1,4 +1,4 @@
-import { CaTube } from '@/components/tube/CaTube'
+import { TubeHome } from '@/components/tube/TubeHome'
 
 export const metadata = {
   title: 'CA Tube · Community Archive',
@@ -7,5 +7,5 @@ export const metadata = {
 }
 
 export default function TubePage() {
-  return <CaTube />
+  return <TubeHome />
 }

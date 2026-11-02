@@ -269,4 +269,7 @@ CREATE POLICY "Tweet page summaries are publicly readable"
   TO "anon", "authenticated"
   USING (true);
 
+-- No user policies: runs are read and written only by the server's
+-- service-role client, which checks ownership in route code.
+ALTER TABLE "public"."agent_search_runs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.directory_hidden_users ENABLE ROW LEVEL SECURITY;

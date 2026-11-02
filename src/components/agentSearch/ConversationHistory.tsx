@@ -1,0 +1,114 @@
+'use client'
+
+import { useState } from 'react'
+import { History } from 'lucide-react'
+import type { ConversationSummary } from '@/lib/agentSearch/history'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+import { RecentConversations, type DeleteHistory } from './RecentConversations'
+
+export const GHOST_BUTTON =
+  'inline-flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent'
+
+/**
+ * Past questions from inside a conversation: a popover on wide screens, a
+ * bottom sheet on phones. Picking one opens it in place.
+ */
+export function ConversationHistory({
+  conversations,
+  currentId,
+  onOpen,
+  disabled,
+  onDelete,
+  onDeleteAll,
+  loading = false,
+}: {
+  conversations: ConversationSummary[] | null
+  /** The list has not arrived yet: the button shows, the list shows its place. */
+  loading?: boolean
+  currentId: string
+  onOpen: (id: string) => void
+  disabled?: boolean
+  onDelete?: (id: string) => Promise<string | null>
+  onDeleteAll?: DeleteHistory
+}) {
+  // Separate states: both triggers stay mounted (one hidden by CSS), and a
+  // shared one would open the modal sheet behind the popover.
+  const [popoverOpen, setPopoverOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  if (!loading && !conversations?.length) return null
+  const pick = (id: string) => {
+    setPopoverOpen(false)
+    setSheetOpen(false)
+    if (id !== currentId) onOpen(id)
+  }
+  const list = (
+    <RecentConversations
+      conversations={conversations}
+      loading={loading}
+      currentId={currentId}
+      onOpen={pick}
+      variant="compact"
+      onDelete={onDelete}
+      onDeleteAll={onDeleteAll}
+    />
+  )
+  const label = (
+    <>
+      <History aria-hidden="true" className="h-4 w-4" />
+      History
+    </>
+  )
+
+  return (
+    <>
+      <div className="hidden lg:block">
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" disabled={disabled} className={GHOST_BUTTON}>
+              {label}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            aria-label="Past questions"
+            className="max-h-[70vh] w-96 overflow-y-auto p-1"
+          >
+            <p className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+              Past questions
+            </p>
+            {list}
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="lg:hidden">
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger asChild>
+            <button type="button" disabled={disabled} className={GHOST_BUTTON}>
+              {label}
+            </button>
+          </SheetTrigger>
+          <SheetContent
+            side="bottom"
+            className="max-h-[70vh] overflow-y-auto px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4"
+          >
+            <SheetHeader className="px-2 text-left">
+              <SheetTitle className="text-base">Past questions</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">{list}</div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
+  )
+}

@@ -58,6 +58,10 @@
     "fleet:test": "bash fleet/test/run.sh"
   },
   "dependencies": {
+    "@ai-sdk/openai": "4.0.74",
+    "@ai-sdk/openai-compatible": "3.0.55",
+    "@ai-sdk/react": "4.0.116",
+    "@ai-sdk/workflow": "2.0.44",
     "@next/bundle-analyzer": "15.5.28",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-avatar": "^1.1.2",
@@ -91,6 +95,7 @@
     "@tiptap/react": "3.30.5",
     "@tiptap/starter-kit": "3.30.5",
     "@zip.js/zip.js": "^2.7.57",
+    "ai": "7.0.113",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "d3-force": "3.0.0",
@@ -101,6 +106,7 @@
     "geist": "^1.3.1",
     "graphology": "0.26.0",
     "graphology-communities-louvain": "2.0.2",
+    "just-bash": "3.6.0",
     "lucide-react": "^0.304.0",
     "next": "15.5.28",
     "next-themes": "^0.2.1",
@@ -123,7 +129,8 @@
     "tsx": "4.23.15",
     "undici": "6.29.1",
     "winston": "^3.17.0",
-    "workflow": "4.8.2"
+    "workflow": "5.2.2",
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@swc/core": "^1.10.12",
@@ -162,22 +169,19 @@
       "supabase"
     ],
     "overrides": {
-      "@workflow/core@4.8.2>devalue": "5.9.3",
-      "@workflow/world-local@4.2.4>undici": "7.30.1",
-      "@workflow/world-vercel@4.6.2>undici": "7.30.1",
       "next@15.5.28>postcss": "8.5.32",
       "@typescript-eslint/typescript-estree@6.21.0>minimatch": "9.0.7",
-      "@workflow/core@4.8.2>nanoid": "3.3.20",
-      "@workflow/core@4.8.2>zod": "4.6.6",
-      "@workflow/world@4.3.1>zod": "4.6.6",
-      "@workflow/world-local@4.2.4>zod": "4.6.6",
-      "@workflow/world-vercel@4.6.2>zod": "4.6.6",
-      "@workflow/cli@4.3.6>zod": "4.6.6",
+      "@workflow/world-local@5.1.1>undici": "7.30.1",
+      "@workflow/world-vercel@5.2.2>undici": "7.30.1",
+      "guarded-fetch@0.1.3>undici": "7.30.1",
+      "@workflow/core@5.2.2>nanoid": "3.3.20",
+      "@workflow/core@5.2.2>zod": "4.6.6",
+      "@workflow/world@5.0.4>zod": "4.6.6",
+      "@workflow/world-local@5.1.1>zod": "4.6.6",
+      "@workflow/world-vercel@5.2.2>zod": "4.6.6",
+      "@workflow/cli@5.0.5>zod": "4.6.6",
       "@vercel/cli-auth@0.0.1>zod": "4.6.6",
       "@vercel/cli-config@0.2.3>zod": "4.6.6"
-    },
-    "patchedDependencies": {
-      "@workflow/world@4.3.1": "patches/@workflow__world@4.3.1.patch"
     }
   }
 }

@@ -151,10 +151,13 @@ export type NavIcon =
   | 'graph'
   | 'bulletin'
   | 'apps'
+  | 'ask'
 
 export interface NavMenuItem extends NavItem {
   description: string
   icon: NavIcon
+  /** Shown only while Ask the archive is visible to the viewer. */
+  requiresAsk?: true
 }
 
 export interface NavGroup {
@@ -194,6 +197,14 @@ export const getPrimaryNav = (): NavEntry[] => [
   {
     label: 'Explore archive',
     items: [
+      {
+        href: '/search/ask',
+        label: 'Ask the archive',
+        description:
+          'Ask a question; an agent searches members’ tweets and cites them.',
+        icon: 'ask',
+        requiresAsk: true,
+      },
       {
         href: '/user-dir',
         label: 'Explore by user',
@@ -263,6 +274,13 @@ export function isNavItemActive(pathname: string, href: string): boolean {
     (itemPathname !== '/' && pathname.startsWith(`${itemPathname}/`))
   )
 }
+
+/** A group's items the viewer may see: Ask the archive only while visible. */
+export const visibleNavItems = (
+  group: NavGroup,
+  { askVisible }: { askVisible: boolean },
+): NavMenuItem[] =>
+  group.items.filter((item) => !item.requiresAsk || askVisible)
 
 export const isNavGroupActive = (pathname: string, group: NavGroup): boolean =>
   group.items.some((item) => isNavItemActive(pathname, item.href))

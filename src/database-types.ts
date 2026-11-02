@@ -54,6 +54,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"agent_search_runs": {
+                  Row: {
+                    "account_id": string,"answer": string | null,"cited_tweet_ids": (string)[],"completed_at": string | null,"conversation_id": string | null,"cost_usd": number,"deleted_at": string | null,"error": string | null,"id": string,"input_tokens": number,"invalid_citation_ids": (string)[],"key_source": string,"model": string,"output_tokens": number,"parts": Json | null,"question": string,"started_at": string,"status": string,"tool_calls": NonNullable<Json>,"workflow_run_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"answer"?: string | null,"cited_tweet_ids"?: (string)[],"completed_at"?: string | null,"conversation_id"?: string | null,"cost_usd"?: number,"deleted_at"?: string | null,"error"?: string | null,"id": string,"input_tokens"?: number,"invalid_citation_ids"?: (string)[],"key_source"?: string,"model": string,"output_tokens"?: number,"parts"?: Json | null,"question": string,"started_at"?: string,"status": string,"tool_calls"?: NonNullable<Json>,"workflow_run_id"?: string | null
+                  }
+                  Update: {
+                    "account_id"?: string,"answer"?: string | null,"cited_tweet_ids"?: (string)[],"completed_at"?: string | null,"conversation_id"?: string | null,"cost_usd"?: number,"deleted_at"?: string | null,"error"?: string | null,"id"?: string,"input_tokens"?: number,"invalid_citation_ids"?: (string)[],"key_source"?: string,"model"?: string,"output_tokens"?: number,"parts"?: Json | null,"question"?: string,"started_at"?: string,"status"?: string,"tool_calls"?: NonNullable<Json>,"workflow_run_id"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"all_account": {
                   Row: {
                     "account_display_name": string,"account_id": string,"created_at": string,"created_via": string,"is_tombstone": boolean,"num_followers": number | null,"num_following": number | null,"num_likes": number | null,"num_tweets": number | null,"updated_at": string | null,"username": string
@@ -1094,6 +1108,12 @@ isOneToOne: false
                            },
 "admin_set_scrape_block":
 { Args: { "p_account_id": string,"p_blocked": boolean }; Returns: undefined
+                           },
+"agent_search_add_usage":
+{ Args: { "p_cost_usd": number,"p_input_tokens": number,"p_output_tokens": number,"p_run_id": string }; Returns: undefined
+                           },
+"agent_search_admit":
+{ Args: { "p_account_id": string,"p_conversation_id": string,"p_daily_limit": number,"p_global_daily_usd": number,"p_key_source": string,"p_model": string,"p_monthly_limit": number,"p_question": string,"p_run_id": string,"p_stale_after_seconds": number }; Returns: string
                            },
 "apply_public_entities_rls_policies":
 { Args: { "schema_name": string,"table_name": string }; Returns: undefined

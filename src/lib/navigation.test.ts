@@ -63,6 +63,7 @@ describe('site navigation', () => {
       Community: [
         ['Bulletin Board', '/bulletin'],
         ['Community Apps', '/community'],
+        ['CA Tube', '/tube'],
       ],
     })
     expect(nav.slice(0, 2)).toEqual([

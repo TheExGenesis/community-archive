@@ -151,6 +151,7 @@ export type NavIcon =
   | 'graph'
   | 'bulletin'
   | 'apps'
+  | 'tube'
 
 export interface NavMenuItem extends NavItem {
   description: string
@@ -235,6 +236,12 @@ export const getPrimaryNav = (): NavEntry[] => [
         label: 'Community Apps',
         description: 'Explore tools and apps built on the Community Archive.',
         icon: 'apps',
+      },
+      {
+        href: '/tube',
+        label: 'CA Tube',
+        description: 'YouTube videos the community keeps sharing.',
+        icon: 'tube',
       },
     ],
   },

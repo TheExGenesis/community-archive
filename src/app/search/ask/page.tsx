@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import AgentSearch from '@/components/agentSearch/AgentSearch'
 import {
   ASK_PREFILL_PARAMS,
@@ -8,6 +9,7 @@ import {
 } from '@/lib/askFromSearch'
 import { agentSearchEnabled } from '@/lib/agentSearch/enabled'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { agentSearchVisible } from '@/lib/agentSearch/visibility'
 import { loginHref } from '@/lib/authRedirect'
 
 // Eligibility depends on the session cookie, so this page is never cached.
@@ -64,6 +66,8 @@ export default async function AskTheArchivePage({
     >
   >
 }) {
+  // Before launch (AGENT_SEARCH_LAUNCHED) the page exists for admins only.
+  if (!(await agentSearchVisible())) notFound()
   const searchParams = await searchParamsPromise
   const access = await getAgentSearchViewer()
 

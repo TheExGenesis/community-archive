@@ -224,9 +224,9 @@ resolved headers, including the API key, into the event log.
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AGENT_SEARCH_MODEL`                                                                                            | `openrouter:deepseek/deepseek-v4.1-flash`        | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative                                                                                                |
 | `AGENT_SEARCH_TOOLS`                                                                                            | `bash`                                           | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with                                                                        |
-| `AGENT_SEARCH_PROMPT`                                                                                           | `v2-examples`                                    | `v1` (numbered procedure) or `v2` (goal and definition of done, no examples) instead of the default. The route passes it to the run, which keeps it |
-| `AGENT_SEARCH_KEEP_REASONING`                                                                                   | on                                               | `off` stops putting each step's reasoning back on its tool call (the workflow agent drops it between steps; DeepSeek expects it back) |
-| `AGENT_SEARCH_STALL_REMINDER`                                                                                   | on                                               | `off` stops the reminder to take stock after a repeated command or three commands in a row that found nothing new |
+| `AGENT_SEARCH_PROMPT`                                                                                           | `v2-examples`                                    | `v1` (numbered procedure) or `v2` (goal and definition of done, no examples) instead of the default. The route passes it to the run, which keeps it                               |
+| `AGENT_SEARCH_KEEP_REASONING`                                                                                   | on                                               | `off` stops putting each step's reasoning back on its tool call (the workflow agent drops it between steps; DeepSeek expects it back)                                             |
+| `AGENT_SEARCH_STALL_REMINDER`                                                                                   | on                                               | `off` stops the reminder to take stock after a repeated command or three commands in a row that found nothing new                                                                 |
 | `SEMANTIC_SEARCH_URL`                                                                                           | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint                                                                                                                                                          |
 | `OPENROUTER_API_BASE_URL`                                                                                       | `https://openrouter.ai/api/v1`                   | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default                                                                              |
 | `AGENT_SEARCH_SCORER`                                                                                           | unset                                            | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM                                                                   |
@@ -235,6 +235,7 @@ resolved headers, including the API key, into the event log.
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY`                                                                         |                                                  | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true`                                                                                                           |
 | `AGENT_SEARCH_DAILY_LIMIT`                                                                                      | `10`                                             | Questions per member per UTC day                                                                                                                                                  |
 | `AGENT_SEARCH_MONTHLY_LIMIT`                                                                                    | `30`                                             | Questions per member per UTC month, counted like the daily limit; the page shows whichever runs out first                                                                         |
+| `AGENT_SEARCH_LAUNCHED`                                                                                         | off                                              | Set to `true` to show Ask the archive to members; until then only admins see it (see below)                                                                                       |
 | `AGENT_SEARCH_ENABLED`                                                                                          | on                                               | Set to `false` to pause new questions (history still works); see below                                                                                                            |
 | `AGENT_SEARCH_GLOBAL_DAILY_USD`                                                                                 | `25`                                             | Global daily spend kill switch                                                                                                                                                    |
 | `AGENT_SEARCH_RUN_DEADLINE_MS`                                                                                  | `300000`                                         | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools                     |
@@ -274,6 +275,22 @@ questions; house questions keep their own counts). They add it from the
   member's key add tokens but no cost, so `cost_usd` and the global daily cap
   count house spend only. The scorer and the semantic search still run on the
   house, so own-key questions still stop when the global cap is reached.
+
+### Launching Ask the archive
+
+`AGENT_SEARCH_LAUNCHED` is the launch flag (`src/lib/agentSearch/enabled.ts`).
+Unset means not launched, so the feature can ship to production before members
+see it. Until it is set to `true` (or `1`, `on`, `yes`), only admins
+(`isAdminUser`) see Ask the archive; for everyone else:
+
+- The "Ask the archive" nav item and the search-box entry points are hidden
+  (`/api/auth/navigation` reports `askVisible: false` and `askEnabled: false`).
+- `/search/ask` answers 404.
+- `POST /api/agent-search` and `POST /api/agent-search/key` answer
+  `404 { error: 'not_found' }` before any check, admission or spend.
+
+Local development needs `AGENT_SEARCH_LAUNCHED=true` too, unless you sign in
+as an admin.
 
 ### Pausing Ask the archive
 

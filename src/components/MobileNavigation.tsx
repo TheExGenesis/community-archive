@@ -19,9 +19,11 @@ import {
   navAnalyticsDestination,
   NavEntry,
   NavGroup,
+  visibleNavItems,
 } from '@/lib/navigation'
 import { cn } from '@/utils/tailwind'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { useNavigationAudience } from '@/components/NavigationAudience'
 
 function trackClick(href: string, alreadyActive: boolean) {
   capturePostHogEvent('navigation_item_clicked', {
@@ -41,6 +43,7 @@ function MobileGroup({
   onNavigate: () => void
 }) {
   const isActive = isNavGroupActive(pathname, group)
+  const items = visibleNavItems(group, useNavigationAudience())
   const [expanded, setExpanded] = useState(isActive)
   const panelId = `mobile-nav-${group.label.toLowerCase().replace(/\s+/g, '-')}`
 
@@ -67,7 +70,7 @@ function MobileGroup({
       </button>
       {expanded && (
         <ul id={panelId} className="mb-2 space-y-0.5">
-          {group.items.map((item) => {
+          {items.map((item) => {
             const itemActive = isNavItemActive(pathname, item.href)
             return (
               <li key={item.href}>

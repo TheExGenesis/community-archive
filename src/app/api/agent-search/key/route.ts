@@ -12,6 +12,7 @@ import {
   OWN_KEY_HEADER,
   looksLikeOpenRouterKey,
 } from '@/lib/agentSearch/ownKey'
+import { agentSearchVisible } from '@/lib/agentSearch/visibility'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,12 @@ const noStore = { 'Cache-Control': 'private, no-store' }
 // The key arrives in a header and is only passed to OpenRouter; nothing is
 // stored, logged or echoed back.
 export async function POST(request: Request) {
+  if (!(await agentSearchVisible())) {
+    return NextResponse.json(
+      { error: 'not_found' },
+      { status: 404, headers: noStore },
+    )
+  }
   const access = await getAgentSearchAccess()
   if (!access.ok) {
     return NextResponse.json(

@@ -3,6 +3,7 @@ import {
   getMobileNav,
   getPrimaryNav,
   isNavGroup,
+  visibleNavItems,
   isNavGroupActive,
   getTweetBackLink,
   isNavItemActive,
@@ -169,4 +170,14 @@ test('bulletin navigation preserves the source return link', () => {
   )
   expect(navAnalyticsDestination('/bulletin')).toBe('opportunities')
   expect(getTweetBackLink({ from: 'opportunities' }).href).toBe('/bulletin')
+})
+
+test('Ask the archive is listed only while visible to the viewer', () => {
+  const groups = getPrimaryNav().filter(isNavGroup)
+  const hrefs = (askVisible: boolean) =>
+    groups.flatMap((group) =>
+      visibleNavItems(group, { askVisible }).map((item) => item.href),
+    )
+  expect(hrefs(false)).not.toContain('/search/ask')
+  expect(hrefs(true)).toContain('/search/ask')
 })

@@ -1,4 +1,5 @@
 import { agentSearchEnabled } from '@/lib/agentSearch/enabled'
+import { agentSearchVisible } from '@/lib/agentSearch/visibility'
 import { createModelCallToUIChunkTransform } from '@ai-sdk/workflow'
 import { createUIMessageStreamResponse } from 'ai'
 import { NextResponse } from 'next/server'
@@ -67,6 +68,13 @@ const ownKeyRefusal = (reason: OwnKeyError) =>
   )
 
 export async function POST(request: Request) {
+  // Not launched (AGENT_SEARCH_LAUNCHED) and not an admin: Ask doesn't exist.
+  if (!(await agentSearchVisible())) {
+    return NextResponse.json(
+      { error: 'not_found' },
+      { status: 404, headers: noStore },
+    )
+  }
   // Paused (AGENT_SEARCH_ENABLED): no new questions; history still works.
   if (!agentSearchEnabled()) {
     return NextResponse.json(

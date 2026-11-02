@@ -95,7 +95,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
         <Menu className="h-5 w-5" />
       </button>
       <Link href="/tube" className="flex shrink-0 items-center gap-1.5">
-        <span className="flex h-6 w-8 items-center justify-center rounded-md bg-[#e8553f] text-white">
+        <span className="flex h-6 w-8 items-center justify-center rounded-md bg-brand text-brand-foreground">
           <svg viewBox="0 0 10 10" className="h-3 w-3 fill-current" aria-hidden>
             <path d="M2 1l7 4-7 4z" />
           </svg>

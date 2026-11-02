@@ -113,7 +113,7 @@ export function TubeWatch({ id }: { id: string }) {
                 alt=""
                 className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
               />
-              <span className="absolute left-1/2 top-1/2 flex h-14 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-[#e8553f] text-white shadow-lg transition-transform group-hover:scale-110">
+              <span className="absolute left-1/2 top-1/2 flex h-14 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-brand text-brand-foreground shadow-lg transition-transform group-hover:scale-110">
                 <Play className="h-7 w-7 fill-current" />
               </span>
             </button>
@@ -289,7 +289,7 @@ function TweetText({ text }: { text: string }) {
             href={p}
             target="_blank"
             rel="noreferrer"
-            className="text-[#e8553f] hover:underline"
+            className="text-brand hover:underline"
           >
             ▶ link
           </a>

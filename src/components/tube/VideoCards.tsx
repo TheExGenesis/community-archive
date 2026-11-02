@@ -23,7 +23,7 @@ function Thumb({ v, className }: { v: TubeVideo; className: string }) {
         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
       />
       {seen && (
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-[#e8553f]" aria-label="watched" />
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-brand" aria-label="watched" />
       )}
     </div>
   )

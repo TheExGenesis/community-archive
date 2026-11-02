@@ -213,7 +213,7 @@ export function TubeSettings() {
           type="checkbox"
           checked={state.frames}
           onChange={(e) => setFrames(e.target.checked)}
-          className="mt-1 h-5 w-5 shrink-0 accent-[#e8553f]"
+          className="mt-1 h-5 w-5 shrink-0 accent-brand"
         />
       </label>
       <div className="flex items-start justify-between gap-6 pt-6">

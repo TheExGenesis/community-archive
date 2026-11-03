@@ -1,3 +1,7 @@
+// ai is ESM-only; tool() only needs to hand back its definition here.
+jest.mock('ai', () => ({ tool: (definition: unknown) => definition }))
+jest.mock('./toolImpl', () => ({ AGENT_SEARCH_TOOL_EXECUTORS: {} }))
+
 import { askerInstructions, agentSearchInstructions } from './agent'
 import { lookupAsker } from './asker'
 import { getUser } from './gateway'

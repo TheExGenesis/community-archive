@@ -403,6 +403,45 @@ written by the harnesses themselves (`fleet/lib/common.sh`):
 Operator view, in reading order: dashboard → digest → inbox → run directory
 (control-panel `docs/ca-fleet-operations.md`, "Watching the fleet").
 
+### Talking to the fleet in Slack
+
+The Slack agent (`fleet/slack/`, user unit `fleet-slack` on `ca-fleet`,
+Socket Mode) is the conversational front of the same machinery. It acts
+only on messages and clicks from the member ids in
+`SLACK_ALLOWED_USER_IDS`; everyone else is ignored.
+
+- **Ask for work.** Mention the bot in a channel or DM it. It answers in a
+  thread with one status message it keeps editing (`☑ understanding ▶
+working ☐ gate ☐ PR ☐ waiting on you`), progress lines from the Claude
+  Code session (what it read, edited, ran), and its own text. Each thread is
+  one Claude session, one run directory (`<ts>-slack`) and one worktree:
+  reply in the thread to answer a question or steer the work, say `stop` to
+  drop it. The rules it works under are `fleet/slack/INSTRUCTIONS.md`,
+  appended to the system prompt on every run: Tier 0 / Tier 1 from the memo,
+  one issue per change, ask first when the change is not obvious, over 300
+  lines, or near auth, consent, API contracts or data; never push to `main`.
+- **Ship.** After a green gate (the fixer's four checks) it commits
+  `[fleet:slack] <title>`, pushes `fleet/slack-<ts>`, opens the PR, reads it
+  back, and posts the link with **Merge** and **Not now**. Merge works only
+  for an allowed user, when the PR is open, mergeable and every check is
+  green, and no Tier 1 path is in it; then it squash-merges, confirms, and
+  closes the linked issue. Tier 1 changes get a PR without a Merge button.
+  `FLEET_MODE=main` is not used from Slack.
+- **Inbox.** Every five minutes new `signal` and `bug` issues are posted
+  once each into `SLACK_SIGNALS_CHANNEL` (title, severity, route, link,
+  summary) with a one-turn classification in the thread ("looks obvious,
+  shall I fix it?", "needs a decision: …", "probably wontfix because …")
+  and a **Go ahead** button. No fix starts without a click or a reply.
+- **Commands.** `status` (timers, last canary, open fleet PRs, today's cost
+  and runs), `runs` (`runs.sh list 10`), `run <id>` (transcript excerpt plus
+  the Grafana link), `help`.
+
+Every task leaves the usual evidence (`result.json`, `transcript.*`,
+`loki.jsonl`, metrics under `routine="slack"`), and the thread ends with the
+run id and the transcript link when `FLEET_RUNS_EXPLORE_URL` is set. Setup
+(manifest, tokens, enabling the unit) is in the control-panel runbook
+`docs/ca-fleet-operations.md`, section "Slack agent".
+
 ### Tests
 
 `pnpm fleet:test` runs `shellcheck` over `fleet/` and the tests in
@@ -410,5 +449,8 @@ Operator view, in reading order: dashboard → digest → inbox → run director
 guard, full fixer runs in both modes against a bare git remote with fake
 `gh`/`claude`/`pnpm`, canary runs with a fake `curl`/`npx` including the
 rollback path, the metrics textfile and failure signals, and the digest in
-dry-run and posting mode). CI runs it in the pull-request workflow after the
-unit tests.
+dry-run and posting mode), after type-checking `fleet/slack` and running
+its `node:test` suite (summariser, status checklist, SQLite store, merge
+guard, intake dedupe, Slack routing, and whole tasks through `task.sh`
+against a bare git remote with the same fakes). CI runs it in the
+pull-request workflow after the unit tests.

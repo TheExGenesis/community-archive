@@ -68,6 +68,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"agent_search_shared_conversations": {
+                  Row: {
+                    "account_id": string,"conversation_id": string,"shared_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"conversation_id": string,"shared_at"?: string
+                  }
+                  Update: {
+                    "account_id"?: string,"conversation_id"?: string,"shared_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"all_account": {
                   Row: {
                     "account_display_name": string,"account_id": string,"created_at": string,"created_via": string,"is_tombstone": boolean,"num_followers": number | null,"num_following": number | null,"num_likes": number | null,"num_tweets": number | null,"updated_at": string | null,"username": string

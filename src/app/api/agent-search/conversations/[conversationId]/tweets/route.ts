@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { readConversationForViewer } from '@/lib/agentSearch/conversationAccess'
 import {
   MAX_TWEET_IDS_PER_REQUEST,
   conversationTweetIds,
   fetchConversationTweets,
 } from '@/lib/agentSearch/historyTweets'
-import { ownConversationRuns } from '@/lib/agentSearch/ownConversation'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,31 +14,22 @@ const TWEET_ID = /^\d{1,20}$/
 
 // The tweets a stored conversation refers to, fetched again through the
 // gateway (which applies opt-outs) for the page to fill in as they arrive.
-// Only the asker may read them, and only ids the conversation's stored runs
-// hold: this is not a general tweet lookup. A deleted conversation lists no
-// runs, so its ids are gone with it.
+// Only the asker, or a reader of a shared conversation, may read them, and
+// only ids the conversation's stored runs hold: this is not a general tweet
+// lookup. A deleted conversation lists no runs, so its ids are gone with it.
 export async function POST(
   request: Request,
   { params: paramsPromise }: { params: Promise<{ conversationId: string }> },
 ) {
   const params = await paramsPromise
-  const access = await getAgentSearchViewer()
-  if (!access.ok) {
+  const read = await readConversationForViewer(params.conversationId)
+  if (!read.ok) {
     return NextResponse.json(
-      { error: access.reason },
-      { status: access.reason === 'signed_out' ? 401 : 403, headers: noStore },
+      { error: read.error },
+      { status: read.status, headers: noStore },
     )
   }
-  const runs = await ownConversationRuns(
-    params.conversationId,
-    access.viewer.accountId,
-  )
-  if (!runs) {
-    return NextResponse.json(
-      { error: 'not_found' },
-      { status: 404, headers: noStore },
-    )
-  }
+  const { runs } = read
   const body = (await request.json().catch(() => null)) as {
     ids?: unknown
   } | null

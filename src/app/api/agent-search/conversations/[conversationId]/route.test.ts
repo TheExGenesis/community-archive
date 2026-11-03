@@ -26,7 +26,11 @@ jest.mock('@ai-sdk/openai-compatible', () => ({
   createOpenAICompatible: jest.fn(),
 }))
 
-const store = { listConversation: jest.fn(), deleteConversation: jest.fn() }
+const store = {
+  listConversation: jest.fn(),
+  deleteConversation: jest.fn(),
+  getShare: jest.fn(),
+}
 const ID = 'conv-12345678'
 const call = (id = ID) =>
   DELETE(new Request(`http://localhost/x/${id}`, { method: 'DELETE' }), {
@@ -53,6 +57,7 @@ beforeEach(() => {
     viewer: { accountId: 'acct-1' },
   } as never)
   store.deleteConversation.mockResolvedValue(1)
+  store.getShare.mockResolvedValue(null)
 })
 
 describe('GET', () => {
@@ -60,7 +65,7 @@ describe('GET', () => {
   // the list names a workspace file holding 3; 4 is only in the sources.
   const answer =
     'Said [[t:1]], [[q:2 | words]] and [[t:5]]\n[[posts: All | lists/a.jsonl]]'
-  const stored = () =>
+  const stored = (overrides: Record<string, unknown> = {}) =>
     run({
       question: 'Who?',
       answer,
@@ -83,6 +88,7 @@ describe('GET', () => {
         ],
         answer,
       ),
+      ...overrides,
     })
 
   test('answers at once, without the gateway, with the tweets as references to fetch in priority order', async () => {
@@ -118,6 +124,87 @@ describe('GET', () => {
     expect((await get()).status).toBe(404)
     expect((await get('../x')).status).toBe(404)
     expect(fetchConversationTweets).not.toHaveBeenCalled()
+  })
+
+  test('the asker is told whether it is shared', async () => {
+    store.listConversation.mockResolvedValue([stored()])
+    expect(await (await get()).json()).toMatchObject({
+      readOnly: false,
+      shared: false,
+    })
+    store.getShare.mockResolvedValue({ accountId: 'acct-1' })
+    expect(await (await get()).json()).toMatchObject({
+      readOnly: false,
+      shared: true,
+    })
+  })
+
+  describe('a shared conversation', () => {
+    const share = { conversationId: ID, accountId: 'acct-2' }
+
+    test('is read by anyone with its link, signed in or not, finished turns only', async () => {
+      store.getShare.mockResolvedValue(share)
+      store.listConversation.mockResolvedValue([
+        stored({ accountId: 'acct-2' }),
+        run({ id: 'r2', accountId: 'acct-2', status: 'running' }),
+      ])
+      for (const access of [
+        { ok: false, reason: 'signed_out' },
+        { ok: false, reason: 'not_eligible' },
+        { ok: true, viewer: { accountId: 'acct-1' } },
+      ]) {
+        jest.mocked(getAgentSearchViewer).mockResolvedValue(access as never)
+        const response = await get()
+        expect(response.status).toBe(200)
+        expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+        const body = await response.json()
+        expect(body).toMatchObject({
+          readOnly: true,
+          shared: true,
+          runningRunId: null,
+        })
+        expect(body.messages.map((m: { id: string }) => m.id)).toEqual([
+          'r1-question',
+          'r1',
+        ])
+        expect(body.pendingTweetIds).toEqual(['1', '2', '5', '3', '4'])
+      }
+    })
+
+    test('is the asker’s own when they open it', async () => {
+      store.getShare.mockResolvedValue({ ...share, accountId: 'acct-1' })
+      store.listConversation.mockResolvedValue([stored()])
+      expect(await (await get()).json()).toMatchObject({
+        readOnly: false,
+        shared: true,
+      })
+    })
+
+    test('never shows runs another account stored under the shared id', async () => {
+      store.getShare.mockResolvedValue(share)
+      store.listConversation.mockResolvedValue([
+        stored({ accountId: 'acct-2' }),
+        stored({ id: 'r9', accountId: 'acct-3' }),
+      ])
+      jest
+        .mocked(getAgentSearchViewer)
+        .mockResolvedValue({ ok: false, reason: 'signed_out' } as never)
+      expect((await get()).status).toBe(401)
+    })
+
+    test('not shared, a visitor is refused as before', async () => {
+      store.listConversation.mockResolvedValue([
+        stored({ accountId: 'acct-2' }),
+      ])
+      jest
+        .mocked(getAgentSearchViewer)
+        .mockResolvedValue({ ok: false, reason: 'signed_out' } as never)
+      expect((await get()).status).toBe(401)
+      jest
+        .mocked(getAgentSearchViewer)
+        .mockResolvedValue({ ok: false, reason: 'not_eligible' } as never)
+      expect((await get()).status).toBe(403)
+    })
   })
 })
 

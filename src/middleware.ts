@@ -421,6 +421,18 @@ function memberPreviewEnabled(): boolean {
   )
 }
 
+/**
+ * A link to an Ask the archive conversation. It may be shared, which makes
+ * it readable signed out, and only the page can tell (it reads the share);
+ * an unshared one gets the page's own sign-in prompt, which returns here.
+ */
+function sharedAskLink(url: URL): boolean {
+  return (
+    /^\/search\/ask\/?$/.test(url.pathname) &&
+    /^[A-Za-z0-9_-]{8,100}$/.test(url.searchParams.get('c') ?? '')
+  )
+}
+
 /** Temporary login requirement for archive search and account browsing. */
 function requiresLogin(pathname: string): boolean {
   return [
@@ -671,7 +683,8 @@ export async function middleware(request: NextRequest) {
   const guestPreview =
     pathname === '/search' ||
     /^\/user-dir\/?$/.test(pathname) ||
-    /^\/user\/[^/]+\/?$/.test(pathname)
+    /^\/user\/[^/]+\/?$/.test(pathname) ||
+    sharedAskLink(request.nextUrl)
   // In local development the member preview (see the end of this function)
   // stands in for a signed-in viewer, so it passes the login wall too.
   let authenticated =

@@ -124,6 +124,23 @@ export interface AgentSearchRunStore {
   deleteConversation(accountId: string, conversationId: string): Promise<number>
   /** The same for every conversation of the member's. */
   deleteAllConversations(accountId: string): Promise<number>
+  /**
+   * Who shared the conversation and when, or null when it is not shared.
+   * Sharing is by conversation: a shared one is readable by anyone with its
+   * link, follow-ups included, until the member stops sharing or deletes it.
+   */
+  getShare(conversationId: string): Promise<ConversationShare | null>
+  /** Shares the member's conversation; already shared, it stays as it was. */
+  shareConversation(accountId: string, conversationId: string): Promise<void>
+  /** Stops sharing it. Nothing happens when it was not shared. */
+  unshareConversation(accountId: string, conversationId: string): Promise<void>
+}
+
+/** A conversation its asker shared. */
+export interface ConversationShare {
+  conversationId: string
+  accountId: string
+  sharedAt: string
 }
 
 /** What deleting a run clears: everything the member wrote or was shown. */
@@ -158,6 +175,8 @@ function withoutContent<T extends Partial<AgentSearchRun>>(patch: T): T {
 }
 
 type RunRow = Database['public']['Tables']['agent_search_runs']['Row']
+type ShareRow =
+  Database['public']['Tables']['agent_search_shared_conversations']['Row']
 type RunInsert = Database['public']['Tables']['agent_search_runs']['Insert']
 type RunUpdate = Database['public']['Tables']['agent_search_runs']['Update']
 
@@ -271,6 +290,50 @@ export function createFileRunStore(
   const fileFor = (id: string) => {
     assertRunId(id)
     return path.join(dir, `${id}.json`)
+  }
+  // Shares sit in their own directory, so the run listing never reads one
+  // as a run.
+  const sharesDir = path.join(dir, 'shares')
+  const shareFileFor = (conversationId: string) => {
+    assertRunId(conversationId)
+    return path.join(sharesDir, `${conversationId}.json`)
+  }
+  const readShare = async (
+    conversationId: string,
+  ): Promise<ConversationShare | null> => {
+    try {
+      return JSON.parse(
+        await readFile(shareFileFor(conversationId), 'utf8'),
+      ) as ConversationShare
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw error
+    }
+  }
+  const removeShare = async (accountId: string, conversationId: string) => {
+    const share = await readShare(conversationId)
+    if (!share || share.accountId !== accountId) return
+    await unlink(shareFileFor(conversationId)).catch((error) => {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    })
+  }
+  const listShares = async (accountId: string) => {
+    let names: string[]
+    try {
+      names = await readdir(sharesDir)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+      throw error
+    }
+    const shares = await Promise.all(
+      names
+        .filter((name) => name.endsWith('.json'))
+        .map((name) => readShare(name.slice(0, -'.json'.length))),
+    )
+    return shares.filter(
+      (share): share is ConversationShare =>
+        share !== null && share.accountId === accountId,
+    )
   }
 
   const withLock = <T>(id: string, task: () => Promise<T>): Promise<T> => {
@@ -432,13 +495,37 @@ export function createFileRunStore(
         .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
         .slice(-MAX_CONVERSATION_RUNS)
     },
-    deleteConversation: (accountId, conversationId) =>
-      clearRuns(
+    // A deleted conversation is no longer shared: its link shows nothing.
+    deleteConversation: async (accountId, conversationId) => {
+      await removeShare(accountId, conversationId)
+      return clearRuns(
         (run) =>
           run.accountId === accountId && run.conversationId === conversationId,
-      ),
-    deleteAllConversations: (accountId) =>
-      clearRuns((run) => run.accountId === accountId),
+      )
+    },
+    deleteAllConversations: async (accountId) => {
+      for (const share of await listShares(accountId)) {
+        await removeShare(accountId, share.conversationId)
+      }
+      return clearRuns((run) => run.accountId === accountId)
+    },
+    getShare: readShare,
+    async shareConversation(accountId, conversationId) {
+      const existing = await readShare(conversationId)
+      if (existing?.accountId === accountId) return
+      await mkdir(sharesDir, { recursive: true })
+      const share: ConversationShare = {
+        conversationId,
+        accountId,
+        sharedAt: new Date().toISOString(),
+      }
+      await writeFile(
+        shareFileFor(conversationId),
+        JSON.stringify(share, null, 2),
+        'utf8',
+      )
+    },
+    unshareConversation: removeShare,
   }
 
   async function clearRuns(match: (run: AgentSearchRun) => boolean) {
@@ -601,6 +688,14 @@ export function createSupabaseRunStore(
   > = createServerServiceRoleClient(),
 ): AgentSearchRunStore {
   const table = () => client.from('agent_search_runs')
+  const shares = () => client.from('agent_search_shared_conversations')
+  const unshare = async (accountId: string, conversationId?: string) => {
+    let query = shares().delete().eq('account_id', accountId)
+    if (conversationId !== undefined)
+      query = query.eq('conversation_id', conversationId)
+    const { error } = await query
+    if (error) throw new Error(`Agent search unshare failed: ${error.message}`)
+  }
 
   return {
     async create(run) {
@@ -738,7 +833,9 @@ export function createSupabaseRunStore(
         )
       return (data ?? []).map(fromRow).reverse()
     },
+    // A deleted conversation is no longer shared: its link shows nothing.
     async deleteConversation(accountId, conversationId) {
+      await unshare(accountId, conversationId)
       const { data, error } = await table()
         .update(clearedRow())
         .eq('account_id', accountId)
@@ -749,6 +846,7 @@ export function createSupabaseRunStore(
       return data?.length ?? 0
     },
     async deleteAllConversations(accountId) {
+      await unshare(accountId)
       const { data, error } = await table()
         .update(clearedRow())
         .eq('account_id', accountId)
@@ -757,8 +855,34 @@ export function createSupabaseRunStore(
       if (error) throw new Error(`Agent search delete failed: ${error.message}`)
       return data?.length ?? 0
     },
+    async getShare(conversationId) {
+      const { data, error } = await shares()
+        .select('conversation_id, account_id, shared_at')
+        .eq('conversation_id', conversationId)
+        .maybeSingle()
+      if (error)
+        throw new Error(`Agent search share read failed: ${error.message}`)
+      return data ? shareFromRow(data) : null
+    },
+    async shareConversation(accountId, conversationId) {
+      // The route has checked the conversation is the member's; a row that
+      // exists already keeps its date.
+      const { error } = await shares().upsert(
+        { conversation_id: conversationId, account_id: accountId },
+        { onConflict: 'conversation_id', ignoreDuplicates: true },
+      )
+      if (error) throw new Error(`Agent search share failed: ${error.message}`)
+    },
+    unshareConversation: (accountId, conversationId) =>
+      unshare(accountId, conversationId),
   }
 }
+
+const shareFromRow = (row: ShareRow): ConversationShare => ({
+  conversationId: row.conversation_id,
+  accountId: row.account_id,
+  sharedAt: row.shared_at,
+})
 
 function clearedRow(): RunUpdate {
   return toRowPatch(clearedContent(new Date().toISOString()))

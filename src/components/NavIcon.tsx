@@ -1,7 +1,7 @@
 import {
   GitBranch,
-  LayoutGrid,
   MessageSquareText,
+  Map as MapIcon,
   Megaphone,
   Network,
   Radio,
@@ -21,7 +21,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   trends: TrendingUp,
   graph: Network,
   bulletin: Megaphone,
-  apps: LayoutGrid,
+  map: MapIcon,
   tube: Tv,
   ask: MessageSquareText,
 }

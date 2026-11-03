@@ -1,5 +1,4 @@
 jest.mock('server-only', () => ({}))
-jest.mock('next/headers', () => ({ headers: jest.fn() }))
 jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
 jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
 jest.mock('@/lib/auth-utils', () => ({ getOptInStatus: jest.fn() }))

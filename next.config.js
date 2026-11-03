@@ -19,6 +19,8 @@ const nextConfig = {
     'guarded-fetch',
   ],
   outputFileTracingIncludes: {
+    // The homepage's CA Tube panel reads the snapshot from disk.
+    '/': ['./public/tube/videos.json'],
     '/user/*/opengraph-image': [
       './src/app/user/*/community-archive-logo-white.png',
     ],

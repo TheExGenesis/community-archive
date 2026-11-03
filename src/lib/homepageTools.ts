@@ -1,5 +1,6 @@
 import 'server-only'
-import { headers } from 'next/headers'
+import { readFile } from 'fs/promises'
+import path from 'path'
 import { unstable_cache } from 'next/cache'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getOptInStatus } from '@/lib/auth-utils'
@@ -31,28 +32,18 @@ export function pickHomepageTubeVideos(data: TubeData): TubeVideo[] {
     .slice(0, HOMEPAGE_TOOL_ITEMS)
 }
 
-// The snapshot is a 1.4 MB static file; cache only the three picks.
-const cachedTubePicks = unstable_cache(
-  async (origin: string) => {
-    const response = await fetch(new URL(TUBE_DATA_URL, origin), {
-      cache: 'no-store',
-    })
-    if (!response.ok) throw new Error(`Tube data returned ${response.status}`)
-    return pickHomepageTubeVideos((await response.json()) as TubeData)
+// The snapshot is a 1.4 MB static file traced into the homepage function
+// (next.config.js); cache only the three picks.
+export const loadHomepageTube = unstable_cache(
+  async (): Promise<TubeVideo[]> => {
+    const file = path.join(process.cwd(), 'public', TUBE_DATA_URL)
+    return pickHomepageTubeVideos(
+      JSON.parse(await readFile(file, 'utf8')) as TubeData,
+    )
   },
   ['homepage-tube-picks'],
   { revalidate: 3600 },
 )
-
-export async function loadHomepageTube(): Promise<TubeVideo[]> {
-  const requestHeaders = await headers()
-  const host = requestHeaders.get('host')
-  if (!host) return []
-  const protocol =
-    requestHeaders.get('x-forwarded-proto') ??
-    (host.startsWith('localhost') ? 'http' : 'https')
-  return cachedTubePicks(`${protocol}://${host}`)
-}
 
 /**
  * Mirrors the Bulletin page's consent gate without its redirects, so guests

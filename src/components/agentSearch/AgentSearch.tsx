@@ -3,9 +3,10 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, ChevronLeft, Lock, Plus, Quote, X } from 'lucide-react'
+import { ArrowUp, ChevronLeft, Globe, Lock, Plus, Quote, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { ConversationSummary } from '@/lib/agentSearch/history'
 import type { AgentTweet } from '@/lib/agentSearch/types'
@@ -33,6 +34,8 @@ import { StepLog, type StopState } from './StepLog'
 import { TweetLinksInNewTab } from '@/components/portal/tweetLinks'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConversationHistory, GHOST_BUTTON } from './ConversationHistory'
+import { ShareConversation } from './ShareConversation'
+import { loginHref } from '@/lib/authRedirect'
 import { createReconnectingFetch } from './reconnectingFetch'
 import {
   answerText,
@@ -79,6 +82,10 @@ interface StoredConversation {
   pendingTweetIds?: string[]
   /** Cited tweets the gateway no longer returns. */
   unavailableTweetIds?: string[]
+  /** Someone else's conversation, shared: to read, not to continue. */
+  readOnly?: boolean
+  /** The asker has shared it: anyone with the link can read it. */
+  shared?: boolean
 }
 
 /** One batch from the tweets route; a refusal is not tried again. */
@@ -123,6 +130,9 @@ function mergeSupply(
 }
 
 const questionAnchor = (messageId: string) => `ask-question-${messageId}`
+
+const BACK_BUTTON =
+  'inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent'
 
 /**
  * Whether a run's stored answer should take the place of what its stream
@@ -226,12 +236,19 @@ export default function AgentSearch({
   initialConversationId = null,
   initialPrefill = null,
   paused = false,
+  guest = false,
 }: {
   initialConversationId?: string | null
   /** A search handed over from archive search; prefilled, never sent. */
   initialPrefill?: AskPrefill | null
   /** New questions are off (AGENT_SEARCH_ENABLED); history still works. */
   paused?: boolean
+  /**
+   * The viewer cannot ask (signed out, or not a member) and is here to read
+   * a shared conversation: no history, no composer, and the way out is the
+   * page itself.
+   */
+  guest?: boolean
 }) {
   const [conversation, setConversation] = useState<Conversation>(() => ({
     id: initialConversationId ?? newConversationId(),
@@ -240,6 +257,10 @@ export default function AgentSearch({
   }))
   const [loading, setLoading] = useState(Boolean(initialConversationId))
   const [loadError, setLoadError] = useState<string | null>(null)
+  // The conversation on screen is someone else's, shared: read only.
+  const [readOnly, setReadOnly] = useState(guest)
+  // The asker has shared the conversation on screen.
+  const [shared, setShared] = useState(false)
   const [recent, setRecent] = useState<ConversationSummary[] | null>(null)
   // The list and the quota arrive together; until then both show
   // placeholders, so "no history yet" is never shown while loading.
@@ -444,6 +465,11 @@ export default function AgentSearch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const fetchRecent = async () => {
+    // A guest has no history and no questions to count.
+    if (guest) {
+      setRecentLoaded(true)
+      return
+    }
     try {
       const response = await fetch('/api/agent-search/conversations', {
         cache: 'no-store',
@@ -521,6 +547,8 @@ export default function AgentSearch({
       loaderRef.current = loader
       loader.load(pendingTweetIds)
     }
+    setReadOnly(body.readOnly === true)
+    setShared(body.shared === true)
     // The stored answers are the server's own: nothing to settle with it,
     // and a Stop can only be for the run still going.
     runIdRef.current = body.runningRunId ?? null
@@ -893,10 +921,17 @@ export default function AgentSearch({
   // same entry when the open one was deleted, unchanged after Back or Forward.
   const resetConversation = (url: 'push' | 'replace' | 'keep') => {
     if (busy) return
+    // A guest has nowhere to go but the page's own gate.
+    if (guest) {
+      window.location.assign('/search/ask')
+      return
+    }
     if (error) clearError()
     leaveLoadBehind()
     setLoading(false)
     setLoadError(null)
+    setReadOnly(false)
+    setShared(false)
     const fresh = newConversationId()
     shownConversationRef.current = fresh
     stopTweetLoader()
@@ -968,6 +1003,37 @@ export default function AgentSearch({
   const deleteAllHistory = () =>
     deleteHistory('/api/agent-search/conversations', true)
 
+  // Sharing the open conversation: the server keeps the switch, so a reload
+  // or another device shows it the same way.
+  const changeShare = async (method: 'POST' | 'DELETE') => {
+    const id = conversation.id
+    try {
+      const response = await fetch(
+        `/api/agent-search/conversations/${encodeURIComponent(id)}/share`,
+        { method },
+      )
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as {
+          error?: string
+        }
+        return body.error === 'no_answer_yet'
+          ? 'Wait for the answer to finish first.'
+          : method === 'POST'
+            ? 'Could not share. Try again.'
+            : 'Could not stop sharing. Try again.'
+      }
+    } catch {
+      return method === 'POST'
+        ? 'Could not share. Try again.'
+        : 'Could not stop sharing. Try again.'
+    }
+    // Still the same conversation on screen.
+    if (shownConversationRef.current === id) setShared(method === 'POST')
+    return null
+  }
+  const shareConversation = () => changeShare('POST')
+  const unshareConversation = () => changeShare('DELETE')
+
   // The box sends what is typed plus any filters a handed-over search left.
   const sendDraft = () => {
     if (!input.trim() || busy || loading) return
@@ -1024,6 +1090,7 @@ export default function AgentSearch({
 
   const hasThread = messages.length > 0
   const lastIndex = messages.length - 1
+  const hasAnswer = messages.some((message) => message.role === 'assistant')
   // Where a Stop pressed on this question stands with the server.
   const stopStateFor = (questionId: string): StopState | null =>
     stopping?.questionId === questionId
@@ -1218,6 +1285,37 @@ export default function AgentSearch({
     </div>
   )
 
+  // Someone else's shared conversation: no follow-ups, and the way to a
+  // question of one's own. A guest signs in first; the page gates them.
+  const readerNote = (
+    <p className="text-sm leading-6 text-muted-foreground">
+      {guest ? (
+        <>
+          A member shared this conversation from Ask the archive.{' '}
+          <Link
+            href={loginHref('/search/ask')}
+            className="text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground"
+          >
+            Sign in
+          </Link>{' '}
+          to ask your own questions.
+        </>
+      ) : (
+        <>
+          Another member shared this conversation.{' '}
+          <button
+            type="button"
+            onClick={startNewConversation}
+            className="text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Ask your own question
+          </button>
+          .
+        </>
+      )}
+    </p>
+  )
+
   const inThread = hasThread || loading
   // The citation sidebar sits beside the page, so the page makes room for it.
   const sidebarOpen = useCitationSidebar() !== null
@@ -1239,41 +1337,77 @@ export default function AgentSearch({
           {inThread ? (
             <div className="mb-6 flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2">
               {/* The caret leaves the conversation for Ask's start page, as a
-                  new history entry, so the browser's Back returns to it. */}
+                  new history entry, so the browser's Back returns to it. A
+                  guest's goes to the page itself, which gates them. */}
               <div className="-ml-2 flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={startNewConversation}
-                  disabled={busy}
-                  aria-label="Back to Ask the archive"
-                  title="Back to Ask the archive"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-                >
-                  <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-                </button>
+                {guest ? (
+                  <Link
+                    href="/search/ask"
+                    aria-label="Ask the archive"
+                    title="Ask the archive"
+                    className={BACK_BUTTON}
+                  >
+                    <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startNewConversation}
+                    disabled={busy}
+                    aria-label="Back to Ask the archive"
+                    title="Back to Ask the archive"
+                    className={BACK_BUTTON}
+                  >
+                    <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                )}
                 <h1 className="text-[15px] font-semibold text-foreground [font-family:inherit]">
                   Ask the archive
                 </h1>
+                {readOnly && !loading && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                    <Globe aria-hidden="true" className="h-3 w-3" />
+                    Shared
+                  </span>
+                )}
               </div>
               <div className="-mr-2.5 flex items-center gap-1">
-                <ConversationHistory
-                  conversations={recent}
-                  loading={!recentLoaded}
-                  currentId={conversation.id}
-                  onOpen={(id) => void openConversation(id, true)}
-                  disabled={busy || loading}
-                  onDelete={deleteConversation}
-                  onDeleteAll={deleteAllHistory}
-                />
-                <button
-                  type="button"
-                  onClick={startNewConversation}
-                  disabled={busy}
-                  className={GHOST_BUTTON}
-                >
-                  <Plus aria-hidden="true" className="h-4 w-4" />
-                  New question
-                </button>
+                {!guest && (
+                  <ConversationHistory
+                    conversations={recent}
+                    loading={!recentLoaded}
+                    currentId={conversation.id}
+                    onOpen={(id) => void openConversation(id, true)}
+                    disabled={busy || loading}
+                    onDelete={deleteConversation}
+                    onDeleteAll={deleteAllHistory}
+                  />
+                )}
+                {/* The asker's own conversation, once an answer is stored. */}
+                {!readOnly && !loading && !busy && hasAnswer && (
+                  <ShareConversation
+                    conversationId={conversation.id}
+                    shared={shared}
+                    onShare={shareConversation}
+                    onUnshare={unshareConversation}
+                  />
+                )}
+                {guest ? (
+                  <Link href="/search/ask" className={GHOST_BUTTON}>
+                    <Plus aria-hidden="true" className="h-4 w-4" />
+                    Ask your own
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startNewConversation}
+                    disabled={busy}
+                    className={GHOST_BUTTON}
+                  >
+                    <Plus aria-hidden="true" className="h-4 w-4" />
+                    New question
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -1382,7 +1516,9 @@ export default function AgentSearch({
                           mode={endedEarly}
                           steps={[]}
                           elapsedMs={stopped[message.id] ?? null}
-                          onAskAgain={() => ask(question)}
+                          onAskAgain={
+                            readOnly ? undefined : () => ask(question)
+                          }
                           canAskAgain={canAskAgain}
                         />
                       )}
@@ -1419,7 +1555,9 @@ export default function AgentSearch({
                         onStop={stopTurn}
                         stopState={asked ? stopStateFor(asked.id) : null}
                         onAskAgain={
-                          asked ? askAgainFor(messageText(asked)) : undefined
+                          asked && !readOnly
+                            ? askAgainFor(messageText(asked))
+                            : undefined
                         }
                         canAskAgain={canAskAgain}
                         showSources={
@@ -1441,7 +1579,13 @@ export default function AgentSearch({
             runs: Stop, in the step log, is the only action then. */}
           {hasThread && !loading && !busy && (
             <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6">
-              {paused ? pausedNote : outOfQuestions ? limitNote : threadForm}
+              {readOnly
+                ? readerNote
+                : paused
+                  ? pausedNote
+                  : outOfQuestions
+                    ? limitNote
+                    : threadForm}
             </div>
           )}
         </section>

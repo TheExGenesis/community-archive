@@ -5,6 +5,7 @@ export const productFeatures = [
   'birdseye',
   'tweet',
   'tube',
+  'ask_archive',
 ] as const
 export const productActions = [
   'node_selected',
@@ -28,6 +29,8 @@ export const productActions = [
   'shuffled',
   'setting_changed',
   'history_cleared',
+  'shared',
+  'unshared',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]

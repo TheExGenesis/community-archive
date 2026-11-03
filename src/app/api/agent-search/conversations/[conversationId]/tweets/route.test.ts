@@ -23,7 +23,7 @@ jest.mock('@ai-sdk/openai-compatible', () => ({
   createOpenAICompatible: jest.fn(),
 }))
 
-const store = { listConversation: jest.fn() }
+const store = { listConversation: jest.fn(), getShare: jest.fn() }
 const ID = 'conv-12345678'
 const tweet = (id: string) => ({ id, text: `Post ${id}`, username: 'u' })
 const call = (body: unknown, id = ID) =>
@@ -71,6 +71,7 @@ beforeEach(() => {
     viewer: { accountId: 'acct-1' },
   } as never)
   store.listConversation.mockResolvedValue([run()])
+  store.getShare.mockResolvedValue(null)
   jest.mocked(fetchConversationTweets).mockImplementation(async (ids) => ({
     tweets: new Map(
       ids.filter((id) => id !== '4').map((id) => [id, tweet(id) as never]),
@@ -90,6 +91,19 @@ test('returns the conversation’s tweets, full cards for the cited ones, and wh
   const [ids, cited] = jest.mocked(fetchConversationTweets).mock.calls[0]
   expect(ids).toEqual(['1', '3', '4'])
   expect(Array.from(cited)).toEqual(['1'])
+})
+
+test('a shared conversation’s tweets are read by anyone with its link', async () => {
+  jest
+    .mocked(getAgentSearchViewer)
+    .mockResolvedValue({ ok: false, reason: 'signed_out' } as never)
+  expect((await call({ ids: ['1'] })).status).toBe(401)
+  store.getShare.mockResolvedValue({ conversationId: ID, accountId: 'acct-1' })
+  const response = await call({ ids: ['1'] })
+  expect(response.status).toBe(200)
+  expect(await response.json()).toEqual({ tweets: [tweet('1')], failed: [] })
+  // Still only the ids the conversation holds.
+  expect((await call({ ids: ['999'] })).status).toBe(400)
 })
 
 test('only ids the conversation’s stored runs hold; it is not a tweet lookup', async () => {

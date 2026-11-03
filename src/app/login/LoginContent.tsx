@@ -9,6 +9,12 @@ interface LoginContentProps {
 export default function LoginContent({ redirectUrl }: LoginContentProps) {
   const fromBulletin =
     redirectUrl === '/bulletin' || redirectUrl === '/opt-in?redirect=/bulletin'
+  // Ask the archive: say what signing in is for, and show the question
+  // waiting on the other side instead of the raw return address.
+  const askReturn = redirectUrl?.startsWith('/search/ask')
+    ? new URL(redirectUrl, 'https://x.invalid')
+    : null
+  const pendingQuestion = askReturn?.searchParams.get('q')?.trim() || null
   const isDev = process.env.NODE_ENV === 'development'
 
   return (
@@ -20,9 +26,19 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
             <p className="text-muted-foreground">
               {fromBulletin
                 ? 'The bulletin shows asks and offers from the community. To maintain this high trust environment, we gate the page to users who have opted into Community Archive.'
-                : 'Sign in to continue exploring Community Archive.'}
+                : askReturn
+                  ? 'Ask the archive reads members’ tweets and writes a short answer that cites them. It’s for signed-in members.'
+                  : 'Sign in to continue exploring Community Archive.'}
             </p>
-            {redirectUrl && (
+            {pendingQuestion && (
+              <p className="mt-3 rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground">
+                <span className="block text-xs text-muted-foreground">
+                  Your question will be waiting
+                </span>
+                {pendingQuestion}
+              </p>
+            )}
+            {redirectUrl && !askReturn && (
               <p className="mt-2 text-sm text-brand">
                 You&apos;ll be redirected to: {redirectUrl}
               </p>

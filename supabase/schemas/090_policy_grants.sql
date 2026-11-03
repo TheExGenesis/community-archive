@@ -266,3 +266,6 @@ GRANT EXECUTE ON FUNCTION public.create_public_api_key(uuid,text,text,text,text)
 GRANT EXECUTE ON FUNCTION public.list_public_api_keys(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.revoke_public_api_key(uuid,text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.verify_public_api_key(text,text) TO service_role;
+
+REVOKE ALL ON TABLE public.directory_hidden_users FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.directory_hidden_users TO service_role;

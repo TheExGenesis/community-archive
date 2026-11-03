@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import { loadConversationMap } from '@/lib/conversation-map/data'
 
 export const dynamic = 'force-dynamic'
@@ -26,12 +27,13 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Conversation map unavailable:', error)
-    return NextResponse.json(
-      {
-        error: 'The conversation map is temporarily unavailable. Please retry.',
-      },
-      { status: 502, headers: { 'Cache-Control': 'private, no-store' } },
-    )
+    return reportApiError({
+      request,
+      route: '/api/conversation-map',
+      status: 502,
+      message: 'The conversation map is temporarily unavailable. Please retry.',
+      upstream: 'unknown',
+      error,
+    })
   }
 }

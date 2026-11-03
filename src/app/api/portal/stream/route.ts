@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import {
   getPortalStreamPage,
   getPortalStreamUpdates,
@@ -99,10 +100,13 @@ export async function GET(request: NextRequest) {
       },
     )
   } catch (error) {
-    console.error('Portal stream request failed:', error)
-    return NextResponse.json(
-      { error: 'The live stream is temporarily unavailable' },
-      { status: 502, headers: { 'Cache-Control': 'private, no-store' } },
-    )
+    return reportApiError({
+      request,
+      route: '/api/portal/stream',
+      status: 502,
+      message: 'The live stream is temporarily unavailable',
+      upstream: 'unknown',
+      error,
+    })
   }
 }

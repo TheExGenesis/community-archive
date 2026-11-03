@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import {
   DateRangeValidation,
   getStatsRangeLimitMs,
@@ -77,7 +78,9 @@ export async function GET(request: NextRequest) {
     if (startDate || endDate) {
       if (!startDate || !endDate) {
         return NextResponse.json(
-          { error: 'Both startDate and endDate are required for custom range.' },
+          {
+            error: 'Both startDate and endDate are required for custom range.',
+          },
           { status: 400 },
         )
       }
@@ -119,8 +122,7 @@ export async function GET(request: NextRequest) {
       { timeoutMs: 25_000 },
     )
 
-    const currentPeriod =
-      range.end > new Date(Date.now() - 60 * 60 * 1000)
+    const currentPeriod = range.end > new Date(Date.now() - 60 * 60 * 1000)
     return NextResponse.json(response, {
       headers: {
         'Cache-Control': currentPeriod
@@ -129,10 +131,13 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('ClickHouse stream-stats request failed:', error)
-    return NextResponse.json(
-      { error: 'Streaming statistics are temporarily unavailable' },
-      { status: 502 },
-    )
+    return reportApiError({
+      request,
+      route: '/api/scraping-stats',
+      status: 502,
+      message: 'Streaming statistics are temporarily unavailable',
+      upstream: 'gateway',
+      error,
+    })
   }
 }

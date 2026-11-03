@@ -89,6 +89,7 @@ export function ProfileHeader({
           <Image
             src={headerUrl}
             alt=""
+            referrerPolicy="no-referrer"
             fill
             priority
             // The /1500x500 variant is already sized by Twitter.

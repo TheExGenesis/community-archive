@@ -339,3 +339,41 @@ test.each([
   expect((await request(path)).headers.get('x-middleware-next')).toBe('1')
   expect(createMiddlewareClient).not.toHaveBeenCalled()
 })
+
+describe('member preview', () => {
+  const env = process.env as Record<string, string | undefined>
+  const nodeEnv = env.NODE_ENV
+  afterEach(() => {
+    env.NODE_ENV = nodeEnv
+  })
+
+  test.each([
+    ['/search/ask?as=member', undefined],
+    ['/search/ask', 'dev_as_member=1'],
+  ])('passes the login wall in development: %s', async (path, cookie) => {
+    env.NODE_ENV = 'development'
+    const response = await request(path, { cookie })
+    expect(response.status).not.toBe(307)
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+  })
+
+  test('?as=guest drops the preview cookie at the login wall', async () => {
+    env.NODE_ENV = 'development'
+    const response = await request('/search/ask?as=guest', {
+      cookie: 'dev_as_member=1',
+    })
+    expect(response.status).toBe(307)
+  })
+
+  test.each(['production', 'test'])(
+    'does not pass the login wall in %s',
+    async (mode) => {
+      env.NODE_ENV = mode
+      const response = await request('/search/ask?as=member', {
+        cookie: 'dev_as_member=1',
+      })
+      expect(response.status).toBe(307)
+      expect(new URL(response.headers.get('location')!).pathname).toBe('/login')
+    },
+  )
+})

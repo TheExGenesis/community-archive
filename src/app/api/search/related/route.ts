@@ -1,5 +1,6 @@
 import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import {
   searchRelatedDigestStories,
   searchRelatedStrands,
@@ -34,10 +35,15 @@ export async function GET(request: NextRequest) {
       { headers },
     )
   } catch (error) {
-    console.error(`Related ${type} search failed:`, error)
-    return NextResponse.json(
-      { error: 'Related pages could not load.' },
-      { status: 503, headers },
-    )
+    return reportApiError({
+      request,
+      route: '/api/search/related',
+      status: 503,
+      message: 'Related pages could not load.',
+      upstream: 'unknown',
+      error,
+      headers,
+      extra: { type },
+    })
   }
 }

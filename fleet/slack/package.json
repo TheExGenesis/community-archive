@@ -1,0 +1,6 @@
+{
+  "name": "ca-fleet-slack",
+  "private": true,
+  "type": "module",
+  "description": "Slack agent for the Community Archive fleet: Claude Code in a thread, with the fixer's machinery underneath. Dependencies come from the repository root (pnpm install there); this file only marks the directory as ES modules."
+}

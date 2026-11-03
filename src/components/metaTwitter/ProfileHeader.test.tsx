@@ -48,6 +48,28 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://archive.supabase.co'
 })
 
+test('omits referrers for both the large avatar and the sized Twitter banner', () => {
+  const { container } = render(
+    <ProfileHeader
+      profile={{
+        ...profile({ has_archive: false, is_opted_in: true }),
+        header_media_url: 'https://pbs.twimg.com/profile_banners/42/123',
+      }}
+      archivedAt={null}
+    />,
+  )
+  const banner = container.querySelector('img[src*="profile_banners"]')
+  expect(banner).toHaveAttribute(
+    'src',
+    'https://pbs.twimg.com/profile_banners/42/123/1500x500',
+  )
+  expect(banner).toHaveAttribute('referrerpolicy', 'no-referrer')
+  expect(screen.getByAltText("Alice's avatar")).toHaveAttribute(
+    'referrerpolicy',
+    'no-referrer',
+  )
+})
+
 test('does not label a non-member or offer an archive download', () => {
   render(
     <ProfileHeader

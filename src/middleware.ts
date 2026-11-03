@@ -124,6 +124,10 @@ const IN_MEMORY_MAX_PUBLIC_API_VERIFIER = 600
 // Staging can fan out several reads per page from one server IP. The bridge
 // authenticates every request itself; keep its budget separate and bounded.
 const IN_MEMORY_MAX_PRODUCTION_READ_BRIDGE = 600
+// Signal inbox (/api/signals/*): the Vercel log drain batches deliveries from
+// a few IPs and bursts during exactly the incidents the inbox exists for.
+// The route authenticates and caps each body itself.
+const IN_MEMORY_MAX_SIGNAL_INBOX = 120
 const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 let lastCleanup = Date.now()
@@ -172,6 +176,12 @@ function getApiRateLimitPolicy(
           : isSG
             ? IN_MEMORY_MAX_API_SG
             : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
+  if (method === 'POST' && pathname.startsWith('/api/signals/')) {
+    return {
+      bucket: 'api:signal-inbox',
+      maxRequests: IN_MEMORY_MAX_SIGNAL_INBOX,
     }
   }
   if (method === 'GET' && pathname.startsWith('/api/companion/v1/')) {
@@ -404,6 +414,13 @@ function isPublicInformationRoute(pathname: string): boolean {
   )
 }
 
+function memberPreviewEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' ||
+    process.env.NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW === 'true'
+  )
+}
+
 /** Temporary login requirement for archive search and account browsing. */
 function requiresLogin(pathname: string): boolean {
   return [
@@ -459,13 +476,17 @@ export async function middleware(request: NextRequest) {
   // non-browser UA), and one-click unsubscribe POSTs come from mailbox
   // provider servers holding a per-subscription token. The Bulletin preview
   // source and the public API key verifier require their own bearer secrets
-  // and are called from other servers.
+  // and are called from other servers. The signal inbox receives webhooks
+  // from PostHog, Grafana, the Vercel log drain and the fleet host, each
+  // with a short non-browser UA; it verifies a bearer secret or Vercel's
+  // HMAC signature itself (src/lib/signals/auth.ts).
   const machineAuthRoute =
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
     pathname === '/api/bulletin/preview-board' ||
     pathname === '/api/internal/public-api/keys/verify' ||
-    (pathname === '/api/public-data' && request.method === 'POST')
+    (pathname === '/api/public-data' && request.method === 'POST') ||
+    (pathname.startsWith('/api/signals/') && request.method === 'POST')
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (
@@ -651,7 +672,13 @@ export async function middleware(request: NextRequest) {
     pathname === '/search' ||
     /^\/user-dir\/?$/.test(pathname) ||
     /^\/user\/[^/]+\/?$/.test(pathname)
-  let authenticated = false
+  // In local development the member preview (see the end of this function)
+  // stands in for a signed-in viewer, so it passes the login wall too.
+  let authenticated =
+    process.env.NODE_ENV === 'development' &&
+    (request.nextUrl.searchParams.get('as') === 'member' ||
+      (request.cookies.get('dev_as_member')?.value === '1' &&
+        request.nextUrl.searchParams.get('as') !== 'guest'))
 
   // Chunked Supabase sessions use -auth-token.0, -auth-token.1, etc.
   const hasAuthCookies = request.cookies
@@ -663,7 +690,7 @@ export async function middleware(request: NextRequest) {
       const client = createMiddlewareClient(request)
       if (loginRequired) {
         const { data, error } = await client.supabase.auth.getUser()
-        authenticated = !error && Boolean(data.user)
+        authenticated ||= !error && Boolean(data.user)
       } else {
         await client.supabase.auth.getSession()
       }
@@ -772,10 +799,7 @@ export async function middleware(request: NextRequest) {
   // account; ?as=guest clears it. Enabled in development, and on deployments
   // that opt in via NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW (e.g. staging previews
   // where X sign-in isn't wired up). Keep the flag unset in production.
-  if (
-    process.env.NODE_ENV === 'development' ||
-    process.env.NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW === 'true'
-  ) {
+  if (memberPreviewEnabled()) {
     const as = request.nextUrl.searchParams.get('as')
     if (as === 'member') {
       response.cookies.set('dev_as_member', '1', { path: '/', sameSite: 'lax' })

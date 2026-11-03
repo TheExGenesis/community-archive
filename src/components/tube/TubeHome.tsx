@@ -11,6 +11,7 @@ import {
   type TubeFilters,
   type TubeSort,
 } from '@/lib/tube'
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useTube } from './TubeProvider'
 import { TubeStatus, VideoGrid } from './VideoCards'
 
@@ -47,10 +48,12 @@ export function TubeHome() {
 
   useEffect(() => setLimit(PAGE), [filters])
 
-  const set = (patch: Partial<TubeFilters>) =>
+  const set = (patch: Partial<TubeFilters>) => {
+    captureProductAction('tube', 'filter_changed')
     router.push(`${pathname}${filtersToQuery({ ...filters, ...patch })}`, {
       scroll: false,
     })
+  }
 
   // Personal ranking is frozen per visit so cards don't jump under the cursor.
   const ranked = useMemo(
@@ -167,7 +170,10 @@ export function TubeHome() {
         <div className="mt-10 flex justify-center">
           <button
             type="button"
-            onClick={() => setLimit((l) => l + PAGE)}
+            onClick={() => {
+              captureProductAction('tube', 'load_more')
+              setLimit((l) => l + PAGE)
+            }}
             className="rounded-full bg-muted px-5 py-2 text-sm font-medium hover:bg-muted/70"
           >
             Show more

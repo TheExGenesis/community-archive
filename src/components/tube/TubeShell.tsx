@@ -20,6 +20,7 @@ import {
   ThumbsUp,
   type LucideIcon,
 } from 'lucide-react'
+import { captureProductAction } from '@/lib/productAnalytics'
 import { TubeProvider, useTube } from './TubeProvider'
 
 const NAV: { href: string; label: string; icon: LucideIcon }[] = [
@@ -111,6 +112,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
         className="mx-auto flex w-full min-w-0 max-w-xl"
         onSubmit={(e) => {
           e.preventDefault()
+          if (q.trim()) captureProductAction('tube', 'searched')
           const next = new URLSearchParams(pathname === '/tube' ? params : '')
           if (q.trim()) next.set('q', q.trim())
           else next.delete('q')

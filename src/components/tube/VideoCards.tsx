@@ -66,11 +66,13 @@ export function VideoList({
   list,
   activeId,
   numbered = false,
+  onOpen,
 }: {
   videos: TubeVideo[]
   list?: string
   activeId?: string
   numbered?: boolean
+  onOpen?: () => void
 }) {
   return (
     <ul className="space-y-2">
@@ -78,6 +80,7 @@ export function VideoList({
         <li key={v.id}>
           <Link
             href={watchHref(v.id, list)}
+            onClick={onOpen}
             className={`group flex gap-2 rounded-lg p-1 ${
               v.id === activeId ? 'bg-muted' : 'hover:bg-muted/50'
             }`}

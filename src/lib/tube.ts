@@ -51,6 +51,9 @@ export interface TubeComment {
   c: number
   ru: string | null
   st: 'strong' | 'rec' | 'ref' | 'neg' | null
+  /** Reply-to tweet id, when the comment is a reply. */
+  rt?: string
+  /** The parent tweet, when it is in the archive. */
   p?: TubeParent
 }
 

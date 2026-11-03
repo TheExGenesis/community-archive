@@ -62,7 +62,10 @@ const QUESTION_TEXT =
 const STOP_TEXT =
   'Works as designed; 41 is intentional.\n\n```json\n{"status":"stop","summary":"Works as designed."}\n```'
 
-async function setup(extraEnv: Record<string, string> = {}): Promise<Harness> {
+async function setup(
+  extraEnv: Record<string, string> = {},
+  cfgOverrides: Partial<Config> = {},
+): Promise<Harness> {
   const base = tmpDir('fleet-slack-e2e-')
   execFileSync(
     'bash',
@@ -141,7 +144,11 @@ async function setup(extraEnv: Record<string, string> = {}): Promise<Harness> {
     intakeEnabled: false,
     maxConcurrentTasks: 1,
     progressIntervalMs: 0,
+    autoMerge: false,
+    mergePollIntervalMs: 10,
+    mergeWaitMs: 2000,
     env,
+    ...cfgOverrides,
   }
   const tokens = createTokenProvider({
     staticToken: cfg.githubToken,
@@ -238,11 +245,19 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   assert.ok(finalStatus.includes('|PR>'), finalStatus)
   assert.ok(finalStatus.includes('https://g.example/explore?run='), finalStatus)
 
-  // Progress lines from the stream, Claude's text, the PR message with two buttons, the run line.
+  // Progress is one edited note on the status message, not a thread message per tool call.
   const texts = h.slack.texts('C1', '1.0')
   assert.ok(
-    texts.some((t) => t.includes('🔧 Read `src/foo.ts`')),
-    texts.join('\n---\n'),
+    !texts.some((t) => t.includes('🔧')),
+    `no tool lines in the thread: ${texts.join('\n---\n')}`,
+  )
+  assert.ok(
+    h.slack.updates.some(
+      (u) =>
+        u.ts === status.ts &&
+        u.text.includes('1 tool call · Read `src/foo.ts`'),
+    ),
+    'tool progress in the status note',
   )
   assert.ok(
     texts.some((t) => t.startsWith('Set the answer to 42 in src/foo.ts.')),
@@ -261,16 +276,12 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   assert.equal(buttonsOf(prMsg)[0].value.pr, 100)
   assert.match(
     prMsg.text,
-    /Opened <.*\/pull\/100\|PR #100>: Set the answer to 42/,
+    /Opened <.*\/pull\/100\|PR #100>: Set the answer to 42\.\n\d+ lines · gate green\.\nMerge\?$/,
   )
-  assert.match(prMsg.text, /small Tier 0 change\. Merge when CI is green\?/)
-  assert.ok(
-    texts.some((t) =>
-      /^Run `\d{8}T\d{6}Z-slack` · outcome `pr_opened` · <https:\/\/g\.example/.test(
-        t,
-      ),
-    ),
-    'run line',
+  assert.equal(
+    texts.length,
+    3,
+    `status, Claude's text, the PR message: ${texts.join('\n---\n')}`,
   )
 
   // GitHub side: the PR, its branch on origin, the commit convention.
@@ -306,7 +317,9 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   const claudeArgs = fs.readFileSync(h.claudeLog, 'utf8')
   assert.match(claudeArgs, /--permission-mode dontAsk/)
   assert.match(claudeArgs, /--output-format stream-json --verbose/)
-  assert.match(claudeArgs, /Bash\\\(git\\ push\\\*\\\)/)
+  assert.match(claudeArgs, /--allowedTools Read Edit Write Grep Glob Bash /)
+  assert.match(claudeArgs, /Bash\\\(git\\ push:\\\*\\\)/)
+  assert.match(claudeArgs, /Bash\\\(gh\\ issue\\ close:\\\*\\\)/)
   assert.match(claudeArgs, /--append-system-prompt .*Standing rules/)
   assert.match(
     fs.readFileSync(`${h.claudeLog}.prompt-1`, 'utf8'),
@@ -359,7 +372,7 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   assert.equal(h.store.getThread('C1', '1.0')?.state, 'merged')
   assert.match(
     h.slack.texts('C1', '1.0').pop() || '',
-    /🎉 Merged <.*pull\/100\|PR #100> \(squash\) by <@U1>/,
+    /🎉 Merged <.*pull\/100\|PR #100> \(by <@U1>\)/,
   )
   assert.match(h.slack.lastUpdate(status.ts) || '', /🎉 merged/)
   assert.ok(
@@ -485,15 +498,13 @@ test('a red gate gets one repair attempt, then waits for a human with nothing pu
   assert.equal(thread?.state, 'waiting')
   const texts = h.slack.texts('C1', '4.0')
   assert.ok(
-    texts.some((t) =>
-      t.startsWith('Gate failed (FAIL lint). Asking Claude to repair it once.'),
-    ),
-    texts.join('\n'),
+    h.slack.updates.some((u) => u.text.includes('one repair attempt')),
+    'repair attempt announced on the status line',
   )
   assert.ok(
     texts.some(
       (t) =>
-        t.includes('The gate is still red after one repair attempt') &&
+        t.startsWith('❌ Gate still red after one repair: FAIL lint') &&
         t.includes('fake pnpm: lint failed'),
     ),
     texts.join('\n'),
@@ -530,10 +541,7 @@ test('stop ends the task, removes the worktree and records the run', async () =>
   const thread = h.store.getThread('C1', '5.0')
   assert.equal(thread?.state, 'closed')
   assert.equal(thread?.worktree, undefined)
-  assert.match(
-    h.slack.lastUpdate(h.slack.posts[0].ts) || '',
-    /stopped, nothing shipped/,
-  )
+  assert.match(h.slack.lastUpdate(h.slack.posts[0].ts) || '', /\nstopped\n/)
   const result = JSON.parse(
     fs.readFileSync(path.join(thread?.runDir as string, 'result.json'), 'utf8'),
   )
@@ -585,5 +593,152 @@ test('an issue-linked task writes a learning and links the issue in commit and P
   assert.equal(issues[0].state, 'CLOSED')
   assert.match(issues[0].comments[0].body, /\[fleet:slack\] merged/)
   assert.match(h.slack.texts('CSIG', '6.0').pop() || '', /Closed #7/)
+  h.store.close()
+})
+
+test('auto-merge: a Tier 0 PR merges on its own once CI is green', async () => {
+  const h = await setup(
+    {
+      FAKE_CLAUDE_OUTPUT: path.join(tmpDir(), 'out.json'),
+      FAKE_CLAUDE_EDITS: 'printf "export const answer = 42\\n" > src/foo.ts',
+    },
+    { autoMerge: true },
+  )
+  fs.writeFileSync(h.env.FAKE_CLAUDE_OUTPUT as string, claudeResult(DONE_TEXT))
+  await h.runner.start({
+    channel: 'CSIG',
+    threadTs: '8.0',
+    userId: 'U1',
+    text: '',
+    source: 'intake',
+    issue: {
+      number: 7,
+      title: 'bug: answer is off by one',
+      body: 'src/foo.ts exports 41, should be 42.',
+      url: 'https://github.com/o/r/issues/7',
+    },
+  })
+  const prMsg = h.slack.posts.find((p) => buttonsOf(p).length > 0)
+  assert.ok(prMsg, 'PR message')
+  assert.match(prMsg.text, /gate green · merging when CI is green\./)
+  assert.deepEqual(
+    buttonsOf(prMsg).map((b) => b.actionId),
+    ['not_now'],
+    'only a Hold button',
+  )
+  const wait = h.runner.pendingMerge('CSIG', '8.0')
+  assert.ok(wait, 'a CI wait is running')
+  await wait
+  const thread = h.store.getThread('CSIG', '8.0')
+  assert.equal(thread?.state, 'merged')
+  assert.equal(prs(h)[0].state, 'MERGED')
+  assert.match(
+    h.slack.texts('CSIG', '8.0').pop() || '',
+    /🎉 Merged <.*pull\/100\|PR #100> \(CI green\)\. Closed #7\./,
+  )
+  const issues = JSON.parse(
+    fs.readFileSync(path.join(h.ghState, 'issues.json'), 'utf8'),
+  ) as { number: number; state: string }[]
+  assert.equal(issues.find((i) => i.number === 7)?.state, 'CLOSED')
+  assert.match(h.slack.lastUpdate(h.slack.posts[0].ts) || '', /🎉 merged/)
+  assert.equal(h.runner.pendingMerge('CSIG', '8.0'), undefined)
+  h.store.close()
+})
+
+test('auto-merge: red CI hands the PR back with Merge and Hold buttons; Hold stops a wait', async () => {
+  const h = await setup(
+    {
+      FAKE_CLAUDE_OUTPUT: path.join(tmpDir(), 'out.json'),
+      FAKE_CLAUDE_EDITS: 'printf "export const answer = 42\\n" > src/foo.ts',
+    },
+    { autoMerge: true },
+  )
+  fs.writeFileSync(h.env.FAKE_CLAUDE_OUTPUT as string, claudeResult(DONE_TEXT))
+  fs.writeFileSync(
+    path.join(h.ghState, 'pr-checks.json'),
+    JSON.stringify([
+      {
+        __typename: 'CheckRun',
+        name: 'pull_request_workflow',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+      },
+    ]),
+  )
+  await h.runner.start({
+    channel: 'C1',
+    threadTs: '9.0',
+    userId: 'U1',
+    text: 'set the answer to 42',
+    source: 'mention',
+  })
+  await h.runner.pendingMerge('C1', '9.0')
+  assert.equal(h.store.getThread('C1', '9.0')?.state, 'pr_open')
+  assert.equal(prs(h)[0].state, 'OPEN')
+  const last = h.slack.posts[h.slack.posts.length - 1]
+  assert.match(last.text, /^Not merging <.*PR #100>: CI is red\./)
+  assert.deepEqual(
+    buttonsOf(last).map((b) => b.actionId),
+    ['merge_pr', 'not_now'],
+  )
+  assert.match(h.slack.lastUpdate(h.slack.posts[0].ts) || '', /CI red/)
+
+  // Hold: the thread is held, a later Merge click still works.
+  const thread = h.store.getThread('C1', '9.0')
+  await h.runner.notNow(thread as NonNullable<typeof thread>, 'U1')
+  assert.equal(h.store.getThread('C1', '9.0')?.state, 'held')
+  assert.match(h.slack.texts('C1', '9.0').pop() || '', /holding <.*\|the PR>/)
+  h.store.close()
+})
+
+test('close: Claude marks an issue outdated and the harness closes it with the reason', async () => {
+  const h = await setup({ FAKE_CLAUDE_OUTPUT: path.join(tmpDir(), 'out.json') })
+  fs.writeFileSync(
+    h.env.FAKE_CLAUDE_OUTPUT as string,
+    claudeResult(
+      'Already fixed by commit abc1234 (src/foo.ts exports 42 on main).\n\n```json\n{"status":"done","summary":"Already fixed on main.","close":[{"number":7,"reason":"Fixed by abc1234; src/foo.ts exports 42 on main."}]}\n```',
+    ),
+  )
+  await h.runner.start({
+    channel: 'CSIG',
+    threadTs: '10.0',
+    userId: 'U1',
+    text: '',
+    source: 'intake',
+    issue: {
+      number: 7,
+      title: 'bug: answer is off by one',
+      body: 'src/foo.ts exports 41, should be 42.',
+      url: 'https://github.com/o/r/issues/7',
+    },
+  })
+  const thread = h.store.getThread('CSIG', '10.0')
+  assert.equal(
+    thread?.state,
+    'closed',
+    'done without changes but with closes = stop',
+  )
+  const issues = JSON.parse(
+    fs.readFileSync(path.join(h.ghState, 'issues.json'), 'utf8'),
+  ) as { number: number; state: string; comments: { body: string }[] }[]
+  const issue = issues.find((i) => i.number === 7)
+  assert.equal(issue?.state, 'CLOSED')
+  assert.ok(
+    issue?.comments.some((c) =>
+      c.body.includes('Fixed by abc1234; src/foo.ts exports 42 on main.'),
+    ),
+    JSON.stringify(issue?.comments),
+  )
+  const texts = h.slack.texts('CSIG', '10.0')
+  assert.ok(
+    texts.some((t) =>
+      t.startsWith(
+        'Closed #7: Fixed by abc1234; src/foo.ts exports 42 on main.',
+      ),
+    ),
+    texts.join('\n'),
+  )
+  assert.ok(!texts.some((t) => t.includes('nothing to ship')), texts.join('\n'))
+  assert.equal(prs(h).length, 0)
   h.store.close()
 })

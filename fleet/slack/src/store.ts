@@ -13,6 +13,7 @@ export type ThreadState =
   | 'gate'
   | 'waiting'
   | 'pr_open'
+  | 'held'
   | 'merged'
   | 'closed'
   | 'error'

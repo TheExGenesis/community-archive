@@ -65,7 +65,7 @@ test('renderIssuePost and renderClassification', () => {
   assert.ok(text.includes('<https://vercel.example/log|source link>'))
   assert.match(
     renderClassification({ verdict: 'obvious', reason: 'r', explicit: true }),
-    /^Looks obvious: r\nShall I fix it\?$/,
+    /^Looks obvious: r$/,
   )
   assert.match(
     renderClassification({
@@ -77,7 +77,7 @@ test('renderIssuePost and renderClassification', () => {
   )
   assert.match(
     renderClassification({ verdict: 'wontfix', reason: 'r', explicit: true }),
-    /^Probably wontfix because r/,
+    /^Probably not worth fixing: r/,
   )
 })
 
@@ -154,7 +154,7 @@ test('intake posts each open issue once, classifies in the thread, and never sta
   }).tick()
   assert.deepEqual(third, { posted: 1, seen: 3 })
   const last = slack.posts[slack.posts.length - 1]
-  assert.match(last.text, /Probably wontfix because noise/)
+  assert.match(last.text, /Probably not worth fixing: noise/)
   assert.equal(buttonsOf(last)[0].actionId, 'go_ahead')
   store.close()
 })

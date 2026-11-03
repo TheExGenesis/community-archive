@@ -35,6 +35,10 @@ export interface Config {
   intakeEnabled: boolean
   maxConcurrentTasks: number
   progressIntervalMs: number
+  /** Merge Tier 0 PRs under the line cap as soon as CI is green (no button). */
+  autoMerge: boolean
+  mergePollIntervalMs: number
+  mergeWaitMs: number
   /** Everything else the child processes should see */
   env: NodeJS.ProcessEnv
 }
@@ -130,8 +134,11 @@ export function loadConfig(
     exploreUrl: nonEmpty(env.FLEET_RUNS_EXPLORE_URL),
     intakeIntervalMs: num(env.FLEET_SLACK_INTAKE_INTERVAL_S, 300) * 1000,
     intakeEnabled: (env.FLEET_SLACK_INTAKE || 'true') !== 'false',
-    maxConcurrentTasks: num(env.FLEET_SLACK_MAX_CONCURRENT, 1),
+    maxConcurrentTasks: num(env.FLEET_SLACK_MAX_CONCURRENT, 2),
     progressIntervalMs: num(env.FLEET_SLACK_PROGRESS_INTERVAL_S, 6) * 1000,
+    autoMerge: (env.FLEET_SLACK_AUTOMERGE || 'true') !== 'false',
+    mergePollIntervalMs: num(env.FLEET_SLACK_MERGE_POLL_S, 30) * 1000,
+    mergeWaitMs: num(env.FLEET_SLACK_MERGE_WAIT_MIN, 40) * 60 * 1000,
     env,
   }
 }

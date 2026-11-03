@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
-import { humanText, ProgressBatcher, summariseEvent } from '../src/summarise.js'
+import {
+  ProgressBatcher,
+  ProgressTracker,
+  humanText,
+  summariseEvent,
+} from '../src/summarise.js'
 import { renderStatus } from '../src/status.js'
 import { parseClassification, parseTurnVerdict } from '../src/verdict.js'
 import { findRepoRoot } from '../src/config.js'
@@ -147,6 +152,7 @@ test('parseTurnVerdict reads the fenced block and falls back to the diff', () =>
     status: 'done',
     summary: 'Guarded q.',
     title: 'Guard empty q',
+    close: [],
     explicit: true,
   })
   const q = parseTurnVerdict('Which of the two routes do you mean?', false)
@@ -171,4 +177,43 @@ test('parseClassification', () => {
     },
   )
   assert.equal(parseClassification('no block').verdict, 'needs-decision')
+})
+
+test('ProgressTracker folds tool calls into one status line', () => {
+  const t = new ProgressTracker()
+  assert.equal(t.line(), '')
+  t.observe({
+    type: 'assistant',
+    message: {
+      content: [
+        { type: 'tool_use', name: 'Read', input: { file_path: 'src/a.ts' } },
+        { type: 'tool_use', name: 'Bash', input: { command: 'pnpm lint' } },
+      ],
+    },
+  })
+  t.observe({
+    type: 'user',
+    message: {
+      content: [{ type: 'tool_result', is_error: true, content: 'denied' }],
+    },
+  })
+  assert.equal(
+    t.line(),
+    '_working · 2 tool calls · 1 tool error · Bash `pnpm lint`_',
+  )
+})
+
+test('parseTurnVerdict reads the close list in its lenient forms', () => {
+  const v = parseTurnVerdict(
+    'Outdated.\n\n```json\n{"status":"stop","summary":"Outdated.","close":[7, "#8", {"number": 9, "reason": "fixed in abc"}, {"issue": "10"}, "x"]}\n```',
+    false,
+  )
+  assert.equal(v.status, 'stop')
+  assert.deepEqual(v.close, [
+    { number: 7, reason: 'Outdated.' },
+    { number: 8, reason: 'Outdated.' },
+    { number: 9, reason: 'fixed in abc' },
+    { number: 10, reason: 'Outdated.' },
+  ])
+  assert.deepEqual(parseTurnVerdict('plain text', true).close, [])
 })

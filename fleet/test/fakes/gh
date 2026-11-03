@@ -2,7 +2,8 @@
 # Fake `gh` for fleet tests. State lives in $FAKE_GH_STATE:
 #   issues.json  [{number,title,body,state,createdAt,closedAt?,labels:[{name}],comments:[{body}]}]
 #   labels.txt   one label name per line
-#   prs.json     [{number,url,title,body,head,base,state,createdAt?,mergedAt?,closedAt?}]
+#   prs.json     [{number,url,title,body,head,base,state,createdAt?,mergedAt?,closedAt?,checks?}]
+#   pr-checks.json optional statusCheckRollup given to every PR `pr create` makes
 #   commits.json optional GitHub API shape, answers `api repos/.../commits?...`
 #   calls.log    every invocation, one per line
 # FAKE_GH_REMOTE (optional): bare repo used to answer `api repos/.../compare`.
@@ -105,7 +106,9 @@ case "$cmd $sub" in
     TITLE="$(opt --title)" BODY="$body" HEAD="$(opt --head)" BASE="$(opt --base)" REPO="$(opt --repo)" mutate '
       const number = 100 + prs.length;
       const url = "https://github.com/" + env.REPO + "/pull/" + number;
-      prs.push({number, url, title: env.TITLE, body: env.BODY, head: env.HEAD, base: env.BASE, state: "OPEN"});
+      const checksFile = env.STATE + "/pr-checks.json";
+      const checks = fs.existsSync(checksFile) ? JSON.parse(fs.readFileSync(checksFile, "utf8")) : undefined;
+      prs.push({number, url, title: env.TITLE, body: env.BODY, head: env.HEAD, base: env.BASE, state: "OPEN", ...(checks ? {checks} : {})});
       return url + "\n";'
     ;;
   "pr view")

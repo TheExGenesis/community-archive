@@ -82,9 +82,9 @@ export function renderClassification(v: ClassificationVerdict): string {
   const reason = mrkdwnEscape(v.reason || '(no reason given)')
   switch (v.verdict) {
     case 'obvious':
-      return `Looks obvious: ${reason}\nShall I fix it?`
+      return `Looks obvious: ${reason}`
     case 'wontfix':
-      return `Probably wontfix because ${reason}\nI can still try if you say so.`
+      return `Probably not worth fixing: ${reason}`
     default:
       return `Needs a decision: ${reason}`
   }
@@ -158,7 +158,12 @@ export class Intake {
         blocks: buttonBlocks(text, [
           {
             actionId: 'go_ahead',
-            text: verdict.verdict === 'wontfix' ? 'Try anyway' : 'Go ahead',
+            text:
+              verdict.verdict === 'wontfix'
+                ? 'Try anyway'
+                : verdict.verdict === 'obvious'
+                  ? 'Fix it'
+                  : 'Go ahead',
             style: verdict.verdict === 'obvious' ? 'primary' : undefined,
             value: {
               issue: issue.number,

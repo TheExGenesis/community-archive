@@ -4,12 +4,43 @@
 // Without a readable block the diff decides: changes → done, none → question.
 export type TurnStatus = 'done' | 'question' | 'stop'
 
+export interface IssueClose {
+  number: number
+  reason: string
+}
+
 export interface TurnVerdict {
   status: TurnStatus
   summary: string
   title?: string
+  /** Issues Claude found outdated or already fixed; the harness closes them with the reason. */
+  close: IssueClose[]
   /** True when the block was found and valid (false: heuristic). */
   explicit: boolean
+}
+
+/** `close` may be numbers, "#12" strings or {number, reason} objects. */
+export function parseCloseList(
+  raw: unknown,
+  fallbackReason: string,
+): IssueClose[] {
+  if (!Array.isArray(raw)) return []
+  const out: IssueClose[] = []
+  for (const item of raw) {
+    let number: number | undefined
+    let reason = ''
+    if (typeof item === 'number') number = item
+    else if (typeof item === 'string') number = Number(item.replace(/^#/, ''))
+    else if (item && typeof item === 'object') {
+      const o = item as { number?: unknown; issue?: unknown; reason?: unknown }
+      const n = o.number ?? o.issue
+      number = typeof n === 'string' ? Number(n.replace(/^#/, '')) : Number(n)
+      reason = String(o.reason || '').trim()
+    }
+    if (number && Number.isInteger(number) && number > 0)
+      out.push({ number, reason: reason || fallbackReason })
+  }
+  return out
 }
 
 const VALID = new Set<TurnStatus>(['done', 'question', 'stop'])
@@ -27,12 +58,15 @@ export function parseTurnVerdict(
         status?: unknown
         summary?: unknown
         title?: unknown
+        close?: unknown
       }
       if (v && typeof v === 'object' && VALID.has(v.status as TurnStatus)) {
+        const summary = String(v.summary || '').trim()
         return {
           status: v.status as TurnStatus,
-          summary: String(v.summary || '').trim(),
+          summary,
           title: v.title ? String(v.title).trim().slice(0, 72) : undefined,
+          close: parseCloseList(v.close, summary),
           explicit: true,
         }
       }
@@ -47,6 +81,7 @@ export function parseTurnVerdict(
   return {
     status: hasChanges ? 'done' : 'question',
     summary: (firstLine || '').slice(0, 300),
+    close: [],
     explicit: false,
   }
 }

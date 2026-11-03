@@ -6,6 +6,17 @@ gateway, follows threads and quote posts, scores candidates, and streams an
 answer whose claims cite tweets inline. The page renders the cited tweets with
 `TweetCard`, the other posts the search found, and a coverage note.
 
+## Who is asking
+
+The workflow's first step looks up the asker's archive profile (handle,
+display name, bio) through the gateway by account id (`asker.ts`), alongside
+the conversation's earlier turns, and appends it to the system prompt
+(`askerInstructions` in `agent.ts`). The model then reads "my tweets" as
+`--from @handle` and can pitch an answer to the asker. The bio is quoted as
+data, clipped to 300 characters, and never stored with the run. The lookup
+has a two-second budget; on a miss or failure, or for the development
+preview's `dev` account, the question runs without it.
+
 ## How a question runs
 
 1. `POST /api/agent-search` checks the viewer (`src/lib/agentSearch/eligibility.ts`),
@@ -208,6 +219,29 @@ its id. Workflow keeps a run's own data only 7 days after it ends on Vercel Pro
   `answer.unavailable` so a later change can replace the prose that still
   names those authors.
 - The start route refuses a conversation id that belongs to someone else.
+
+### Sharing
+
+A member may share a conversation from its header (Share). A row in
+`agent_search_shared_conversations` (conversation id, account id, when) makes
+the same link (`/search/ask?c=<id>`) readable by anyone, signed in or not;
+Stop sharing removes the row, and deleting the conversation or all history
+removes it too. Sharing is by conversation, so follow-ups asked later are
+shared as well. The link shows the questions and answers with the tweets they
+cite, never who asked; a run still answering is left out.
+
+- `POST` / `DELETE /api/agent-search/conversations/{id}/share` share and stop
+  sharing. The asker only; `409 no_answer_yet` until an answer is stored.
+- `GET /api/agent-search/conversations/{id}` and its `tweets` route answer a
+  shared conversation to anyone (`conversationAccess.ts`): the asker gets it
+  whole with `shared`, anyone else gets `readOnly: true`. Every run under the
+  id must belong to the member who shared it, or nothing is shown
+  (`sharedConversation.ts`). An unshared conversation is refused as before.
+- The page renders a shared conversation to a visitor who cannot ask (signed
+  out, or not a member) in guest mode: no history, no composer, a note with a
+  sign-in link, and the first question as the link preview's title. A member
+  reading another member's conversation sees it read-only with the way to a
+  question of their own.
 
 ### Follow-up questions
 

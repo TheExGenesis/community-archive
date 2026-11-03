@@ -441,6 +441,39 @@ describe('file run store', () => {
     expect(await store.deleteConversation('42', 'conv-1')).toBe(0)
   })
 
+  test('shares a conversation until its asker stops, or deletes it', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(baseRun({ id: 'r1', conversationId: 'conv-1' }))
+    await store.create(baseRun({ id: 'r2', conversationId: 'conv-2' }))
+    expect(await store.getShare('conv-1')).toBeNull()
+
+    await store.shareConversation('42', 'conv-1')
+    const share = await store.getShare('conv-1')
+    expect(share).toMatchObject({ conversationId: 'conv-1', accountId: '42' })
+    expect(share?.sharedAt).toEqual(expect.any(String))
+    // Sharing again keeps the first share's date.
+    await store.shareConversation('42', 'conv-1')
+    expect(await store.getShare('conv-1')).toEqual(share)
+    // The share file is not a run.
+    expect(await store.listRecent('42', 10)).toHaveLength(2)
+
+    // Only the member who shared it may stop sharing it.
+    await store.unshareConversation('7', 'conv-1')
+    expect(await store.getShare('conv-1')).toEqual(share)
+    await store.unshareConversation('42', 'conv-1')
+    expect(await store.getShare('conv-1')).toBeNull()
+    await store.unshareConversation('42', 'conv-1')
+
+    // Deleting a conversation, or all history, takes its share with it.
+    await store.shareConversation('42', 'conv-1')
+    await store.shareConversation('42', 'conv-2')
+    await store.deleteConversation('42', 'conv-1')
+    expect(await store.getShare('conv-1')).toBeNull()
+    expect(await store.getShare('conv-2')).not.toBeNull()
+    await store.deleteAllConversations('42')
+    expect(await store.getShare('conv-2')).toBeNull()
+  })
+
   test('a run deleted while it goes on keeps its status, never its answer', async () => {
     const store = createFileRunStore(dir)
     await store.create(baseRun({ id: 'live', conversationId: 'conv-1' }))
@@ -559,11 +592,23 @@ describe('supabase run store', () => {
     const is = jest.fn(() => ({ select }))
     const eq: jest.Mock = jest.fn(() => ({ eq, is }))
     const update = jest.fn(() => ({ eq }))
-    const store = createSupabaseRunStore({
-      from: jest.fn(() => ({ update })),
-    } as never)
+    // The share row goes first.
+    const shareEq: jest.Mock = jest.fn(() => {
+      const chain = { eq: shareEq }
+      return Object.assign(Promise.resolve({ error: null }), chain)
+    })
+    const shareDelete = jest.fn(() => ({ eq: shareEq }))
+    const from = jest.fn((table: string) =>
+      table === 'agent_search_shared_conversations'
+        ? { delete: shareDelete }
+        : { update },
+    )
+    const store = createSupabaseRunStore({ from } as never)
 
     expect(await store.deleteConversation('42', 'conv-12345678')).toBe(2)
+    expect(shareDelete).toHaveBeenCalled()
+    expect(shareEq).toHaveBeenCalledWith('account_id', '42')
+    expect(shareEq).toHaveBeenCalledWith('conversation_id', 'conv-12345678')
     const row = (update.mock.calls[0] as unknown[])[0] as Record<
       string,
       unknown
@@ -590,6 +635,54 @@ describe('supabase run store', () => {
     expect(eq).toHaveBeenCalledWith('account_id', '42')
     expect(eq).toHaveBeenCalledWith('conversation_id', 'conv-12345678')
     expect(is).toHaveBeenCalledWith('deleted_at', null)
+  })
+
+  test('reads, writes and removes shares through their own table', async () => {
+    const maybeSingle = jest.fn().mockResolvedValue({
+      data: {
+        conversation_id: 'conv-12345678',
+        account_id: '42',
+        shared_at: '2026-11-03T10:00:00+00:00',
+      },
+      error: null,
+    })
+    const selectEq = jest.fn(() => ({ maybeSingle }))
+    const select = jest.fn(() => ({ eq: selectEq }))
+    const upsert = jest.fn().mockResolvedValue({ error: null })
+    const deleteEq: jest.Mock = jest.fn(() => {
+      const chain = { eq: deleteEq }
+      return Object.assign(Promise.resolve({ error: null }), chain)
+    })
+    const remove = jest.fn(() => ({ eq: deleteEq }))
+    const from = jest.fn(() => ({ select, upsert, delete: remove }))
+    const store = createSupabaseRunStore({ from } as never)
+
+    expect(await store.getShare('conv-12345678')).toEqual({
+      conversationId: 'conv-12345678',
+      accountId: '42',
+      sharedAt: '2026-11-03T10:00:00+00:00',
+    })
+    expect(from).toHaveBeenCalledWith('agent_search_shared_conversations')
+    expect(selectEq).toHaveBeenCalledWith('conversation_id', 'conv-12345678')
+
+    await store.shareConversation('42', 'conv-12345678')
+    expect(upsert).toHaveBeenCalledWith(
+      { conversation_id: 'conv-12345678', account_id: '42' },
+      { onConflict: 'conversation_id', ignoreDuplicates: true },
+    )
+
+    await store.unshareConversation('42', 'conv-12345678')
+    expect(remove).toHaveBeenCalled()
+    expect(deleteEq).toHaveBeenCalledWith('account_id', '42')
+    expect(deleteEq).toHaveBeenCalledWith('conversation_id', 'conv-12345678')
+
+    maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    expect(await store.getShare('conv-12345678')).toBeNull()
+    maybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'down' },
+    })
+    await expect(store.getShare('conv-12345678')).rejects.toThrow('down')
   })
 
   test('admits through the database function and fails closed', async () => {

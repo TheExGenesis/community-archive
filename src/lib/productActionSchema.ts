@@ -6,6 +6,7 @@ export const productFeatures = [
   'tweet',
   'tube',
   'tweet_cleanup',
+  'ask_archive',
 ] as const
 export const productActions = [
   'node_selected',
@@ -31,6 +32,8 @@ export const productActions = [
   'history_cleared',
   'pattern_selected',
   'bulk_deleted',
+  'shared',
+  'unshared',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]

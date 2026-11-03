@@ -190,6 +190,9 @@ CREATE INDEX IF NOT EXISTS "agent_search_runs_conversation_idx"
 CREATE INDEX IF NOT EXISTS "agent_search_runs_account_live_idx"
   ON "public"."agent_search_runs" ("account_id", "started_at" DESC)
   WHERE "deleted_at" IS NULL;
+-- Deleting all of a member's history removes their shares.
+CREATE INDEX IF NOT EXISTS "agent_search_shared_conversations_account_idx"
+  ON "public"."agent_search_shared_conversations" ("account_id");
 
 CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
   ON "public"."digest_edition_comments" ("edition_id", "created_at");

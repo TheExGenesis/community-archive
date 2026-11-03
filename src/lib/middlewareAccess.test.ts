@@ -64,6 +64,26 @@ test.each(['/search', '/search?q=open+source&fromUser=alice'])(
   },
 )
 
+// A conversation link may be shared; the page decides, and gates it if not.
+test('lets a signed-out visitor open an Ask the archive conversation link', async () => {
+  const response = await request(
+    '/search/ask?c=5f3735da-1113-4c96-845b-06bfe57d4c1b',
+  )
+  expect(response.headers.get('x-middleware-next')).toBe('1')
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
+  expect(createMiddlewareClient).not.toHaveBeenCalled()
+})
+
+test.each([
+  '/search/ask',
+  '/search/ask?c=../x',
+  '/search/ask/other?c=conv-12345678',
+])('still sends a signed-out visitor at %s to sign in', async (path) => {
+  const response = await request(path)
+  expect(response.status).toBe(307)
+  expect(new URL(response.headers.get('location')!).pathname).toBe('/login')
+})
+
 test.each([
   ['/user/alice?chapter=2025', '/guest/user/alice?chapter=2025'],
   ['/user/42', '/guest/user/42'],

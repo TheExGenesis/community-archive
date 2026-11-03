@@ -1,4 +1,5 @@
 import {
+  AnalyticsGatewayError,
   clickHouseSearchGatewayBaseUrl,
   fetchAnalyticsGatewayJson,
 } from '@/lib/clickhouseGateway'
@@ -13,6 +14,33 @@ import type { AgentTweet } from './types'
 
 const GATEWAY_TIMEOUT_MS = 20_000
 const ID = /^\d{1,20}$/
+// The gateway answers 503 "Search is busy; retry shortly." when it has too
+// many searches in flight. Wait and try again, while the run has time left.
+export const BUSY_RETRY_DELAYS_MS = [500, 1_500]
+
+export async function retryWhileBusy<T>(
+  limits: RunLimits,
+  call: () => Promise<T>,
+  delays: number[] = BUSY_RETRY_DELAYS_MS,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await call()
+    } catch (error) {
+      const busy =
+        error instanceof AnalyticsGatewayError && error.status === 503
+      const delay = delays[attempt]
+      if (!busy || delay === undefined) throw error
+      if (
+        limits.deadlineAt !== undefined &&
+        Date.now() + delay >= limits.deadlineAt
+      ) {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+}
 
 interface GatewayMedia {
   mediaUrl: string
@@ -127,12 +155,14 @@ export async function searchTweets(
   if (input.since) params.set('since', input.since)
   if (input.until) params.set('until', input.until)
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort)
-  const response = await fetchAnalyticsGatewayJson<{
-    data: { tweets: GatewayTweet[]; nextOffset: number | null }
-  }>(['search'], params, {
-    baseUrl: clickHouseSearchGatewayBaseUrl(),
-    timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
-  })
+  const response = await retryWhileBusy(limits, () =>
+    fetchAnalyticsGatewayJson<{
+      data: { tweets: GatewayTweet[]; nextOffset: number | null }
+    }>(['search'], params, {
+      baseUrl: clickHouseSearchGatewayBaseUrl(),
+      timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
+    }),
+  )
   if (!Array.isArray(response.data?.tweets)) {
     throw new Error('Gateway search returned an invalid payload')
   }

@@ -23,6 +23,7 @@ import { findMembers, getUser, searchTweets } from './gateway'
 import {
   collectAndScoreImpl,
   findPeopleImpl,
+  SEARCH_CONCURRENCY,
   searchTweetsImpl,
 } from './toolImpl'
 
@@ -97,6 +98,28 @@ test('a term that runs out passes its share to the others', async () => {
   expect(result.collected).toBe(6)
   expect(result.kept.map((t) => t.id)).toContain('10')
   expect(result.capped).toBe(true)
+})
+
+test('collect keeps at most SEARCH_CONCURRENCY searches in flight', async () => {
+  const terms = range('t', 8)
+  serve(Object.fromEntries(terms.map((term, i) => [term, range(`${i}x`, 3)])))
+  const served = (searchTweets as jest.Mock).getMockImplementation()!
+  let inFlight = 0
+  let peak = 0
+  ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+    peak = Math.max(peak, ++inFlight)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    inFlight--
+    return served(input)
+  })
+  const result = await collectAndScoreImpl({
+    terms,
+    criterion: 'Does this tweet name a book?',
+    maxTweets: 100,
+  })
+  expect(peak).toBe(SEARCH_CONCURRENCY)
+  expect(result.collected).toBe(24)
+  expect(result.capped).toBe(false)
 })
 
 test('collect is not capped when every term is exhausted', async () => {

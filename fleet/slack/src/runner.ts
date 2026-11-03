@@ -377,7 +377,11 @@ export class TaskRunner {
       thread.worktree as string,
       thread.runDir as string,
     )
-    const hasChanges = patch.trim() !== ''
+    // Staged edits, or a commit a failed push left behind (a retry ships it).
+    const ahead = thread.prUrl
+      ? { count: 0, sha: '' }
+      : await fleet.ahead(thread.worktree as string, thread.runDir as string)
+    const hasChanges = patch.trim() !== '' || ahead.count > 0
     const verdict = parseTurnVerdict(res.text, hasChanges)
     await this.postClaudeText(thread, res.text)
     if (verdict.close.length) await this.closeIssues(thread, verdict.close)
@@ -814,7 +818,10 @@ export class TaskRunner {
         .filter((l) => l !== undefined)
         .join('\n') + '\n',
     )
-    const sha = await fleet.commit(worktree, messageFile, runDir)
+    const staged = (await fleet.stage(worktree, runDir)).trim() !== ''
+    const sha = staged
+      ? await fleet.commit(worktree, messageFile, runDir)
+      : (await fleet.ahead(worktree, runDir)).sha
     await fleet.pushBranch(worktree, thread.branch as string, runDir)
 
     let prUrl = thread.prUrl

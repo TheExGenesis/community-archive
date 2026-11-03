@@ -503,6 +503,21 @@ fleet_gate_failure_prompt() {
 }
 
 # ─── Worktrees ──────────────────────────────────────────────────────────────
+# fleet_git_push <worktree> <refspec> : push with GH_TOKEN as the https
+# credential when set (the box has no stored git credentials; gh's own token
+# does not reach git without `gh auth setup-git`). Nothing is written to disk.
+fleet_git_push() {
+  local wt="$1" refspec="$2"
+  if [[ -n "${GH_TOKEN:-}" ]]; then
+    git -C "$wt" \
+      -c credential.helper= \
+      -c 'credential.helper=!f() { echo "username=x-access-token"; echo "password=$GH_TOKEN"; }; f' \
+      push --quiet origin "$refspec"
+  else
+    git -C "$wt" push --quiet origin "$refspec"
+  fi
+}
+
 # fleet_worktree_add <branch> <path> [base-branch] : fresh worktree of
 # origin/<base> (default main) on a new branch, with node_modules linked from
 # the checkout. Prints the base commit.

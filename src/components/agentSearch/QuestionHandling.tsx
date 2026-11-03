@@ -22,9 +22,9 @@ export function QuestionHandling() {
         </p>
         <ul className="list-disc space-y-1.5 pl-4 text-muted-foreground">
           <li>
-            The model that runs the search sees your question and the tweets it
-            finds. It is reached through OpenRouter, set to keep nothing and not
-            train on it.
+            The model that runs the search sees your question, your handle,
+            name and bio, and the tweets it finds. It is reached through
+            OpenRouter, set to keep nothing and not train on it.
           </li>
           <li>
             Searches by meaning go to the Community Archive’s embeddings

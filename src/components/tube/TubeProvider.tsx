@@ -9,6 +9,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { captureProductAction } from '@/lib/productAnalytics'
+import type { ProductAction } from '@/lib/productActionSchema'
 import {
   EMPTY_TUBE_STATE,
   TUBE_DATA_URL,
@@ -74,6 +76,8 @@ interface TubeContextValue {
   forgetAll: () => void
 }
 
+const track = (action: ProductAction) => captureProductAction('tube', action)
+
 const TubeContext = createContext<TubeContextValue | null>(null)
 
 export function TubeProvider({ children }: { children: ReactNode }) {
@@ -106,8 +110,12 @@ export function TubeProvider({ children }: { children: ReactNode }) {
       byId: new Map(data?.videos.map((v) => [v.id, v]) ?? []),
       state,
       seed,
-      reshuffle: () => setSeed(Math.floor(Math.random() * 1e9)),
-      watched: (id) =>
+      reshuffle: () => {
+        track('shuffled')
+        setSeed(Math.floor(Math.random() * 1e9))
+      },
+      watched: (id) => {
+        track('video_played')
         update((s) => ({
           ...s,
           history: [
@@ -115,24 +123,40 @@ export function TubeProvider({ children }: { children: ReactNode }) {
             { id, at: Math.floor(Date.now() / 1000) },
           ].slice(-500),
           later: s.later.filter((x) => x !== id),
-        })),
-      setLiked: (id, on) =>
+        }))
+      },
+      setLiked: (id, on) => {
+        if (on) track('video_liked')
         update((s) => ({
           ...s,
           liked: toggle(s.liked, id, on),
           disliked: on ? s.disliked.filter((x) => x !== id) : s.disliked,
-        })),
-      setDisliked: (id, on) =>
+        }))
+      },
+      setDisliked: (id, on) => {
+        if (on) track('video_disliked')
         update((s) => ({
           ...s,
           disliked: toggle(s.disliked, id, on),
           liked: on ? s.liked.filter((x) => x !== id) : s.liked,
-        })),
-      setLater: (id, on) =>
-        update((s) => ({ ...s, later: toggle(s.later, id, on) })),
-      setFrames: (on) => update((s) => ({ ...s, frames: on })),
-      clearHistory: () => update((s) => ({ ...s, history: [] })),
-      forgetAll: () => update((s) => ({ ...EMPTY_TUBE_STATE, frames: s.frames })),
+        }))
+      },
+      setLater: (id, on) => {
+        if (on) track('watch_later_added')
+        update((s) => ({ ...s, later: toggle(s.later, id, on) }))
+      },
+      setFrames: (on) => {
+        track('setting_changed')
+        update((s) => ({ ...s, frames: on }))
+      },
+      clearHistory: () => {
+        track('history_cleared')
+        update((s) => ({ ...s, history: [] }))
+      },
+      forgetAll: () => {
+        track('history_cleared')
+        update((s) => ({ ...EMPTY_TUBE_STATE, frames: s.frames }))
+      },
     }),
     [data, error, state, seed, update],
   )

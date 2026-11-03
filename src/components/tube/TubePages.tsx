@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import { Play } from 'lucide-react'
 import { isHiddenGem, tubeThumbnail, type TubeVideo } from '@/lib/tube'
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useTube } from './TubeProvider'
 import { usePlaylists } from './usePlaylists'
 import { PageTitle, TubeStatus, VideoGrid, watchHref } from './VideoCards'
@@ -176,7 +177,11 @@ function PlaylistCard({
 }) {
   const { state } = useTube()
   return (
-    <Link href={watchHref(videos[0].id, id)} className="group block">
+    <Link
+      href={watchHref(videos[0].id, id)}
+      onClick={() => captureProductAction('tube', 'playlist_opened')}
+      className="group block"
+    >
       <div className="relative">
         <div className="absolute inset-x-3 -top-1.5 h-3 rounded-t-xl bg-muted-foreground/30" />
         <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">

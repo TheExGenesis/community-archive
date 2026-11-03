@@ -15,6 +15,7 @@ import {
   type TubeDetail,
   type TubeParent,
 } from '@/lib/tube'
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useTube } from './TubeProvider'
 import { usePlaylists, type TubePlaylist } from './usePlaylists'
 import { TubeStatus, VideoList } from './VideoCards'
@@ -160,6 +161,7 @@ export function TubeWatch({ id }: { id: string }) {
             href={`https://www.youtube.com/watch?v=${id}`}
             target="_blank"
             rel="noreferrer"
+            onClick={() => captureProductAction('tube', 'external_opened')}
             className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-medium hover:bg-foreground/10"
           >
             <ExternalLink className="h-4 w-4" /> YouTube
@@ -205,7 +207,10 @@ export function TubeWatch({ id }: { id: string }) {
         {playlist && <PlaylistPanel playlist={playlist} activeId={id} />}
         <div>
           <h2 className="mb-2 text-sm font-semibold">Shared by the same people</h2>
-          <VideoList videos={upNext(data, video, state)} />
+          <VideoList
+            videos={upNext(data, video, state)}
+            onOpen={() => captureProductAction('tube', 'related_opened')}
+          />
         </div>
       </aside>
     </div>

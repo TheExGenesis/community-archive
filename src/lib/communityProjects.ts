@@ -44,23 +44,6 @@ export interface CommunityProject {
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
   {
-    slug: 'bangers',
-    name: 'Bangers',
-    creator: 'Community Archive',
-    summary: 'Find standout community tweets from the last day or years ago.',
-    description:
-      'Browse popular archived posts, search by keyword, and explore different time periods and rankings.',
-    archiveUse:
-      'Ranks posts from participating accounts using archived engagement and community interactions.',
-    category: 'Tools',
-    tags: ['Discovery', 'Popular tweets', 'Search'],
-    projectUrl: '/bangers',
-    image: '/images/community/bangers-card.webp',
-    coverClass: 'from-[#f3d36b] via-[#f0a660] to-[#1e9bcd]',
-    featured: true,
-    publishedAt: '2026-09-18',
-  },
-  {
     slug: 'pairwise',
     name: 'Pairwise',
     creator: 'Loopy',
@@ -95,40 +78,6 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
     featured: true,
     publishedAt: '2026-09-07',
-  },
-  {
-    slug: 'strands',
-    name: 'Strands',
-    creator: 'Community Archive',
-    summary: 'Follow ideas as they evolve across people and conversations.',
-    description:
-      'Read the original Best Strands collection: summaries of ideas that spread through the community, with key posts and links back to each conversation.',
-    archiveUse:
-      'Reuses the existing ranked strand analyses and their source references from the archive. Each strand has its own shareable page.',
-    category: 'Experiments',
-    tags: ['Ideas', 'Conversations', 'AI analysis'],
-    projectUrl: '/strands',
-    image: '/images/community/strands-card.webp',
-    coverClass: 'from-[#f3d36b] via-[#f0a660] to-[#1e9bcd]',
-    featured: true,
-    publishedAt: '2026-09-07',
-  },
-  {
-    slug: 'conversation-map',
-    name: 'Conversation Map',
-    creator: 'Community Archive',
-    summary: 'Explore a year of conversations, one memorable post at a time.',
-    description:
-      'A zoomable map of the most-quoted community posts each year. Scroll to uncover more labels, pan through time, and hover to read the original posts and images.',
-    archiveUse:
-      'Loads up to 200 member-authored posts per year from the archive’s current banger ranking. Height shows community quotes, with source links to Community Archive tweet pages.',
-    category: 'Experiments',
-    tags: ['Timeline', 'Conversations', 'Visualization'],
-    projectUrl: '/conversation-map',
-    image: '/images/community/conversation-map-card.webp',
-    coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
-    featured: true,
-    publishedAt: '2026-08-30',
   },
   {
     slug: 'bangers-page',
@@ -410,6 +359,16 @@ export const SUBMITTED_PROJECT_OVERRIDES: Record<
 }
 
 /**
+ * First-party products live in the Tools nav menu, not the community Gallery.
+ * Published rows with these slugs (backfilled before the split) are hidden.
+ */
+export const FIRST_PARTY_TOOL_SLUGS: ReadonlySet<string> = new Set([
+  'bangers',
+  'strands',
+  'conversation-map',
+])
+
+/**
  * The live Gallery catalog: published database rows replace the checked-in
  * entry with the same slug, so admin edits win over the curated defaults.
  */
@@ -420,6 +379,7 @@ export function mergeCommunityCatalog(
     COMMUNITY_PROJECTS.map((project) => [project.slug, project]),
   )
   for (const project of publishedProjects) {
+    if (FIRST_PARTY_TOOL_SLUGS.has(project.slug)) continue
     // A backfilled database row has no uploaded cover; keep the curated
     // catalog's artwork for the same slug so the card doesn't regress.
     const curated = bySlug.get(project.slug)

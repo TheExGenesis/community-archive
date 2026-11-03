@@ -126,7 +126,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('18 projects')).toBeInTheDocument()
+    expect(screen.getByText('15 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -206,27 +206,14 @@ describe('CommunityGallery', () => {
     expect(covers[0]).not.toHaveAttribute('srcset')
   })
 
-  it('opens the Conversation Map internally without inventing a source post', async () => {
-    const user = userEvent.setup()
+  it('leaves first-party tools out of the gallery', () => {
     render(<CommunityGallery />)
-    await user.click(
-      screen.getByRole('button', {
-        name: /Conversation Map.*Community Archive/i,
-      }),
-    )
-    expect(
-      screen.getByRole('dialog', { name: 'Conversation Map' }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Open project/i })).toHaveAttribute(
-      'href',
-      '/conversation-map',
-    )
-    expect(
-      screen.getByRole('link', { name: /Open project/i }),
-    ).not.toHaveAttribute('target')
-    expect(
-      screen.queryByRole('link', { name: 'View source post' }),
-    ).not.toBeInTheDocument()
+    for (const name of ['Bangers', 'Strands', 'Conversation Map']) {
+      expect(
+        screen.queryByAltText(`Preview of ${name}`),
+      ).not.toBeInTheDocument()
+    }
+    expect(screen.getByAltText('Preview of Pairwise')).toBeInTheDocument()
   })
 
   it('shows one continuous grid and preserves the curated Tools order when filtered', async () => {
@@ -251,7 +238,7 @@ describe('CommunityGallery', () => {
     )
     expect(
       screen.getAllByRole('button', { name: /Preview of/ })[0],
-    ).toHaveAccessibleName(/Bangers/)
+    ).toHaveAccessibleName(/Pairwise/)
     expect(
       screen
         .getAllByRole('button')
@@ -271,7 +258,7 @@ describe('CommunityGallery', () => {
     ])
 
     await user.click(screen.getByRole('button', { name: 'Tools' }))
-    expect(screen.getByText('10 projects')).toBeInTheDocument()
+    expect(screen.getByText('9 projects')).toBeInTheDocument()
   })
 
   it('leads each card with its one-line summary, then name and creator', () => {
@@ -327,10 +314,10 @@ describe('CommunityGallery', () => {
 
   it('shows hearts for curated cards once their published rows are loaded', () => {
     const slugs = [
-      'bangers',
+      'bangers-page',
       'pairwise',
       'birdseye',
-      'strands',
+      'followle',
       'model-behavior-reports',
     ]
     const publishedProjects = slugs.map((slug, index) => ({

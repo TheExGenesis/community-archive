@@ -251,9 +251,11 @@ publishes the validated edition through Supabase.
 The publisher is date-idempotent. It exits before generation when a date is
 already published, records the stable run identifier `systemd:YYYY-MM-DD`, does
 not replace an edition an editor published during generation, and publishes a
-completed automated run if an earlier database publication attempt failed.
-Generation or validation failure leaves the run failed and does not change the
-public edition.
+completed automated run if an earlier publication attempt failed. systemd
+restarts a failed job every 20 minutes, up to five starts, so a transient
+gateway or database failure recovers without an operator. Generation or
+validation failure leaves the run failed and does not change the public edition;
+those restarts exit at the failed run without another model call.
 
 For a supervised no-write replay, run the publisher with
 `--date YYYY-MM-DD --dry-run`. To pause new nightly writes without affecting
@@ -310,7 +312,7 @@ terms cannot fill either directional slot. Web and email render the same saved
 snapshot, ending on the UTC day before the edition date. Retries preserve it.
 
 If current-day trend retrieval or persistence fails, publication fails visibly;
-the completed generation can be retried without another model call. Older
+the completed generation is retried by systemd without another model call. Older
 editions without snapshots remain unchanged: the live weekly endpoint cannot
 reconstruct historical trends. This code also requires deploying the standalone
 nightly service; a website deployment alone does not update that publisher.

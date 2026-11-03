@@ -35,7 +35,9 @@ storage for device and session continuity. Leave either variable unset to
 disable PostHog locally.
 
 The same two variables drive server-side error reporting (`posthog-node` via
-`src/instrumentation.ts` and `reportServerError`). `POSTHOG_CLI_TOKEN` is a
+`src/instrumentation.ts`, `reportServerError`, and `reportApiError`); set
+`SERVER_ERROR_CAPTURE=off` to keep server exceptions out of PostHog while the
+log lines still emit. `POSTHOG_CLI_TOKEN` is a
 build-time personal API key that lets `next build` upload source maps to
 PostHog project 546185; leave it unset locally, the build runs unchanged
 without it. See `docs/product-analytics.md`, "Error tracking".

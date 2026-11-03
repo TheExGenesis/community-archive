@@ -5,6 +5,16 @@ import UserDirectoryClient, { USERS_PER_PAGE } from './UserDirectoryClient'
 import { fetchUsers } from '@/lib/queries/fetchUsers'
 import type { DirectoryUser } from '@/lib/types'
 import { capturePostHogEvent } from '@/lib/posthog'
+import {
+  hideDirectoryUser,
+  listHiddenDirectoryUsers,
+  restoreDirectoryUser,
+} from './actions'
+jest.mock('./actions', () => ({
+  hideDirectoryUser: jest.fn(),
+  listHiddenDirectoryUsers: jest.fn(),
+  restoreDirectoryUser: jest.fn(),
+}))
 
 jest.mock('@/lib/queries/fetchUsers', () => ({
   fetchUsers: jest.fn(),
@@ -230,5 +240,104 @@ describe('UserDirectoryClient', () => {
       expect.objectContaining({ offset: 0, search: 'member_2' }),
     )
     log.mockRestore()
+  })
+})
+
+const renderDirectory = (isAdmin = false, initialNextOffset = 1) =>
+  render(
+    <UserDirectoryClient
+      totalCount={null}
+      isAdmin={isAdmin}
+      initialUsers={[directoryUser(1)]}
+      initialHasMore={true}
+      initialNextOffset={initialNextOffset}
+    />,
+  )
+
+describe('directory visibility controls', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockFetchUsers.mockResolvedValue({
+      users: [],
+      hasMore: false,
+      nextOffset: 1,
+    })
+    jest.mocked(hideDirectoryUser).mockResolvedValue(undefined)
+    jest.mocked(restoreDirectoryUser).mockResolvedValue(undefined)
+    jest.mocked(listHiddenDirectoryUsers).mockResolvedValue([])
+  })
+
+  test('regular members do not see hide or restore controls', () => {
+    renderDirectory()
+    expect(
+      screen.queryByRole('button', { name: 'Hidden users' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Hide @/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  test('admin hides a row and reloads from the first page', async () => {
+    renderDirectory(true)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Hide @member_1 from directory' }),
+    )
+    await waitFor(() =>
+      expect(hideDirectoryUser).toHaveBeenCalledWith('archive:1', 'member_1'),
+    )
+    await waitFor(() =>
+      expect(screen.queryByText('Member 1')).not.toBeInTheDocument(),
+    )
+    expect(mockFetchUsers).toHaveBeenCalledWith(
+      expect.objectContaining({ offset: 0 }),
+    )
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '@member_1 hidden from the directory.',
+    )
+  })
+
+  test('failed hide keeps the row and reports the error', async () => {
+    jest
+      .mocked(hideDirectoryUser)
+      .mockRejectedValueOnce(new Error('Please try again.'))
+    renderDirectory(true)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Hide @member_1 from directory' }),
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Please try again.',
+    )
+    expect(screen.getByText('Member 1')).toBeInTheDocument()
+  })
+
+  test('admin can restore from the hidden users list', async () => {
+    jest.mocked(listHiddenDirectoryUsers).mockResolvedValueOnce([
+      {
+        visibility_key: 'id:42',
+        account_id: '42',
+        username: 'bot',
+        hidden_by: null,
+        hidden_at: '2026-10-29',
+      },
+    ])
+    renderDirectory(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Hidden users' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Restore @bot to directory' }),
+    )
+    await waitFor(() =>
+      expect(restoreDirectoryUser).toHaveBeenCalledWith('id:42'),
+    )
+    expect(await screen.findByText('No hidden users.')).toBeInTheDocument()
+  })
+
+  test('load more uses the source cursor rather than the visible row count', async () => {
+    renderDirectory(false, 3)
+    fireEvent.click(screen.getByRole('button', { name: /Load/ }))
+    await waitFor(() =>
+      expect(mockFetchUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 3 }),
+      ),
+    )
   })
 })

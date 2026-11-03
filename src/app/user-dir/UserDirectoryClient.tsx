@@ -23,6 +23,12 @@ import { formatDirectoryDate as formatJoinedDate } from '@/lib/directoryDate'
 import { fetchUsers, getDirectoryProfileHref } from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
 import { capturePostHogEvent } from '@/lib/posthog'
+import {
+  hideDirectoryUser,
+  listHiddenDirectoryUsers,
+  restoreDirectoryUser,
+} from './actions'
+import type { HiddenDirectoryUser } from '@/lib/directoryVisibility'
 
 export const USERS_PER_PAGE = 15
 
@@ -31,6 +37,8 @@ interface UserDirectoryClientProps {
   totalCountSlot?: ReactNode
   initialUsers: DirectoryUser[] | null
   initialHasMore: boolean
+  initialNextOffset?: number
+  isAdmin?: boolean
 }
 
 export default function UserDirectoryClient({
@@ -38,7 +46,21 @@ export default function UserDirectoryClient({
   totalCountSlot,
   initialUsers,
   initialHasMore,
+  initialNextOffset,
+  isAdmin = false,
 }: UserDirectoryClientProps) {
+  const [nextOffset, setNextOffset] = useState(
+    initialNextOffset ?? initialUsers?.length ?? 0,
+  )
+  const [hiddenUsers, setHiddenUsers] = useState<HiddenDirectoryUser[] | null>(
+    null,
+  )
+  const [showHidden, setShowHidden] = useState(false)
+  const [pendingVisibility, setPendingVisibility] = useState<string | null>(
+    null,
+  )
+  const [visibilityError, setVisibilityError] = useState<string | null>(null)
+  const [visibilityNotice, setVisibilityNotice] = useState<string | null>(null)
   const [users, setUsers] = useState<DirectoryUser[]>(initialUsers ?? [])
   const [loading, setLoading] = useState(initialUsers === null)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -87,6 +109,7 @@ export default function UserDirectoryClient({
           return
         setUsers(page.users)
         setHasMore(page.hasMore)
+        setNextOffset(page.nextOffset ?? page.users.length)
         if (
           debouncedSearch &&
           debouncedSearch !== lastCapturedSearchRef.current
@@ -130,7 +153,7 @@ export default function UserDirectoryClient({
     try {
       const page = await fetchUsers({
         limit: USERS_PER_PAGE,
-        offset: users.length,
+        offset: nextOffset,
         sortBy: sortKey,
         sortOrder,
         search: debouncedSearch || undefined,
@@ -139,6 +162,7 @@ export default function UserDirectoryClient({
 
       setUsers((currentUsers) => [...currentUsers, ...page.users])
       setHasMore(page.hasMore)
+      setNextOffset(page.nextOffset ?? nextOffset + page.users.length)
     } catch (err) {
       if (requestVersion !== requestVersionRef.current) return
       setError('We could not load more members. Please try again.')
@@ -154,7 +178,7 @@ export default function UserDirectoryClient({
     loadingMore,
     sortKey,
     sortOrder,
-    users.length,
+    nextOffset,
   ])
 
   useEffect(() => {
@@ -171,6 +195,54 @@ export default function UserDirectoryClient({
     observer.observe(target)
     return () => observer.disconnect()
   }, [error, hasMore, loadMore, loading, loadingMore])
+
+  const changeVisibility = async (
+    user: DirectoryUser | HiddenDirectoryUser,
+  ) => {
+    if (pendingVisibility) return
+    const restoring = 'visibility_key' in user
+    setPendingVisibility(restoring ? user.visibility_key : user.directory_id)
+    setVisibilityError(null)
+    setVisibilityNotice(null)
+    try {
+      if (restoring) await restoreDirectoryUser(user.visibility_key)
+      else await hideDirectoryUser(user.directory_id, user.username)
+      // Invalidate pending list requests before reloading from the first page.
+      requestVersionRef.current++
+      setUsers([])
+      setLoading(true)
+      setRetryCount((count) => count + 1)
+      setVisibilityNotice(
+        `@${user.username} ${restoring ? 'restored to' : 'hidden from'} the directory.`,
+      )
+      setHiddenUsers(null)
+      if (showHidden) setHiddenUsers(await listHiddenDirectoryUsers())
+    } catch (err) {
+      setVisibilityError(
+        err instanceof Error
+          ? err.message
+          : 'Could not update directory visibility.',
+      )
+    } finally {
+      setPendingVisibility(null)
+    }
+  }
+
+  const toggleHiddenUsers = async () => {
+    if (showHidden) {
+      setShowHidden(false)
+      return
+    }
+    setShowHidden(true)
+    setVisibilityError(null)
+    try {
+      setHiddenUsers(await listHiddenDirectoryUsers())
+    } catch {
+      setVisibilityError(
+        'Could not load hidden users. Close this list and try again.',
+      )
+    }
+  }
 
   const handleSort = (key: SortKey) => {
     const nextOrder =
@@ -253,6 +325,70 @@ export default function UserDirectoryClient({
             className="h-12 rounded-lg border-border bg-card pl-11 shadow-sm dark:border-border dark:bg-background"
           />
         </div>
+
+        {isAdmin && (
+          <div className="mb-6 space-y-3">
+            <Button
+              variant="outline"
+              onClick={toggleHiddenUsers}
+              aria-expanded={showHidden}
+            >
+              {showHidden ? 'Close hidden users' : 'Hidden users'}
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Hiding only removes a user from this directory. Their profile,
+              archive, and membership stay intact.
+            </p>
+            {visibilityNotice && (
+              <p role="status" className="text-sm">
+                {visibilityNotice}
+              </p>
+            )}
+            {visibilityError && (
+              <p role="alert" className="text-sm text-red-600">
+                {visibilityError}
+              </p>
+            )}
+            {showHidden && (
+              <section
+                aria-label="Hidden users"
+                className="rounded-lg border p-4"
+              >
+                {hiddenUsers === null ? (
+                  <p className="text-sm">
+                    {visibilityError
+                      ? 'Hidden users unavailable.'
+                      : 'Loading hidden users…'}
+                  </p>
+                ) : hiddenUsers.length === 0 ? (
+                  <p className="text-sm">No hidden users.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {hiddenUsers.map((user) => (
+                      <li
+                        key={user.visibility_key}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span>@{user.username}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={pendingVisibility !== null}
+                          aria-label={`Restore @${user.username} to directory`}
+                          onClick={() => changeVisibility(user)}
+                        >
+                          {pendingVisibility === user.visibility_key
+                            ? 'Restoring…'
+                            : 'Restore'}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+          </div>
+        )}
 
         <div
           className="overflow-hidden rounded-lg border border-border bg-card shadow-sm dark:border-border dark:bg-card"
@@ -417,11 +553,24 @@ export default function UserDirectoryClient({
                         </time>
                       </TableCell>
                       <TableCell className="pr-4">
-                        <div className="flex justify-end gap-0.5">
+                        <div className="flex items-center justify-end gap-2">
                           <MembershipStatusIcon
                             hasArchive={user.has_archive}
                             isOptedIn={user.is_opted_in}
                           />
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={pendingVisibility !== null}
+                              aria-label={`Hide @${user.username} from directory`}
+                              onClick={() => changeVisibility(user)}
+                            >
+                              {pendingVisibility === user.directory_id
+                                ? 'Hiding…'
+                                : 'Hide'}
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

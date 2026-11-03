@@ -1031,6 +1031,11 @@ export async function getInitialPortalBangersPage(
 }
 
 /** Discover current terms first; the browser requests only its selected chart resolution. */
+/** The homepage's daily-cached trending terms, shared by the guest preview. */
+export async function getCachedWeeklyTrends(): Promise<PortalTrends['weekly']> {
+  return (await getCachedTrendsSnapshot(portalDataSourceKey())).weekly
+}
+
 export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
   return { ...emptyPortalTrends(), weekly: await fetchPortalWeeklyTrends() }
 }

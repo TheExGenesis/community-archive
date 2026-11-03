@@ -1,16 +1,5 @@
 import type { Instrumentation } from 'next'
 
-const mockCaptureExceptionImmediate = jest.fn()
-const mockPostHogConstructor = jest.fn()
-jest.mock('posthog-node', () => ({
-  PostHog: class {
-    constructor(...args: unknown[]) {
-      mockPostHogConstructor(...args)
-    }
-    captureExceptionImmediate = mockCaptureExceptionImmediate
-  },
-}))
-
 const mockGetClaims = jest.fn()
 jest.mock('@supabase/ssr', () => ({
   createServerClient: () => ({ auth: { getClaims: mockGetClaims } }),
@@ -26,16 +15,34 @@ jest.mock('@/utils/supabase', () => ({
     anonKey: 'anon',
   }),
 }))
+jest.mock('@/lib/observability/serverErrorCapture', () => {
+  const actual = jest.requireActual('@/lib/observability/serverErrorCapture')
+  return {
+    ...actual,
+    captureServerException: jest.fn(async () => true),
+    serverErrorCaptureEnabled: jest.fn(() => true),
+  }
+})
 
+import {
+  captureServerException,
+  serverErrorCaptureEnabled,
+} from '@/lib/observability/serverErrorCapture'
 import {
   describeRequestError,
   reportRequestError,
   reportServerError,
-  resetServerPostHogClientForTests,
   resolveRequestUserId,
   sanitizeServerErrorContext,
   toReportableError,
 } from './serverErrors'
+
+const captureMock = captureServerException as jest.MockedFunction<
+  typeof captureServerException
+>
+const enabledMock = serverErrorCaptureEnabled as jest.MockedFunction<
+  typeof serverErrorCaptureEnabled
+>
 
 type RequestErrorContext = Parameters<Instrumentation.onRequestError>[2]
 
@@ -50,19 +57,18 @@ const routeContext = (
 })
 
 describe('serverErrors', () => {
-  const originalEnv = { ...process.env }
+  const originalRuntime = process.env.NEXT_RUNTIME
 
   beforeEach(() => {
     jest.clearAllMocks()
-    resetServerPostHogClientForTests()
-    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = 'test-token'
-    process.env.NEXT_PUBLIC_POSTHOG_HOST = 'https://analytics.example.com'
+    enabledMock.mockReturnValue(true)
+    captureMock.mockResolvedValue(true)
     delete process.env.NEXT_RUNTIME
-    mockCaptureExceptionImmediate.mockResolvedValue(undefined)
   })
 
   afterAll(() => {
-    process.env = originalEnv
+    if (originalRuntime === undefined) delete process.env.NEXT_RUNTIME
+    else process.env.NEXT_RUNTIME = originalRuntime
   })
 
   describe('sanitizeServerErrorContext', () => {
@@ -114,16 +120,15 @@ describe('serverErrors', () => {
   })
 
   describe('reportServerError', () => {
-    it('is a no-op when PostHog is not configured', async () => {
-      delete process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
+    it('is a no-op when server capture is disabled', async () => {
+      enabledMock.mockReturnValue(false)
       await expect(
         reportServerError('digest_email', new Error('x')),
       ).resolves.toBe(false)
-      expect(mockPostHogConstructor).not.toHaveBeenCalled()
-      expect(mockCaptureExceptionImmediate).not.toHaveBeenCalled()
+      expect(captureMock).not.toHaveBeenCalled()
     })
 
-    it('sends the error with the scope and bounded context under the server id', async () => {
+    it('sends the scope and bounded context under the server id', async () => {
       const error = new Error('send failed')
       await expect(
         reportServerError('digest_email', error, {
@@ -132,54 +137,43 @@ describe('serverErrors', () => {
           recipient_email: 'someone@example.com',
         }),
       ).resolves.toBe(true)
-      expect(mockPostHogConstructor).toHaveBeenCalledWith(
-        'test-token',
-        expect.objectContaining({
-          host: 'https://analytics.example.com',
-          flushAt: 1,
-          disableGeoip: true,
-          enableExceptionAutocapture: false,
-        }),
-      )
-      expect(mockCaptureExceptionImmediate).toHaveBeenCalledWith(
-        error,
-        'server',
-        {
+      expect(captureMock).toHaveBeenCalledWith(error, {
+        route: 'digest_email',
+        method: undefined,
+        requestId: undefined,
+        userState: 'unknown',
+        distinctId: undefined,
+        extra: {
           stage: 'send',
           failure_count: 2,
           scope: 'digest_email',
           runtime: 'server',
-          $process_person_profile: false,
         },
-      )
+      })
     })
 
-    it('attributes to a signed-in user id without the server flag', async () => {
+    it('attributes to a verified user id', async () => {
       await reportServerError(
         'archive_delete',
         { message: 'row missing', code: 'PGRST116' },
         { stage: 'read_upload' },
         'user-123',
       )
-      const [reported, distinctId, properties] =
-        mockCaptureExceptionImmediate.mock.calls[0]
-      expect(reported.message).toBe('row missing')
-      expect(distinctId).toBe('user-123')
-      expect(properties).toEqual({
-        stage: 'read_upload',
-        scope: 'archive_delete',
-        runtime: 'server',
+      const [reported, context] = captureMock.mock.calls[0]
+      expect((reported as Error).message).toBe('row missing')
+      expect(context).toMatchObject({
+        route: 'archive_delete',
+        distinctId: 'user-123',
+        userState: 'signed_in',
+        extra: { stage: 'read_upload', scope: 'archive_delete' },
       })
     })
 
-    it('swallows transport failures', async () => {
-      mockCaptureExceptionImmediate.mockRejectedValue(new Error('offline'))
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    it('reports transport failures as false', async () => {
+      captureMock.mockResolvedValue(false)
       await expect(
         reportServerError('digest_generation', new Error('x')),
       ).resolves.toBe(false)
-      expect(warn).toHaveBeenCalled()
-      warn.mockRestore()
     })
   })
 
@@ -281,7 +275,11 @@ describe('serverErrors', () => {
     const request = {
       path: '/api/search?q=private-words',
       method: 'POST',
-      headers: { cookie: 'sb-project-auth-token=x', 'user-agent': 'Jest' },
+      headers: {
+        cookie: 'sb-project-auth-token=x',
+        'user-agent': 'Jest',
+        'x-vercel-id': 'iad1::abc-123',
+      },
     }
 
     it('captures unhandled route errors with bounded context and the user id', async () => {
@@ -297,50 +295,56 @@ describe('serverErrors', () => {
           routeContext({ routePath: '/api/search/route' }),
         ),
       ).resolves.toBe(true)
-      expect(mockCaptureExceptionImmediate).toHaveBeenCalledWith(
-        error,
-        'user-123',
-        {
+      expect(captureMock).toHaveBeenCalledWith(error, {
+        route: '/api/search',
+        method: 'POST',
+        requestId: 'iad1::abc-123',
+        userState: 'signed_in',
+        distinctId: 'user-123',
+        extra: {
           route_name: 'api',
           page_group: 'api',
-          route_path: '/api/search',
-          http_method: 'POST',
           router_kind: 'app',
           route_type: 'route',
           scope: 'request',
           runtime: 'server',
         },
-      )
-      const properties = mockCaptureExceptionImmediate.mock.calls[0][2]
-      expect(JSON.stringify(properties)).not.toContain('private-words')
-      expect(JSON.stringify(properties)).not.toContain('user-agent')
+      })
+      const serialized = JSON.stringify(captureMock.mock.calls[0][1])
+      expect(serialized).not.toContain('private-words')
+      expect(serialized).not.toContain('user-agent')
+      expect(serialized).not.toContain('Jest')
     })
 
-    it('falls back to the server id when no user is signed in', async () => {
+    it('falls back to the server id with a coarse user state', async () => {
       await reportRequestError(
         new Error('x'),
-        { ...request, headers: {} },
+        { ...request, headers: { cookie: 'theme=dark' } },
         routeContext({ routePath: '/api/search/route' }),
       )
-      expect(mockCaptureExceptionImmediate).toHaveBeenCalledWith(
+      expect(mockGetClaims).not.toHaveBeenCalled()
+      expect(captureMock).toHaveBeenCalledWith(
         expect.any(Error),
-        'server',
-        expect.objectContaining({ $process_person_profile: false }),
+        expect.objectContaining({
+          distinctId: undefined,
+          userState: 'guest',
+          requestId: undefined,
+        }),
       )
     })
 
-    it('does nothing on the edge runtime or without configuration', async () => {
+    it('does nothing on the edge runtime or when capture is disabled', async () => {
       process.env.NEXT_RUNTIME = 'edge'
       await expect(
         reportRequestError(new Error('x'), request, routeContext()),
       ).resolves.toBe(false)
       delete process.env.NEXT_RUNTIME
-      delete process.env.NEXT_PUBLIC_POSTHOG_HOST
-      resetServerPostHogClientForTests()
+      enabledMock.mockReturnValue(false)
       await expect(
         reportRequestError(new Error('x'), request, routeContext()),
       ).resolves.toBe(false)
-      expect(mockCaptureExceptionImmediate).not.toHaveBeenCalled()
+      expect(mockGetClaims).not.toHaveBeenCalled()
+      expect(captureMock).not.toHaveBeenCalled()
     })
   })
 })

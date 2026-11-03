@@ -173,21 +173,29 @@ What is captured:
   sanitized page category; `$set`/`$set_once` and identity properties are
   stripped. Signing in later resets the SDK before `identify`, so earlier
   anonymous errors stay unlinked. DNT is still respected.
-- **Server, unhandled:** `src/instrumentation.ts` (`onRequestError`) reports
-  every unhandled error in route handlers, server components, and server
-  actions through `posthog-node`, with bounded context only: the analytics
-  route name and group (or the API route template, never the raw path),
-  HTTP method, router kind, route type, and render source. The signed-in user
-  id from the verified Supabase cookie is the `distinct_id`; otherwise the fixed
-  `server` id, flagged `$process_person_profile: false`. Middleware runs on
-  the edge runtime and is not covered.
+- **Server, unhandled:** `src/instrumentation.ts` (`onRequestError`) writes
+  one JSON log line, then reports every unhandled error in route handlers,
+  server components, and server actions through `posthog-node`, with bounded
+  context only: `route` (the analytics route template or the API route
+  template, never the raw path), `route_name` and `page_group`, `method`,
+  `router_kind`, `route_type`, `render_source`, Vercel's `request_id`, and
+  the deployment properties. The signed-in user id from the verified Supabase
+  cookie is the `distinct_id` (`user_state=signed_in`); otherwise the fixed
+  `server:<environment>` id, flagged `$process_person_profile: false`, with a
+  coarse `user_state` of `guest` or `unknown`. Middleware runs on the edge
+  runtime, where only the log line is written.
 - **Server, deliberate:** `reportServerError(scope, error, context)` in
   `src/lib/serverErrors.ts` for places that log and continue: archive deletion
   routes, digest generation, and both digest cron routes. `scope` is an enum;
   context values must be enum tokens, counts, booleans, or status codes.
   Free text, emails, usernames, query text, IDs, and URLs are rejected by the
   sanitizer. Keep the `console.error` beside it; Vercel logs stay the raw
-  record.
+  record. Handled 5xx responses in API routes use `reportApiError` instead
+  (docs/hyperobservability.md).
+
+All server reports share one transport,
+`src/lib/observability/serverErrorCapture.ts`, so `SERVER_ERROR_CAPTURE=off`
+silences every one of them while the log lines keep flowing.
 
 Source maps: `withPostHogConfig` in `next.config.js` injects release ids and
 uploads source maps during the Vercel build when `POSTHOG_CLI_TOKEN` (a
@@ -197,8 +205,8 @@ is served publicly. Without the token the build runs unchanged with minified
 frames.
 
 Environment: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST`
-(browser and server capture; both no-ops when unset) and `POSTHOG_CLI_TOKEN`
-(build only).
+(browser and server capture; both no-ops when unset), `SERVER_ERROR_CAPTURE=off`
+(server kill switch), and `POSTHOG_CLI_TOKEN` (build only).
 
 Verify after a release in [Error tracking](https://us.posthog.com/project/546185/error_tracking):
 
@@ -210,7 +218,7 @@ Verify after a release in [Error tracking](https://us.posthog.com/project/546185
 2. Signed in, trigger a route error boundary and confirm the issue lists the
    account and `error_boundary=route`.
 3. Call an API route with an unhandled failure in preview and confirm the
-   server issue carries `scope=request`, `route_path` as a template, and no
+   server issue carries `scope=request`, `route` as a template, and no
    query string.
 4. Check that frames resolve to source files once a build with
    `POSTHOG_CLI_TOKEN` has deployed.

@@ -1,5 +1,6 @@
 import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
+import { reportApiError } from '@/lib/observability/apiError'
 import {
   analyticsGatewayRequestUrl,
   clickHouseSearchGatewayBaseUrl,
@@ -8,6 +9,11 @@ import {
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
+// The ClickHouse gateway runs in Helsinki and the auth server in London. From
+// the default iad1 region each search paid two Atlantic round trips before any
+// ClickHouse work began (a TLS handshake plus the request); Stockholm is about
+// 10 ms from the gateway and 25 ms from auth.
+export const preferredRegion = 'arn1'
 
 export async function GET(request: NextRequest) {
   const authError = await browsingAuthError()
@@ -19,11 +25,14 @@ export async function GET(request: NextRequest) {
 
   const token = process.env.CLICKHOUSE_ANALYTICS_API_TOKEN
   if (!token) {
-    console.error('CLICKHOUSE_ANALYTICS_API_TOKEN is not configured')
-    return NextResponse.json(
-      { error: 'Tweet search is not configured' },
-      { status: 503 },
-    )
+    return reportApiError({
+      request,
+      route: '/api/tweet-search',
+      status: 503,
+      message: 'Tweet search is not configured',
+      upstream: 'none',
+      error: new Error('CLICKHOUSE_ANALYTICS_API_TOKEN is not configured'),
+    })
   }
 
   let target: URL
@@ -60,11 +69,14 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (request.signal.aborted) return new NextResponse(null, { status: 499 })
-    console.error('ClickHouse tweet search request failed:', error)
-    return NextResponse.json(
-      { error: 'Tweet search is temporarily unavailable' },
-      { status: 502 },
-    )
+    return reportApiError({
+      request,
+      route: '/api/tweet-search',
+      status: 502,
+      message: 'Tweet search is temporarily unavailable',
+      upstream: 'gateway',
+      error,
+    })
   } finally {
     clearTimeout(timeout)
     request.signal.removeEventListener('abort', cancel)

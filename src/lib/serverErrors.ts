@@ -1,6 +1,9 @@
 // Server-side error reporting to PostHog. Browser reporting lives in
 // `src/lib/posthog.ts`; this module is only imported by server code (route
-// handlers, workflow steps, and the Next.js instrumentation hook).
+// handlers, workflow steps, and the Next.js instrumentation hook). Transport
+// is `captureServerException` (src/lib/observability/serverErrorCapture.ts),
+// shared with `reportApiError`, so every server exception honours
+// `SERVER_ERROR_CAPTURE=off` and carries the same deployment properties.
 //
 // Contract (docs/product-analytics.md, "Error tracking"): the error itself
 // (type, message, stack) plus bounded context only. Scopes are an enum, route
@@ -8,8 +11,13 @@
 // context values are rejected. Never pass usernames, emails, query text,
 // tweet or archive IDs, or raw URLs.
 import type { Instrumentation } from 'next'
-import { PostHog } from 'posthog-node'
 import { analyticsRoute } from '@/lib/analyticsRoutes'
+import { userStateFromCookieHeader } from '@/lib/observability/apiError'
+import {
+  captureServerException,
+  serverErrorCaptureEnabled,
+  type UserState,
+} from '@/lib/observability/serverErrorCapture'
 
 export const serverErrorScopes = [
   'archive_delete',
@@ -22,39 +30,11 @@ export type ServerErrorScope = (typeof serverErrorScopes)[number]
 type SafeContextValue = string | number | boolean
 export type ServerErrorContext = Record<string, SafeContextValue | undefined>
 
-export const SERVER_DISTINCT_ID = 'server'
 const REQUEST_IDENTITY_TIMEOUT_MS = 1500
 const contextKeyPattern = /^[a-z][a-z0-9_]{0,39}$/
 // Enum tokens, status codes, and route templates; never free text.
 const contextTokenPattern = /^[A-Za-z0-9_.\-/[\]]{1,160}$/
 const routeTemplatePattern = /^(\/[A-Za-z0-9_.\-[\]]+)+$/
-
-let serverClient: PostHog | null | undefined
-
-export function getServerPostHogClient(): PostHog | null {
-  if (serverClient !== undefined) return serverClient
-  const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST
-  if (!projectToken || !host) {
-    serverClient = null
-    return null
-  }
-  serverClient = new PostHog(projectToken, {
-    host,
-    // Vercel functions end right after the response; nothing may stay queued.
-    flushAt: 1,
-    flushInterval: 0,
-    requestTimeout: 3000,
-    disableGeoip: true,
-    enableExceptionAutocapture: false,
-  })
-  return serverClient
-}
-
-// Tests swap the environment between cases; production creates one client.
-export function resetServerPostHogClientForTests() {
-  serverClient = undefined
-}
 
 export function sanitizeServerErrorContext(
   context: ServerErrorContext,
@@ -95,36 +75,46 @@ export function toReportableError(error: unknown): Error {
   return new Error(typeof error === 'string' ? error : 'Unknown error')
 }
 
+type RequestAttribution = {
+  requestId?: string
+  userState?: UserState
+}
+
+// `route_path` and `http_method` become the shared `route`/`method`
+// properties; everything else travels as bounded extras.
+async function sendServerError(
+  scope: ServerErrorScope,
+  error: unknown,
+  context: ServerErrorContext,
+  distinctId: string | undefined,
+  attribution: RequestAttribution = {},
+): Promise<boolean> {
+  if (!serverErrorCaptureEnabled()) return false
+  const {
+    route_path: routePath,
+    http_method: method,
+    ...extra
+  } = sanitizeServerErrorContext(context)
+  return captureServerException(toReportableError(error), {
+    route: typeof routePath === 'string' ? routePath : scope,
+    method: typeof method === 'string' ? method : undefined,
+    requestId: attribution.requestId,
+    userState: attribution.userState ?? (distinctId ? 'signed_in' : 'unknown'),
+    distinctId,
+    extra: { ...extra, scope, runtime: 'server' },
+  })
+}
+
+// `distinctId` is the verified account id (from `supabase.auth.getUser()` or
+// `getClaims()`), used only so the issue lists the member it affected.
+// Unset: the fixed, personless server id.
 export async function reportServerError(
   scope: ServerErrorScope,
   error: unknown,
   context: ServerErrorContext = {},
-  distinctId: string = SERVER_DISTINCT_ID,
+  distinctId?: string,
 ): Promise<boolean> {
-  const client = getServerPostHogClient()
-  if (!client) return false
-  const properties: Record<string, SafeContextValue> = {
-    ...sanitizeServerErrorContext(context),
-    scope,
-    runtime: 'server',
-  }
-  // The fixed server id must not become a person profile.
-  if (distinctId === SERVER_DISTINCT_ID)
-    properties.$process_person_profile = false
-  try {
-    await client.captureExceptionImmediate(
-      toReportableError(error),
-      distinctId,
-      properties,
-    )
-    return true
-  } catch (reportFailure) {
-    console.warn(
-      'PostHog server error report failed',
-      reportFailure instanceof Error ? reportFailure.message : reportFailure,
-    )
-    return false
-  }
+  return sendServerError(scope, error, context, distinctId)
 }
 
 type RequestErrorRequest = Parameters<Instrumentation.onRequestError>[1]
@@ -207,9 +197,13 @@ export async function resolveRequestUserId(
   }
 }
 
+function headerValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
+}
+
 // Next.js calls `onRequestError` for every unhandled error in route handlers,
 // server components, and server actions. Middleware runs on the edge runtime,
-// where this reporter is skipped.
+// where this reporter is skipped (src/instrumentation.ts still logs it).
 export async function reportRequestError(
   error: unknown,
   request: RequestErrorRequest,
@@ -217,12 +211,22 @@ export async function reportRequestError(
 ): Promise<boolean> {
   if (process.env.NEXT_RUNTIME && process.env.NEXT_RUNTIME !== 'nodejs')
     return false
-  if (!getServerPostHogClient()) return false
+  if (!serverErrorCaptureEnabled()) return false
   const userId = await resolveRequestUserId(request.headers)
-  return reportServerError(
+  const rawCookie = request.headers.cookie
+  const cookieHeader = Array.isArray(rawCookie)
+    ? rawCookie.join('; ')
+    : rawCookie
+  return sendServerError(
     'request',
     error,
     describeRequestError(request, context),
-    userId ?? SERVER_DISTINCT_ID,
+    userId ?? undefined,
+    {
+      requestId: headerValue(request.headers['x-vercel-id']),
+      userState: userId
+        ? 'signed_in'
+        : userStateFromCookieHeader(cookieHeader ?? null),
+    },
   )
 }

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Fake `npx` (vercel rollback) for canary tests: logs and succeeds.
+set -euo pipefail
+: "${FAKE_NPX_LOG:?FAKE_NPX_LOG must be set}"
+printf '%q ' "$@" >>"$FAKE_NPX_LOG"
+echo >>"$FAKE_NPX_LOG"
+echo "fake npx: ok"

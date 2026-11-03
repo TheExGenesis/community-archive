@@ -19,6 +19,8 @@ overrides:
   '@vercel/cli-auth@0.0.1>zod': 4.6.6
   '@vercel/cli-config@0.2.3>zod': 4.6.6
 
+packageExtensionsChecksum: 3019cf15af6645c355cecdae5d088f3b
+
 pnpmfileChecksum: 4otufk36fekymmsg4b7fvedbea
 
 importers:
@@ -247,7 +249,7 @@ importers:
     devDependencies:
       '@slack/bolt':
         specifier: 5.1.0
-        version: 5.1.0(@types/express@5.0.6)(undici@6.29.1)
+        version: 5.1.0(@types/express@5.0.6)
       '@swc/core':
         specifier: ^1.10.12
         version: 1.10.12
@@ -8401,11 +8403,11 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
-  '@slack/bolt@5.1.0(@types/express@5.0.6)(undici@6.29.1)':
+  '@slack/bolt@5.1.0(@types/express@5.0.6)':
     dependencies:
       '@slack/logger': 5.0.0
       '@slack/oauth': 4.0.0
-      '@slack/socket-mode': 3.1.1(undici@6.29.1)
+      '@slack/socket-mode': 3.1.1(undici@7.30.1)
       '@slack/types': 3.3.0
       '@slack/web-api': 8.3.0
       '@types/express': 5.0.6
@@ -8413,9 +8415,9 @@ snapshots:
       path-to-regexp: 8.4.2
       raw-body: 3.0.2
       tsscmp: 1.0.6
+      undici: 7.30.1
     transitivePeerDependencies:
       - supports-color
-      - undici
 
   '@slack/logger@5.0.0':
     dependencies:
@@ -8429,13 +8431,13 @@ snapshots:
       '@types/node': 20.3.1
       jsonwebtoken: 9.0.3
 
-  '@slack/socket-mode@3.1.1(undici@6.29.1)':
+  '@slack/socket-mode@3.1.1(undici@7.30.1)':
     dependencies:
       '@slack/logger': 5.0.0
       '@slack/web-api': 8.3.0
       '@types/node': 20.3.1
       eventemitter3: 5.0.1
-      undici: 6.29.1
+      undici: 7.30.1
 
   '@slack/types@3.3.0': {}
 

@@ -185,6 +185,18 @@
       "@workflow/cli@5.0.5>zod": "4.6.6",
       "@vercel/cli-auth@0.0.1>zod": "4.6.6",
       "@vercel/cli-config@0.2.3>zod": "4.6.6"
+    },
+    "packageExtensions": {
+      "@slack/socket-mode@3.1.1": {
+        "dependencies": {
+          "undici": "7.30.1"
+        }
+      },
+      "@slack/bolt@5.1.0": {
+        "dependencies": {
+          "undici": "7.30.1"
+        }
+      }
     }
   }
 }

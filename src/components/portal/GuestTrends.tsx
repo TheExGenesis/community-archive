@@ -1,6 +1,4 @@
 import Link from 'next/link'
-import { Suspense } from 'react'
-import BrowsingSignInPrompt from '@/components/BrowsingSignInPrompt'
 import type { TermWeek } from '@/lib/portal/types'
 import GuestTrendsSignIn from './GuestTrendsSignIn'
 import { CARD, MUTED, SERIF } from './styles'
@@ -45,17 +43,7 @@ export default function GuestTrends({
             </div>
             <WeeklyKeywordRows weekly={weekly} failed={failed} />
           </div>
-          <Suspense
-            fallback={
-              <BrowsingSignInPrompt
-                title="Log in to explore trends"
-                description="Chart any term across the full archive, compare up to several lines, and read the posts behind each spike."
-                returnTo="/trends"
-              />
-            }
-          >
-            <GuestTrendsSignIn />
-          </Suspense>
+          <GuestTrendsSignIn />
         </div>
       </div>
     </main>

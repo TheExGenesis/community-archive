@@ -9,6 +9,11 @@ import {
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
+// The ClickHouse gateway runs in Helsinki and the auth server in London. From
+// the default iad1 region each search paid two Atlantic round trips before any
+// ClickHouse work began (a TLS handshake plus the request); Stockholm is about
+// 10 ms from the gateway and 25 ms from auth.
+export const preferredRegion = 'arn1'
 
 export async function GET(request: NextRequest) {
   const authError = await browsingAuthError()

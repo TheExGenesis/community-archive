@@ -27,7 +27,8 @@ Regenerate in a scratch directory (these are read-only production reads):
 6. `python3 -I fetch-oembed.py` (run from the scratch directory) → `meta.json`.
    Deleted and private videos come back empty and are dropped.
 7. Optional: `python3 -I scripts/tube/enrich.py <scratch dir> public/tube/videos.json`
-   runs batched `claude -p` calls (needs a logged-in Claude Code CLI) and writes
+   runs batched `claude -p` calls (needs a logged-in Claude Code CLI; model from
+   `TUBE_MODEL`, default `haiku`) and writes
    `enrich/*.json`. It is resumable.
 8. `python3 -I scripts/tube/build-tube-data.py <scratch dir> public/tube`.
 9. Optional, after an enriched build: `python3 -I scripts/tube/curate.py <scratch dir> public/tube`

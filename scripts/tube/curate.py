@@ -31,7 +31,7 @@ Return ONLY a JSON array of objects with keys: "title" (short, evocative, no cat
 
 def claude(prompt):
     for _ in range(3):
-        p = subprocess.run(['claude', '-p', '--model', 'sonnet', '--output-format', 'json'],
+        p = subprocess.run(['claude', '-p', '--model', os.environ.get('TUBE_MODEL', 'haiku'), '--output-format', 'json'],
                            input=prompt, capture_output=True, text=True, timeout=900)
         try:
             result = json.loads(p.stdout)['result']
@@ -61,7 +61,10 @@ def main():
 
     def submap(cat):
         subs = '\n'.join(f'{n}\t{s}' for s, n in by_cat[cat].most_common())
-        m = claude(SUBMAP_PROMPT.format(cat=cat, cat_lower=cat.lower(), subs=subs))
+        try:
+            m = claude(SUBMAP_PROMPT.format(cat=cat, cat_lower=cat.lower(), subs=subs))
+        except RuntimeError:
+            m = {}  # keep this category's subcategories as they are
         return cat, {s: m.get(s, s) for s in by_cat[cat]}
 
     def playlists(cat):
@@ -70,7 +73,10 @@ def main():
         lines = '\n'.join(json.dumps({'id': v['id'], 'title': v['title'], 'channel': v['channel'],
                                       'sharers': v['n'], 'summary': summaries.get(v['id'], '')},
                                      ensure_ascii=False) for v in top)
-        return cat, claude(PLAYLIST_PROMPT.format(cat=cat, k=k, videos=lines))
+        try:
+            return cat, claude(PLAYLIST_PROMPT.format(cat=cat, k=k, videos=lines))
+        except RuntimeError:
+            return cat, []
 
     cats = sorted(by_cat)
     out = {}

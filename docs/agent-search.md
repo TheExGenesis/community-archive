@@ -6,6 +6,17 @@ gateway, follows threads and quote posts, scores candidates, and streams an
 answer whose claims cite tweets inline. The page renders the cited tweets with
 `TweetCard`, the other posts the search found, and a coverage note.
 
+## Who is asking
+
+The workflow's first step looks up the asker's archive profile (handle,
+display name, bio) through the gateway by account id (`asker.ts`), alongside
+the conversation's earlier turns, and appends it to the system prompt
+(`askerInstructions` in `agent.ts`). The model then reads "my tweets" as
+`--from @handle` and can pitch an answer to the asker. The bio is quoted as
+data, clipped to 300 characters, and never stored with the run. The lookup
+has a two-second budget; on a miss or failure, or for the development
+preview's `dev` account, the question runs without it.
+
 ## How a question runs
 
 1. `POST /api/agent-search` checks the viewer (`src/lib/agentSearch/eligibility.ts`),

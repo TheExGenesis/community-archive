@@ -206,6 +206,17 @@ export class FleetTask {
     ).trim()
   }
 
+  /** Commits HEAD has beyond origin/<base> (a failed push leaves them), and HEAD. */
+  async ahead(
+    worktree: string,
+    runDir: string,
+  ): Promise<{ count: number; sha: string }> {
+    const [count, sha] = (await this.run(['ahead', worktree], { runDir }))
+      .trim()
+      .split(' ')
+    return { count: Number(count) || 0, sha: sha || '' }
+  }
+
   async pushBranch(
     worktree: string,
     branch: string,

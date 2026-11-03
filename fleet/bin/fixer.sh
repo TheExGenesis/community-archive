@@ -412,7 +412,7 @@ fleet_info "committed $COMMIT_SHA: $COMMIT_TITLE"
 
 # ─── Ship ───────────────────────────────────────────────────────────────────
 if [[ "$FLEET_MODE" == "pr" ]]; then
-  git -C "$WORKTREE" push --quiet origin "HEAD:refs/heads/$BRANCH"
+  fleet_git_push "$WORKTREE" "HEAD:refs/heads/$BRANCH"
   {
     echo "$SUMMARY"
     echo
@@ -445,7 +445,7 @@ if [[ "$FLEET_MODE" == "pr" ]]; then
   fleet_readback_pr "$PR_NUMBER" || fleet_die "read-back failed: PR #$PR_NUMBER is not open on GitHub"
   OUTCOME="pr_opened"
 else
-  git -C "$WORKTREE" push --quiet origin "HEAD:$FLEET_BASE_BRANCH"
+  fleet_git_push "$WORKTREE" "HEAD:$FLEET_BASE_BRANCH"
   REF="$COMMIT_SHA"
   {
     echo "**[fleet:fixer] fixed on $FLEET_BASE_BRANCH**"

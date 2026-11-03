@@ -16,7 +16,8 @@
 #   task.sh gate <worktree> <log-dir>            the four CI checks; exit 1 on the first failure
 #   task.sh gate-failure-prompt <log-dir> <out>  the --resume prompt after a red gate
 #   task.sh commit <worktree> <message-file>     commit the staged change (--no-verify); prints the sha
-#   task.sh push-branch <worktree> <branch>      push HEAD to origin/<branch>
+#   task.sh push-branch <worktree> <branch>      push HEAD to origin/<branch> (GH_TOKEN as the https credential)
+#   task.sh ahead <worktree> [base]              "<count> <sha>": commits HEAD has beyond origin/<base>, and HEAD
 #   task.sh pr-create <branch> <title> <body-file> [base]   open the PR, read it back; prints the URL
 #   task.sh pr-view <number>                     PR facts as JSON (state, mergeable, checks, files, body)
 #   task.sh pr-merge <number>                    squash-merge, delete the branch, read back MERGED
@@ -104,7 +105,12 @@ case "$cmd" in
     git -C "$1" rev-parse HEAD
     ;;
   push-branch)
-    git -C "${1:?worktree}" push --quiet origin "HEAD:refs/heads/${2:?branch}"
+    fleet_git_push "${1:?worktree}" "HEAD:refs/heads/${2:?branch}"
+    ;;
+  ahead)
+    # commits on HEAD that origin/<base> lacks, and HEAD: "<count> <sha>"
+    wt="${1:?worktree}" base="${2:-$FLEET_BASE_BRANCH}"
+    printf '%s %s\n' "$(git -C "$wt" rev-list --count "origin/$base..HEAD")" "$(git -C "$wt" rev-parse HEAD)"
     ;;
   pr-create)
     branch="${1:?branch}" title="${2:?title}" body="${3:?body-file}" base="${4:-$FLEET_BASE_BRANCH}"

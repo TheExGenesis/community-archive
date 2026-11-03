@@ -99,6 +99,15 @@ command writes a one-line summary to stderr (`search “x”: 120 tweets · 85
 authors · 2023-01 to 2025-06 · more exist`), which the model sees, and a
 shorter one for the page (`Searched “x” · 120 tweets`).
 
+`search --any` (and `collect_and_score`) runs one gateway search per term,
+three at a time (`SEARCH_CONCURRENCY` in `toolImpl.ts`), and returns once
+every term is done, so the agent sees one combined result. The gateway
+shares two running and four queued searches across the whole site and
+answers `503 Search is busy` past that; a search retries a busy answer twice
+(after 0.5 s and 1.5 s) while the run has time left. Gateway-side queueing
+for bursts is
+[control-panel#309](https://github.com/TheExGenesis/community-archive-control-panel/issues/309).
+
 Each command runs in a fresh shell, because a workflow step may run in
 another process. Between commands, and between turns of a conversation, the
 workspace is carried as a manifest (`workspace/manifest.ts`): for each tweet

@@ -41,6 +41,9 @@ export const BORDERLINE_THRESHOLD = 0.35
 export const DEFAULT_COLLECT = 300
 export const MAX_COLLECT = 1000
 const PAGE = 100
+// Searches one command keeps in flight. The gateway answers 503 "Search is
+// busy" when one caller sends more at once (seen with 7 on 2026-11-02).
+export const SEARCH_CONCURRENCY = 3
 const MAX_KEPT_RETURNED = 60
 const MAX_BORDERLINE_RETURNED = 20
 
@@ -199,11 +202,32 @@ export async function scoreWithParents(
   return { scored, scorer: result.scorer, costUsd: result.costUsd }
 }
 
+/** Runs `run` over every item, `concurrency` at a time, keeping order. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  run: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await run(items[i])
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  )
+  return results
+}
+
 /**
- * Pages through every term in parallel, giving each an equal share of the
- * limit, so the first term cannot use it all. Shares left unused by terms
- * that run out pass to terms that still have pages. `capped` is true when
- * matching posts were left unfetched.
+ * Pages through every term, SEARCH_CONCURRENCY at a time, giving each an
+ * equal share of the limit, so the first term cannot use it all. Shares left
+ * unused by terms that run out pass to terms that still have pages. All terms
+ * finish before anything is returned, so the agent gets one combined result.
+ * `capped` is true when matching posts were left unfetched.
  */
 export async function collectAcrossTerms(
   terms: string[],
@@ -218,8 +242,10 @@ export async function collectAcrossTerms(
   while (collected.size < max && open().length) {
     const active = open()
     const share = Math.max(1, Math.ceil((max - collected.size) / active.length))
-    const results = await Promise.all(
-      active.map(async (term) => {
+    const results = await mapWithConcurrency(
+      active,
+      SEARCH_CONCURRENCY,
+      async (term) => {
         const tweets: AgentTweet[] = []
         let offset = offsets.get(term) ?? null
         while (offset !== null && tweets.length < share) {
@@ -238,7 +264,7 @@ export async function collectAcrossTerms(
         }
         offsets.set(term, offset)
         return tweets
-      }),
+      },
     )
     // Interleave so an overlap between terms does not favour the first one.
     const longest = Math.max(0, ...results.map((tweets) => tweets.length))

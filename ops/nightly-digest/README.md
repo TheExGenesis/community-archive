@@ -13,8 +13,10 @@ rejects the first response, then stages and publishes through Supabase.
 The job is date-idempotent. It exits before generation when the date is already
 published, records a stable `systemd:YYYY-MM-DD` run identifier, preserves an
 editor-published edition, and can publish a previously completed run after a
-transient database failure. A failed model or validation attempt remains a
-failed run and is not automatically retried.
+transient failure. systemd restarts a failed job every 20 minutes, up to five
+starts, so a brief gateway or database outage does not strand a finished
+edition as a draft. A failed model or validation attempt remains a failed run
+and those restarts stop at it without another model call.
 
 ## Runtime configuration
 

@@ -80,8 +80,7 @@ def main():
                                input=prompt, capture_output=True, text=True, timeout=900)
             try:
                 result = json.loads(p.stdout)['result']
-                body = result[result.index('['):result.rindex(']') + 1]
-                items = json.loads(body)
+                items, _ = json.JSONDecoder().raw_decode(result[result.index('['):])
                 assert len(items) == len(batches[k])
                 json.dump(items, open(out, 'w'), ensure_ascii=False)
                 return k, 'ok'

@@ -277,9 +277,9 @@ function Comments({ detail, total }: { detail: TubeDetail | null | undefined; to
 /** Shortened t.co links become a small link marker; everything else is text. */
 function TweetText({ text }: { text: string }) {
   const parts = decodeTweetText(text)
-    .replace(/\s+(https?:\/\/t\.co\/\w+)/g, ' $1')
+    .replace(/\s+(https?:\/\/t\.co\/[A-Za-z0-9]{1,10})/g, ' $1')
     .trim()
-    .split(/(https?:\/\/t\.co\/\w+)/g)
+    .split(/(https?:\/\/t\.co\/[A-Za-z0-9]{1,10})/g)
   return (
     <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed">
       {parts.map((p, i) =>
@@ -336,8 +336,33 @@ function Byline({ u, n, c, extra }: { u: string; n: string; c: number; extra?: s
   )
 }
 
+const parentCache = new Map<string, Promise<TubeParent | null>>()
+
+/** Parents outside the archive come from X's embed API at render time only. */
+function useExternalParent(id: string | undefined): TubeParent | null | undefined {
+  const [parent, setParent] = useState<TubeParent | null | undefined>(id ? undefined : null)
+  useEffect(() => {
+    if (!id) return
+    if (!parentCache.has(id)) {
+      parentCache.set(
+        id,
+        fetch(`/api/syndication/tweet/${id}`)
+          .then((r) => (r.ok ? r.json() : { tweet: null }))
+          .then((d) => d.tweet as TubeParent | null)
+          .catch(() => null),
+      )
+    }
+    let live = true
+    parentCache.get(id)!.then((p) => live && setParent(p))
+    return () => {
+      live = false
+    }
+  }, [id])
+  return parent
+}
+
 /** The post a reply answers, drawn above it and joined by a thread line. */
-function ParentItem({ p }: { p: TubeParent }) {
+function ParentItem({ p, external = false }: { p: TubeParent; external?: boolean }) {
   return (
     <div className="flex gap-3">
       <div className="flex w-10 shrink-0 flex-col items-center">
@@ -345,23 +370,39 @@ function ParentItem({ p }: { p: TubeParent }) {
         <div className="mt-1 w-0.5 flex-1 bg-border" />
       </div>
       <div className="min-w-0 flex-1 pb-3 text-muted-foreground">
-        <Byline u={p.u} n={p.n} c={p.c} />
+        <Byline u={p.u} n={p.n} c={p.c} extra={external ? 'not in the archive, via X' : undefined} />
         <TweetText text={p.x} />
-        <Link
-          href={tweetPermalinkHref(p.t)}
-          className="mt-1 inline-block text-xs hover:text-foreground hover:underline"
-        >
-          View tweet
-        </Link>
+        {external ? (
+          <a
+            href={`https://x.com/${p.u}/status/${p.t}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-block text-xs hover:text-foreground hover:underline"
+          >
+            View on X
+          </a>
+        ) : (
+          <Link
+            href={tweetPermalinkHref(p.t)}
+            className="mt-1 inline-block text-xs hover:text-foreground hover:underline"
+          >
+            View tweet
+          </Link>
+        )}
       </div>
     </div>
   )
 }
 
 function CommentItem({ c }: { c: TubeComment }) {
+  const external = useExternalParent(c.p ? undefined : c.rt)
   return (
     <li>
       {c.p && <ParentItem p={c.p} />}
+      {!c.p && external && <ParentItem p={external} external />}
+      {!c.p && external === undefined && (
+        <div className="mb-3 ml-[52px] h-10 animate-pulse rounded-lg bg-muted" />
+      )}
       <div className="flex gap-3">
         <Avatar u={c.u} n={c.n} av={c.av} />
         <div className="min-w-0 flex-1">
@@ -369,7 +410,7 @@ function CommentItem({ c }: { c: TubeComment }) {
             u={c.u}
             n={c.n}
             c={c.c}
-            extra={c.ru && !c.p ? `replying to @${c.ru}` : undefined}
+            extra={c.ru && !c.p && !external ? `replying to @${c.ru}` : undefined}
           />
           <TweetText text={c.x} />
           <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground">

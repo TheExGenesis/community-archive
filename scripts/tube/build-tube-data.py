@@ -7,6 +7,7 @@ Inputs, all produced by read-only queries (see README.md next to this file):
   meta.json   {video id: {title, channel, channel_url} | null}   (YouTube oEmbed)
   texts*.json [{t: tweet id, x: full text, ru: reply-to username, z: tombstone}]
   av.json     [{a: account id, p: avatar url}]
+  replyids.json optional [{t: tweet id, rt: reply-to tweet id}]
   parents.json  optional [{t: reply tweet id, pt, pa, px, pf, pc: the parent tweet}]
   enrich/*.json  optional LLM fields from enrich.py
 
@@ -45,6 +46,9 @@ texts = {}
 for f in glob.glob(f'{src}/texts*.json'):
     for t in json.load(open(f)):
         texts[t['t']] = t
+reply_to = {}
+if os.path.exists(f'{src}/replyids.json'):
+    reply_to = {r['t']: r['rt'] for r in json.load(open(f'{src}/replyids.json'))}
 parents = {}
 if os.path.exists(f'{src}/parents.json'):
     parents = {p['t']: p for p in json.load(open(f'{src}/parents.json'))}
@@ -52,6 +56,11 @@ enriched = {}
 for f in sorted(glob.glob(f'{src}/enrich/*.json')):
     for e in json.load(open(f)):
         enriched[e['id']] = e
+# curate.py merges free-text subcategories into a few per category.
+if os.path.exists(f'{src}/submap.json'):
+    submap = json.load(open(f'{src}/submap.json'))
+    for e in enriched.values():
+        e['sub'] = submap.get(e.get('cat'), {}).get(e.get('sub'), e.get('sub'))
 
 by_video = collections.defaultdict(list)
 for r in rows:
@@ -76,6 +85,9 @@ for vid, shares in by_video.items():
             'av': avatars.get(s['a'], ''), 'x': s['x'], 'f': s['f'] or 0,
             'c': s['c'], 'ru': s['ru'], 'st': stance.get(s['t']),
         })
+        if s['t'] in reply_to:
+            # Parents outside the archive are fetched from X at render time.
+            comments[-1]['rt'] = reply_to[s['t']]
         p = parents.get(s['t'])
         if p:
             pa = accounts.get(p['pa'], {})

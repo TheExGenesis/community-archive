@@ -29,7 +29,13 @@ import {
   loadCommunityProjectLikeCounts,
   loadPublishedCommunityProjects,
 } from '@/lib/communityProjectDatabase'
-import { getPortalTrendSnapshot, startStreamData } from '@/lib/portal/data'
+import {
+  getCachedWeeklyTrends,
+  getPortalTrendSnapshot,
+  loadPortalComponentData,
+  startStreamData,
+} from '@/lib/portal/data'
+import GuestTrends from '@/components/portal/GuestTrends'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
 
 jest.mock('@/components/bulletin/BulletinBoard.module.css', () => ({}))
@@ -51,6 +57,7 @@ jest.mock('@/lib/communityProjectDatabase', () => ({
 }))
 jest.mock('@/lib/portal/data', () => ({
   startStreamData: jest.fn(),
+  getCachedWeeklyTrends: jest.fn(),
   getPortalTrendSnapshot: jest.fn(),
   loadPortalComponentData: jest.fn(),
 }))
@@ -127,9 +134,16 @@ test('live tweets resolve while optional corpus totals remain pending', async ()
   expect(result.props.failed).toBe(false)
 })
 
-test('signed-out Trends still redirects before requesting analytical data', async () => {
+test('signed-out Trends previews cached terms without explorer reads', async () => {
   jest.mocked(getIsMember).mockResolvedValue(false)
-  await expect(TrendsPage({})).rejects.toThrow('redirect')
+  jest
+    .mocked(loadPortalComponentData)
+    .mockResolvedValue({ data: [], failed: false })
+  const page = await TrendsPage({})
+  expect(page.type).toBe(GuestTrends)
+  expect(jest.mocked(loadPortalComponentData).mock.calls[0][1]).toBe(
+    getCachedWeeklyTrends,
+  )
   expect(getPortalTrendSnapshot).not.toHaveBeenCalled()
 })
 

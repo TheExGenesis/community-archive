@@ -1,9 +1,9 @@
-import { redirect } from 'next/navigation'
 import PortalComponentErrorBoundary from '@/components/portal/PortalComponentErrorBoundary'
+import GuestTrends from '@/components/portal/GuestTrends'
 import TrendsExplorer from '@/components/portal/TrendsExplorer'
 import { getIsMember } from '@/lib/portal/auth'
-import { loginHref } from '@/lib/authRedirect'
 import {
+  getCachedWeeklyTrends,
   getPortalTrendSnapshot,
   loadPortalComponentData,
 } from '@/lib/portal/data'
@@ -32,8 +32,15 @@ export default async function TrendsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
   const initialSearch = serializedSearchParams((await searchParams) ?? {})
+  // Cookie-less visitors get the cached /guest/trends render from the
+  // middleware; this covers expired sessions with the same cached data.
   if (!(await getIsMember())) {
-    redirect(loginHref(`/trends${initialSearch ? `?${initialSearch}` : ''}`))
+    const weekly = await loadPortalComponentData(
+      'guest-trends',
+      getCachedWeeklyTrends,
+      [],
+    )
+    return <GuestTrends weekly={weekly.data} failed={weekly.failed} />
   }
   const initial = await loadPortalComponentData(
     'trends-explorer',

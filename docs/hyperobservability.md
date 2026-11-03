@@ -413,10 +413,12 @@ only on messages and clicks from the member ids in
 - **Ask for work.** Mention the bot in a channel or DM it. It answers in a
   thread with one status message it keeps editing (`☑ understanding ▶
 working ☐ gate ☐ PR ☐ waiting on you`, with a one-line progress note such
-  as `working · 12 tool calls · Grep ...`) and its own short text. Each
-  thread is one Claude session, one run directory (`<ts>-slack`) and one
-  worktree: reply in the thread to answer a question or steer the work, say
-  `stop` to drop it. The rules it works under are
+  as `working · 12 tool calls · Grep ...`) and its own short text; the
+  message that asked gets 👀, then ✅ or ❌. A thread is a conversation:
+  one Claude session resumed on every reply, before and after anything
+  ships, in one worktree; each change is a job (branch, run directory
+  `<ts>-slack`, PR), and "do these three things" ships them one after the
+  other. Say `stop` to drop the current work. The rules it works under are
   `fleet/slack/INSTRUCTIONS.md`, appended to the system prompt on every run:
   terse voice, Tier 0 / Tier 1 from the memo, one issue per change, fix
   small bugs without asking, ask only when the change is genuinely unclear,

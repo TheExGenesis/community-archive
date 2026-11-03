@@ -133,6 +133,7 @@ export class Bot {
       userId: m.user as string,
       text,
       source,
+      messageTs: m.ts,
     })
   }
 
@@ -150,19 +151,12 @@ export class Bot {
           threadTs,
           m.user as string,
           text,
+          m.ts,
         )
       }
       return
     }
     if (thread.kind === 'intake') return
-    if (['merged', 'closed'].includes(thread.state)) {
-      await this.d.slack.post({
-        channel: m.channel,
-        threadTs,
-        text: `This task is ${thread.state}. Mention me in a new message for a new task.`,
-      })
-      return
-    }
     if (/^(stop|cancel|drop it|never mind)\.?$/i.test(text)) {
       await this.d.runner.reply(
         thread,
@@ -180,7 +174,7 @@ export class Bot {
       return
     }
     await this.d.slack.react({ channel: m.channel, ts: m.ts, name: 'eyes' })
-    await this.d.runner.reply(thread, text, m.user as string)
+    await this.d.runner.reply(thread, text, m.user as string, m.ts)
   }
 
   private findPostedIssue(
@@ -196,6 +190,7 @@ export class Bot {
     threadTs: string,
     userId: string,
     instructions: string,
+    messageTs?: string,
   ): Promise<void> {
     const issues = await this.d.fleet.issuesList().catch(() => [])
     const issue = issues.find((i) => i.number === issueNumber)
@@ -206,6 +201,7 @@ export class Bot {
       userId,
       text: instructions,
       source: 'intake',
+      messageTs,
       issue: issue
         ? { number: issue.number, title: issue.title, body: issue.body, url }
         : {
@@ -260,18 +256,17 @@ export class Bot {
         await this.startIssueTask(value.issue, channel, threadTs, a.user, '')
         return
       }
-      const thread = this.d.store.getThread(channel, threadTs)
-      if (!thread) {
+      const pr = value.pr || this.d.store.getThread(channel, threadTs)?.prNumber
+      if (!pr) {
         await this.d.slack.post({
           channel,
           threadTs,
-          text: 'I no longer know this thread (restarted with a fresh database?).',
+          text: 'I no longer know this PR (restarted with a fresh database?).',
         })
         return
       }
-      if (a.actionId === 'merge_pr') await this.d.runner.merge(thread, a.user)
-      else if (a.actionId === 'not_now')
-        await this.d.runner.notNow(thread, a.user)
+      if (a.actionId === 'merge_pr') await this.d.runner.merge(pr, a.user)
+      else if (a.actionId === 'not_now') await this.d.runner.notNow(pr, a.user)
     } catch (err) {
       this.d.log.error('action failed', {
         action: a.actionId,

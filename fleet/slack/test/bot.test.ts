@@ -49,10 +49,8 @@ function makeBot(opts: { busy?: boolean } = {}) {
     },
     reply: async (thread: ThreadRecord, text: string, user: string) =>
       void calls.replied.push({ thread, text, user }),
-    merge: async (_t: ThreadRecord, user: string) =>
-      void calls.merged.push(user),
-    notNow: async (_t: ThreadRecord, user: string) =>
-      void calls.notNow.push(user),
+    merge: async (_pr: number, user: string) => void calls.merged.push(user),
+    notNow: async (_pr: number, user: string) => void calls.notNow.push(user),
     isBusy: () => Boolean(opts.busy),
     activeCount: () => 0,
   } as unknown as TaskRunner
@@ -177,7 +175,7 @@ test('bot messages and mention echoes are dropped; DMs start tasks', async () =>
   assert.equal(calls.started[0].source, 'dm')
 })
 
-test('a reply in a task thread resumes it; stop is forwarded; finished threads refuse', async () => {
+test('a reply in a task thread resumes it; stop is forwarded; finished threads go on', async () => {
   const { bot, store, slack, calls } = makeBot()
   await bot.onMention({
     channel: 'C1',
@@ -220,8 +218,12 @@ test('a reply in a task thread resumes it; stop is forwarded; finished threads r
     user: 'U_OK',
     text: 'more',
   })
-  assert.equal(calls.replied.length, 3)
-  assert.match(slack.texts('C1', '2.0').pop() || '', /This task is merged/)
+  assert.equal(
+    calls.replied.length,
+    4,
+    'a merged thread is still a conversation',
+  )
+  assert.equal(calls.replied[3].text, 'more')
 })
 
 test('a busy thread asks to wait', async () => {
@@ -291,10 +293,7 @@ test('buttons: go ahead starts the issue task in the intake thread; merge and no
     channel: 'CX',
     messageTs: '1',
   })
-  assert.match(
-    slack.texts('CX', '0.0').pop() || '',
-    /no longer know this thread/,
-  )
+  assert.match(slack.texts('CX', '0.0').pop() || '', /no longer know this PR/)
 })
 
 test('a reply under an intake post (no task yet) starts the fix with the reply as instructions', async () => {

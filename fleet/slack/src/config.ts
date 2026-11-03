@@ -35,6 +35,10 @@ export interface Config {
   intakeEnabled: boolean
   maxConcurrentTasks: number
   progressIntervalMs: number
+  /** The agent's own memory (MEMORY.md + notes), shared by every thread. */
+  memoryDir: string
+  /** How many jobs one turn chain may ship before it stops and asks. */
+  maxChain: number
   /** Merge Tier 0 PRs under the line cap as soon as CI is green (no button). */
   autoMerge: boolean
   mergePollIntervalMs: number
@@ -136,6 +140,12 @@ export function loadConfig(
     intakeEnabled: (env.FLEET_SLACK_INTAKE || 'true') !== 'false',
     maxConcurrentTasks: num(env.FLEET_SLACK_MAX_CONCURRENT, 2),
     progressIntervalMs: num(env.FLEET_SLACK_PROGRESS_INTERVAL_S, 6) * 1000,
+    memoryDir:
+      nonEmpty(env.FLEET_MEMORY_DIR) ||
+      (fs.existsSync(fleetHome)
+        ? path.join(fleetHome, 'memory')
+        : path.join(runsDir, 'memory')),
+    maxChain: num(env.FLEET_SLACK_MAX_CHAIN, 5),
     autoMerge: (env.FLEET_SLACK_AUTOMERGE || 'true') !== 'false',
     mergePollIntervalMs: num(env.FLEET_SLACK_MERGE_POLL_S, 30) * 1000,
     mergeWaitMs: num(env.FLEET_SLACK_MERGE_WAIT_MIN, 40) * 60 * 1000,

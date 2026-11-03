@@ -13,7 +13,7 @@ import {
   type ClaudeRunResult,
 } from './claude.js'
 import { transcriptUrl, type Config } from './config.js'
-import type { FleetTask } from './fleetTask.js'
+import type { FleetTask, PrFacts } from './fleetTask.js'
 import { errorMessage, type Logger } from './log.js'
 import { evaluateMerge } from './merge.js'
 import {
@@ -24,8 +24,12 @@ import {
 } from './slack.js'
 import type { Store, ThreadRecord } from './store.js'
 import { renderStatus, type Step, type StatusView } from './status.js'
-import { humanText, ProgressBatcher, summariseEvent } from './summarise.js'
-import { parseTurnVerdict, type TurnVerdict } from './verdict.js'
+import { humanText, ProgressTracker } from './summarise.js'
+import {
+  parseTurnVerdict,
+  type IssueClose,
+  type TurnVerdict,
+} from './verdict.js'
 
 export interface IssueRef {
   number: number
@@ -73,10 +77,20 @@ export function shortTitle(text: string, fallback = 'task'): string {
   return flat.length > 72 ? `${flat.slice(0, 71)}…` : flat
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms)
+    t.unref?.()
+  })
+}
+
 export class TaskRunner {
   private busy = new Set<string>()
   private active = 0
   private waiters: (() => void)[] = []
+  /** One CI wait per thread; a newer wait (or a new turn) retires the older one. */
+  private mergeGen = new Map<string, number>()
+  private mergeWaits = new Map<string, Promise<void>>()
 
   constructor(private d: RunnerDeps) {}
 
@@ -90,6 +104,11 @@ export class TaskRunner {
 
   activeCount(): number {
     return this.active
+  }
+
+  /** The CI wait running for a thread, if any (tests await it). */
+  pendingMerge(channel: string, threadTs: string): Promise<void> | undefined {
+    return this.mergeWaits.get(this.key(channel, threadTs))
   }
 
   // ─── entry points ────────────────────────────────────────────────────────
@@ -131,7 +150,7 @@ export class TaskRunner {
       await this.d.slack.post({
         channel: thread.channel,
         threadTs: thread.threadTs,
-        text: 'There is no Claude session to resume in this thread yet; mention me with the task again.',
+        text: 'No session to resume here; mention me with the task again.',
       })
       return
     }
@@ -171,7 +190,7 @@ export class TaskRunner {
       '## This run',
       '',
       `- Repository: ${this.d.cfg.repo}; you are in a fresh git worktree at ${thread.worktree} on branch ${thread.branch}, created from origin/${this.d.cfg.baseBranch}.`,
-      `- The human is <@${thread.requestedBy}> in Slack; your final message of each turn is posted to the thread as is, so write it for them.`,
+      `- The human is <@${thread.requestedBy}> in Slack; your final message of each turn is posted to the thread as is, so write it for them, short.`,
       `- Date: ${now.toISOString().slice(0, 10)}. Run id: ${thread.runDir ? path.basename(thread.runDir) : 'n/a'}.`,
       thread.issueNumber ? `- Linked issue: #${thread.issueNumber}.` : '',
       thread.prUrl
@@ -193,7 +212,7 @@ export class TaskRunner {
     await this.d.slack.post({
       channel: thread.channel,
       threadTs: thread.threadTs,
-      text: `Queued behind ${this.active} running task${this.active === 1 ? '' : 's'}; I'll start as soon as one finishes.`,
+      text: `Queued behind ${this.active} running task${this.active === 1 ? '' : 's'}.`,
     })
     await new Promise<void>((resolve) => this.waiters.push(resolve))
     this.active += 1
@@ -216,11 +235,12 @@ export class TaskRunner {
       await slack.post({
         channel: threadIn.channel,
         threadTs: threadIn.threadTs,
-        text: "I'm still working on the previous message in this thread; send that again when I've answered.",
+        text: 'Still on the previous message; send that again when I have answered.',
       })
       return
     }
     this.busy.add(key)
+    this.mergeGen.set(key, (this.mergeGen.get(key) || 0) + 1)
     let thread = threadIn
     try {
       await this.acquireSlot(thread)
@@ -247,13 +267,18 @@ export class TaskRunner {
         const hasChanges = patch.trim() !== ''
         const verdict = parseTurnVerdict(res.text, hasChanges)
         await this.postClaudeText(thread, res.text)
+        if (verdict.close.length) await this.closeIssues(thread, verdict.close)
         if (verdict.status === 'done' && !hasChanges) {
-          await slack.post({
-            channel: thread.channel,
-            threadTs: thread.threadTs,
-            text: 'Claude says it is done but changed no files, so there is nothing to ship. Reply with what you want, or say stop.',
-          })
-          verdict.status = 'question'
+          if (verdict.close.length) {
+            verdict.status = 'stop'
+          } else {
+            await slack.post({
+              channel: thread.channel,
+              threadTs: thread.threadTs,
+              text: 'No files changed, so nothing to ship. Say what you want, or `stop`.',
+            })
+            verdict.status = 'question'
+          }
         }
         if (verdict.status === 'question') {
           store.updateThread(thread.channel, thread.threadTs, {
@@ -286,7 +311,7 @@ export class TaskRunner {
         .post({
           channel: thread.channel,
           threadTs: thread.threadTs,
-          text: `❌ The task hit an error on my side: ${mrkdwnEscape(errorMessage(err)).slice(0, 600)}\nReply to retry the last step, or mention me with a new task.`,
+          text: `❌ Error on my side: ${mrkdwnEscape(errorMessage(err)).slice(0, 600)}\nReply to retry.`,
         })
         .catch(() => undefined)
       await this.setStatus(thread, { finished: 'error' }).catch(() => undefined)
@@ -349,6 +374,10 @@ export class TaskRunner {
     thread: ThreadRecord,
     prompt: string,
     resume: string | undefined,
+    statusBase: Partial<StatusView> = {
+      current: 'working',
+      done: ['understanding'],
+    },
   ): Promise<ClaudeRunResult> {
     const { cfg, store, slack, lib, log } = this.d
     const runDir = thread.runDir as string
@@ -361,17 +390,23 @@ export class TaskRunner {
       n === 1 ? 'prompt.md' : `prompt-${n}.md`,
     )
     fs.writeFileSync(promptFile, prompt)
-    const batcher = new ProgressBatcher(
-      async (lines) => {
-        await slack.post({
-          channel: thread.channel,
-          threadTs: thread.threadTs,
-          text: lines.join('\n'),
-        })
-      },
-      { intervalMs: cfg.progressIntervalMs },
-    )
-    const literals = lib.secretLiterals(cfg.env)
+    // Progress goes into the status message's note line, throttled, not into
+    // the thread: one edited line instead of a message per tool call.
+    const tracker = new ProgressTracker(lib.describeToolUse)
+    let lastNote = ''
+    const tick = async () => {
+      const note = tracker.line()
+      if (!note || note === lastNote) return
+      lastNote = note
+      await this.setStatus(thread, { ...statusBase, note })
+    }
+    const timer =
+      cfg.progressIntervalMs > 0
+        ? setInterval(() => void tick(), cfg.progressIntervalMs)
+        : undefined
+    timer?.unref?.()
+    const env = { ...cfg.env, ...(await this.d.fleet.tokenEnv()) }
+    const literals = lib.secretLiterals(env)
     const res = await runClaude({
       bin: cfg.claudeBin,
       cwd: thread.worktree as string,
@@ -382,7 +417,7 @@ export class TaskRunner {
       model: cfg.claudeModel,
       allowedTools: TASK_ALLOWED_TOOLS,
       disallowedTools: TASK_DISALLOWED_TOOLS,
-      env: cfg.env,
+      env,
       transcriptPath: path.join(runDir, 'transcript.jsonl'),
       outputPath: path.join(
         runDir,
@@ -392,14 +427,10 @@ export class TaskRunner {
       invocationsPath: path.join(runDir, 'claude-invocations.txt'),
       scrub: (line) => lib.scrubLine(line, literals),
       timeoutMs: RUN_TIMEOUT_MS,
-      onEvent: (ev) => {
-        if (ev.type === 'result') return
-        batcher.push(
-          ...summariseEvent(ev, { describeToolUse: lib.describeToolUse }),
-        )
-      },
+      onEvent: (ev) => tracker.observe(ev),
     })
-    await batcher.drain()
+    if (timer) clearInterval(timer)
+    await tick()
     if (res.sessionId && res.sessionId !== thread.sessionId) {
       store.updateThread(thread.channel, thread.threadTs, {
         sessionId: res.sessionId,
@@ -430,7 +461,7 @@ export class TaskRunner {
     await slack.post({
       channel: thread.channel,
       threadTs: thread.threadTs,
-      text: `❌ Claude Code failed: ${mrkdwnEscape(res.errorMessage || 'unknown error')}\nReply to retry, or mention me with a new task.`,
+      text: `❌ Claude Code failed: ${mrkdwnEscape(res.errorMessage || 'unknown error')}. Reply to retry.`,
     })
     await this.setStatus(thread, {
       failed: ['working'],
@@ -459,9 +490,7 @@ export class TaskRunner {
     if (!human) return
     const limit = 3500
     const body =
-      human.length > limit
-        ? `${human.slice(0, limit)}\n… (clipped; the transcript has the rest)`
-        : human
+      human.length > limit ? `${human.slice(0, limit)}\n… (clipped)` : human
     await this.d.slack.post({
       channel: thread.channel,
       threadTs: thread.threadTs,
@@ -488,7 +517,49 @@ export class TaskRunner {
       done: ['understanding', 'working'],
       note: verdict.summary || undefined,
     })
-    await this.postRunLine(thread, 'stopped')
+  }
+
+  /** Issues Claude marked outdated or fixed: close each with its reason (read back by task.sh). */
+  private async closeIssues(
+    thread: ThreadRecord,
+    list: IssueClose[],
+  ): Promise<void> {
+    const { cfg, fleet, slack } = this.d
+    const lines: string[] = []
+    for (const c of list) {
+      const file = path.join(
+        thread.runDir || cfg.runsDir,
+        `issue-close-${c.number}.md`,
+      )
+      const runLine = thread.runDir
+        ? await fleet.runLine('closed', thread.runDir).catch(() => '')
+        : ''
+      fs.writeFileSync(
+        file,
+        [
+          '**[fleet:slack] closed from Slack**',
+          '',
+          c.reason,
+          '',
+          `Requested by Slack user \`${thread.requestedBy}\`.`,
+          runLine ? `\n${runLine}` : '',
+        ].join('\n') + '\n',
+      )
+      try {
+        await fleet.issueClose(c.number, file, thread.runDir)
+        lines.push(`Closed #${c.number}: ${mrkdwnEscape(c.reason)}`)
+      } catch (err) {
+        lines.push(
+          `Could not close #${c.number}: ${mrkdwnEscape(errorMessage(err)).slice(0, 300)}`,
+        )
+      }
+    }
+    if (lines.length)
+      await slack.post({
+        channel: thread.channel,
+        threadTs: thread.threadTs,
+        text: lines.join('\n'),
+      })
   }
 
   private async ship(
@@ -524,10 +595,10 @@ export class TaskRunner {
       runDir,
     )
     if (!gate.ok && thread.sessionId) {
-      await slack.post({
-        channel: thread.channel,
-        threadTs: thread.threadTs,
-        text: `Gate failed (${gate.summary.join(', ')}). Asking Claude to repair it once.`,
+      await this.setStatus(thread, {
+        current: 'gate',
+        done: ['understanding', 'working'],
+        note: `gate failed (${gate.summary.join(', ')}); one repair attempt`,
       })
       const retryPrompt = path.join(runDir, `prompt-retry-${attempt}.md`)
       await fleet.gateFailurePrompt(
@@ -539,6 +610,7 @@ export class TaskRunner {
         thread,
         fs.readFileSync(retryPrompt, 'utf8'),
         thread.sessionId,
+        { current: 'gate', done: ['understanding', 'working'] },
       )
       thread = store.getThread(thread.channel, thread.threadTs) || thread
       if (!res.isError) {
@@ -579,9 +651,9 @@ export class TaskRunner {
         channel: thread.channel,
         threadTs: thread.threadTs,
         text: [
-          `❌ The gate is still red after one repair attempt: ${gate.summary.join(', ')}.`,
+          `❌ Gate still red after one repair: ${gate.summary.join(', ')}. Nothing pushed.`,
           tail ? codeBlock(tail, 2500) : '',
-          'Nothing was pushed. Reply with guidance and I will try again, or say stop.',
+          'Reply with guidance, or `stop`.',
         ]
           .filter(Boolean)
           .join('\n'),
@@ -690,56 +762,202 @@ export class TaskRunner {
       sessionId: thread.sessionId,
     })
 
-    const buttons = [
-      ...(tier1.length
-        ? []
-        : [
-            {
-              actionId: 'merge_pr',
-              text: 'Merge',
-              style: 'primary' as const,
-              value: {
-                channel: thread.channel,
-                threadTs: thread.threadTs,
-                pr: prNumber,
-              },
-            },
-          ]),
-      {
-        actionId: 'not_now',
-        text: 'Not now',
-        value: {
-          channel: thread.channel,
-          threadTs: thread.threadTs,
-          pr: prNumber,
-        },
-      },
-    ]
     const obvious = !tier1.length && changed <= cfg.maxChangedLines
+    const prRef = `<${prUrl}|PR #${prNumber}>`
+    const head = threadIn.prUrl
+      ? `Pushed \`${sha.slice(0, 7)}\` to ${prRef}.`
+      : `Opened ${prRef}: ${mrkdwnEscape(title)}.`
+    const flagLines = warnings.map((w) => `⚠️ ${mrkdwnEscape(w)}`)
+    const value = {
+      channel: thread.channel,
+      threadTs: thread.threadTs,
+      pr: prNumber,
+    }
+    if (obvious && cfg.autoMerge) {
+      const text = [
+        head,
+        `${changed} lines · gate green · merging when CI is green.`,
+        ...flagLines,
+      ].join('\n')
+      await slack.post({
+        channel: thread.channel,
+        threadTs: thread.threadTs,
+        text,
+        blocks: buttonBlocks(text, [
+          { actionId: 'not_now', text: 'Hold', value },
+        ]),
+      })
+      await this.setStatus(thread, {
+        current: 'waiting',
+        done: ['understanding', 'working', 'gate', 'pr'],
+        prUrl,
+        note: 'waiting for CI, then merging',
+      })
+      this.startMergeWait(thread)
+      return
+    }
     const text = [
-      threadIn.prUrl
-        ? `Pushed \`${sha.slice(0, 7)}\` to <${prUrl}|PR #${prNumber}>.`
-        : `Opened <${prUrl}|PR #${prNumber}>: ${mrkdwnEscape(title)}`,
-      `${changed} changed lines · gate green locally · CI runs on the PR.`,
-      ...warnings.map((w) => `⚠️ ${mrkdwnEscape(w)}`),
-      obvious
-        ? 'This looks like a small Tier 0 change. Merge when CI is green?'
-        : tier1.length
-          ? 'Tier 1 paths are touched, so a human merges this on GitHub.'
-          : 'Merge when you have looked at it?',
+      head,
+      `${changed} lines · gate green.`,
+      ...flagLines,
+      tier1.length ? 'Tier 1: a human merges this on GitHub.' : 'Merge?',
     ].join('\n')
     await slack.post({
       channel: thread.channel,
       threadTs: thread.threadTs,
       text,
-      blocks: buttonBlocks(text, buttons),
+      blocks: buttonBlocks(text, [
+        ...(tier1.length
+          ? []
+          : [
+              {
+                actionId: 'merge_pr',
+                text: 'Merge',
+                style: 'primary' as const,
+                value,
+              },
+            ]),
+        { actionId: 'not_now', text: 'Not now', value },
+      ]),
     })
     await this.setStatus(thread, {
       current: 'waiting',
       done: ['understanding', 'working', 'gate', 'pr'],
       prUrl,
     })
-    await this.postRunLine(thread, 'pr_opened')
+  }
+
+  // ─── auto-merge: wait for CI, then merge, unless held ────────────────────
+
+  private startMergeWait(thread: ThreadRecord): void {
+    const key = this.key(thread.channel, thread.threadTs)
+    const gen = (this.mergeGen.get(key) || 0) + 1
+    this.mergeGen.set(key, gen)
+    const p = this.awaitMerge(thread, gen)
+      .catch((err) => {
+        this.d.log.error('merge wait failed', {
+          thread: key,
+          error: errorMessage(err),
+        })
+      })
+      .finally(() => {
+        if (this.mergeWaits.get(key) === p) this.mergeWaits.delete(key)
+      })
+    this.mergeWaits.set(key, p)
+  }
+
+  private async awaitMerge(thread: ThreadRecord, gen: number): Promise<void> {
+    const { cfg, store, fleet, slack } = this.d
+    const key = this.key(thread.channel, thread.threadTs)
+    const deadline = Date.now() + cfg.mergeWaitMs
+    for (;;) {
+      if (this.mergeGen.get(key) !== gen) return
+      const fresh = store.getThread(thread.channel, thread.threadTs)
+      if (!fresh || fresh.state !== 'pr_open' || !fresh.prNumber) return
+      const pr = await fleet.prView(fresh.prNumber)
+      if (pr.state === 'MERGED') {
+        await this.recordMerged(fresh, pr, 'on GitHub')
+        return
+      }
+      if (pr.state !== 'OPEN') {
+        store.updateThread(fresh.channel, fresh.threadTs, { state: 'closed' })
+        await slack.post({
+          channel: fresh.channel,
+          threadTs: fresh.threadTs,
+          text: `<${pr.url}|PR #${pr.number}> was closed on GitHub.`,
+        })
+        await this.setStatus(fresh, { finished: 'closed' })
+        return
+      }
+      const tier1 = await fleet.tier1Paths(pr.files.map((f) => f.path))
+      const decision = evaluateMerge({
+        userId: fresh.requestedBy,
+        allowedUserIds: cfg.allowedUserIds,
+        pr,
+        tier1Violations: tier1,
+        baseBranch: cfg.baseBranch,
+      })
+      if (decision.ok) {
+        if (this.mergeGen.get(key) !== gen) return
+        await fleet.prMerge(pr.number, fresh.runDir)
+        await this.recordMerged(fresh, pr, 'CI green')
+        return
+      }
+      const timedOut = Date.now() > deadline
+      if (!decision.pending || timedOut) {
+        const value = {
+          channel: fresh.channel,
+          threadTs: fresh.threadTs,
+          pr: pr.number,
+        }
+        const text = `Not merging <${pr.url}|PR #${pr.number}>: ${decision.reasons.map(mrkdwnEscape).join('; ')}. Reply to fix it, or merge on GitHub.`
+        await slack.post({
+          channel: fresh.channel,
+          threadTs: fresh.threadTs,
+          text,
+          blocks: buttonBlocks(text, [
+            { actionId: 'merge_pr', text: 'Merge', value },
+            { actionId: 'not_now', text: 'Hold', value },
+          ]),
+        })
+        await this.setStatus(fresh, {
+          current: 'waiting',
+          done: ['understanding', 'working', 'gate', 'pr'],
+          prUrl: pr.url,
+          note: timedOut ? 'CI did not finish in time' : 'CI red',
+        })
+        return
+      }
+      await sleep(cfg.mergePollIntervalMs)
+    }
+  }
+
+  /** After a merge (by the wait, the button, or a human on GitHub): close the issue, finish the run, clean up. */
+  private async recordMerged(
+    thread: ThreadRecord,
+    pr: PrFacts,
+    how: string,
+  ): Promise<void> {
+    const { cfg, store, fleet, slack, log } = this.d
+    log.info('merged', { pr: pr.number, how })
+    store.updateThread(thread.channel, thread.threadTs, { state: 'merged' })
+    let closed = ''
+    if (thread.issueNumber) {
+      const commentFile = path.join(
+        thread.runDir || cfg.runsDir,
+        `issue-close-${thread.issueNumber}.md`,
+      )
+      fs.writeFileSync(
+        commentFile,
+        `**[fleet:slack] merged**\n\n${pr.url} was merged (${how}).\n`,
+      )
+      try {
+        await fleet.issueClose(thread.issueNumber, commentFile, thread.runDir)
+        closed = ` Closed #${thread.issueNumber}.`
+      } catch (err) {
+        closed = ` Could not close #${thread.issueNumber}: ${errorMessage(err)}`
+      }
+    }
+    await slack.post({
+      channel: thread.channel,
+      threadTs: thread.threadTs,
+      text: `🎉 Merged <${pr.url}|PR #${pr.number}> (${how}).${closed}`,
+    })
+    await this.setStatus(thread, {
+      finished: 'merged',
+      done: ['understanding', 'working', 'gate', 'pr', 'waiting'],
+      prUrl: pr.url,
+    })
+    if (thread.runDir) {
+      await fleet
+        .finish('merged', thread.runDir, {
+          issue: thread.issueNumber,
+          ref: pr.url,
+          sessionId: thread.sessionId,
+        })
+        .catch(() => undefined)
+    }
+    await this.cleanupWorktree(thread)
   }
 
   private writeLearning(
@@ -780,16 +998,20 @@ export class TaskRunner {
   // ─── merge flow ──────────────────────────────────────────────────────────
 
   async merge(thread: ThreadRecord, userId: string): Promise<void> {
-    const { cfg, store, fleet, slack, log } = this.d
+    const { cfg, fleet, slack } = this.d
     if (!thread.prNumber) {
       await slack.post({
         channel: thread.channel,
         threadTs: thread.threadTs,
-        text: 'This thread has no PR to merge.',
+        text: 'No PR to merge in this thread.',
       })
       return
     }
     const pr = await fleet.prView(thread.prNumber)
+    if (pr.state === 'MERGED') {
+      await this.recordMerged(thread, pr, 'on GitHub')
+      return
+    }
     const tier1 = await fleet.tier1Paths(pr.files.map((f) => f.path))
     const decision = evaluateMerge({
       userId,
@@ -806,53 +1028,24 @@ export class TaskRunner {
       })
       return
     }
+    // A click retires any CI wait for the thread.
+    const key = this.key(thread.channel, thread.threadTs)
+    this.mergeGen.set(key, (this.mergeGen.get(key) || 0) + 1)
     await fleet.prMerge(pr.number, thread.runDir)
-    log.info('merged', { pr: pr.number, by: userId })
-    store.updateThread(thread.channel, thread.threadTs, { state: 'merged' })
-    let closed = ''
-    if (thread.issueNumber) {
-      const commentFile = path.join(
-        thread.runDir || cfg.runsDir,
-        `issue-close-${thread.issueNumber}.md`,
-      )
-      fs.writeFileSync(
-        commentFile,
-        `**[fleet:slack] merged**\n\n${pr.url} was merged from Slack by \`${userId}\`.\n`,
-      )
-      try {
-        await fleet.issueClose(thread.issueNumber, commentFile, thread.runDir)
-        closed = ` Closed #${thread.issueNumber}.`
-      } catch (err) {
-        closed = ` Could not close #${thread.issueNumber}: ${errorMessage(err)}`
-      }
-    }
-    await slack.post({
-      channel: thread.channel,
-      threadTs: thread.threadTs,
-      text: `🎉 Merged <${pr.url}|PR #${pr.number}> (squash) by <@${userId}>.${closed}`,
-    })
-    await this.setStatus(thread, {
-      finished: 'merged',
-      done: ['understanding', 'working', 'gate', 'pr', 'waiting'],
-      prUrl: pr.url,
-    })
-    if (thread.runDir) {
-      await fleet
-        .finish('merged', thread.runDir, {
-          issue: thread.issueNumber,
-          ref: pr.url,
-          sessionId: thread.sessionId,
-        })
-        .catch(() => undefined)
-    }
-    await this.cleanupWorktree(thread)
+    await this.recordMerged(thread, pr, `by <@${userId}>`)
   }
 
   async notNow(thread: ThreadRecord, userId: string): Promise<void> {
+    const key = this.key(thread.channel, thread.threadTs)
+    this.mergeGen.set(key, (this.mergeGen.get(key) || 0) + 1)
+    if (thread.state === 'pr_open')
+      this.d.store.updateThread(thread.channel, thread.threadTs, {
+        state: 'held',
+      })
     await this.d.slack.post({
       channel: thread.channel,
       threadTs: thread.threadTs,
-      text: `OK <@${userId}>, leaving ${thread.prUrl ? `<${thread.prUrl}|the PR>` : 'it'} open. Reply here to change it, click Merge later, or merge on GitHub.`,
+      text: `OK <@${userId}>, holding ${thread.prUrl ? `<${thread.prUrl}|the PR>` : 'it'}. Reply to change it, click Merge, or merge on GitHub.`,
     })
   }
 
@@ -891,23 +1084,5 @@ export class TaskRunner {
       .catch((err) => {
         this.d.log.warn('status update failed', { error: errorMessage(err) })
       })
-  }
-
-  private async postRunLine(
-    thread: ThreadRecord,
-    outcome: string,
-  ): Promise<void> {
-    if (!thread.runDir) return
-    const runId = path.basename(thread.runDir)
-    const url = transcriptUrl(this.d.cfg, runId)
-    await this.d.slack
-      .post({
-        channel: thread.channel,
-        threadTs: thread.threadTs,
-        text: url
-          ? `Run \`${runId}\` · outcome \`${outcome}\` · <${url}|transcript>`
-          : `Run \`${runId}\` · outcome \`${outcome}\` · transcript: \`fleet/bin/runs.sh show ${runId}\` on the box`,
-      })
-      .catch(() => undefined)
   }
 }

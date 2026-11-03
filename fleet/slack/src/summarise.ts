@@ -102,6 +102,39 @@ export function summariseEvent(
 }
 
 /**
+ * ProgressTracker folds the stream into one short line for the status
+ * message ("working · 12 tool calls · Grep `src/foo.ts`") instead of a
+ * message per tool call.
+ */
+export class ProgressTracker {
+  tools = 0
+  errors = 0
+  last = ''
+
+  constructor(private describe: DescribeToolUse = defaultDescribe) {}
+
+  observe(ev: StreamEvent): void {
+    for (const line of summariseEvent(ev, { describeToolUse: this.describe })) {
+      if (line.startsWith('🔧')) {
+        this.tools += 1
+        this.last = line.slice(2).trim()
+      } else if (line.startsWith('⚠️')) {
+        this.errors += 1
+      }
+    }
+  }
+
+  line(): string {
+    if (!this.tools && !this.errors) return ''
+    const parts = [`${this.tools} tool call${this.tools === 1 ? '' : 's'}`]
+    if (this.errors)
+      parts.push(`${this.errors} tool error${this.errors === 1 ? '' : 's'}`)
+    if (this.last) parts.push(oneLine(this.last, 120))
+    return `_working · ${parts.join(' · ')}_`
+  }
+}
+
+/**
  * ProgressBatcher collects lines and flushes them as one message at most
  * every `intervalMs` (and never more than `maxLines` per message; the rest
  * waits for the next flush). `drain()` flushes whatever is left.

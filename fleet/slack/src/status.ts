@@ -42,7 +42,7 @@ export function renderStatus(v: StatusView): string {
   const lines = [`*${v.title}*`, marks.join('   ')]
   if (v.finished === 'merged') lines.push('🎉 merged')
   else if (v.finished === 'closed') lines.push('closed')
-  else if (v.finished === 'stopped') lines.push('stopped, nothing shipped')
+  else if (v.finished === 'stopped') lines.push('stopped')
   else if (v.finished === 'error') lines.push('❌ errored, see the thread')
   if (v.note) lines.push(v.note)
   const tail: string[] = []

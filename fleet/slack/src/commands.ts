@@ -33,10 +33,9 @@ export function parseCommand(text: string): Command | null {
 
 export const HELP_TEXT = [
   '*Fleet Slack agent*',
-  'Mention me (or DM me) with a task, e.g. `@fleet the search page 500s when q is empty, fix it`. I answer in a thread: one status message I keep editing, progress lines, questions when something is unclear, then a PR with Merge / Not now buttons once the gate is green.',
-  'Reply in the thread to answer a question or steer the work; say `stop` to drop it.',
-  "Commands: `status` (timers, last canary, open fleet PRs, today's cost), `runs` (last 10 runs), `run <id>` (transcript excerpt), `help`.",
-  'Rules I follow: `fleet/slack/INSTRUCTIONS.md` in the repo (Tier 0 merges from here, Tier 1 always a PR a human merges).',
+  'Mention or DM me with a task. I work in a thread: one status line I keep editing, a question only when something is unclear, then a PR. Tier 0 PRs merge on their own once CI is green (Hold stops that); Tier 1 waits for a human on GitHub. Issues that turn out outdated I close with the evidence.',
+  'Reply in the thread to steer; `stop` drops the task.',
+  'Commands: `status`, `runs`, `run <id>`, `help`. Rules: `fleet/slack/INSTRUCTIONS.md`.',
 ].join('\n')
 
 export interface CommandDeps {

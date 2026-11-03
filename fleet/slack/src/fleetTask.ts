@@ -78,6 +78,11 @@ export class FleetTask {
     return env
   }
 
+  /** GH_TOKEN/FLEET_GITHUB_TOKEN for a child that reads GitHub (Claude's gh). */
+  async tokenEnv(): Promise<NodeJS.ProcessEnv> {
+    return this.tokens.env()
+  }
+
   /** Run one subcommand; resolves with the raw result (no throw on non-zero). */
   async raw(
     args: string[],

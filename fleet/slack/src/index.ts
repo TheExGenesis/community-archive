@@ -91,6 +91,19 @@ async function main(): Promise<void> {
     }),
   })
 
+  fs.mkdirSync(cfg.memoryDir, { recursive: true })
+  runner.resumeMergeWaits()
+  // Idle threads give their worktree back after FLEET_SLACK_WORKTREE_TTL_H
+  // (72) hours; the Claude session survives (it is keyed by the worktree
+  // path, which is recreated on the next message).
+  const ttlMs = Number(process.env.FLEET_SLACK_WORKTREE_TTL_H || 72) * 3600e3
+  const sweep = () =>
+    runner.sweepIdleWorktrees(ttlMs).catch((err) => {
+      log.warn('worktree sweep failed', { error: errorMessage(err) })
+    })
+  void sweep()
+  setInterval(() => void sweep(), 3600e3).unref()
+
   app.event('app_mention', async ({ event }) => {
     const e = event as unknown as {
       channel: string

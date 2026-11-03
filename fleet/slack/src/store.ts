@@ -37,6 +37,25 @@ export interface ThreadRecord {
   updatedAt: string
 }
 
+/** A shipped change: one branch, run dir and PR of a thread; the thread moves on, the job keeps its PR state. */
+export type JobState = 'pr_open' | 'held' | 'merged' | 'closed'
+
+export interface JobRecord {
+  channel: string
+  threadTs: string
+  prNumber: number
+  prUrl: string
+  runDir: string
+  branch: string
+  worktree: string
+  issueNumber?: number
+  statusTs?: string
+  requestedBy: string
+  state: JobState
+  createdAt: string
+  updatedAt: string
+}
+
 export interface PostedIssue {
   issueNumber: number
   channel: string
@@ -67,6 +86,22 @@ CREATE TABLE IF NOT EXISTS threads (
 );
 CREATE INDEX IF NOT EXISTS threads_pr ON threads (pr_number);
 CREATE INDEX IF NOT EXISTS threads_state ON threads (state);
+CREATE TABLE IF NOT EXISTS jobs (
+  pr_number INTEGER PRIMARY KEY,
+  channel TEXT NOT NULL,
+  thread_ts TEXT NOT NULL,
+  pr_url TEXT NOT NULL,
+  run_dir TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  worktree TEXT NOT NULL,
+  issue_number INTEGER,
+  status_ts TEXT,
+  requested_by TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS jobs_thread ON jobs (channel, thread_ts);
 CREATE TABLE IF NOT EXISTS posted_issues (
   issue_number INTEGER PRIMARY KEY,
   channel TEXT NOT NULL,
@@ -104,6 +139,30 @@ function rowToThread(r: Record<string, unknown>): ThreadRecord {
         ? undefined
         : Number(r.issue_number),
     statusTs: opt(r.status_ts),
+    createdAt: String(r.created_at),
+    updatedAt: String(r.updated_at),
+  }
+}
+
+function rowToJob(r: Record<string, unknown>): JobRecord {
+  return {
+    channel: String(r.channel),
+    threadTs: String(r.thread_ts),
+    prNumber: Number(r.pr_number),
+    prUrl: String(r.pr_url),
+    runDir: String(r.run_dir),
+    branch: String(r.branch),
+    worktree: String(r.worktree),
+    issueNumber:
+      r.issue_number === null || r.issue_number === undefined
+        ? undefined
+        : Number(r.issue_number),
+    statusTs:
+      r.status_ts === null || r.status_ts === undefined
+        ? undefined
+        : String(r.status_ts),
+    requestedBy: String(r.requested_by ?? ''),
+    state: String(r.state) as JobState,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
   }
@@ -229,6 +288,69 @@ export class Store {
       )
       .run(...values)
     return this.getThread(channel, threadTs)
+  }
+
+  // ─── jobs ────────────────────────────────────────────────────────────────
+
+  upsertJob(job: Omit<JobRecord, 'createdAt' | 'updatedAt'>): JobRecord {
+    const now = new Date().toISOString()
+    this.db
+      .prepare(
+        `INSERT INTO jobs (pr_number, channel, thread_ts, pr_url, run_dir, branch, worktree, issue_number, status_ts, requested_by, state, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(pr_number) DO UPDATE SET
+           pr_url = excluded.pr_url, run_dir = excluded.run_dir, branch = excluded.branch,
+           worktree = excluded.worktree, issue_number = excluded.issue_number, status_ts = excluded.status_ts,
+           requested_by = excluded.requested_by, state = excluded.state, updated_at = excluded.updated_at`,
+      )
+      .run(
+        job.prNumber,
+        job.channel,
+        job.threadTs,
+        job.prUrl,
+        job.runDir,
+        job.branch,
+        job.worktree,
+        job.issueNumber ?? null,
+        job.statusTs ?? null,
+        job.requestedBy,
+        job.state,
+        now,
+        now,
+      )
+    return this.getJob(job.prNumber) as JobRecord
+  }
+
+  getJob(prNumber: number): JobRecord | undefined {
+    const row = this.db
+      .prepare('SELECT * FROM jobs WHERE pr_number = ?')
+      .get(prNumber)
+    return row ? rowToJob(row) : undefined
+  }
+
+  setJobState(prNumber: number, state: JobState): JobRecord | undefined {
+    this.db
+      .prepare('UPDATE jobs SET state = ?, updated_at = ? WHERE pr_number = ?')
+      .run(state, new Date().toISOString(), prNumber)
+    return this.getJob(prNumber)
+  }
+
+  /** Jobs of a thread, newest first. */
+  listJobs(channel: string, threadTs: string): JobRecord[] {
+    return this.db
+      .prepare(
+        'SELECT * FROM jobs WHERE channel = ? AND thread_ts = ? ORDER BY pr_number DESC',
+      )
+      .all(channel, threadTs)
+      .map(rowToJob)
+  }
+
+  /** Jobs still waiting on CI or a human (state pr_open), for the merge waits to resume after a restart. */
+  listOpenJobs(): JobRecord[] {
+    return this.db
+      .prepare("SELECT * FROM jobs WHERE state = 'pr_open' ORDER BY pr_number")
+      .all()
+      .map(rowToJob)
   }
 
   // ─── posted issues (intake dedupe) ───────────────────────────────────────

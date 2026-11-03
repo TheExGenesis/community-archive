@@ -144,6 +144,8 @@ async function setup(
     intakeEnabled: false,
     maxConcurrentTasks: 1,
     progressIntervalMs: 0,
+    memoryDir: path.join(base, 'memory'),
+    maxChain: 5,
     autoMerge: false,
     mergePollIntervalMs: 10,
     mergeWaitMs: 2000,
@@ -234,9 +236,11 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   assert.ok(thread.prUrl?.endsWith('/pull/100'), thread.prUrl)
 
   // Status message: posted first, then edited through the checklist.
+  // The status message appears with the first tool call, not before.
   const status = h.slack.posts[0]
   assert.equal(status.threadTs, '1.0')
-  assert.match(status.text, /▶ understanding/)
+  assert.match(status.text, /☑ understanding   ▶ working/)
+  assert.match(status.text, /1 tool call · Read `src\/foo\.ts`/)
   const finalStatus = h.slack.lastUpdate(status.ts) || ''
   assert.match(
     finalStatus,
@@ -250,14 +254,6 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   assert.ok(
     !texts.some((t) => t.includes('🔧')),
     `no tool lines in the thread: ${texts.join('\n---\n')}`,
-  )
-  assert.ok(
-    h.slack.updates.some(
-      (u) =>
-        u.ts === status.ts &&
-        u.text.includes('1 tool call · Read `src/foo.ts`'),
-    ),
-    'tool progress in the status note',
   )
   assert.ok(
     texts.some((t) => t.startsWith('Set the answer to 42 in src/foo.ts.')),
@@ -323,7 +319,7 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   assert.match(claudeArgs, /--append-system-prompt .*Standing rules/)
   assert.match(
     fs.readFileSync(`${h.claudeLog}.prompt-1`, 'utf8'),
-    /Request from <@U1> in Slack:\n\nset the answer to 42/,
+    /Message from <@U1> in Slack:\n\nset the answer to 42/,
   )
 
   // Run directory: the fixer's files, result.json, metrics, Loki export.
@@ -367,17 +363,18 @@ test('happy path: task → gate → PR with buttons → merge closes the thread'
   )
 
   // Merge from the button.
-  await h.runner.merge(thread, 'U1')
+  await h.runner.merge(100, 'U1')
   assert.equal(prs(h)[0].state, 'MERGED')
   assert.equal(h.store.getThread('C1', '1.0')?.state, 'merged')
+  assert.equal(h.store.getJob(100)?.state, 'merged')
   assert.match(
     h.slack.texts('C1', '1.0').pop() || '',
     /🎉 Merged <.*pull\/100\|PR #100> \(by <@U1>\)/,
   )
   assert.match(h.slack.lastUpdate(status.ts) || '', /🎉 merged/)
   assert.ok(
-    !fs.existsSync(thread.worktree as string),
-    'worktree removed after merge',
+    fs.existsSync(thread.worktree as string),
+    'the worktree stays for the conversation',
   )
   assert.match(
     fs.readFileSync(path.join(h.ghState, 'calls.log'), 'utf8'),
@@ -470,7 +467,7 @@ test('Tier 1 paths ship as a PR without a Merge button and the guard refuses', a
   )
   state[0].files = [{ path: 'supabase/migrations/1.sql' }]
   fs.writeFileSync(path.join(h.ghState, 'prs.json'), JSON.stringify(state))
-  await h.runner.merge(thread as NonNullable<typeof thread>, 'U1')
+  await h.runner.merge(100, 'U1')
   assert.match(
     h.slack.texts('C1', '3.0').pop() || '',
     /🚫 Not merging .*Tier 1: Tier 1 path changed: supabase\/migrations\/1\.sql/,
@@ -539,8 +536,8 @@ test('stop ends the task, removes the worktree and records the run', async () =>
     source: 'dm',
   })
   const thread = h.store.getThread('C1', '5.0')
-  assert.equal(thread?.state, 'closed')
-  assert.equal(thread?.worktree, undefined)
+  assert.equal(thread?.state, 'waiting', 'the conversation stays open')
+  assert.ok(thread?.worktree && fs.existsSync(thread.worktree))
   assert.match(h.slack.lastUpdate(h.slack.posts[0].ts) || '', /\nstopped\n/)
   const result = JSON.parse(
     fs.readFileSync(path.join(thread?.runDir as string, 'result.json'), 'utf8'),
@@ -586,7 +583,7 @@ test('an issue-linked task writes a learning and links the issue in commit and P
     /Work on GitHub issue #7: bug: answer is off by one/,
   )
   // Merge closes the issue.
-  await h.runner.merge(thread as NonNullable<typeof thread>, 'U1')
+  await h.runner.merge(100, 'U1')
   const issues = JSON.parse(
     fs.readFileSync(path.join(h.ghState, 'issues.json'), 'utf8'),
   )
@@ -626,7 +623,7 @@ test('auto-merge: a Tier 0 PR merges on its own once CI is green', async () => {
     ['not_now'],
     'only a Hold button',
   )
-  const wait = h.runner.pendingMerge('CSIG', '8.0')
+  const wait = h.runner.pendingMerge(100)
   assert.ok(wait, 'a CI wait is running')
   await wait
   const thread = h.store.getThread('CSIG', '8.0')
@@ -641,7 +638,7 @@ test('auto-merge: a Tier 0 PR merges on its own once CI is green', async () => {
   ) as { number: number; state: string }[]
   assert.equal(issues.find((i) => i.number === 7)?.state, 'CLOSED')
   assert.match(h.slack.lastUpdate(h.slack.posts[0].ts) || '', /🎉 merged/)
-  assert.equal(h.runner.pendingMerge('CSIG', '8.0'), undefined)
+  assert.equal(h.runner.pendingMerge(100), undefined)
   h.store.close()
 })
 
@@ -672,7 +669,7 @@ test('auto-merge: red CI hands the PR back with Merge and Hold buttons; Hold sto
     text: 'set the answer to 42',
     source: 'mention',
   })
-  await h.runner.pendingMerge('C1', '9.0')
+  await h.runner.pendingMerge(100)
   assert.equal(h.store.getThread('C1', '9.0')?.state, 'pr_open')
   assert.equal(prs(h)[0].state, 'OPEN')
   const last = h.slack.posts[h.slack.posts.length - 1]
@@ -684,9 +681,9 @@ test('auto-merge: red CI hands the PR back with Merge and Hold buttons; Hold sto
   assert.match(h.slack.lastUpdate(h.slack.posts[0].ts) || '', /CI red/)
 
   // Hold: the thread is held, a later Merge click still works.
-  const thread = h.store.getThread('C1', '9.0')
-  await h.runner.notNow(thread as NonNullable<typeof thread>, 'U1')
+  await h.runner.notNow(100, 'U1')
   assert.equal(h.store.getThread('C1', '9.0')?.state, 'held')
+  assert.equal(h.store.getJob(100)?.state, 'held')
   assert.match(h.slack.texts('C1', '9.0').pop() || '', /holding <.*\|the PR>/)
   h.store.close()
 })
@@ -715,8 +712,8 @@ test('close: Claude marks an issue outdated and the harness closes it with the r
   const thread = h.store.getThread('CSIG', '10.0')
   assert.equal(
     thread?.state,
-    'closed',
-    'done without changes but with closes = stop',
+    'waiting',
+    'done without changes = nothing to ship, conversation open',
   )
   const issues = JSON.parse(
     fs.readFileSync(path.join(h.ghState, 'issues.json'), 'utf8'),
@@ -740,5 +737,140 @@ test('close: Claude marks an issue outdated and the harness closes it with the r
   )
   assert.ok(!texts.some((t) => t.includes('nothing to ship')), texts.join('\n'))
   assert.equal(prs(h).length, 0)
+  h.store.close()
+})
+
+test('conversation: a chat turn posts no status; after a merge the next reply starts a new job in the same worktree and session', async () => {
+  const out = path.join(tmpDir(), 'out.json')
+  const h = await setup({ FAKE_CLAUDE_OUTPUT: out }, { autoMerge: true })
+  const CHAT =
+    'Hi, ready when you are.\n\n```json\n{"status":"stop","summary":"Greeting."}\n```'
+  fs.writeFileSync(out, claudeResult(CHAT))
+  await h.runner.start({
+    channel: 'C1',
+    threadTs: '11.0',
+    userId: 'U1',
+    text: 'hey, setting you up',
+    source: 'mention',
+    messageTs: '11.0',
+  })
+  let thread = h.store.getThread('C1', '11.0')
+  assert.equal(thread?.state, 'waiting')
+  // The fake claude always makes one Read call, so a status line appears; a
+  // plain answer gets only the text after it, no run line.
+  const texts = h.slack.texts('C1', '11.0')
+  assert.equal(texts.length, 2, texts.join('\n---\n'))
+  assert.equal(texts[1], 'Hi, ready when you are.')
+  assert.match(h.slack.lastUpdate(h.slack.posts[0].ts) || '', /\nstopped\n/)
+  assert.deepEqual(
+    h.slack.reactions.map((r) => r.name),
+    ['white_check_mark'],
+  )
+  const firstWorktree = thread?.worktree as string
+  const firstRun = thread?.runDir as string
+
+  // A reply that ships: same worktree, same run dir and branch (the job continues).
+  fs.writeFileSync(out, claudeResult(DONE_TEXT))
+  h.env.FAKE_CLAUDE_EDITS = 'printf "export const answer = 42\\n" > src/foo.ts'
+  h.env.FAKE_CLAUDE_EDITS_2 = h.env.FAKE_CLAUDE_EDITS
+  await h.runner.reply(
+    thread as NonNullable<typeof thread>,
+    'set it to 42',
+    'U1',
+    '11.1',
+  )
+  await h.runner.pendingMerge(100)
+  thread = h.store.getThread('C1', '11.0')
+  assert.equal(thread?.state, 'merged')
+  assert.equal(thread?.worktree, firstWorktree)
+  assert.equal(thread?.runDir, firstRun)
+  assert.equal(h.store.listJobs('C1', '11.0').length, 1)
+
+  // After the merge the conversation goes on: a new job on a fresh branch, same worktree.
+  fs.writeFileSync(
+    out,
+    claudeResult(
+      'Set it to 43 as well.\n\n```json\n{"status":"done","summary":"Set the answer to 43.","title":"Set the answer to 43"}\n```',
+    ),
+  )
+  h.env.FAKE_CLAUDE_EDITS_2 =
+    'printf "export const answer = 43\\n" > src/foo.ts'
+  await h.runner.reply(
+    thread as NonNullable<typeof thread>,
+    'now 43',
+    'U1',
+    '11.2',
+  )
+  await h.runner.pendingMerge(101)
+  thread = h.store.getThread('C1', '11.0')
+  assert.equal(thread?.worktree, firstWorktree, 'same worktree')
+  assert.notEqual(thread?.runDir, firstRun, 'new run dir')
+  assert.equal(thread?.prNumber, 101)
+  assert.equal(thread?.state, 'merged')
+  const jobs = h.store.listJobs('C1', '11.0')
+  assert.deepEqual(
+    jobs.map((j) => [j.prNumber, j.state]),
+    [
+      [101, 'merged'],
+      [100, 'merged'],
+    ],
+  )
+  assert.notEqual(jobs[0].branch, jobs[1].branch)
+  const claudeArgs = fs.readFileSync(h.claudeLog, 'utf8').trim().split('\n')
+  assert.equal(claudeArgs.length, 3)
+  assert.match(claudeArgs[2], /--resume 11111111-2222-3333-4444-555555555555/)
+  assert.match(
+    fs.readFileSync(`${h.claudeLog}.prompt-3`, 'utf8'),
+    /Reply from <@U1> in the Slack thread:\n\nnow 43/,
+  )
+  h.store.close()
+})
+
+test('chain: done with "next" ships, then resumes the session with the next step', async () => {
+  const out = path.join(tmpDir(), 'out.json')
+  const out2 = path.join(tmpDir(), 'out2.json')
+  const h = await setup(
+    {
+      FAKE_CLAUDE_OUTPUT: out,
+      FAKE_CLAUDE_OUTPUT_2: out2,
+      FAKE_CLAUDE_EDITS: 'printf "export const answer = 42\\n" > src/foo.ts',
+      FAKE_CLAUDE_EDITS_2: 'printf "export const other = 1\\n" > src/bar.ts',
+    },
+    { autoMerge: true },
+  )
+  fs.writeFileSync(
+    out,
+    claudeResult(
+      'Found two things; fixing the answer first.\n\n```json\n{"status":"done","summary":"Set the answer to 42.","title":"Set the answer to 42","next":"add src/bar.ts"}\n```',
+    ),
+  )
+  fs.writeFileSync(
+    out2,
+    claudeResult(
+      'Added bar.\n\n```json\n{"status":"done","summary":"Add bar.","title":"Add bar"}\n```',
+    ),
+  )
+  await h.runner.start({
+    channel: 'C1',
+    threadTs: '12.0',
+    userId: 'U1',
+    text: 'find things and fix them',
+    source: 'mention',
+  })
+  const jobs = h.store.listJobs('C1', '12.0')
+  assert.deepEqual(
+    jobs.map((j) => j.prNumber),
+    [101, 100],
+    'two PRs from one message',
+  )
+  assert.match(
+    fs.readFileSync(`${h.claudeLog}.prompt-2`, 'utf8'),
+    /^Shipped as https:.*pull\/100\. Go on with the next step you named: add src\/bar\.ts/,
+  )
+  await Promise.all([h.runner.pendingMerge(100), h.runner.pendingMerge(101)])
+  assert.deepEqual(
+    prs(h).map((p) => p.state),
+    ['MERGED', 'MERGED'],
+  )
   h.store.close()
 })

@@ -125,6 +125,15 @@ export class FleetTask {
     return (await this.run(['worktree-add', branch, dir], { runDir })).trim()
   }
 
+  /** A new branch of origin/<base> in the thread's existing worktree (must be clean). */
+  async branchNew(
+    worktree: string,
+    branch: string,
+    runDir: string,
+  ): Promise<string> {
+    return (await this.run(['branch-new', worktree, branch], { runDir })).trim()
+  }
+
   async worktreeRemove(
     dir: string,
     branch: string | undefined,

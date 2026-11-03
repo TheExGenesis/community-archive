@@ -8,6 +8,7 @@
 #   task.sh init-run <name>                      create RUN_DIR, record started_at
 #   task.sh worktree-add <branch> <path> [base]  fresh worktree of origin/<base>; prints the base sha
 #   task.sh worktree-remove <path> [branch]      remove it (and the local branch)
+#   task.sh branch-new <worktree> <branch> [base] fresh branch of origin/<base> in an existing clean worktree; prints the base sha
 #   task.sh stage <worktree>                     git add -A; prints the staged patch
 #   task.sh tier1 <worktree>                     Tier 1 violations of the staged diff, one per line
 #   task.sh tier1-paths                          Tier 1 violations for file paths on stdin, one per line
@@ -68,6 +69,15 @@ case "$cmd" in
     ;;
   worktree-remove)
     fleet_worktree_remove "${1:?path}" "${2:-}"
+    ;;
+  branch-new)
+    wt="${1:?worktree}" branch="${2:?branch}" base="${3:-$FLEET_BASE_BRANCH}"
+    if [[ -n "$(git -C "$wt" status --porcelain)" ]]; then
+      fleet_die "branch-new: $wt has uncommitted changes"
+    fi
+    git -C "$wt" fetch --quiet origin "$base"
+    git -C "$wt" checkout --quiet -b "$branch" "origin/$base"
+    git -C "$wt" rev-parse HEAD
     ;;
   stage)
     git -C "${1:?worktree}" add -A

@@ -15,6 +15,8 @@ export interface TurnVerdict {
   title?: string
   /** Issues Claude found outdated or already fixed; the harness closes them with the reason. */
   close: IssueClose[]
+  /** After shipping: what Claude wants to do next in the same thread (the harness resumes it with this). */
+  next?: string
   /** True when the block was found and valid (false: heuristic). */
   explicit: boolean
 }
@@ -59,6 +61,7 @@ export function parseTurnVerdict(
         summary?: unknown
         title?: unknown
         close?: unknown
+        next?: unknown
       }
       if (v && typeof v === 'object' && VALID.has(v.status as TurnStatus)) {
         const summary = String(v.summary || '').trim()
@@ -67,6 +70,9 @@ export function parseTurnVerdict(
           summary,
           title: v.title ? String(v.title).trim().slice(0, 72) : undefined,
           close: parseCloseList(v.close, summary),
+          ...(typeof v.next === 'string' && v.next.trim()
+            ? { next: v.next.trim().slice(0, 500) }
+            : {}),
           explicit: true,
         }
       }

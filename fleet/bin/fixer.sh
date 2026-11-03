@@ -313,56 +313,19 @@ if [[ -n "$VIOLATIONS" ]]; then
 fi
 
 # ─── Gate ───────────────────────────────────────────────────────────────────
-# run_gate <dir> : the four CI checks as plain commands; logs under <dir>; returns 1 on first failure.
-run_gate() {
-  local dir="$1" name cmd
-  mkdir -p "$dir"
-  while IFS='|' read -r name cmd; do
-    [[ -z "$name" ]] && continue
-    fleet_info "gate: $name ($cmd)"
-    if (cd "$WORKTREE" && bash -c "$cmd") >"$dir/$name.log" 2>&1; then
-      echo "ok $name" >>"$dir/summary.txt"
-    else
-      echo "FAIL $name" >>"$dir/summary.txt"
-      fleet_warn "gate: $name failed"
-      return 1
-    fi
-  done <<EOF
-lint|pnpm lint
-type-check|pnpm type-check
-security|pnpm test:security
-unit|pnpm test:ci
-EOF
-}
-
-gate_failure_prompt() {
-  local dir="$1" out="$2"
-  {
-    echo "The CI gate failed on your change. Fix the cause (not the check), keep the Tier 0 rules, and end again with the fenced JSON verdict."
-    echo
-    echo "Gate summary:"
-    cat "$dir/summary.txt"
-    echo
-    local failed
-    failed="$(awk '/^FAIL/ {print $2}' "$dir/summary.txt" | head -1)"
-    echo "Last 200 lines of the failing check ($failed):"
-    echo '```'
-    tail -n 200 "$dir/$failed.log"
-    echo '```'
-  } >"$out"
-}
-
+# fleet_run_gate (fleet/lib/common.sh) runs the four CI checks; shared with the
+# Slack agent so both ship under the same gate.
 GATE_OK=0
-if run_gate "$RUN_DIR/gate-1"; then
+if fleet_run_gate "$WORKTREE" "$RUN_DIR/gate-1"; then
   GATE_OK=1
 elif [[ -n "$SESSION_ID" ]]; then
-  gate_failure_prompt "$RUN_DIR/gate-1" "$RUN_DIR/prompt-retry.md"
+  fleet_gate_failure_prompt "$RUN_DIR/gate-1" "$RUN_DIR/prompt-retry.md"
   fleet_info "gate failed; resuming session $SESSION_ID once"
   run_claude "$RUN_DIR/claude-output-2.json" "$RUN_DIR/prompt-retry.md" --resume "$SESSION_ID"
   git -C "$WORKTREE" add -A
   git -C "$WORKTREE" diff --cached >"$RUN_DIR/fix.patch"
   VIOLATIONS="$(fleet_tier1_violations "$WORKTREE")"
-  if [[ -z "$VIOLATIONS" ]] && run_gate "$RUN_DIR/gate-2"; then
+  if [[ -z "$VIOLATIONS" ]] && fleet_run_gate "$WORKTREE" "$RUN_DIR/gate-2"; then
     GATE_OK=1
   fi
 fi

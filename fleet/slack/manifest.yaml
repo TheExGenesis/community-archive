@@ -1,0 +1,52 @@
+# Slack app manifest for the fleet's Slack agent (fleet/slack).
+#
+# Create the app once: https://api.slack.com/apps → Create New App → From a
+# manifest → pick the workspace → paste this file (YAML) → Create. Then:
+#   1. Basic Information → App-Level Tokens → Generate Token and Scopes:
+#      name "socket", scope connections:write → copy the xapp-… token
+#      (SLACK_APP_TOKEN).
+#   2. Install App → Install to Workspace → copy the Bot User OAuth Token
+#      xoxb-… (SLACK_BOT_TOKEN).
+#   3. In Slack, invite the bot to the signals channel (/invite @CA Fleet)
+#      and note the channel id (SLACK_SIGNALS_CHANNEL) and the maintainers'
+#      member ids (SLACK_ALLOWED_USER_IDS).
+# Socket Mode means Slack connects out to nothing: the service on ca-fleet
+# opens a websocket to Slack, so no inbound port or public URL is needed.
+display_information:
+  name: CA Fleet
+  description: Claude Code for the Community Archive fleet, in a thread.
+  background_color: "#1f2937"
+features:
+  bot_user:
+    display_name: fleet
+    always_online: true
+  app_home:
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - chat:write
+      - channels:history
+      - channels:read
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - im:write
+      - reactions:read
+      - reactions:write
+      - users:read
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_mention
+      - message.channels
+      - message.groups
+      - message.im
+  interactivity:
+    is_enabled: true
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

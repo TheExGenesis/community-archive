@@ -2,7 +2,7 @@
 
 import { CollectionPreferenceControl } from '@/components/CollectionPreferenceControl'
 import { collectionPreferenceAvailable } from '@/lib/collectionPreference'
-import { getOwnLatestTweets } from '@/app/settings/tweet-actions'
+import { OwnTweetsPanel } from '@/app/settings/OwnTweetsPanel'
 import { useRef, useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
@@ -81,31 +81,10 @@ export default function ProfileContent({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
-  const [deletingTweetId, setDeletingTweetId] = useState<string | null>(null)
-  const [ownTweets, setOwnTweets] = useState(initialTweets ?? [])
-  const tweetsLoaded = useRef(initialTweets !== undefined)
-  const tweetsRequestInFlight = useRef(false)
-  const [tweetsLoading, setTweetsLoading] = useState(false)
-  const [tweetsError, setTweetsError] = useState<string | null>(null)
-
-  const loadOwnTweets = async () => {
-    if (tweetsLoaded.current || tweetsRequestInFlight.current) return
-    tweetsRequestInFlight.current = true
-    setTweetsLoading(true)
-    setTweetsError(null)
-    try {
-      setOwnTweets(await getOwnLatestTweets())
-      tweetsLoaded.current = true
-    } catch {
-      setTweetsError('Your tweets could not be loaded.')
-    } finally {
-      tweetsRequestInFlight.current = false
-      setTweetsLoading(false)
-    }
-  }
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
   const [showOptOutDialog, setShowOptOutDialog] = useState(false)
   const [optOutReason, setOptOutReason] = useState('')
+  const [tweetsTabOpened, setTweetsTabOpened] = useState(false)
   const supabase = createBrowserClient()
 
   // From the server-verified user's Twitter/X identity or app_metadata, never
@@ -389,42 +368,6 @@ export default function ProfileContent({
     }
   }
 
-  const handleDeleteTweet = async (tweetId: string) => {
-    if (
-      !confirm(
-        'Permanently delete this tweet and its archived media? This cannot be undone.',
-      )
-    ) {
-      return
-    }
-
-    setDeletingTweetId(tweetId)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      const { data, error: deleteError } = await supabase.rpc(
-        'delete_own_tweets',
-        { p_tweet_ids: [tweetId] },
-      )
-      if (deleteError) throw deleteError
-      if (data?.[0]?.deleted_tweets !== 1) {
-        throw new Error('The tweet was not deleted')
-      }
-
-      setOwnTweets((tweets) =>
-        tweets.filter((tweet) => tweet.tweet_id !== tweetId),
-      )
-      setSuccess('Tweet deleted permanently')
-      capturePostHogEvent('own_tweet_deleted')
-      await logUserAction('delete_tweet', { tweet_id: tweetId })
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete tweet')
-    } finally {
-      setDeletingTweetId(null)
-    }
-  }
-
   return (
     <div className="space-y-6">
       <Card>
@@ -451,7 +394,7 @@ export default function ProfileContent({
         className="w-full"
         onValueChange={(tab) => {
           capturePostHogEvent('settings_tab_selected', { tab })
-          if (tab === 'tweets') void loadOwnTweets()
+          if (tab === 'tweets') setTweetsTabOpened(true)
         }}
       >
         <TabsList className="grid w-full grid-cols-3">
@@ -673,73 +616,18 @@ export default function ProfileContent({
           </Card>
         </TabsContent>
 
-        <TabsContent value="tweets" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Tweets</CardTitle>
-              <CardDescription>
-                Permanently remove individual tweets from your archive. The most
-                recent 100 tweets are shown.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tweetsLoading ? (
-                <p
-                  role="status"
-                  className="py-8 text-center text-muted-foreground"
-                >
-                  Loading your tweets…
-                </p>
-              ) : tweetsError ? (
-                <div role="alert" className="space-y-3 py-4">
-                  <p>{tweetsError}</p>
-                  <Button
-                    variant="outline"
-                    onClick={() => void loadOwnTweets()}
-                  >
-                    Retry loading tweets
-                  </Button>
-                </div>
-              ) : ownTweets.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  No archived tweets found.
-                </div>
-              ) : (
-                <div className="divide-y rounded-lg border">
-                  {ownTweets.map((tweet) => (
-                    <div
-                      key={tweet.tweet_id}
-                      className="flex items-start justify-between gap-4 p-4"
-                    >
-                      <div className="min-w-0 space-y-2">
-                        <p className="whitespace-pre-wrap break-words text-sm">
-                          {tweet.full_text}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(tweet.created_at).toLocaleDateString()} ·{' '}
-                          {tweet.favorite_count || 0} likes ·{' '}
-                          {tweet.retweet_count || 0} reposts
-                        </p>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="flex-shrink-0"
-                        onClick={() => handleDeleteTweet(tweet.tweet_id)}
-                        disabled={deletingTweetId !== null}
-                        aria-label={`Delete tweet ${tweet.tweet_id}`}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {deletingTweetId === tweet.tweet_id
-                          ? 'Deleting...'
-                          : 'Delete'}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Stays mounted after first open so searches survive tab switches. */}
+        <TabsContent
+          value="tweets"
+          forceMount
+          className="space-y-4 data-[state=inactive]:hidden"
+        >
+          {tweetsTabOpened && (
+            <OwnTweetsPanel
+              initialTweets={initialTweets}
+              logUserAction={logUserAction}
+            />
+          )}
         </TabsContent>
       </Tabs>
 

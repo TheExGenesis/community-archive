@@ -5,6 +5,7 @@ export const productFeatures = [
   'birdseye',
   'tweet',
   'tube',
+  'tweet_cleanup',
   'ask_archive',
 ] as const
 export const productActions = [
@@ -29,6 +30,8 @@ export const productActions = [
   'shuffled',
   'setting_changed',
   'history_cleared',
+  'pattern_selected',
+  'bulk_deleted',
   'shared',
   'unshared',
 ] as const

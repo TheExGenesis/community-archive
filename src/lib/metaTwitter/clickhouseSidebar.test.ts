@@ -1,9 +1,16 @@
 import type { AnalyticsGatewayFetcher } from '@/lib/clickhouseGateway'
+import type { readDirectoryMembers } from '@/lib/directoryMembers'
+import type { ArchivePerson } from './types'
 import {
   fetchClickHouseProfileInteractions,
   fetchClickHouseProfileMedia,
   fetchClickHouseProfileSidebar,
+  withMembership,
 } from './clickhouseSidebar'
+
+jest.mock('@/lib/publicDataSource', () => ({
+  createPublicReadClient: () => ({}),
+}))
 
 const response = (year: number | null) => ({
   data: {
@@ -70,7 +77,7 @@ test('maps year-scoped ClickHouse media and interactions for the sidebar', async
         interactions: 9,
         avatar_media_url:
           'https://pbs.twimg.com/profile_images/7/avatar_normal.jpg',
-        in_archive: true,
+        in_archive: false,
       },
     ],
   })
@@ -143,4 +150,55 @@ test('loads a bounded reserve of people for the editable all-time profile', asyn
     new URLSearchParams({ limit: '25' }),
     { timeoutMs: 30_000 },
   )
+})
+
+const person = (user_id: string, screen_name: string): ArchivePerson => ({
+  user_id,
+  screen_name,
+  name: null,
+  interactions: 1,
+  in_archive: false,
+})
+
+test('links only interaction partners who are directory members', async () => {
+  const readMembers = jest.fn(async () => [
+    {
+      account_id: '7',
+      username: 'bob',
+      avatar_media_url: '',
+      has_archive: true,
+    },
+    {
+      account_id: '',
+      username: 'Optin',
+      avatar_media_url: '',
+      has_archive: false,
+    },
+  ]) as unknown as typeof readDirectoryMembers
+
+  const people = await withMembership(
+    [
+      person('7', 'bob_renamed'),
+      person('8', 'optin'),
+      person('527055672', 'stranger'),
+    ],
+    readMembers,
+  )
+
+  expect(people.map((p) => p.in_archive)).toEqual([true, true, false])
+  expect(readMembers).toHaveBeenCalledWith({}, [
+    'bob_renamed',
+    'optin',
+    'stranger',
+  ])
+})
+
+test('links nobody when the membership check fails', async () => {
+  const readMembers = jest.fn(async () => {
+    throw new Error('Directory membership check failed')
+  }) as unknown as typeof readDirectoryMembers
+
+  const people = await withMembership([person('7', 'bob')], readMembers)
+
+  expect(people).toEqual([person('7', 'bob')])
 })

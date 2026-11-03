@@ -12,7 +12,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 describe('HeaderNavigation', () => {
-  it('renders Home, the digest, the three menus, then Research, in order', () => {
+  it('renders Home, the digest, Explore, Community, Tools, then Research', () => {
     render(<HeaderNavigation entries={getPrimaryNav()} label="Main" />)
 
     const nav = screen.getByRole('navigation', { name: 'Main' })
@@ -23,9 +23,9 @@ describe('HeaderNavigation', () => {
     ).toEqual([
       'Home',
       "Today's Digest",
-      'Ideas',
       'Explore archive',
       'Community',
+      'Tools',
       'Research',
     ])
     expect(
@@ -36,18 +36,18 @@ describe('HeaderNavigation', () => {
   it('marks the menu holding the current page as active', () => {
     render(<HeaderNavigation entries={getPrimaryNav()} label="Main" />)
 
-    expect(screen.getByRole('button', { name: 'Explore archive' })).toHaveClass(
+    expect(screen.getByRole('button', { name: 'Tools' })).toHaveClass(
       'text-brand',
     )
-    expect(screen.getByRole('button', { name: 'Ideas' })).not.toHaveClass(
-      'bg-brand/10',
-    )
+    expect(
+      screen.getByRole('button', { name: 'Explore archive' }),
+    ).not.toHaveClass('bg-brand/10')
   })
 
   it('opens a menu with titled, described items and tracks the destination', () => {
     render(<HeaderNavigation entries={getPrimaryNav()} label="Main" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ideas' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
     const bangers = screen.getByRole('link', { name: /Bangers/ })
     expect(bangers).toHaveTextContent('The best tweets of all time.')
     expect(screen.getByRole('link', { name: /Strands/ })).toHaveAttribute(

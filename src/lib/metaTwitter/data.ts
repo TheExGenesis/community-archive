@@ -24,14 +24,61 @@ const getMetaClient = (): SupabaseClient<Database> => {
   return createPublicReadClient()
 }
 
+async function fetchHeaderMembership(
+  supabase: SupabaseClient<Database>,
+  accountId: string,
+  username?: string,
+  hasArchive?: boolean,
+) {
+  if (username === undefined || hasArchive === undefined) {
+    const { data, error } = await supabase
+      .from('user_directory')
+      .select('has_archive, is_opted_in')
+      .eq('account_id', accountId)
+      .maybeSingle()
+    if (error) throw error
+    return data
+  }
+
+  // The live directory lookup already established membership and archive
+  // status. Its non-archive branch consists exclusively of opted-in members.
+  if (!hasArchive) return { has_archive: false, is_opted_in: true }
+
+  // Match the archived_members opt-in flag without rebuilding the directory
+  // view. These are display metadata reads, never a substitute for eligibility.
+  const results = await Promise.all([
+    supabase
+      .from('optin')
+      .select('id')
+      .eq('opted_in', true)
+      .eq('twitter_user_id', accountId)
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('optin')
+      .select('id')
+      .eq('opted_in', true)
+      .ilike('username', username.replace(/_/g, '\\_'))
+      .limit(1)
+      .maybeSingle(),
+  ])
+  for (const result of results) if (result.error) throw result.error
+  return {
+    has_archive: true,
+    is_opted_in: results.some((result) => result.data !== null),
+  }
+}
+
 async function fetchProfileHeader(
   accountId: string,
+  username?: string,
+  hasArchive?: boolean,
 ): Promise<ProfileHeaderData | null> {
   const supabase = getMetaClient()
   const [
     { data: account, error: accountError },
     { data: profile, error: profileError },
-    { data: membership, error: membershipError },
+    membership,
   ] = await Promise.all([
     supabase
       .from('all_account')
@@ -47,15 +94,10 @@ async function fetchProfileHeader(
       .order('archive_upload_id', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from('user_directory')
-      .select('has_archive, is_opted_in')
-      .eq('account_id', accountId)
-      .maybeSingle(),
+    fetchHeaderMembership(supabase, accountId, username, hasArchive),
   ])
   if (accountError) throw accountError
   if (profileError) throw profileError
-  if (membershipError) throw membershipError
   if (!account) return null
   const bio = profile?.bio ?? null
   const website = profile?.website ?? null
@@ -209,14 +251,21 @@ async function fetchMediaCount(scope: SidebarScope): Promise<number> {
 }
 
 const cachedProfileHeader = unstable_cache(
-  (accountId: string, _source: string) => fetchProfileHeader(accountId),
-  ['meta-twitter-profile-header-v4'],
+  (
+    accountId: string,
+    _source: string,
+    username?: string,
+    hasArchive?: boolean,
+  ) => fetchProfileHeader(accountId, username, hasArchive),
+  ['meta-twitter-profile-header-v5'],
   { revalidate: 3600 },
 )
 
 export interface PublicProfileIdentity {
   accountId: string | null
   username: string
+  /** Supplied by the bounded RPC or view, absent on older identity RPCs. */
+  hasArchive?: boolean
 }
 
 const isMissingFunctionError = (error: { code?: string }) =>
@@ -251,7 +300,7 @@ export const resolvePublicProfileIdentity = async (
   const viewLookup = () => {
     const baseQuery = supabase
       .from('user_directory')
-      .select('account_id, username')
+      .select('account_id, username, has_archive')
     return isDirectoryIdentifier
       ? baseQuery.eq('directory_id', decoded).limit(1).maybeSingle()
       : isAccountIdentifier
@@ -286,7 +335,13 @@ export const resolvePublicProfileIdentity = async (
 
   if (error) throw error
   if (!data?.username) return null
-  return { accountId: data.account_id ?? null, username: data.username }
+  return {
+    accountId: data.account_id ?? null,
+    username: data.username,
+    ...('has_archive' in data && typeof data.has_archive === 'boolean'
+      ? { hasArchive: data.has_archive }
+      : {}),
+  }
 }
 
 /**
@@ -341,8 +396,21 @@ const cachedProfileSidebarData = unstable_cache(
   { revalidate: DAY },
 )
 
-export const getCachedProfileHeader = (accountId: string) =>
-  cachedProfileHeader(accountId, publicDataConfig().sourceId)
+export const getCachedProfileHeader = (
+  accountId: string,
+  identity?: PublicProfileIdentity,
+) => {
+  const knownMembership =
+    identity?.accountId === accountId &&
+    isTwitterUsername(identity.username) &&
+    typeof identity.hasArchive === 'boolean'
+  return cachedProfileHeader(
+    accountId,
+    publicDataConfig().sourceId,
+    knownMembership ? identity.username : undefined,
+    knownMembership ? identity.hasArchive : undefined,
+  )
+}
 export const getCachedArchivedAt = (accountId: string) =>
   cachedArchivedAt(accountId, publicDataConfig().sourceId)
 export const getCachedProfileSidebarData = (

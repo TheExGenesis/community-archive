@@ -92,7 +92,7 @@ async function memberProfile(
 ): Promise<ResolvedProfile | null> {
   if (identity.accountId) {
     const profile = await measureServerRead('profile.header', () =>
-      getCachedProfileHeader(identity.accountId!),
+      getCachedProfileHeader(identity.accountId!, identity),
     )
     if (profile) {
       return {

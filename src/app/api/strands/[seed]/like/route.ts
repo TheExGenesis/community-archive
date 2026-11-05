@@ -9,12 +9,16 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Params = { params: { seed: string } }
+type RouteParams = { seed: string }
 
 const headers = { 'Cache-Control': 'private, no-store' }
 
 /** Viewer-specific like state; the button hydrates its signed-in state here. */
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const strand = await ensureVisibleStrand(params.seed)
   if ('error' in strand) return strand.error
 
@@ -30,7 +34,11 @@ export async function GET(_request: Request, { params }: Params) {
   )
 }
 
-export async function POST(_request: Request, { params }: Params) {
+export async function POST(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -57,7 +65,11 @@ export async function POST(_request: Request, { params }: Params) {
   })
 }
 
-export async function DELETE(_request: Request, { params }: Params) {
+export async function DELETE(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

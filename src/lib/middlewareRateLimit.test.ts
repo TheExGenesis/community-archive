@@ -1,5 +1,19 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { middleware } from '../../src/middleware'
+
+jest.mock('@/utils/supabase', () => ({
+  createMiddlewareClient: () => ({
+    supabase: {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: 'viewer' } },
+          error: null,
+        }),
+      },
+    },
+    response: NextResponse.next(),
+  }),
+}))
 
 const browserUserAgent =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36'
@@ -15,6 +29,7 @@ const request = (
       method,
       headers: {
         'user-agent': browserUserAgent,
+        cookie: 'sb-test-auth-token=session',
         'x-forwarded-for': ip,
         'x-vercel-ip-country': country,
       },
@@ -22,6 +37,42 @@ const request = (
   )
 
 describe('API middleware rate limits', () => {
+  it('lets server bridge reads reach secret validation with their own bounded budget', async () => {
+    const bridgeRequest = (method = 'POST') =>
+      middleware(
+        new NextRequest('https://www.community-archive.org/api/public-data', {
+          method,
+          headers: {
+            'user-agent': 'undici',
+            'x-forwarded-for': '203.0.113.79',
+          },
+        }),
+      )
+    for (let index = 0; index < 600; index++)
+      expect((await bridgeRequest()).status).toBe(200)
+    expect((await bridgeRequest()).status).toBe(429)
+    expect((await bridgeRequest('GET')).status).toBe(403)
+    expect((await request('/api/public-data', '203.0.113.79')).status).toBe(200)
+    expect((await request('/api/search', '203.0.113.79')).status).toBe(200)
+  })
+  it.each([
+    ['US', 20, '203.0.113.90'],
+    ['SG', 5, '203.0.113.91'],
+  ])(
+    'keeps map search usable after background traffic, with the %s quota',
+    async (country, quota, ip) => {
+      for (let i = 0; i < quota; i++)
+        await request('/api/hex-map/posts', ip, 'GET', country)
+      expect(
+        (await request('/api/hex-map/posts', ip, 'GET', country)).status,
+      ).toBe(429)
+      for (const path of ['/api/hex-map/lookup', '/api/hex-map/me']) {
+        for (let i = 0; i < quota; i++)
+          expect((await request(path, ip, 'GET', country)).status).toBe(200)
+        expect((await request(path, ip, 'GET', country)).status).toBe(429)
+      }
+    },
+  )
   it('gives companion reads one bounded budget separate from website background traffic', async () => {
     const ip = '203.0.113.80'
     for (let index = 0; index < 20; index++) {

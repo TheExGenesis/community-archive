@@ -44,6 +44,9 @@ jest.mock('@/lib/agentSearch/openRouterKey', () => ({
   checkOpenRouterKey: jest.fn(),
   ownKeysEnabled: jest.fn(),
 }))
+jest.mock('@/lib/agentSearch/visibility', () => ({
+  agentSearchVisible: jest.fn(),
+}))
 jest.mock('@ai-sdk/openai', () => ({ createOpenAI: jest.fn() }))
 jest.mock('@ai-sdk/openai-compatible', () => ({
   createOpenAICompatible: jest.fn(),
@@ -58,6 +61,7 @@ import {
 } from '@/lib/agentSearch/openRouterKey'
 import { unsealOwnKey } from '@/lib/agentSearch/ownKey'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
+import { agentSearchVisible } from '@/lib/agentSearch/visibility'
 import { POST } from './route'
 
 const KEY = `sk-or-v1-${'d4'.repeat(32)}`
@@ -80,6 +84,7 @@ const ask = (headers: Record<string, string> = {}) =>
 beforeEach(() => {
   jest.clearAllMocks()
   process.env.AGENT_SEARCH_KEY_SECRET = SECRET
+  jest.mocked(agentSearchVisible).mockResolvedValue(true)
   jest.mocked(getAgentSearchAccess).mockResolvedValue({
     ok: true,
     viewer: { accountId: '42', userId: 'u', preview: false },
@@ -169,6 +174,15 @@ test('with own keys turned off, a key is refused rather than ignored', async () 
   expect(response.status).toBe(503)
   expect(await response.json()).toEqual({ error: 'own_key_unavailable' })
   expect(admitAgentSearchRun).not.toHaveBeenCalled()
+})
+
+test('before launch, a non-admin gets 404 before anything is checked', async () => {
+  jest.mocked(agentSearchVisible).mockResolvedValue(false)
+  const response = await ask()
+  expect(response.status).toBe(404)
+  expect(getAgentSearchAccess).not.toHaveBeenCalled()
+  expect(admitAgentSearchRun).not.toHaveBeenCalled()
+  expect(start).not.toHaveBeenCalled()
 })
 
 test('paused, a question is refused before anything is checked or admitted', async () => {

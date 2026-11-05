@@ -1,3 +1,4 @@
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
@@ -35,7 +36,7 @@ const rankedIds = unstable_cache(
       .flatMap((row) => (row.tweet_id ? [row.tweet_id] : []))
       .slice(0, 6)
   },
-  ['birdseye-cited-likes-v1'],
+  ['birdseye-cited-likes-v1', productionReadCacheKey()],
   { revalidate: 300 },
 )
 

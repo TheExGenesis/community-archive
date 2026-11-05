@@ -27,11 +27,11 @@ function serializedSearchParams(
 }
 
 export default async function TrendsPage({
-  searchParams = {},
+  searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const initialSearch = serializedSearchParams(searchParams)
+  const initialSearch = serializedSearchParams((await searchParams) ?? {})
   if (!(await getIsMember())) {
     redirect(loginHref(`/trends${initialSearch ? `?${initialSearch}` : ''}`))
   }

@@ -11,8 +11,9 @@ const GIF = Uint8Array.from(
 
 export async function GET(
   _request: Request,
-  { params }: { params: { token: string } },
+  { params: paramsPromise }: { params: Promise<{ token: string }> },
 ) {
+  const params = await paramsPromise
   if (UUID_PATTERN.test(params.token)) {
     const { error } = await createServerServiceRoleClient()
       .from('digest_email_sends')

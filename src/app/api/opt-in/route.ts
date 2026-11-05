@@ -1,3 +1,4 @@
+import { revalidateTag } from 'next/cache'
 import {
   createServerClient,
   createServerServiceRoleClient,
@@ -17,7 +18,7 @@ function getSessionTwitterUserId(user: User): string | null {
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = createServerClient(cookieStore, { readSource: 'app' })
 
     // Check authentication
     const {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     // so PostgREST treats it as `authenticated` and RLS blocks updates to rows
     // whose user_id is null or doesn't match (e.g. admin manual opt-in rows
     // waiting to be claimed). All identity checks are enforced below.
-    const admin = createServerServiceRoleClient()
+    const admin = createServerServiceRoleClient({ readSource: 'app' })
     const body = await request.json()
     const {
       username: bodyUsername,
@@ -173,6 +174,8 @@ export async function POST(request: NextRequest) {
       result = data
     }
 
+    revalidateTag('hex-map-members')
+    revalidateTag('homepage-recent-members')
     return NextResponse.json({
       success: true,
       data: result,
@@ -192,7 +195,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = createServerClient(cookieStore, { readSource: 'app' })
 
     // Check authentication
     const {

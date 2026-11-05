@@ -3,7 +3,16 @@ import { ProfileAvatar } from './ProfileAvatar'
 
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ alt = '', ...props }: { alt?: string }) => (
+  default: ({
+    alt = '',
+    priority: _priority,
+    unoptimized: _unoptimized,
+    ...props
+  }: {
+    alt?: string
+    priority?: boolean
+    unoptimized?: boolean
+  }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img alt={alt} {...props} />
   ),
@@ -28,6 +37,10 @@ test('keeps a stored avatar without requesting syndication recovery', () => {
     'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
   )
   expect(fetchMock).not.toHaveBeenCalled()
+  expect(screen.getByAltText("Alice's avatar")).toHaveAttribute(
+    'referrerpolicy',
+    'no-referrer',
+  )
 })
 
 test('recovers a missing avatar after rendering the initial fallback', async () => {
@@ -70,6 +83,10 @@ test('requests a fresh source after a stored avatar fails instead of retrying th
     ),
   )
   expect(fetchMock).toHaveBeenCalledWith('/api/profile/42/avatar?refresh=1')
+  expect(screen.getByAltText("Alice's avatar")).toHaveAttribute(
+    'referrerpolicy',
+    'no-referrer',
+  )
   fireEvent.error(screen.getByAltText("Alice's avatar"))
   expect(screen.getByText('A')).toBeVisible()
   expect(fetchMock).toHaveBeenCalledTimes(1)

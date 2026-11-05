@@ -19,7 +19,7 @@ export function StrandFeed({
   const offset = page ? page.nextOffset : 0
   const sentinel = useRef<HTMLDivElement>(null)
   const inFlight = useRef(false)
-  const controller = useRef<AbortController>()
+  const controller = useRef<AbortController | undefined>(undefined)
   const load = useCallback(async () => {
     if (inFlight.current || offset === null) return
     inFlight.current = true

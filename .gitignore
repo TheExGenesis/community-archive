@@ -79,3 +79,6 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# fleet harness run directories (fleet/bin/*.sh)
+.fleet-runs/

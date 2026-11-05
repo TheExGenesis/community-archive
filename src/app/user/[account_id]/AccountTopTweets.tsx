@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 import { PopularTweet } from '@/lib/types'
 
 const AccountTopTweets = async ({ userData }: { userData: FormattedUser }) => {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
   if (!userData.account_id) return null

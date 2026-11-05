@@ -26,7 +26,7 @@ describe('search crawler middleware handling', () => {
     ['Googlebot', googlebot, '203.0.113.110'],
     ['the Search Console inspection tool', inspectionTool, '203.0.113.111'],
   ])('serves %s the page instead of the JS challenge', async (_, ua, ip) => {
-    const response = await request('/user/alice', ua, ip)
+    const response = await request('/about', ua, ip)
 
     expect(response.status).toBe(200)
     expect(response.headers.get('x-middleware-next')).toBe('1')
@@ -35,11 +35,11 @@ describe('search crawler middleware handling', () => {
   it('gives crawlers a larger but bounded page budget', async () => {
     const ip = '203.0.113.112'
     for (let index = 0; index < 120; index += 1) {
-      expect(
-        (await request(`/user/member_${index}`, googlebot, ip)).status,
-      ).toBe(200)
+      expect((await request(`/docs/page_${index}`, googlebot, ip)).status).toBe(
+        200,
+      )
     }
-    expect((await request('/user/one_more', googlebot, ip)).status).toBe(429)
+    expect((await request('/docs/one_more', googlebot, ip)).status).toBe(429)
   })
 
   it('keeps the default page budget for browsers', async () => {
@@ -78,7 +78,7 @@ describe('search crawler middleware handling', () => {
   )
 
   it('leaves public pages indexable', async () => {
-    const response = await request('/user/alice', googlebot, '203.0.113.116')
+    const response = await request('/about', googlebot, '203.0.113.116')
 
     expect(response.headers.get('x-robots-tag')).toBeNull()
   })

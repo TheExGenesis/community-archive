@@ -1,3 +1,4 @@
+import { requireBrowsingUser } from '@/lib/browsingAuth'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
@@ -12,10 +13,11 @@ import {
 import { resolveProfile } from '@/lib/metaTwitter/profile'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
+export const dynamic = 'force-dynamic'
+
 export const alt = 'Community Archive user profile'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
-export const revalidate = 3600
 // Header and avatar images are fetched from pbs.twimg.com while the image
 // renders; a slow upstream can outlast the 15s default and 504 the card.
 export const maxDuration = 60
@@ -383,9 +385,11 @@ function ProfilePreview({
 export default async function Image({
   params,
 }: {
-  params: { account_id: string }
+  params: Promise<{ account_id: string }>
 }) {
-  const resolved = await resolveProfile(params.account_id)
+  const { account_id } = await params
+  await requireBrowsingUser(`/user/${encodeURIComponent(account_id)}`)
+  const resolved = await resolveProfile(account_id)
   if (!resolved) notFound()
   const logo = await readFile(
     join(

@@ -73,7 +73,7 @@ function CitationChip({
   // On a pointer that can hover, the tweet opens in a card after a short
   // pause and stays while the pointer moves onto it.
   const [open, setOpen] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(timer.current), [])
   const later = (next: boolean, ms: number) => {
     clearTimeout(timer.current)

@@ -236,11 +236,13 @@ function ViewTab({
 export default async function MissingAccountsPage({
   searchParams,
 }: {
-  searchParams?: { view?: string | string[] }
+  searchParams?: Promise<{ view?: string | string[] }>
 }) {
+  const resolvedSearchParams = await searchParams
   const view: View =
-    searchParams?.view === 'archive' || searchParams?.view === 'repliers'
-      ? searchParams.view
+    resolvedSearchParams?.view === 'archive' ||
+    resolvedSearchParams?.view === 'repliers'
+      ? resolvedSearchParams.view
       : 'opt-in'
   let needsOptIn: MissingAccount[] = []
   let needsArchive: MissingAccount[] = []

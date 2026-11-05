@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { Resend } from 'resend'
+import { productionReadMode } from '@/utils/supabaseReadRouting'
 
 // Sender must stay on the Resend-verified domain (community-archive.org).
 const DEFAULT_FROM = 'Community Archive <no-reply@community-archive.org>'
@@ -30,14 +31,32 @@ function getResendClient(): Resend {
   return client
 }
 
-export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const { to, subject, html, text, replyTo, headers, from = DEFAULT_FROM } = input
+export async function sendEmail(
+  input: SendEmailInput,
+): Promise<SendEmailResult> {
+  if (productionReadMode())
+    return {
+      ok: false,
+      error: 'Email delivery is disabled while staging reads production data.',
+    }
+  const {
+    to,
+    subject,
+    html,
+    text,
+    replyTo,
+    headers,
+    from = DEFAULT_FROM,
+  } = input
 
   let resend: Resend
   try {
     resend = getResendClient()
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
   }
 
   const { data, error } = await resend.emails.send({

@@ -12,9 +12,13 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Params = { params: { seed: string } }
+type RouteParams = { seed: string }
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const strand = await ensureVisibleStrand(params.seed)
   if ('error' in strand) return strand.error
 
@@ -40,7 +44,11 @@ export async function GET(_request: Request, { params }: Params) {
   )
 }
 
-export async function POST(request: Request, { params }: Params) {
+export async function POST(
+  request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

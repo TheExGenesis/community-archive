@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 
 export async function requireAuth(redirectTo = '/opt-in') {
   const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient(cookieStore, { readSource: 'app' })
 
   const {
     data: { user },
@@ -20,7 +20,7 @@ export async function requireAuth(redirectTo = '/opt-in') {
 
 export async function getOptInStatus(userId: string) {
   const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient(cookieStore, { readSource: 'app' })
 
   const { data, error } = await supabase
     .from('optin')

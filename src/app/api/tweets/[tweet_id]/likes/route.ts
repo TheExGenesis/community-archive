@@ -13,8 +13,9 @@ export const dynamic = 'force-dynamic'
 /** The most recent accounts that liked a tweet on Community Archive. */
 export async function GET(
   _request: Request,
-  { params }: { params: { tweet_id: string } },
+  { params: paramsPromise }: { params: Promise<{ tweet_id: string }> },
 ) {
+  const params = await paramsPromise
   if (!TWEET_ID_PATTERN.test(params.tweet_id)) {
     return NextResponse.json({ error: 'Tweet not found' }, { status: 404 })
   }

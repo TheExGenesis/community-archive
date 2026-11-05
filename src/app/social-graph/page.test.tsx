@@ -47,7 +47,11 @@ const getTwitterUsernameMock = jest.mocked(getTwitterUsername)
 describe('SocialGraphPage public access', () => {
   it('preserves a valid person from the companion URL', async () => {
     getCurrentUserMock.mockResolvedValue(null)
-    render(await SocialGraphPage({ searchParams: { person: 'alice' } }))
+    render(
+      await SocialGraphPage({
+        searchParams: Promise.resolve({ person: 'alice' }),
+      }),
+    )
     expect(screen.getByTestId('graph-focus')).toHaveTextContent('alice')
   })
   beforeEach(() => {

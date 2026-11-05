@@ -5,27 +5,29 @@ const { withWorkflow } = require('workflow/next')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    // just-bash (the agent search workspace) ships ES-module worker files that
-    // webpack would copy in as assets and fail to minify; Node loads it at
-    // runtime instead.
-    serverComponentsExternalPackages: [
-      'just-bash',
-      // just-bash's own dependencies, per its Next.js guidance.
-      '@mongodb-js/zstd',
-      'node-liblzma',
-      'seek-bzip',
-      'sql.js',
-      'run',
-      'guarded-fetch',
+  // just-bash (the agent search workspace) ships ES-module worker files that
+  // webpack would copy in as assets and fail to minify; Node loads it at
+  // runtime instead.
+  serverExternalPackages: [
+    'just-bash',
+    // just-bash's own dependencies, per its Next.js guidance.
+    '@mongodb-js/zstd',
+    'node-liblzma',
+    'seek-bzip',
+    'sql.js',
+    'run',
+    'guarded-fetch',
+  ],
+  outputFileTracingIncludes: {
+    '/user/*/opengraph-image': [
+      './src/app/user/*/community-archive-logo-white.png',
     ],
-    outputFileTracingIncludes: {
-      '/user/*/opengraph-image': [
-        './src/app/user/*/community-archive-logo-white.png',
-      ],
-    },
   },
   images: {
+    // Optimized images are re-transformed when their cache entry expires. The
+    // default is 60 seconds, which made cache writes outnumber transformations
+    // three to one. Avatars, banners, and app thumbnails rarely change.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: 'https',

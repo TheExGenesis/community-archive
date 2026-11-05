@@ -1,5 +1,6 @@
 'use client'
 
+import { usePreviewSession } from '@/components/PreviewSession'
 import Link from 'next/link'
 import { Shield } from 'lucide-react'
 import { createContext, useContext, useEffect, useState } from 'react'
@@ -7,15 +8,18 @@ import { createContext, useContext, useEffect, useState } from 'react'
 type NavigationAudience = {
   isMember: boolean
   isAdmin: boolean
-  /** Ask the archive is taking questions (not paused). */
+  /** Ask the archive is taking questions (visible and not paused). */
   askEnabled: boolean
+  /** Ask the archive is shown at all (launched, or the viewer is an admin). */
+  askVisible: boolean
   localPreview?: 'admin' | 'signed-out' | null
 }
 
 const PUBLIC_AUDIENCE: NavigationAudience = {
   isMember: false,
   isAdmin: false,
-  askEnabled: true,
+  askEnabled: false,
+  askVisible: false,
 }
 
 const NavigationAudienceContext =
@@ -44,7 +48,8 @@ export function NavigationAudienceProvider({
         setAudience({
           isMember: nextAudience.isMember === true,
           isAdmin: nextAudience.isAdmin === true,
-          askEnabled: nextAudience.askEnabled !== false,
+          askEnabled: nextAudience.askEnabled === true,
+          askVisible: nextAudience.askVisible === true,
           localPreview: nextAudience.localPreview ?? null,
         })
       })
@@ -79,4 +84,16 @@ export function AdminNavigationLink() {
   )
 }
 
-export const useNavigationAudience = () => useContext(NavigationAudienceContext)
+export const useNavigationAudience = () => {
+  const audience = useContext(NavigationAudienceContext)
+  const preview = usePreviewSession()
+  return preview.enabled && preview.view !== 'actual'
+    ? {
+        isMember: preview.optedIn,
+        isAdmin: false,
+        localPreview: null,
+        askEnabled: audience.askEnabled,
+        askVisible: audience.askVisible,
+      }
+    : audience
+}

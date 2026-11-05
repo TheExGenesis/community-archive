@@ -1,3 +1,4 @@
+import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import { getClickHouseProfileMediaOrThrow } from '@/lib/metaTwitter/clickhouseSidebar'
 
@@ -8,8 +9,12 @@ const ACCOUNT_ID_PATTERN = /^\d{1,20}$/
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { account_id: string } },
+  { params: paramsPromise }: { params: Promise<{ account_id: string }> },
 ) {
+  const params = await paramsPromise
+  const authError = await browsingAuthError()
+  if (authError) return authError
+
   if (!ACCOUNT_ID_PATTERN.test(params.account_id)) {
     return NextResponse.json(
       { error: 'Invalid profile account' },
@@ -37,8 +42,7 @@ export async function GET(
       await getClickHouseProfileMediaOrThrow(params.account_id, year),
       {
         headers: {
-          'Cache-Control':
-            'public, s-maxage=86400, stale-while-revalidate=604800',
+          'Cache-Control': 'private, no-store',
         },
       },
     )

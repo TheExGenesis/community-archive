@@ -1,18 +1,74 @@
 import { Suspense } from 'react'
 import { SectionReady } from '@/components/PagePerformance'
 import {
-  ArchiveOverview,
   DigestHero,
-  HomeBangerPanel,
-  HomePortalLayout,
+  HomepageHighlightsLayout,
   HomeResearchPanel,
   HomeTrendsPanel,
-  HomepageLiveStream,
 } from '@/components/portal/Portal'
 import { getLatestDigestPreview } from '@/lib/digest/data'
 import { formatNumber } from '@/lib/formatNumber'
 import type { HomepageData } from '@/lib/portal/data'
 import { measureServerRead } from '@/lib/performance/server'
+
+export async function HomepageGrowth({
+  data,
+}: {
+  data: HomepageData['globalStats']
+}) {
+  const stats = await data
+  if (stats.failed) {
+    return (
+      <p className="mt-4 text-center text-sm text-muted-foreground">
+        Archive counts are temporarily unavailable.
+      </p>
+    )
+  }
+  const {
+    totalTweets,
+    memberCount,
+    membersAddedLast24Hours,
+    addedLast24Hours,
+  } = stats.data
+  const count = (value: number) => value.toLocaleString('en-US')
+  return (
+    <p className="mt-4 text-center text-sm text-muted-foreground">
+      <span className="inline-block whitespace-nowrap">
+        <strong className="font-medium tabular-nums text-foreground">
+          {count(totalTweets)}
+        </strong>{' '}
+        tweets
+        {addedLast24Hours != null && (
+          <span
+            className="tabular-nums"
+            title="Tweets added in the last 24 hours"
+            aria-label={`${count(addedLast24Hours)} tweets added in the last 24 hours`}
+          >
+            {' '}
+            (+{count(addedLast24Hours)})
+          </span>
+        )}
+      </span>
+      {' · '}
+      <span className="inline-block whitespace-nowrap">
+        <strong className="font-medium tabular-nums text-foreground">
+          {count(memberCount)}
+        </strong>{' '}
+        members
+        {membersAddedLast24Hours != null && (
+          <span
+            className="tabular-nums"
+            title="Members added in the last 24 hours"
+            aria-label={`${count(membersAddedLast24Hours)} members added in the last 24 hours`}
+          >
+            {' '}
+            (+{count(membersAddedLast24Hours)})
+          </span>
+        )}
+      </span>
+    </p>
+  )
+}
 
 export async function HomepageStats({
   data,
@@ -27,31 +83,14 @@ export async function HomepageStats({
       <SectionReady section="homepage_stats" />
       We preserve{' '}
       <strong className="font-semibold text-foreground">
-        {formatNumber(result.data.totalTweets)} public tweets
+        {formatNumber(result.data.totalTweets, 'floor')} public tweets
       </strong>{' '}
       from{' '}
       <strong className="font-semibold text-foreground">
-        {formatNumber(result.data.memberCount)} community members
+        {formatNumber(result.data.memberCount, 'floor')} community members
       </strong>
       .
     </>
-  )
-}
-
-export async function HomepageOverview({
-  data,
-}: {
-  data: HomepageData['overview']
-}) {
-  const { stats, failures } = await data
-  const date = new Date(stats.generatedAt)
-  const generatedDate = `${date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })} · ${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')} UTC`
-  return (
-    <ArchiveOverview
-      stats={stats}
-      failures={failures}
-      generatedDate={generatedDate}
-    />
   )
 }
 
@@ -65,37 +104,6 @@ export async function HomepageDigest() {
       <SectionReady section="homepage_digest" />
       <DigestHero preview={preview} />
     </>
-  )
-}
-
-export async function HomepageStream({
-  data,
-}: {
-  data: HomepageData['stream']
-}) {
-  const result = await data
-  return (
-    <>
-      <SectionReady section="homepage_stream" />
-      <HomepageLiveStream tweets={result.data} failed={result.failed} />
-    </>
-  )
-}
-
-export async function HomepageBanger({
-  data,
-  historical = false,
-}: {
-  data: HomepageData['recentBangers']
-  historical?: boolean
-}) {
-  const result = await data
-  return (
-    <HomeBangerPanel
-      tweet={result.data[0] ?? null}
-      failed={result.failed}
-      historical={historical}
-    />
   )
 }
 
@@ -144,7 +152,7 @@ function SectionLoading({
 }
 
 // Each slot owns its await. A boundary around one combined promise would let
-// a slow trends query delay even cached stats, stream, and editorial content.
+// a slow trends query delay cached stats or editorial content.
 export function HomepagePortal({
   data,
   isMember,
@@ -153,33 +161,23 @@ export function HomepagePortal({
   isMember: boolean
 }) {
   return (
-    <HomePortalLayout
-      overview={
-        <Suspense
-          fallback={<SectionLoading label="archive totals" height="h-28" />}
-        >
-          <HomepageOverview data={data.overview} />
-        </Suspense>
-      }
+    <HomepageHighlightsLayout
       digest={
-        <Suspense fallback={<SectionLoading label="daily digest" />}>
-          <HomepageDigest />
-        </Suspense>
-      }
-      stream={
-        <Suspense
-          fallback={<SectionLoading label="live stream" height="h-[420px]" />}
-        >
-          <HomepageStream data={data.stream} />
-        </Suspense>
-      }
-      bangers={
         <>
-          <Suspense fallback={<SectionLoading label="recent banger" />}>
-            <HomepageBanger data={data.recentBangers} />
+          <Suspense fallback={<SectionLoading label="daily digest" />}>
+            <HomepageDigest />
           </Suspense>
-          <Suspense fallback={<SectionLoading label="historical banger" />}>
-            <HomepageBanger data={data.historicalBangers} historical />
+          <Suspense
+            fallback={
+              <p
+                role="status"
+                className="mt-4 text-center text-sm text-muted-foreground"
+              >
+                Loading archive counts…
+              </p>
+            }
+          >
+            <HomepageGrowth data={data.globalStats} />
           </Suspense>
         </>
       }

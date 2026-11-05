@@ -3,11 +3,15 @@ import { devLog } from '@/lib/devLog'
 import {
   createBrowserClient as browserClient,
   createServerClient as serverClient,
-  type CookieOptions,
+  type CookieMethodsServer,
 } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import {
+  createBrowserReadFetch,
+  createRoutedSupabaseFetch,
+} from './supabaseReadRouting'
 
 const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   const isDevelopment = process.env.NODE_ENV === 'development'
@@ -37,29 +41,27 @@ const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   return config
 }
 
-const createCookieHandler = (cookieStore: ReturnType<typeof cookies>) => ({
-  get: (name: string) => cookieStore.get(name)?.value,
-  set: (name: string, value: string, options: CookieOptions) => {
+const createCookieHandler = (
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+): CookieMethodsServer => ({
+  getAll: () => cookieStore.getAll(),
+  setAll: (cookiesToSet) => {
     try {
-      cookieStore.set({ name, value, ...options })
-    } catch (error) {
-      // The `set` method was called from a Server Component.
-      // This can be ignored if you have middleware refreshing user sessions.
-    }
-  },
-  remove: (name: string, options: CookieOptions) => {
-    try {
-      cookieStore.set({ name, value: '', ...options })
-    } catch (error) {
-      // The `delete` method was called from a Server Component.
-      // This can be ignored if you have middleware refreshing user sessions.
+      for (const { name, value, options } of cookiesToSet) {
+        cookieStore.set({ name, value, ...options })
+      }
+    } catch {
+      // Server Components cannot mutate cookies; middleware refreshes sessions.
     }
   },
 })
 
 export const createBrowserClient = () => {
   const { url, anonKey } = getSupabaseConfig()
-  return browserClient<Database>(url, anonKey)
+  return browserClient<Database, 'public'>(url, anonKey, {
+    cookies: {},
+    global: { fetch: createBrowserReadFetch() },
+  })
 }
 
 export const createAdminBrowserClient = () => {
@@ -83,10 +85,14 @@ export const createAdminBrowserClient = () => {
   return browserClient<Database>(url, serviceRole)
 }
 
-export const createServerClient = (cookieStore: ReturnType<typeof cookies>) => {
+export const createServerClient = (
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+  options: { readSource?: 'app' } = {},
+) => {
   const { url, anonKey } = getSupabaseConfig()
   return serverClient<Database>(url, anonKey, {
     cookies: createCookieHandler(cookieStore),
+    global: { fetch: createRoutedSupabaseFetch('anon', options) },
   })
 }
 
@@ -96,25 +102,40 @@ export const createMiddlewareClient = (request: NextRequest) => {
   const { url, anonKey } = getSupabaseConfig()
   const supabase = serverClient(url, anonKey, {
     cookies: {
-      get: (name: string) => request.cookies.get(name)?.value,
-      set: (name: string, value: string, options: CookieOptions) => {
-        request.cookies.set({ name, value, ...options })
+      getAll: () => request.cookies.getAll(),
+      setAll: (cookiesToSet, headers) => {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value)
+        }
+        const previousCookies = response.cookies.getAll()
+        const previousHeaders = response.headers
         response = NextResponse.next({ request: { headers: request.headers } })
-        response.cookies.set({ name, value, ...options })
-      },
-      remove: (name: string, options: CookieOptions) => {
-        request.cookies.set({ name, value: '', ...options })
-        response = NextResponse.next({ request: { headers: request.headers } })
-        response.cookies.set({ name, value: '', ...options })
+        for (const cookie of previousCookies) response.cookies.set(cookie)
+        for (const { name, value, options } of cookiesToSet) {
+          response.cookies.set({ name, value, ...options })
+        }
+        // SSR supplies these headers to prevent refreshed sessions being cached.
+        for (const name of ['cache-control', 'expires', 'pragma']) {
+          const value = previousHeaders.get(name)
+          if (value) response.headers.set(name, value)
+        }
+        for (const [name, value] of Object.entries(headers)) {
+          response.headers.set(name, value)
+        }
       },
     },
   })
 
-  return { supabase, response }
+  return {
+    supabase,
+    get response() {
+      return response
+    },
+  }
 }
 
 export const createServerAdminClient = (
-  cookieStore: ReturnType<typeof cookies>,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
 ) => {
   const { url, serviceRole } = getSupabaseConfig(true)
   return serverClient<Database>(url, serviceRole!, {
@@ -134,26 +155,18 @@ export const createServerAnonClient = () => {
   return createClient<Database>(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: {
-      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-        fetch(input, { ...init, cache: 'no-store' }),
+      fetch: createRoutedSupabaseFetch('anon', { noStore: true }),
     },
   })
 }
 
 export const createServerServiceRoleClient = (
-  options: { noStore?: boolean } = {},
+  options: { noStore?: boolean; readSource?: 'app' } = {},
 ) => {
   const { url, serviceRole } = getSupabaseConfig(true)
   return createClient<Database>(url, serviceRole!, {
     auth: { autoRefreshToken: false, persistSession: false },
-    ...(options.noStore
-      ? {
-          global: {
-            fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-              fetch(input, { ...init, cache: 'no-store' }),
-          },
-        }
-      : {}),
+    global: { fetch: createRoutedSupabaseFetch('service_role', options) },
   })
 }
 

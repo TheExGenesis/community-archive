@@ -2,8 +2,7 @@ import { render, screen } from '@testing-library/react'
 import type { HomepageData } from '@/lib/portal/data'
 import {
   HomepageStats,
-  HomepageStream,
-  HomepageBanger,
+  HomepageGrowth,
   HomepageResearch,
   HomepageTrends,
   HomepageDigest,
@@ -12,12 +11,6 @@ import { getLatestDigestPreview } from '@/lib/digest/data'
 
 jest.mock('@/lib/digest/data', () => ({ getLatestDigestPreview: jest.fn() }))
 jest.mock('@/components/portal/Portal', () => ({
-  HomepageLiveStream: ({ tweets }: { tweets: unknown[] }) => (
-    <div>Stream: {tweets.length}</div>
-  ),
-  HomeBangerPanel: ({ failed }: { failed: boolean }) => (
-    <div>Banger failed: {String(failed)}</div>
-  ),
   HomeResearchPanel: () => <div>Research</div>,
   HomeTrendsPanel: () => <div>Weekly trends</div>,
   DigestHero: () => <div>Digest</div>,
@@ -36,10 +29,6 @@ test('renders ready panels while trends and the digest remain pending', async ()
       },
       failed: false,
     }),
-    overview: pending,
-    stream: Promise.resolve({ data: [], failed: false }),
-    recentBangers: Promise.resolve({ data: [], failed: true }),
-    historicalBangers: pending,
     research: Promise.resolve({ data: [], failed: false }),
     trends: pending,
   }
@@ -48,14 +37,79 @@ test('renders ready panels while trends and the digest remain pending', async ()
   render(
     <>
       {await HomepageStats({ data: data.globalStats })}
-      {await HomepageStream({ data: data.stream })}
-      {await HomepageBanger({ data: data.recentBangers })}
       {await HomepageResearch({ data: data.research })}
     </>,
   )
   expect(screen.getByText(/14.0M public tweets/)).toBeInTheDocument()
-  expect(screen.getByText('Stream: 0')).toBeInTheDocument()
   expect(screen.getByText('Research')).toBeInTheDocument()
-  expect(screen.getByText('Banger failed: true')).toBeInTheDocument()
   expect(screen.queryByText('Weekly trends')).not.toBeInTheDocument()
+})
+
+const growthStats = (overrides = {}, failed = false) =>
+  Promise.resolve({
+    data: {
+      totalTweets: 21_023_737,
+      memberCount: 1_261,
+      membersAddedLastHour: 0,
+      membersAddedLast24Hours: 259,
+      membershipSnapshotAt: '2026-10-25T18:00:00Z',
+      addedLast24Hours: 668_600,
+      generatedAt: '2026-10-25T18:00:13Z',
+      ...overrides,
+    },
+    failed,
+  })
+
+test('rounds compact headline totals down to reached milestones', async () => {
+  render(
+    await HomepageStats({
+      data: growthStats({ memberCount: 1_650, totalTweets: 21_660_000 }),
+    }),
+  )
+  expect(screen.getByText('1.6K community members')).toBeInTheDocument()
+  expect(screen.getByText('21.6M public tweets')).toBeInTheDocument()
+})
+
+test('shows full totals with compact 24-hour additions', async () => {
+  render(await HomepageGrowth({ data: growthStats() }))
+  expect(screen.getByText('21,023,737')).toBeInTheDocument()
+  expect(screen.getByText('1,261')).toBeInTheDocument()
+  expect(screen.getByText('(+668,600)')).toHaveAttribute(
+    'title',
+    'Tweets added in the last 24 hours',
+  )
+  expect(screen.getByText('(+259)')).toHaveAttribute(
+    'title',
+    'Members added in the last 24 hours',
+  )
+  expect(screen.queryByText(/Members added:/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/Membership as of/)).not.toBeInTheDocument()
+})
+
+test('shows zero additions and omits unavailable additions', async () => {
+  const { rerender } = render(
+    await HomepageGrowth({
+      data: growthStats({ membersAddedLast24Hours: 0, addedLast24Hours: 0 }),
+    }),
+  )
+  expect(screen.getAllByText('(+0)')).toHaveLength(2)
+  rerender(
+    await HomepageGrowth({
+      data: growthStats({
+        membersAddedLast24Hours: null,
+        addedLast24Hours: null,
+      }),
+    }),
+  )
+  expect(screen.getByText('21,023,737')).toBeInTheDocument()
+  expect(screen.getByText('1,261')).toBeInTheDocument()
+  expect(screen.queryByText(/\(\+/)).not.toBeInTheDocument()
+})
+
+test('shows an explicit failure instead of zero totals', async () => {
+  render(await HomepageGrowth({ data: growthStats({}, true) }))
+  expect(
+    screen.getByText('Archive counts are temporarily unavailable.'),
+  ).toBeInTheDocument()
+  expect(screen.queryByText('1,261')).not.toBeInTheDocument()
 })

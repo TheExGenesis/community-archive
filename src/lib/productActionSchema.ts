@@ -20,3 +20,26 @@ export const productActions = [
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]
+
+export const homepageMapActions = [
+  'community_selected',
+  'hex_selected',
+  'selection_cleared',
+  'find_submitted',
+  'content_tab_selected',
+  'story_opened',
+  'members_opened',
+  'archive_overlay_toggled',
+  'zoom_in_clicked',
+  'zoom_out_clicked',
+  'view_reset',
+] as const
+export const homepageMapTabs = [
+  'Stories',
+  'Bangers',
+  'Latest',
+  'Most liked',
+  'Strands',
+] as const
+export type HomepageMapAction = (typeof homepageMapActions)[number]
+export type HomepageMapTab = (typeof homepageMapTabs)[number]

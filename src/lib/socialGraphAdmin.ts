@@ -1,4 +1,5 @@
 import 'server-only'
+import { productionReadMode } from '@/utils/supabaseReadRouting'
 import { clickHouseAnalyticsGatewayBaseUrl } from './clickhouseGateway'
 
 interface FullRebuildOptions {
@@ -21,6 +22,10 @@ export function socialGraphFullRebuildUrl(
 export async function requestSocialGraphFullRebuild(
   options: FullRebuildOptions = {},
 ): Promise<{ accepted: true; status: 'queued' }> {
+  if (productionReadMode())
+    throw new Error(
+      'Production graph refreshes are disabled while staging reads production data.',
+    )
   const gatewayToken =
     options.gatewayToken ?? process.env.CLICKHOUSE_ANALYTICS_API_TOKEN
   const adminToken =

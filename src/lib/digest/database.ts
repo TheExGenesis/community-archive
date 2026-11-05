@@ -5,8 +5,9 @@ import {
 } from '@/utils/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { cookies } from 'next/headers'
+import { createPublicReadClient } from '@/lib/publicDataSource'
 
-export interface DigestPromptVersionRow {
+export type DigestPromptVersionRow = {
   id: string
   version: number
   label: string
@@ -18,7 +19,7 @@ export interface DigestPromptVersionRow {
   created_at: string
 }
 
-export interface DigestRunRow {
+export type DigestRunRow = {
   id: string
   digest_date: string
   status: string
@@ -47,7 +48,7 @@ export interface DigestRunRow {
   updated_at: string
 }
 
-export interface DigestEditionRow {
+export type DigestEditionRow = {
   id: string
   issue_number: number
   digest_date: string
@@ -62,14 +63,14 @@ export interface DigestEditionRow {
   view_count: number
 }
 
-export interface DigestEditionLikeRow {
+export type DigestEditionLikeRow = {
   id: string
   edition_id: string
   user_id: string
   created_at: string
 }
 
-export interface DigestEditionCommentRow {
+export type DigestEditionCommentRow = {
   id: string
   edition_id: string
   user_id: string
@@ -154,7 +155,10 @@ type DigestDatabase = {
 export const createDigestAdminClient = () =>
   createServerServiceRoleClient() as unknown as SupabaseClient<DigestDatabase>
 
+export const createDigestReadClient = () =>
+  createPublicReadClient() as unknown as SupabaseClient<DigestDatabase>
+
 export const createDigestPublicClient = (
-  cookieStore: ReturnType<typeof cookies>,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
 ) =>
   createServerClient(cookieStore) as unknown as SupabaseClient<DigestDatabase>

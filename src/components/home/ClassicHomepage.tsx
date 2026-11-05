@@ -1,7 +1,11 @@
-import dynamic from 'next/dynamic'
+import { PreviewHeroActions } from '@/components/PreviewSession'
+import DynamicHeroCTAButtons from './DynamicHeroCTAButtons'
 import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
+import HexHero from './hero/HexHero'
+import styles from './classicHomepage.module.css'
+import ExploreArchivePill from './ExploreArchivePill'
 import HomepageSearch from '@/components/HomepageSearch'
 import FeaturedCommunityApps from './FeaturedCommunityApps'
 import Testimonials from '@/components/home/Testimonials'
@@ -13,20 +17,6 @@ import {
   HomepagePortal,
   HomepageStats,
 } from '@/components/home/HomepageDataSections'
-
-const DynamicHeroCTAButtons = dynamic(
-  () => import('@/components/HeroCTAButtons'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex flex-col justify-center gap-4 sm:flex-row sm:gap-6">
-        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
-        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
-        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
-      </div>
-    ),
-  },
-)
 
 interface ClassicHomepageProps {
   data: HomepageData
@@ -41,7 +31,7 @@ export default async function ClassicHomepage({
   isMember,
   showCta,
 }: ClassicHomepageProps) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
   let isOptedIn = false
@@ -62,13 +52,17 @@ export default async function ClassicHomepage({
 
   return (
     <main>
-      <section className="overflow-hidden bg-card pb-8 pt-16 dark:bg-background md:pb-10 md:pt-24">
-        <div className="relative z-10 mx-auto w-full max-w-5xl space-y-12 px-4 text-center sm:px-6 md:space-y-16 lg:px-8">
+      <section
+        className={`${styles.intro} overflow-hidden bg-card pb-[72px] pt-12 dark:bg-background md:pb-[88px] md:pt-16`}
+      >
+        <div
+          className={`${styles.content} relative z-10 mx-auto w-full max-w-5xl space-y-6 px-4 text-center sm:px-6 md:space-y-8 lg:px-8`}
+        >
           <div className="space-y-4">
-            <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
               Community Archive
             </h1>
-            <p className="text-xl leading-8 text-muted-foreground">
+            <p className="text-base leading-6 text-muted-foreground sm:text-xl sm:leading-8">
               <Suspense
                 fallback={
                   <>
@@ -82,19 +76,33 @@ export default async function ClassicHomepage({
             </p>
           </div>
 
-          {showCta ? (
-            <div className="!mt-11 md:!mt-[50px]">
-              <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
-            </div>
-          ) : isMember ? (
-            <div className="!mt-11 md:!mt-[50px]">
-              <HomepageSearch />
-            </div>
-          ) : null}
+          <PreviewHeroActions
+            actual={
+              showCta ? (
+                <div className={`${styles.actions} !mt-7 md:!mt-8`}>
+                  <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
+                </div>
+              ) : (
+                <div className="!mt-7 md:!mt-8">
+                  <HomepageSearch />
+                </div>
+              )
+            }
+            signedIn={
+              <div className="!mt-7 md:!mt-8">
+                <HomepageSearch />
+              </div>
+            }
+            signedOut={
+              <div className={`${styles.actions} !mt-7 md:!mt-8`}>
+                <DynamicHeroCTAButtons />
+              </div>
+            }
+          />
 
           {/* The backers line is a footnote to the social proof above it. */}
-          <div className="!mt-6 md:!mt-[50px]">
-            {homepagePeople}
+          <div className="!mt-6 md:!mt-8">
+            <div className={styles.people}>{homepagePeople}</div>
 
             <p className="mt-1 text-xs text-muted-foreground/80">
               Backed by{' '}
@@ -116,19 +124,18 @@ export default async function ClassicHomepage({
                 Vitalik Buterin
               </Link>
             </p>
-            <Link
-              href="#daily-digest"
-              className="mt-5 inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-2 text-sm font-medium text-brand-deep transition-colors hover:bg-brand/20"
-            >
-              Read the daily digest ↓
-            </Link>
+            <ExploreArchivePill />
           </div>
         </div>
       </section>
 
+      <HexHero />
+
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
         <HomepagePortal data={data} isMember={isMember} />
       </section>
+
+      <FeaturedCommunityApps />
 
       <section
         id="upload-archive"
@@ -143,7 +150,6 @@ export default async function ClassicHomepage({
         </div>
       </section>
 
-      <FeaturedCommunityApps />
       <Testimonials />
     </main>
   )

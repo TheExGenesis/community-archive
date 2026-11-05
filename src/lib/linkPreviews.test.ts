@@ -213,6 +213,61 @@ describe('link preview safety and metadata', () => {
       ),
     ).rejects.toThrow('too large')
   })
+
+  test('cancels a streamed response that exceeds its byte limit', async () => {
+    const cancel = jest.fn()
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(1025))
+        },
+        cancel,
+      }),
+      { headers: { 'Content-Type': 'text/html' } },
+    )
+    await expect(
+      fetchSafeRemoteResource(
+        'https://example.com/stream',
+        {
+          accept: 'text/html',
+          maximumBytes: 1024,
+          allowedContentTypes: (type) => type === 'text/html',
+        },
+        jest.fn().mockResolvedValue(response),
+        publicResolver,
+      ),
+    ).rejects.toThrow('too large')
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  test('aborts a request after the preview timeout', async () => {
+    jest.useFakeTimers()
+    try {
+      const fetcher = jest.fn(
+        (_url, options) =>
+          new Promise<Response>((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () =>
+              reject(new Error('Request aborted')),
+            )
+          }),
+      ) as typeof fetch
+      const request = fetchSafeRemoteResource(
+        'https://example.com/slow',
+        {
+          accept: 'text/html',
+          maximumBytes: 1024,
+          allowedContentTypes: (type) => type === 'text/html',
+        },
+        fetcher,
+        publicResolver,
+      )
+      const rejection = expect(request).rejects.toThrow('Request aborted')
+      await jest.advanceTimersByTimeAsync(4000)
+      await rejection
+    } finally {
+      jest.useRealTimers()
+    }
+  })
 })
 
 const videoUrl = 'https://x.com/therealbuni/status/1781147654623297657/video/1'

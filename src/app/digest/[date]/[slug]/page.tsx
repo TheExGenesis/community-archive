@@ -1,4 +1,8 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
+import { DigestArchivedQuotePosts } from '@/components/digest/DigestArchivedQuotePosts'
+import { measureServerRead } from '@/lib/performance/server'
+import type { DigestEdition, DigestStory } from '@/lib/digest/types'
 import { notFound } from 'next/navigation'
 import { DigestStoryView } from '@/components/digest/DigestStoryView'
 import { getPublishedDigest } from '@/lib/digest/data'
@@ -11,15 +15,16 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 export async function generateMetadata({
   params,
 }: {
-  params: { date: string; slug: string }
+  params: Promise<{ date: string; slug: string }>
 }): Promise<Metadata> {
-  const pathname = `/digest/${params.date}/${params.slug}`
-  if (!DATE_PATTERN.test(params.date))
+  const { date, slug } = await params
+  const pathname = `/digest/${date}/${slug}`
+  if (!DATE_PATTERN.test(date))
     return getDigestStoryMetadata(null, undefined, pathname)
-  const edition = await getPublishedDigest(params.date)
+  const edition = await getPublishedDigest(date)
   return getDigestStoryMetadata(
     edition,
-    edition?.content.stories.find((item) => item.slug === params.slug),
+    edition?.content.stories.find((item) => item.slug === slug),
     pathname,
   )
 }
@@ -27,16 +32,43 @@ export async function generateMetadata({
 export default async function DigestStoryPage({
   params,
 }: {
-  params: { date: string; slug: string }
+  params: Promise<{ date: string; slug: string }>
 }) {
-  if (!DATE_PATTERN.test(params.date)) notFound()
-  const edition = await getPublishedDigest(params.date)
+  const { date, slug } = await params
+  if (!DATE_PATTERN.test(date)) notFound()
+  const edition = await getPublishedDigest(date)
   const story = edition?.content.stories.find(
-    (item) => item.slug === params.slug,
+    (item) => item.slug === slug,
   )
   if (!edition || !story) notFound()
-  const quotePosts = await loadDigestQuotePosts(story.bangers)
   return (
-    <DigestStoryView edition={edition} story={story} quotePosts={quotePosts} />
+    <DigestStoryView
+      edition={edition}
+      story={story}
+      archivedQuotes={
+        <Suspense fallback={<p role="status">Loading archived quote posts…</p>}>
+          <ArchivedQuotes edition={edition} story={story} />
+        </Suspense>
+      }
+    />
+  )
+}
+
+async function ArchivedQuotes({
+  edition,
+  story,
+}: {
+  edition: DigestEdition
+  story: DigestStory
+}) {
+  const quotePosts = await measureServerRead('digest.quote-posts', () =>
+    loadDigestQuotePosts(story.bangers),
+  )
+  return (
+    <DigestArchivedQuotePosts
+      edition={edition}
+      story={story}
+      quotePosts={quotePosts}
+    />
   )
 }

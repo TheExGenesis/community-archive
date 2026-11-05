@@ -229,11 +229,7 @@ test('consent is checked again after opt-out, even with the same authenticated s
   expect(getOptInStatus).toHaveBeenCalledTimes(2)
 })
 test('run history uses bounded keyset pagination and rejects malformed cursors', async () => {
-  jest
-    .mocked(getAdminClient)
-    .mockResolvedValue({ rpc } as unknown as Awaited<
-      ReturnType<typeof getAdminClient>
-    >)
+  ;(getAdminClient as jest.Mock).mockResolvedValue({ rpc })
   rpc.mockResolvedValue({
     data: {
       runs: [],

@@ -1,3 +1,4 @@
+import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextRequest, NextResponse } from 'next/server'
 import { getClickHouseProfileInteractionsOrThrow } from '@/lib/metaTwitter/clickhouseSidebar'
 import { applyPeopleCuration } from '@/lib/profileCuration'
@@ -9,8 +10,12 @@ const ACCOUNT_ID_PATTERN = /^\d{1,20}$/
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { account_id: string } },
+  { params: paramsPromise }: { params: Promise<{ account_id: string }> },
 ) {
+  const params = await paramsPromise
+  const authError = await browsingAuthError()
+  if (authError) return authError
+
   if (!ACCOUNT_ID_PATTERN.test(params.account_id)) {
     return NextResponse.json(
       { error: 'Invalid profile account' },

@@ -14,7 +14,12 @@
   uploads, opt-outs, and transactional policy state. ClickHouse is a rebuildable
   analytical projection, never the write authority for those decisions.
 - A member has uploaded an archive or explicitly opted in. Explicit opt-out
-  takes precedence in every public, ingestion, and analytical serving path.
+  takes precedence over membership.
+- Opt-outs are enforced at ingestion and removal time: opted-out content is
+  never written, and is removed or tombstoned when an opt-out lands. Serving
+  paths therefore read stored data as-is. Do not add per-request opt-out
+  rechecks to read or API paths; they duplicate ingestion enforcement and cost
+  seconds on hot pages. Existing serving-time rechecks are legacy.
 - Preserve the archive privacy boundary: process archive data locally where
   designed and never add private messages or unrelated sensitive data to
   uploaded or public datasets.

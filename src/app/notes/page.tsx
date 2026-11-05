@@ -7,8 +7,9 @@ export const metadata = { title: 'AI Field Notes · Community Archive' }
 export default async function NotesPage({
   searchParams,
 }: {
-  searchParams?: { article?: string }
+  searchParams?: Promise<{ article?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   if (!(await getIsMember())) redirect('/')
-  return <PortalNotes initialArticleId={searchParams?.article} />
+  return <PortalNotes initialArticleId={resolvedSearchParams?.article} />
 }

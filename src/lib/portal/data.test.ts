@@ -221,7 +221,7 @@ describe('portal page resilience', () => {
     restore('CLICKHOUSE_ANALYTICS_API_TOKEN', previousEnv.analyticsToken)
   })
 
-  test('lets stats and stream settle while trends, research and Bangers remain pending', async () => {
+  test('loads only retained homepage sections, independently', async () => {
     const pending = new Promise<never>(() => undefined)
     ;(fetchPortalWeeklyTrends as jest.Mock).mockReturnValue(pending)
     fetchPortalRecentBangersMock.mockReturnValue(pending)
@@ -232,10 +232,13 @@ describe('portal page resilience', () => {
       data: { memberCount: 42 },
       failed: false,
     })
-    await expect(sections.stream).resolves.toEqual({ data: [], failed: true })
-    await expect(sections.overview).resolves.toMatchObject({
-      stats: { accountCount: 42 },
-    })
+    expect(Object.keys(sections).sort()).toEqual([
+      'globalStats',
+      'research',
+      'trends',
+    ])
+    expect(fetchPortalRecentBangersMock).not.toHaveBeenCalled()
+    expect(fetchPortalHistoricalBangersMock).not.toHaveBeenCalled()
     expect(fetchPortalTrendsMock).not.toHaveBeenCalled()
   })
 
@@ -294,12 +297,10 @@ describe('portal page resilience', () => {
       stats: { totalTweets: 15_334_092, addedLast24Hours: 399_270 },
       failures: { liveAnalytics: false },
     })
-    const requested = (global.fetch as jest.Mock).mock.calls.map(([input]) =>
-      new URL(String(input)).pathname,
+    const requested = (global.fetch as jest.Mock).mock.calls.map(
+      ([input]) => new URL(String(input)).pathname,
     )
-    expect(requested.some((path) => path.endsWith('/stream-stats'))).toBe(
-      false,
-    )
+    expect(requested.some((path) => path.endsWith('/stream-stats'))).toBe(false)
   })
 })
 
@@ -414,6 +415,8 @@ describe('portal reads', () => {
           data: {
             totalTweets: '15334092',
             memberAccounts: '658',
+            membersAddedLastHour: '0',
+            membersAddedLast24Hours: '136',
             sourceUpdatedAt: '2026-08-13 18:34:09.903',
             collectedAt: '2026-08-13 18:34:20.907',
             membershipSnapshotAt: '2026-08-13 18:34:00.000',
@@ -430,6 +433,9 @@ describe('portal reads', () => {
     await expect(fetchPortalGlobalStats()).resolves.toEqual({
       totalTweets: 15_334_092,
       memberCount: 658,
+      membersAddedLastHour: 0,
+      membersAddedLast24Hours: 136,
+      membershipSnapshotAt: '2026-08-13T18:34:00.000Z',
       addedLast24Hours: 399_270,
       generatedAt: '2026-08-13T18:34:20.907Z',
     })
@@ -460,6 +466,9 @@ describe('portal reads', () => {
       )
       await expect(fetchPortalGlobalStats()).resolves.toMatchObject({
         addedLast24Hours: null,
+        membersAddedLastHour: null,
+        membersAddedLast24Hours: null,
+        membershipSnapshotAt: null,
       })
     }
   })

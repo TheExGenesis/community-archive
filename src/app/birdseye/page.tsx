@@ -18,11 +18,12 @@ export const metadata: Metadata = {
 export default async function BirdseyePage({
   searchParams,
 }: {
-  searchParams: { username?: string; cluster_id?: string }
+  searchParams: Promise<{ username?: string; cluster_id?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   const username =
-    typeof searchParams.username === 'string'
-      ? searchParams.username
+    typeof resolvedSearchParams.username === 'string'
+      ? resolvedSearchParams.username
       : undefined
   const viewer = await getBirdseyeViewer()
   if (!username && viewer.isAdmin && !viewer.user)
@@ -63,9 +64,9 @@ export default async function BirdseyePage({
       </main>
     )
   if (
-    searchParams.cluster_id &&
+    resolvedSearchParams.cluster_id &&
     !access.analysis.clusters.some(
-      (cluster) => cluster.id === searchParams.cluster_id,
+      (cluster) => cluster.id === resolvedSearchParams.cluster_id,
     )
   )
     notFound()
@@ -73,8 +74,8 @@ export default async function BirdseyePage({
     <BirdseyeView
       {...access}
       selectedId={
-        typeof searchParams.cluster_id === 'string'
-          ? searchParams.cluster_id
+        typeof resolvedSearchParams.cluster_id === 'string'
+          ? resolvedSearchParams.cluster_id
           : undefined
       }
     />

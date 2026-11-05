@@ -33,7 +33,7 @@ const getTwitterUsername = (
 export default async function SettingsPage() {
   const { user } = await requireAuth('/settings')
   const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient(cookieStore, { readSource: 'app' })
   const admin = createServerAdminClient(cookieStore)
   const rawTwitterAccountId = user.app_metadata?.provider_id
   const twitterAccountId =
@@ -77,19 +77,19 @@ export default async function SettingsPage() {
               profile:all_profile(avatar_media_url)
             )
           `,
-          )
-          .eq('account_id', twitterAccountId)
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-    twitterAccountId
-      ? getPublicProfileSettings(twitterAccountId)
-      : Promise.resolve({ downloadArchiveVisible: true }),
-    twitterAccountId
-      ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
-      : Promise.resolve(null),
-    // Only members who may ask see Ask the archive's setting.
-    ownKeysEnabled() ? getAgentSearchAccess() : Promise.resolve(null),
-  ])
+            )
+            .eq('account_id', twitterAccountId)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      twitterAccountId
+        ? getPublicProfileSettings(twitterAccountId, { readSource: 'app' })
+        : Promise.resolve({ downloadArchiveVisible: true }),
+      twitterAccountId
+        ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
+        : Promise.resolve(null),
+      // Only members who may ask see Ask the archive's setting.
+      ownKeysEnabled() ? getAgentSearchAccess() : Promise.resolve(null),
+    ])
   const askLimits = askAccess?.ok ? agentSearchDailyLimits() : null
 
   const digestEmailStatus: DigestEmailStatus = !digestSubscription
@@ -115,6 +115,7 @@ export default async function SettingsPage() {
             ownLimit={askLimits.own}
           />
         )}
+
         <section className="mb-8 flex flex-col gap-3 rounded-lg border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">API keys</h2>

@@ -121,10 +121,11 @@ async function AccountsSection({ search }: { search: string }) {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; subscriberPage?: string }
+  searchParams?: Promise<{ q?: string; subscriberPage?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   const { user } = await requireAdmin()
-  const search = normalizeUsername(searchParams?.q)
+  const search = normalizeUsername(resolvedSearchParams?.q)
   const twitterUsername = getDisplayUsername(user)
 
   return (
@@ -186,7 +187,7 @@ export default async function AdminPage({
           fallback={<SectionSkeleton label="Loading digest subscribers" />}
         >
           <DigestSubscribersSection
-            page={Number(searchParams?.subscriberPage ?? 1)}
+            page={Number(resolvedSearchParams?.subscriberPage ?? 1)}
             search={search}
           />
         </Suspense>

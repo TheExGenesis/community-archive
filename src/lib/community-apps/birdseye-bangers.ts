@@ -1,3 +1,4 @@
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
@@ -29,7 +30,7 @@ const quoteAuthors = unstable_cache(
     }
     return rows
   },
-  ['birdseye-quote-authors-v1'],
+  ['birdseye-quote-authors-v1', productionReadCacheKey()],
   { revalidate: 300 },
 )
 

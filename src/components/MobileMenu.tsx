@@ -1,4 +1,5 @@
 'use client'
+import { usePreviewSession } from '@/components/PreviewSession'
 
 import Link from 'next/link'
 import { useNavigationAudience } from '@/components/NavigationAudience'
@@ -18,6 +19,7 @@ import { userProfileHref } from '@/lib/navigation'
 import { capturePostHogEvent } from '@/lib/posthog'
 
 export default function MobileMenu() {
+  const preview = usePreviewSession()
   const { localPreview } = useNavigationAudience()
   const { userMetadata } = useAuthAndArchive()
   const profileHref = userProfileHref(
@@ -32,6 +34,10 @@ export default function MobileMenu() {
       surface: 'account_menu',
       already_active: false,
     })
+    if (preview.enabled && preview.view !== 'actual') {
+      preview.setView('signed-out')
+      return
+    }
     const supabase = createBrowserClient()
     const { error } = await supabase.auth.signOut()
 
@@ -40,7 +46,8 @@ export default function MobileMenu() {
     }
   }
 
-  if (localPreview) return <LocalAdminMenu active={localPreview === 'admin'} />
+  if (localPreview && preview.view === 'actual')
+    return <LocalAdminMenu active={localPreview === 'admin'} />
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -117,13 +124,17 @@ export default function MobileMenu() {
           <DropdownMenuItem asChild>
             <Link
               href="/login"
-              onClick={() =>
+              onClick={(event) => {
+                if (preview.enabled) {
+                  event.preventDefault()
+                  preview.setView('signed-in')
+                }
                 capturePostHogEvent('navigation_item_clicked', {
                   destination: 'sign_in',
                   surface: 'account_menu',
                   already_active: false,
                 })
-              }
+              }}
               className="cursor-pointer gap-3 py-2.5"
             >
               <LogIn className="h-4 w-4" />

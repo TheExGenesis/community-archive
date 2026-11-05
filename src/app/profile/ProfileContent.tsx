@@ -1,5 +1,7 @@
 'use client'
 
+import { CollectionPreferenceControl } from '@/components/CollectionPreferenceControl'
+import { collectionPreferenceAvailable } from '@/lib/collectionPreference'
 import { getOwnLatestTweets } from '@/app/settings/tweet-actions'
 import { useRef, useState } from 'react'
 import { User } from '@supabase/supabase-js'
@@ -495,20 +497,33 @@ export default function ProfileContent({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="opt-in">Opt-in to Tweet Streaming</Label>
-                  <div className="text-sm text-muted-foreground">
-                    Allow your public tweets to be automatically archived
-                  </div>
-                </div>
-                <Switch
-                  id="opt-in"
-                  checked={optInStatus && !explicitOptOut}
-                  onCheckedChange={handleOptInToggle}
+              {collectionPreferenceAvailable && (
+                <CollectionPreferenceControl
                   disabled={isPreferenceSaving || explicitOptOut}
                 />
-              </div>
+              )}
+              {(!collectionPreferenceAvailable || archives.length === 0) && (
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="opt-in">
+                      {collectionPreferenceAvailable
+                        ? 'Join without uploading an archive'
+                        : 'Opt-in to Tweet Streaming'}
+                    </Label>
+                    <div className="text-sm text-muted-foreground">
+                      {collectionPreferenceAvailable
+                        ? 'Join the archive community. Automatic collection follows the setting above.'
+                        : 'Allow your public tweets to be automatically archived'}
+                    </div>
+                  </div>
+                  <Switch
+                    id="opt-in"
+                    checked={optInStatus && !explicitOptOut}
+                    onCheckedChange={handleOptInToggle}
+                    disabled={isPreferenceSaving || explicitOptOut}
+                  />
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -539,15 +554,17 @@ export default function ProfileContent({
                 </Alert>
               )}
 
-              {optInStatus && !explicitOptOut && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription>
-                    You have opted in to tweet streaming. Your public tweets may
-                    be archived for historical and research purposes.
-                  </AlertDescription>
-                </Alert>
-              )}
+              {!collectionPreferenceAvailable &&
+                optInStatus &&
+                !explicitOptOut && (
+                  <Alert>
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription>
+                      You have opted in to tweet streaming. Your public tweets
+                      may be archived for historical and research purposes.
+                    </AlertDescription>
+                  </Alert>
+                )}
             </CardContent>
           </Card>
         </TabsContent>

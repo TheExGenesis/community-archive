@@ -84,7 +84,7 @@ function currentTabHref(html: string): string[] {
 
 test('explains the not-opted-in view in plain language', async () => {
   const html = renderToStaticMarkup(
-    await MissingAccountsPage({ searchParams: {} }),
+    await MissingAccountsPage({ searchParams: Promise.resolve({}) }),
   )
 
   expect(html).toContain(
@@ -104,7 +104,9 @@ test('explains the not-opted-in view in plain language', async () => {
 
 test('uses the same conversational framing for the archive view', async () => {
   const html = renderToStaticMarkup(
-    await MissingAccountsPage({ searchParams: { view: 'archive' } }),
+    await MissingAccountsPage({
+      searchParams: Promise.resolve({ view: 'archive' }),
+    }),
   )
 
   expect(html).toContain(
@@ -121,7 +123,9 @@ test('uses the same conversational framing for the archive view', async () => {
 
 test('ranks the accounts that reply to members without being in the archive', async () => {
   const html = renderToStaticMarkup(
-    await MissingAccountsPage({ searchParams: { view: 'repliers' } }),
+    await MissingAccountsPage({
+      searchParams: Promise.resolve({ view: 'repliers' }),
+    }),
   )
 
   expect(html).toContain(
@@ -149,7 +153,7 @@ test.each([
   ['a repeated view parameter', ['repliers', 'archive']],
 ])('falls back to the not-opted-in view for %s', async (_label, view) => {
   const html = renderToStaticMarkup(
-    await MissingAccountsPage({ searchParams: { view } }),
+    await MissingAccountsPage({ searchParams: Promise.resolve({ view }) }),
   )
 
   expect(html).toContain('Not opted in yet')
@@ -163,7 +167,9 @@ test('shows an empty top-repliers view when the gateway predates the ranking', a
   getMissingAccountsMock.mockResolvedValue({ ...response, data })
 
   const html = renderToStaticMarkup(
-    await MissingAccountsPage({ searchParams: { view: 'repliers' } }),
+    await MissingAccountsPage({
+      searchParams: Promise.resolve({ view: 'repliers' }),
+    }),
   )
 
   expect(html).toContain('No accounts to show yet.')
@@ -171,7 +177,7 @@ test('shows an empty top-repliers view when the gateway predates the ranking', a
 
   // The other two rankings still come through.
   const optIn = renderToStaticMarkup(
-    await MissingAccountsPage({ searchParams: {} }),
+    await MissingAccountsPage({ searchParams: Promise.resolve({}) }),
   )
   expect(optIn).toContain('@deepfates')
 })

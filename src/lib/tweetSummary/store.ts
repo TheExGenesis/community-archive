@@ -1,3 +1,4 @@
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
@@ -18,7 +19,7 @@ import {
 } from './generation'
 import type { TweetPageKind, TweetPageSubject } from './subject'
 
-export interface TweetPageSummaryRow {
+export type TweetPageSummaryRow = {
   subject_key: string
   kind: TweetPageKind
   tweet_ids: string[]
@@ -46,9 +47,9 @@ type SummaryDatabase = {
   }
 }
 
-// The first visit streams in while this runs and unfurlers wait on it (both
-// attempts share this budget), so keep it inside the page's maxDuration; a
-// timeout shows the neutral fallback this time and retries on the next visit.
+// The first signed-in visit streams in while this runs (both attempts share
+// this budget), so keep it inside the page's maxDuration; a timeout shows the
+// neutral fallback this time and retries on the next signed-in visit.
 const GENERATION_BUDGET_MS = 15_000
 
 function summaryClient(): SupabaseClient<SummaryDatabase> | null {
@@ -193,7 +194,12 @@ const cachedOutcome = (subject: TweetPageSubject, allowGeneration: boolean) =>
       if (stored) return stored
       throw new GenerationSkipped()
     },
-    ['tweet-page-summary', `v${SUMMARY_PROMPT_VERSION}`, subject.key],
+    [
+      'tweet-page-summary',
+      `v${SUMMARY_PROMPT_VERSION}`,
+      subject.key,
+      productionReadCacheKey(),
+    ],
     { revalidate: false, tags: [`tweet-page-summary:${subject.key}`] },
   )()
 
@@ -223,8 +229,8 @@ async function lookUpSummary(
 
 /**
  * Generated title and description for a permalink page, or null when the
- * content is not substantive enough or generation is unavailable. Crawlers
- * (`allowGeneration: false`) only see summaries that already exist.
+ * content is not substantive enough or generation is unavailable. Callers
+ * without `allowGeneration` only see summaries that already exist.
  */
 export const getTweetPageSummary = cache(
   async (

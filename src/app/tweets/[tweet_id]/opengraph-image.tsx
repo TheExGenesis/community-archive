@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { loadTweetPage } from '@/lib/tweetSummary/loadTweetPage'
+import { loadGuestTweetPage } from '@/lib/tweetSummary/loadTweetPage'
 import {
   eyebrowLabel,
   fallbackTitle,
@@ -9,6 +9,10 @@ import {
 export const alt = 'An archived tweet on Community Archive'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
+// Unfurlers never carry a session, so the card is always the guest view: the
+// main tweet with no conversation-derived summary. It does not depend on the
+// requester, so it is cached like the guest page.
+export const dynamic = 'force-static'
 export const revalidate = 3600
 
 // Cut at a word boundary so the card never ends mid-word.
@@ -23,9 +27,10 @@ const clip = (text: string, max: number) =>
 export default async function Image({
   params,
 }: {
-  params: { tweet_id: string }
+  params: Promise<{ tweet_id: string }>
 }) {
-  const page = await loadTweetPage(params.tweet_id)
+  const { tweet_id } = await params
+  const page = await loadGuestTweetPage(tweet_id)
   const kind = page?.subject.kind ?? 'tweet'
   const title = page
     ? (page.summary?.title ?? fallbackTitle(page.subject))

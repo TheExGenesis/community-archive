@@ -69,7 +69,7 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const supabase = createServerAdminClient(cookies())
+    const supabase = createServerAdminClient(await cookies())
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {

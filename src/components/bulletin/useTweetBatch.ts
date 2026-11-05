@@ -16,7 +16,7 @@ export function useTweetBatch() {
   const pending = useRef(new Map<string, Pending>())
   const queued = useRef(new Set<string>())
   const controllers = useRef(new Set<AbortController>())
-  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(
     () => () => {

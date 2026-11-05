@@ -436,12 +436,12 @@ export function mergeCommunityCatalog(
   return Array.from(bySlug.values())
 }
 
-export const HOMEPAGE_FEATURED_PROJECT_COUNT = 3
+export const HOMEPAGE_FEATURED_PROJECT_COUNT = 6
 
-/** The home page shows the first featured projects in Gallery order. */
+/** Featured projects lead; fill the second row from the existing gallery. */
 export function homepageFeaturedProjects(catalog: CommunityProject[]) {
   return filterCommunityProjects(catalog, '', 'All', 'Featured')
-    .filter((project) => project.featured && project.projectUrl)
+    .filter((project) => project.projectUrl)
     .slice(0, HOMEPAGE_FEATURED_PROJECT_COUNT)
 }
 

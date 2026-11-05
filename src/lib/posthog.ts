@@ -1,6 +1,13 @@
 'use client'
 
-import { productFeatures, productActions } from './productActionSchema'
+import {
+  productFeatures,
+  productActions,
+  homepageMapActions,
+  homepageMapTabs,
+  type HomepageMapAction,
+  type HomepageMapTab,
+} from './productActionSchema'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import type {
   CaptureResult,
@@ -18,12 +25,21 @@ import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 
 type PostHogClient = Pick<
   PostHog,
-  'capture' | 'get_property' | 'identify' | 'init' | 'reset'
+  | 'capture'
+  | 'get_property'
+  | 'identify'
+  | 'init'
+  | 'reset'
+  | 'opt_in_capturing'
+  | 'opt_out_capturing'
+  | 'stopSessionRecording'
+  | 'startSessionRecording'
 >
 type PostHogExtensionClasses = NonNullable<PostHogConfig['__extensionClasses']>
 type PostHogInitializationOptions = {
   extensionClasses?: PostHogExtensionClasses
   loaded?: () => void
+  userId?: string
 }
 
 type SafeProperty = string | number | boolean
@@ -189,6 +205,11 @@ const profileCurationProperties = {
 }
 
 export const allowedEventProperties = {
+  homepage_map_action: {
+    action: isOneOf(homepageMapActions),
+    tab: (value) => value === undefined || isOneOf(homepageMapTabs)(value),
+    enabled: (value) => value === undefined || isBoolean(value),
+  },
   community_app_action: {
     action: isOneOf(['details_opened', 'launch_clicked']),
     // Public catalog slugs include newly approved apps; never a URL or user input.
@@ -241,6 +262,7 @@ export const allowedEventProperties = {
     section: isOneOf([
       'navigation_shell',
       'homepage_stats',
+      'homepage_hex_map',
       'homepage_digest',
       'homepage_stream',
       'bangers_results',
@@ -400,6 +422,7 @@ const isDisplayName = (value: unknown): value is string =>
 const isEmail = (value: unknown): value is string =>
   typeof value === 'string' && value.length <= 320 && emailPattern.test(value)
 
+let authenticatedSession: Session | null = null
 let posthogClient: PostHogClient | null = null
 let initializationPromise: Promise<PostHogClient | null> | null = null
 let postHogIdentifiedUserId: string | null = null
@@ -534,7 +557,12 @@ export function createPostHogConfig(
     advanced_disable_flags: false,
     advanced_disable_feature_flags: true,
     autocapture: true,
-    before_send: sanitizePostHogEvent,
+    // Gate every SDK event as well as custom captures, including after logout.
+    before_send: (event) =>
+      authenticatedSession?.user.id &&
+      event?.properties.distinct_id === authenticatedSession.user.id
+        ? sanitizePostHogEvent(event)
+        : null,
     capture_pageview: 'history_change',
     capture_pageleave: 'if_capture_pageview',
     capture_dead_clicks: false,
@@ -556,6 +584,7 @@ export function createPostHogConfig(
     mask_all_element_attributes: true,
     mask_all_text: true,
     opt_in_site_apps: false,
+    opt_out_capturing_by_default: true,
     persistence: 'localStorage+cookie',
     person_profiles: 'identified_only',
     respect_dnt: true,
@@ -570,6 +599,10 @@ export function createPostHogConfig(
       recordHeaders: false,
     },
     debug: process.env.NODE_ENV === 'development',
+  }
+
+  if (options.userId) {
+    config.bootstrap = { distinctID: options.userId, isIdentifiedID: true }
   }
 
   if (options.extensionClasses) {
@@ -600,18 +633,43 @@ export function initializePostHogClient(
 export async function initializePostHog(
   initialSession: Session | null,
 ): Promise<{ enabled: boolean; identifiedUserId: string | null }> {
-  const client = await loadPostHogClient(initialSession)
+  authenticatedSession = initialSession?.user.is_anonymous
+    ? null
+    : initialSession
+  if (!authenticatedSession?.user.id) {
+    if (posthogClient) {
+      postHogIdentifiedUserId = syncPostHogIdentity(
+        'SIGNED_OUT',
+        null,
+        postHogIdentifiedUserId,
+      )
+    }
+    markPostHogIdentityReady()
+    return { enabled: false, identifiedUserId: null }
+  }
+
+  const alreadyLoaded = Boolean(posthogClient)
+  const client = await loadPostHogClient()
+  // An auth change may have occurred while the SDK chunk was loading.
+  if (client && initialSession && authenticatedSession === initialSession) {
+    const wasIdentified = postHogIdentifiedUserId === initialSession.user.id
+    postHogIdentifiedUserId = syncPostHogIdentity(
+      'SIGNED_IN',
+      initialSession,
+      postHogIdentifiedUserId,
+    )
+    client.startSessionRecording()
+    if (alreadyLoaded && !wasIdentified) client.capture('$pageview')
+  }
   markPostHogIdentityReady()
   return {
-    enabled: Boolean(client),
+    enabled: Boolean(client && authenticatedSession?.user.id),
     identifiedUserId: postHogIdentifiedUserId,
   }
 }
 
-async function loadPostHogClient(
-  initialSession: Session | null = null,
-): Promise<PostHogClient | null> {
-  if (!isPostHogBootstrapEnabled) return null
+async function loadPostHogClient(): Promise<PostHogClient | null> {
+  if (!isPostHogBootstrapEnabled || !authenticatedSession?.user.id) return null
   if (posthogClient) return posthogClient
 
   const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
@@ -621,41 +679,27 @@ async function loadPostHogClient(
   if (!initializationPromise) {
     initializationPromise = import('@/lib/posthogRuntime')
       .then(({ default: client, postHogMonitoringExtensions }) => {
-        const identityActions: PostHogIdentityActions = {
-          identify: (userId, properties) => client.identify(userId, properties),
-          reset: () => client.reset(),
-          getPersistedUserId: () => {
-            const userId = client.get_property('$user_id')
-            return typeof userId === 'string' ? userId : null
-          },
-        }
+        if (!isPostHogBootstrapEnabled || !authenticatedSession?.user.id)
+          return null
         const initialized = initializePostHogClient(
           client,
           projectToken,
           posthogHost,
           {
             extensionClasses: postHogMonitoringExtensions,
-            loaded: () => {
-              postHogIdentifiedUserId = syncPostHogIdentity(
-                'INITIAL_SESSION',
-                initialSession,
-                postHogIdentifiedUserId,
-                identityActions,
-              )
-              markPostHogIdentityReady()
-            },
+            userId: authenticatedSession.user.id,
           },
         )
-        if (!initialized) {
-          return null
-        }
-
+        if (!initialized) return null
         posthogClient = client
         return client
       })
       .catch((error) => {
         logPostHogError('loading', error)
         return null
+      })
+      .finally(() => {
+        initializationPromise = null
       })
   }
 
@@ -666,8 +710,14 @@ export function capturePostHogEvent(
   eventName: PostHogEventName,
   properties?: Record<string, unknown>,
 ) {
+  // Drop known signed-out activity immediately; never replay it after login.
+  if (isIdentityReady && !authenticatedSession?.user.id) return
+  const sessionAtCapture = authenticatedSession
   void capturePostHogEventWhenReady(
-    loadPostHogClient,
+    () =>
+      sessionAtCapture && authenticatedSession !== sessionAtCapture
+        ? Promise.resolve(null)
+        : loadPostHogClient(),
     () => identityReadyPromise,
     eventName,
     {
@@ -678,6 +728,13 @@ export function capturePostHogEvent(
       ...properties,
     },
   )
+}
+
+export function captureHomepageMapAction(
+  action: HomepageMapAction,
+  details: { tab?: HomepageMapTab; enabled?: boolean } = {},
+) {
+  capturePostHogEvent('homepage_map_action', { action, ...details })
 }
 
 export async function capturePostHogEventWhenReady(
@@ -700,6 +757,9 @@ export function markPostHogIdentityReady() {
 
 export function disablePostHogAfterIdentityFailure() {
   isPostHogBootstrapEnabled = false
+  authenticatedSession = null
+  posthogClient?.stopSessionRecording()
+  posthogClient?.opt_out_capturing()
   markPostHogIdentityReady()
 }
 
@@ -718,12 +778,19 @@ export function capturePostHogEventWithClient(
 }
 
 type PostHogIdentityActions = {
+  optIn: () => void
+  optOut: () => void
   identify: (userId: string, properties: Record<string, unknown>) => void
   reset: () => void
   getPersistedUserId?: () => string | null
 }
 
 const postHogIdentityActions: PostHogIdentityActions = {
+  optIn: () => posthogClient?.opt_in_capturing({ captureEventName: false }),
+  optOut: () => {
+    posthogClient?.stopSessionRecording()
+    posthogClient?.opt_out_capturing()
+  },
   identify: (userId, properties) => {
     if (!posthogClient) return
     try {
@@ -755,24 +822,22 @@ export function syncPostHogIdentity(
   const user = session?.user
   const persistedUserId = actions.getPersistedUserId?.() ?? identifiedUserId
 
-  if (event === 'SIGNED_OUT') {
-    actions.reset()
+  if (event === 'SIGNED_OUT' || !user || user.is_anonymous) {
+    actions.optOut()
+    if (event === 'SIGNED_OUT' || persistedUserId) actions.reset()
     return null
   }
 
-  if (event === 'INITIAL_SESSION' && !user) {
-    if (persistedUserId) actions.reset()
-    return null
-  }
-
-  if (!user || (event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN')) {
+  if (event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') {
     return identifiedUserId
   }
 
   if (persistedUserId && persistedUserId !== user.id) {
+    actions.optOut()
     actions.reset()
   }
 
+  actions.optIn()
   actions.identify(user.id, getPostHogPersonProperties(user))
   return user.id
 }

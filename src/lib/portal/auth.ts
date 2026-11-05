@@ -29,7 +29,7 @@ export const isMemberPreviewEnabled = () =>
   process.env.NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW === 'true'
 
 export const getCurrentUser = requestCache(async (): Promise<User | null> => {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
   const {
     data: { user },
@@ -45,7 +45,7 @@ export const getCurrentUser = requestCache(async (): Promise<User | null> => {
  * so the signed-in experience can be previewed without an account.
  */
 export async function getIsMember(): Promise<boolean> {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   if (
     isMemberPreviewEnabled() &&
     cookieStore.get('dev_as_member')?.value === '1'

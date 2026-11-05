@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { isMonitoringHealthRoute } from '@/lib/monitoringHealthRoute'
 import { createMiddlewareClient } from '@/utils/supabase'
+import { loginHref } from '@/lib/authRedirect'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ const NOINDEX_PATH_PREFIXES = [
   '/settings',
   '/admin',
   '/auth',
+  '/guest',
 ]
 
 // ─── In-memory rate limiting (secondary signal) ──────────────────────────────
@@ -119,6 +121,13 @@ const IN_MEMORY_MAX_AUTH_CALLBACK_SG = 10
 // caches each answer for up to two minutes, so its lookups get their own
 // larger bucket. The route itself requires a server-to-server bearer secret.
 const IN_MEMORY_MAX_PUBLIC_API_VERIFIER = 600
+// Staging can fan out several reads per page from one server IP. The bridge
+// authenticates every request itself; keep its budget separate and bounded.
+const IN_MEMORY_MAX_PRODUCTION_READ_BRIDGE = 600
+// Signal inbox (/api/signals/*): the Vercel log drain batches deliveries from
+// a few IPs and bursts during exactly the incidents the inbox exists for.
+// The route authenticates and caps each body itself.
+const IN_MEMORY_MAX_SIGNAL_INBOX = 120
 const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 let lastCleanup = Date.now()
@@ -157,6 +166,24 @@ function getApiRateLimitPolicy(
   method: string,
   isSG: boolean,
 ) {
+  if (pathname === '/api/public-data') {
+    return {
+      bucket:
+        method === 'POST' ? 'api:production-read-bridge' : 'api:public-data',
+      maxRequests:
+        method === 'POST'
+          ? IN_MEMORY_MAX_PRODUCTION_READ_BRIDGE
+          : isSG
+            ? IN_MEMORY_MAX_API_SG
+            : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
+  if (method === 'POST' && pathname.startsWith('/api/signals/')) {
+    return {
+      bucket: 'api:signal-inbox',
+      maxRequests: IN_MEMORY_MAX_SIGNAL_INBOX,
+    }
+  }
   if (method === 'GET' && pathname.startsWith('/api/companion/v1/')) {
     return {
       bucket: 'api:companion',
@@ -168,6 +195,8 @@ function getApiRateLimitPolicy(
   if (
     method === 'GET' &&
     [
+      '/api/hex-map/lookup',
+      '/api/hex-map/me',
       '/api/tweet-search',
       '/api/user-directory',
       '/api/strands',
@@ -283,11 +312,33 @@ function isBotUA(ua: string): boolean {
 }
 
 function getIp(request: NextRequest): string {
+  // Next 15 removed request.ip. Vercel sets this header at its trusted edge.
   return (
-    request.ip ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   )
+}
+
+/**
+ * Serves a cached guest route under the public URL. Only the path changes:
+ * a plain URL drops any trailing slash, the query string is kept, and cookies
+ * and cache headers the session refresh already set are carried onto the rewrite.
+ */
+function rewriteToGuestView(
+  request: NextRequest,
+  guestPath: string,
+  current: NextResponse,
+): NextResponse {
+  const guestUrl = new URL(request.url)
+  guestUrl.pathname = guestPath.replace(/\/$/, '')
+  const rewritten = NextResponse.rewrite(guestUrl, {
+    request: { headers: request.headers },
+  })
+  for (const cookie of current.cookies.getAll()) rewritten.cookies.set(cookie)
+  for (const name of ['cache-control', 'expires', 'pragma']) {
+    const value = current.headers.get(name)
+    if (value) rewritten.headers.set(name, value)
+  }
+  return rewritten
 }
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
@@ -345,12 +396,14 @@ function isPageRoute(pathname: string): boolean {
 }
 
 /**
- * Public documentation must remain readable by non-browser clients. The rest
+ * The homepage and public documentation must be readable without JavaScript,
+ * browser headers, or cookies. This exemption is only for GET/HEAD reads. The rest
  * of the site keeps its scraper protections, while agents and API tools can
  * fetch these entry points without pretending to be a browser.
  */
-function isPublicDocumentationRoute(pathname: string): boolean {
+function isPublicInformationRoute(pathname: string): boolean {
   return (
+    pathname === '/' ||
     pathname === '/llms.txt' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
@@ -361,6 +414,20 @@ function isPublicDocumentationRoute(pathname: string): boolean {
   )
 }
 
+/** Temporary login requirement for archive search and account browsing. */
+function requiresLogin(pathname: string): boolean {
+  return [
+    '/search',
+    '/user',
+    '/user-dir',
+    '/profile',
+    '/api/tweet-search',
+    '/api/search',
+    '/api/user-directory',
+    '/api/profile',
+  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
 // ─── Main Middleware ─────────────────────────────────────────────────────────
 
 export async function middleware(request: NextRequest) {
@@ -368,7 +435,9 @@ export async function middleware(request: NextRequest) {
   const ua = request.headers.get('user-agent') || ''
   const pageRoute = isPageRoute(pathname)
   const previewBot = isPreviewBot(ua)
-  const publicDocumentationRoute = isPublicDocumentationRoute(pathname)
+  const publicInformationRead =
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    isPublicInformationRoute(pathname)
   const monitoringHealthRoute = isMonitoringHealthRoute(pathname)
   const isRoutePrefetch =
     request.headers.get('next-router-prefetch') === '1' ||
@@ -400,17 +469,22 @@ export async function middleware(request: NextRequest) {
   // non-browser UA), and one-click unsubscribe POSTs come from mailbox
   // provider servers holding a per-subscription token. The Bulletin preview
   // source and the public API key verifier require their own bearer secrets
-  // and are called from other servers.
+  // and are called from other servers. The signal inbox receives webhooks
+  // from PostHog, Grafana, the Vercel log drain and the fleet host, each
+  // with a short non-browser UA; it verifies a bearer secret or Vercel's
+  // HMAC signature itself (src/lib/signals/auth.ts).
   const machineAuthRoute =
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
     pathname === '/api/bulletin/preview-board' ||
-    pathname === '/api/internal/public-api/keys/verify'
+    pathname === '/api/internal/public-api/keys/verify' ||
+    (pathname === '/api/public-data' && request.method === 'POST') ||
+    (pathname.startsWith('/api/signals/') && request.method === 'POST')
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (
     !previewBot &&
-    !publicDocumentationRoute &&
+    !publicInformationRead &&
     !monitoringHealthRoute &&
     !machineAuthRoute
   ) {
@@ -434,7 +508,7 @@ export async function middleware(request: NextRequest) {
   if (
     pageRoute &&
     !previewBot &&
-    !publicDocumentationRoute &&
+    !publicInformationRead &&
     !isServerAction &&
     !isRscRequest
   ) {
@@ -556,7 +630,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Stage 4: JS Challenge Gate (all page routes, first visit) ───────────
-  if (pageRoute && !previewBot && !publicDocumentationRoute) {
+  if (pageRoute && !previewBot && !publicInformationRead) {
     const challengeCookie = request.cookies.get('__cc')?.value
     if (!isValidChallengeCookie(challengeCookie)) {
       const challengeHtml = buildChallengeHtml(request.url)
@@ -586,22 +660,87 @@ export async function middleware(request: NextRequest) {
   // ── Stage 5: Conditional Supabase Session Refresh ───────────────────────
   let response: NextResponse
 
-  // Only call Supabase if auth cookies exist
+  const loginRequired = requiresLogin(pathname)
+  const guestPreview =
+    pathname === '/search' || /^\/user\/[^/]+\/?$/.test(pathname)
+  let authenticated = false
+
+  // Chunked Supabase sessions use -auth-token.0, -auth-token.1, etc.
   const hasAuthCookies = request.cookies
     .getAll()
-    .some((c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
+    .some((c) => /^sb-.+-auth-token(?:\.\d+)?$/.test(c.name))
 
   if (hasAuthCookies) {
     try {
-      const { supabase, response: supabaseResponse } =
-        createMiddlewareClient(request)
-      await supabase.auth.getSession()
-      response = supabaseResponse
+      const client = createMiddlewareClient(request)
+      if (loginRequired) {
+        const { data, error } = await client.supabase.auth.getUser()
+        authenticated = !error && Boolean(data.user)
+      } else {
+        await client.supabase.auth.getSession()
+      }
+      response = client.response
     } catch {
       response = NextResponse.next({ request: { headers: request.headers } })
     }
   } else {
     response = NextResponse.next({ request: { headers: request.headers } })
+  }
+
+  // A signed-out profile view is the same for everyone, so it is served by
+  // the cached /guest route instead of the per-viewer page. The URL stays
+  // /user/..., and only this response may skip the private cache header.
+  const guestProfileRewrite =
+    loginRequired &&
+    !authenticated &&
+    guestPreview &&
+    request.method === 'GET' &&
+    pathname.startsWith('/user/')
+
+  if (loginRequired) {
+    if (!authenticated && !guestPreview) {
+      const returnUrl = request.nextUrl.clone()
+      returnUrl.searchParams.delete('_rsc')
+      const denied = pathname.startsWith('/api/')
+        ? NextResponse.json(
+            { error: 'Authentication required' },
+            { status: 401 },
+          )
+        : NextResponse.redirect(
+            new URL(
+              loginHref(returnUrl.pathname + returnUrl.search),
+              request.url,
+            ),
+          )
+      for (const cookie of response.cookies.getAll()) denied.cookies.set(cookie)
+      for (const name of ['cache-control', 'expires', 'pragma']) {
+        const value = response.headers.get(name)
+        if (value) denied.headers.set(name, value)
+      }
+      response = denied
+    } else if (guestProfileRewrite) {
+      response = rewriteToGuestView(
+        request,
+        `/guest/user${pathname.slice('/user'.length)}`,
+        response,
+      )
+    }
+    if (!guestProfileRewrite) {
+      response.headers.set('Cache-Control', 'private, no-store')
+    }
+    response.headers.set('X-Robots-Tag', 'noindex')
+  }
+
+  // Tweet permalinks show conversation only to visitors with live opt-in
+  // consent, which needs a session. Without a session cookie every visitor
+  // sees the same main-tweet preview, so it comes from the cached guest route
+  // and the consent-checked page is rendered only for signed-in visitors.
+  if (
+    request.method === 'GET' &&
+    !hasAuthCookies &&
+    /^\/tweets\/\d{1,20}\/?$/.test(pathname)
+  ) {
+    response = rewriteToGuestView(request, `/guest${pathname}`, response)
   }
 
   // ── Stage 6: Security Headers (all responses) ──────────────────────────

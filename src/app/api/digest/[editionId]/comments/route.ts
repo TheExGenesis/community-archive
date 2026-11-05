@@ -11,10 +11,10 @@ import {
   resolveCommenterIdentity,
 } from '@/lib/digest/comments'
 
-type Params = { params: { editionId: string } }
+type RouteParams = { editionId: string }
 
 const viewerId = async () => {
-  const supabase = createDigestPublicClient(cookies())
+  const supabase = createDigestPublicClient(await cookies())
   const {
     data: { user },
     error,
@@ -22,7 +22,11 @@ const viewerId = async () => {
   return error ? null : (user ?? null)
 }
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const edition = await ensurePublishedEdition(params.editionId)
   if ('error' in edition) return edition.error
 
@@ -50,7 +54,11 @@ export async function GET(_request: Request, { params }: Params) {
   })
 }
 
-export async function POST(request: Request, { params }: Params) {
+export async function POST(
+  request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const user = await viewerId()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

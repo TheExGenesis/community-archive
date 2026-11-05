@@ -1,43 +1,62 @@
 import 'server-only'
 import { cache } from 'react'
-import { headers } from 'next/headers'
-import { isCrawlerAgent, isLinkPreviewAgent } from '@/lib/crawlers'
+import { canReadTweetConversation } from '@/lib/tweetConversationAccess'
 import { getTweetPageData } from '@/lib/getTweetPageData'
 import { buildTweetPageSubject } from './subject'
-import { getStoredTweetPageSummary, getTweetPageSummary } from './store'
+import { getStoredTweetPageSummary } from './store'
+import type { GeneratedSummary } from './generation'
 
 /**
- * Permalink data plus its subject and any summary that can be shown without
- * waiting. Metadata, the page body, and the share image all read through
- * this, so one request loads once. A first visit by a person gets the page
- * at once with `summaryPending` set, and the body streams the summary in.
- * Unfurlers only read the head, so they wait for generation instead.
- * Crawlers get stored summaries but never trigger a paid generation.
+ * The signed-out view: the main tweet alone, with no thread, quotes, or
+ * summary. It never reads the request, so the /guest/tweets route can render
+ * it once and serve every cookie-less visitor from the cache, and the share
+ * image (always fetched without a session) reads the same record.
  */
-export const loadTweetPage = cache(
+export const loadGuestTweetPage = cache(
   async (tweetId: string, clickhouseOnly = false) => {
     const data = await getTweetPageData(tweetId, {
       clickhouseOnly,
       deferQuotePosts: true,
+      skipQuotePosts: true,
     })
     if (!data.tweet) return null
-    const subject = buildTweetPageSubject(data.tweet, data.threadTree)
-    const page = { ...data, tweet: data.tweet, subject }
-    const stored = await getStoredTweetPageSummary(subject)
-    if (stored !== 'missing')
-      return { ...page, summary: stored, summaryPending: false }
-
-    const userAgent = headers().get('user-agent')
-    if (isLinkPreviewAgent(userAgent))
-      return {
-        ...page,
-        summary: await getTweetPageSummary(subject, true),
-        summaryPending: false,
-      }
     return {
-      ...page,
-      summary: null,
-      summaryPending: !isCrawlerAgent(userAgent),
+      tweet: data.tweet,
+      threadTree: null,
+      quotingTweets: [],
+      quotingTweetCount: 0,
+      quotePosts: undefined,
+      subject: buildTweetPageSubject(data.tweet, null),
+      summary: null as GeneratedSummary | null,
+      summaryPending: false,
+      canReadConversation: false,
     }
   },
 )
+
+/**
+ * Shared by the dynamic page and its metadata. Restricted conversation data
+ * is removed before it can reach a guest render or client props: a visitor
+ * without live consent gets exactly the cached guest view.
+ */
+export const loadTweetPage = cache(
+  async (tweetId: string, clickhouseOnly = false) => {
+    const canReadConversation = await canReadTweetConversation()
+    if (!canReadConversation) return loadGuestTweetPage(tweetId, clickhouseOnly)
+
+    const data = await getTweetPageData(tweetId, {
+      clickhouseOnly,
+      deferQuotePosts: true,
+      skipQuotePosts: false,
+    })
+    if (!data.tweet) return null
+    const subject = buildTweetPageSubject(data.tweet, data.threadTree)
+    const page = { ...data, tweet: data.tweet, subject, canReadConversation }
+    const stored = await getStoredTweetPageSummary(subject)
+    if (stored !== 'missing')
+      return { ...page, summary: stored, summaryPending: false }
+    return { ...page, summary: null, summaryPending: true }
+  },
+)
+
+export type TweetPage = NonNullable<Awaited<ReturnType<typeof loadTweetPage>>>

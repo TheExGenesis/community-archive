@@ -2,6 +2,35 @@ import { parseDigestEditionContent } from './types'
 import { AUGUST_11_MOCK_DIGEST, isDigestPreviewEnabled } from './mock'
 
 describe('daily digest preview fixture', () => {
+  test('production public-read mode uses published editions unless fixtures are explicitly requested', () => {
+    expect(
+      isDigestPreviewEnabled({
+        VERCEL_ENV: 'preview',
+        DATA_READ_SOURCE: 'production',
+      }),
+    ).toBe(false)
+    expect(
+      isDigestPreviewEnabled({
+        VERCEL_ENV: 'preview',
+        DATA_READ_SOURCE: 'production',
+        DIGEST_MOCK_DATA: 'true',
+      }),
+    ).toBe(true)
+  })
+  test('can use published data explicitly in previews and local development', () => {
+    expect(
+      isDigestPreviewEnabled({
+        VERCEL_ENV: 'preview',
+        DIGEST_MOCK_DATA: 'false',
+      }),
+    ).toBe(false)
+    expect(
+      isDigestPreviewEnabled({
+        NODE_ENV: 'development',
+        DIGEST_MOCK_DATA: 'false',
+      }),
+    ).toBe(false)
+  })
   test('is a valid preview edition', () => {
     expect(
       parseDigestEditionContent(AUGUST_11_MOCK_DIGEST.content),

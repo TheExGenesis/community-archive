@@ -16,17 +16,18 @@ export const metadata: Metadata = {
 export default async function StrandsPage({
   searchParams,
 }: {
-  searchParams: { q?: string; page?: string; cluster?: string }
+  searchParams: Promise<{ q?: string; page?: string; cluster?: string }>
 }) {
+  const resolvedSearchParams = await searchParams
   const { strands, generatedAt } = await getStrands()
   const query =
-    typeof searchParams.q === 'string'
-      ? searchParams.q.trim().slice(0, 120)
+    typeof resolvedSearchParams.q === 'string'
+      ? resolvedSearchParams.q.trim().slice(0, 120)
       : ''
   const group =
-    typeof searchParams.cluster === 'string' &&
-    /^\d+$/.test(searchParams.cluster)
-      ? Number(searchParams.cluster)
+    typeof resolvedSearchParams.cluster === 'string' &&
+    /^\d+$/.test(resolvedSearchParams.cluster)
+      ? Number(resolvedSearchParams.cluster)
       : undefined
   const cluster = strands.some((s) => s.position?.cluster === group)
     ? group

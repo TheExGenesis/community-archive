@@ -700,6 +700,34 @@ export function PortalNotes({
   )
 }
 
+export function HomepageHighlightsLayout({
+  digest,
+  trends,
+  research,
+}: Record<'digest' | 'trends' | 'research', ReactNode>) {
+  return (
+    <div className="mx-auto max-w-6xl space-y-6 px-5 py-6 sm:px-7">
+      <div id="daily-digest" className="scroll-mt-20">
+        {digest}
+      </div>
+      <div className="grid items-start gap-6 md:grid-cols-2">
+        {trends}
+        <div className="space-y-6">
+          {research}
+          <UtilityLink
+            href={ARCHIVE_EXPORT_URL}
+            destination="data_export"
+            title="Daily data export"
+            note="Tweets and profiles in Parquet"
+            action="Download"
+            icon={<FaDatabase className="h-[17px] w-[17px]" />}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function HomePortalLayout({
   overview,
   digest,

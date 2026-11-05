@@ -48,7 +48,7 @@ const read = (feature: string, query = '', authorization?: string) =>
       `https://www.community-archive.org/api/companion/v1/${feature}?${query}`,
       { headers: authorization ? { Authorization: authorization } : {} },
     ),
-    { params: { feature } },
+    { params: Promise.resolve({ feature }) },
   )
 const digest = (status = 'published') =>
   ({

@@ -7,6 +7,9 @@ const V1_OPENAPI_URL = 'https://analytics.community-archive.org/v1/openapi.json'
 const V1_MIGRATION_GUIDE_URL =
   'https://github.com/TheExGenesis/community-archive/blob/main/docs/api-v1-migration.md'
 const API_KEYS_URL = '/settings/api-keys'
+const SEMANTIC_SEARCH_URL = 'https://embed.tweetstack.app'
+const SEMANTIC_SEARCH_GUIDE_URL =
+  'https://github.com/TheExGenesis/community-archive/blob/main/docs/api-doc.md#semantic-search-api'
 const API_URL = 'https://fabxmporizzqflnftavs.supabase.co'
 const EXPORT_RELEASE_URL =
   'https://github.com/TheExGenesis/community-archive/releases/latest'
@@ -14,6 +17,20 @@ const EXPORT_POINTER_URL =
   'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json'
 const ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
+const semanticSearchCurlExample = `curl -s -X POST ${SEMANTIC_SEARCH_URL}/embeddings/search \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "searchTerm": "you can just do things",
+    "k": 10,
+    "threshold": 0.6,
+    "filter": {
+      "must": [
+        { "key": "username", "match": { "value": "exgenesis" } },
+        { "key": "created_at", "range": { "gte": "2025-01-01T00:00:00Z" } }
+      ]
+    }
+  }'`
+
 export const metadata: Metadata = {
   title: 'Docs | Community Archive',
   description:
@@ -378,6 +395,94 @@ export default function DocsPage() {
           </div>
         </section>
 
+        <section className="space-y-8" id="semantic-search">
+          <div className="max-w-3xl">
+            <h2 className="text-3xl font-bold text-foreground">
+              Semantic search
+            </h2>
+            <p className="mt-2 leading-7 text-muted-foreground">
+              Find tweets by meaning rather than exact words. The service embeds
+              your query with the corpus model (
+              <code>Qwen/Qwen3-Embedding-4B</code>) and returns the nearest
+              tweets by cosine similarity from the consent-filtered corpus,
+              refreshed every ten minutes. No key is needed; each client gets
+              100 requests a minute. Results carry the tweet ID, so hydrate them
+              through <code>GET /v1/tweets?ids=</code> above when you need
+              counts, media, or the conversation.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">cURL</h3>
+            <CodeBlock>{semanticSearchCurlExample}</CodeBlock>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-border bg-card p-5">
+              <h3 className="font-semibold text-foreground">Request</h3>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li>
+                  <code>POST {SEMANTIC_SEARCH_URL}/embeddings/search</code> with
+                  a JSON body
+                </li>
+                <li>
+                  <code>searchTerm</code> (text) or a 1,024-dimension{' '}
+                  <code>vector</code> from the same model, not both
+                </li>
+                <li>
+                  <code>k</code> results (default 10, up to 1,000) above{' '}
+                  <code>threshold</code> similarity (default 0.65; lower it for
+                  broader results)
+                </li>
+                <li>
+                  <code>filter</code> with <code>must</code>,{' '}
+                  <code>should</code>, and <code>must_not</code> arrays of{' '}
+                  <code>&#123;key, match&#125;</code> or{' '}
+                  <code>&#123;key, range&#125;</code> conditions
+                </li>
+                <li>
+                  <code>GET /embeddings/stats</code> for the current index size
+                </li>
+              </ul>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-5">
+              <h3 className="font-semibold text-foreground">Rules</h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                <li>
+                  Responses are <code>&#123;success, results, count&#125;</code>
+                  ; each result has <code>key</code> (the tweet ID),{' '}
+                  <code>distance</code> (similarity, higher is closer), and{' '}
+                  <code>metadata</code> with username, account ID, text, and{' '}
+                  <code>created_at</code>.
+                </li>
+                <li>
+                  Filter on <code>username</code>, <code>account_id</code>, or{' '}
+                  <code>created_at</code> for speed; a <code>text</code>{' '}
+                  substring filter runs after retrieval and can return fewer
+                  than <code>k</code>.
+                </li>
+                <li>
+                  On <code>429</code>, wait for the{' '}
+                  <code>X-RateLimit-Reset</code> seconds and retry. A{' '}
+                  <code>400</code> with{' '}
+                  <code>&#123;success: false, error&#125;</code> means the body
+                  was invalid.
+                </li>
+                <li>
+                  <Link
+                    href={SEMANTIC_SEARCH_GUIDE_URL}
+                    className="font-medium text-brand"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Full field and filter reference
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <section className="space-y-8" id="legacy-api">
           <div className="max-w-3xl">
             <h2 className="text-3xl font-bold text-foreground">
@@ -478,6 +583,9 @@ export default function DocsPage() {
             </ResourceLink>
             <ResourceLink href={V1_MIGRATION_GUIDE_URL}>
               API v1 migration guide
+            </ResourceLink>
+            <ResourceLink href={SEMANTIC_SEARCH_GUIDE_URL}>
+              Semantic search guide
             </ResourceLink>
             <ResourceLink href="https://github.com/TheExGenesis/community-archive/blob/main/docs/api-doc.md">
               Legacy API guide

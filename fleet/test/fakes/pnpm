@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Fake `pnpm` for the gate. FAKE_PNPM_LOG records calls. FAKE_PNPM_FAIL names a
+# script (lint, type-check, test:security, test:ci) that fails for the first
+# FAKE_PNPM_FAIL_TIMES calls (default 1).
+set -euo pipefail
+: "${FAKE_PNPM_LOG:?FAKE_PNPM_LOG must be set}"
+printf '%q ' "$@" >>"$FAKE_PNPM_LOG"
+echo >>"$FAKE_PNPM_LOG"
+script="${1:-}"
+if [[ -n "${FAKE_PNPM_FAIL:-}" && "$script" == "$FAKE_PNPM_FAIL" ]]; then
+  count="$(grep -c "^$script " "$FAKE_PNPM_LOG" || true)"
+  if [[ "$count" -le "${FAKE_PNPM_FAIL_TIMES:-1}" ]]; then
+    echo "fake pnpm: $script failed (attempt $count)" >&2
+    exit 1
+  fi
+fi
+echo "fake pnpm: $script ok"

@@ -8,8 +8,9 @@ const UUID_PATTERN =
 
 export async function POST(
   _request: Request,
-  { params }: { params: { editionId: string } },
+  { params: paramsPromise }: { params: Promise<{ editionId: string }> },
 ) {
+  const params = await paramsPromise
   if (!UUID_PATTERN.test(params.editionId)) {
     return NextResponse.json({ error: 'Edition not found' }, { status: 404 })
   }

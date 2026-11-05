@@ -12,7 +12,7 @@ test('increments a published digest and returns its new view count', async () =>
   const rpc = jest.fn().mockResolvedValue({ data: 42, error: null })
   jest.mocked(createDigestAdminClient).mockReturnValue({ rpc } as never)
   const response = await POST(new Request('http://localhost'), {
-    params: { editionId: ID },
+    params: Promise.resolve({ editionId: ID }),
   })
   expect(response.status).toBe(200)
   expect(response.headers.get('Cache-Control')).toBe('no-store')
@@ -22,7 +22,7 @@ test('increments a published digest and returns its new view count', async () =>
 
 test('rejects a malformed edition id before touching the database', async () => {
   const response = await POST(new Request('http://localhost'), {
-    params: { editionId: 'invalid' },
+    params: Promise.resolve({ editionId: 'invalid' }),
   })
   expect(response.status).toBe(404)
   expect(createDigestAdminClient).not.toHaveBeenCalled()

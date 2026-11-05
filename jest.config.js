@@ -36,6 +36,8 @@ const customJestConfig = {
       ...commonConfig,
       displayName: 'client',
       testEnvironment: 'jsdom',
+      // Tiptap Markdown loads marked's ESM entry; transform it for Jest's CJS runtime.
+      transformIgnorePatterns: ['/node_modules/(?!(?:\\.pnpm/)?marked(?:@|/))'],
       testMatch: ['<rootDir>/src/**/*.test.{js,jsx,ts,tsx}'],
       testPathIgnorePatterns: ['<rootDir>/src/lib/', '\\.live\\.test\\.tsx$'],
       setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],

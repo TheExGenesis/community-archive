@@ -40,7 +40,9 @@ function setup() {
 }
 
 const call = (handler: typeof POST, id = tweetId) =>
-  handler(new Request('http://localhost'), { params: { tweet_id: id } })
+  handler(new Request('http://localhost'), {
+    params: Promise.resolve({ tweet_id: id }),
+  })
 
 describe('tweet like route', () => {
   beforeEach(() => {

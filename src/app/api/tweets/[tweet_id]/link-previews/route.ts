@@ -7,8 +7,9 @@ export const maxDuration = 15
 
 export async function GET(
   _request: Request,
-  { params }: { params: { tweet_id: string } },
+  { params: paramsPromise }: { params: Promise<{ tweet_id: string }> },
 ) {
+  const params = await paramsPromise
   if (!/^\d{1,20}$/.test(params.tweet_id)) {
     return NextResponse.json(
       { error: 'Invalid tweet ID' },

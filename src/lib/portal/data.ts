@@ -52,6 +52,9 @@ interface PortalCorpusRange {
 interface PortalGlobalStats {
   totalTweets: number
   memberCount: number
+  membersAddedLastHour?: number | null
+  membersAddedLast24Hours?: number | null
+  membershipSnapshotAt?: string | null
   addedLast24Hours: number | null
   generatedAt: string
 }
@@ -63,6 +66,8 @@ interface ClickHouseSummaryResponse {
     sourceUpdatedAt: unknown
     collectedAt: unknown
     membershipSnapshotAt: unknown
+    membersAddedLastHour?: unknown
+    membersAddedLast24Hours?: unknown
     addedLast24Hours?: unknown
     source: string
     countMode: string
@@ -268,6 +273,28 @@ export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
       response.data.memberAccounts,
       'ClickHouse member count',
     ),
+    // Optional during the gateway-first rollout; never invent a zero.
+    membersAddedLastHour:
+      response.data.membersAddedLastHour == null
+        ? null
+        : portalClickHouseCount(
+            response.data.membersAddedLastHour,
+            'members added in the last hour',
+          ),
+    membersAddedLast24Hours:
+      response.data.membersAddedLast24Hours == null
+        ? null
+        : portalClickHouseCount(
+            response.data.membersAddedLast24Hours,
+            'members added in the last 24 hours',
+          ),
+    membershipSnapshotAt:
+      response.data.membershipSnapshotAt == null
+        ? null
+        : portalClickHouseTimestamp(
+            String(response.data.membershipSnapshotAt),
+            'membership snapshot timestamp',
+          ),
     // Older gateway releases omit the field; null hides the 24h note.
     addedLast24Hours:
       response.data.addedLast24Hours == null
@@ -802,7 +829,7 @@ const getCachedCorpusRange = unstable_cache(
 )
 const getCachedGlobalStats = unstable_cache(
   async (_sourceKey: string) => fetchPortalGlobalStats(),
-  ['portal-global-stats-v2'],
+  ['portal-global-stats-v3'],
   { revalidate: 60 },
 )
 const getCachedJoinedThisWeek = unstable_cache(
@@ -1130,11 +1157,10 @@ export async function getPortalData(
 
 /**
  * Start independent section promises. Never return Promise.all here: the hero,
- * stream, digest and cards have separate Suspense boundaries and failure states.
+ * digest and cards have separate Suspense boundaries and failure states.
  */
 export function startHomepageData() {
   const sourceKey = portalDataSourceKey()
-  const today = new Date().toISOString().slice(0, 10)
   const globalStats = loadPortalComponentData(
     'global-stats',
     () => getCachedGlobalStats(sourceKey),
@@ -1145,58 +1171,8 @@ export function startHomepageData() {
       generatedAt: new Date().toISOString(),
     },
   )
-  const joinedThisWeek = loadPortalComponentData(
-    'joined-this-week',
-    () => getCachedJoinedThisWeek(sourceKey),
-    0,
-  )
-  const corpusRange = loadPortalComponentData(
-    'corpus-range',
-    () => getCachedCorpusRange(sourceKey),
-    { firstYear: 0, currentYear: 0 },
-  )
-  const overview = Promise.all([
-    globalStats,
-    joinedThisWeek,
-    corpusRange,
-  ]).then(([global, joined, range]) => ({
-    stats: {
-      totalTweets: global.data.totalTweets,
-      accountCount: global.data.memberCount,
-      generatedAt: global.data.generatedAt,
-      addedLast24Hours: global.data.addedLast24Hours,
-      joinedThisWeek: joined.data,
-      ...range.data,
-    },
-    failures: {
-      liveAnalytics: global.failed,
-      memberCount: global.failed,
-      joinedThisWeek: joined.failed,
-      corpusRange: range.failed,
-    },
-  }))
   return {
     globalStats,
-    overview,
-    stream: loadPortalComponentData(
-      'initial-stream',
-      async () =>
-        selectHomepageStream(
-          await getCachedHomepageStreamCandidates(sourceKey),
-          30,
-        ),
-      [],
-    ),
-    recentBangers: loadPortalComponentData(
-      'recent-bangers',
-      () => getCachedRecentBangers(sourceKey),
-      [],
-    ),
-    historicalBangers: loadPortalComponentData(
-      'historical-bangers',
-      () => getCachedHistoricalBangers(sourceKey, today),
-      [],
-    ),
     trends: loadPortalComponentData(
       'weekly-trends',
       // The gateway caches by UTC day and membership. Read it directly so a

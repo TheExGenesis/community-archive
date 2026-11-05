@@ -1,3 +1,4 @@
+import { browsingAuthError } from '@/lib/browsingAuth'
 import { NextResponse } from 'next/server'
 import {
   getProfileBangersPage,
@@ -20,20 +21,19 @@ const avatarResponse = (
     {
       status,
       headers: {
-        'Cache-Control':
-          status === 200
-            ? 'public, s-maxage=3600, stale-while-revalidate=86400'
-            : status === 404
-              ? 'public, s-maxage=300'
-              : 'private, no-store',
+        'Cache-Control': 'private, no-store',
       },
     },
   )
 
 export async function GET(
   request: Request,
-  { params }: { params: { account_id: string } },
+  { params: paramsPromise }: { params: Promise<{ account_id: string }> },
 ) {
+  const params = await paramsPromise
+  const authError = await browsingAuthError()
+  if (authError) return authError
+
   if (!ACCOUNT_ID_PATTERN.test(params.account_id)) {
     return NextResponse.json(
       { error: 'Invalid profile account' },

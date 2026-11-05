@@ -83,6 +83,7 @@ describe('archive file deletion route', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ removed: 3 })
     expect(mockedUsername).toHaveBeenCalledWith(user)
+    expect(mockedServiceRoleClient).toHaveBeenCalledWith({ readSource: 'app' })
     expect(mockedRemove).toHaveBeenCalledWith(serviceClient, 'verified_owner')
   })
 

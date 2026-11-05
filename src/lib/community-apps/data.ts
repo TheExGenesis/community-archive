@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { publicDataConfig } from '@/lib/publicDataSource'
+import { readDirectoryMembers } from '@/lib/directoryMembers'
 import type { AppDataManifest, BirdseyeAnalysis, Strand } from './types'
 import positions from './strand-positions.json'
 import display from './strand-display.json'
@@ -17,7 +19,7 @@ const BUCKET = 'community-app-data'
 // Only normalized display data lives here. Never expose private Storage URLs,
 // credentials, pickle files, original archives, or embedding vectors.
 const readSnapshot = unstable_cache(
-  async (key: string): Promise<unknown> => {
+  async (key: string, _source: string): Promise<unknown> => {
     if (!/^[a-zA-Z0-9_./-]+$/.test(key) || key.includes('..'))
       throw new Error('Invalid app data path')
     if (process.env.COMMUNITY_APP_DATA_DIR) {
@@ -39,56 +41,63 @@ const readSnapshot = unstable_cache(
 )
 
 export async function getAppDataManifest(): Promise<AppDataManifest> {
-  const manifest = (await readSnapshot('manifest.json')) as AppDataManifest
+  const manifest = (await readSnapshot(
+    'manifest.json',
+    publicDataConfig().sourceId,
+  )) as AppDataManifest
   if (manifest.version !== 1 || !/^v1\/[a-zA-Z0-9_-]+$/.test(manifest.prefix))
     throw new Error('Unsupported community app data manifest')
   return manifest
 }
 // Policy is checked on every request, independently of the snapshot cache.
 export async function getAppPolicy(usernames: string[]) {
-  const admin = createServerServiceRoleClient()
-  const blocked = new Set<string>()
-  const blockedIds = new Set<string>()
-  for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await admin
-      .from('optin')
-      .select('username,twitter_user_id')
-      .eq('explicit_optout', true)
-      .order('id')
-      .range(offset, offset + 999)
-    if (error) throw new Error('Community app consent check failed')
-    for (const row of data ?? []) {
-      blocked.add(row.username.toLowerCase())
-      if (row.twitter_user_id) blockedIds.add(row.twitter_user_id)
-    }
-    if ((data ?? []).length < 1000) break
-  }
-  const members = new Set<string>()
+  const admin = createServerServiceRoleClient({ noStore: true })
   const names = Array.from(
     new Set(usernames.map((name) => name.toLowerCase())),
   ).filter((name) => /^[a-z0-9_]{1,15}$/.test(name))
-  for (let offset = 0; offset < names.length; offset += 40) {
-    const { data, error } = await admin
-      .from('user_directory')
-      .select('account_id,username,has_archive,is_opted_in')
-      .or(
-        names
-          .slice(offset, offset + 40)
-          .map((name) => `username.ilike.${name}`)
-          .join(','),
-      )
-    if (error) throw new Error('Community app membership check failed')
-    for (const row of data ?? []) {
-      if (
-        row.username &&
-        names.includes(row.username.toLowerCase()) &&
-        !blockedIds.has(row.account_id ?? '') &&
-        (row.has_archive || row.is_opted_in) &&
-        !blocked.has(row.username.toLowerCase())
-      )
-        members.add(row.username.toLowerCase())
+  const nameSet = new Set(names)
+  const loadOptouts = async () => {
+    const blocked = new Set<string>()
+    const blockedIds = new Set<string>()
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await admin
+        .from('optin')
+        .select('username,twitter_user_id')
+        .eq('explicit_optout', true)
+        .order('id')
+        .range(offset, offset + 999)
+      if (error) throw new Error('Community app consent check failed')
+      for (const row of data ?? []) {
+        blocked.add(row.username.toLowerCase())
+        if (row.twitter_user_id) blockedIds.add(row.twitter_user_id)
+      }
+      if ((data ?? []).length < 1000) break
     }
+    return { blocked, blockedIds }
   }
+  const loadCandidates = async () =>
+    (await readDirectoryMembers(admin, names)).flatMap((row) =>
+      nameSet.has(row.username.toLowerCase())
+        ? [
+            {
+              username: row.username.toLowerCase(),
+              accountId: row.account_id ?? '',
+            },
+          ]
+        : [],
+    )
+  // Never publish candidates until BOTH current membership and consent succeed.
+  const [{ blocked, blockedIds }, candidates] = await Promise.all([
+    loadOptouts(),
+    loadCandidates(),
+  ])
+  const members = new Set(
+    candidates
+      .filter(
+        (row) => !blocked.has(row.username) && !blockedIds.has(row.accountId),
+      )
+      .map((row) => row.username),
+  )
   return { blocked, blockedIds, members }
 }
 export function hasBlockedParticipant(
@@ -106,6 +115,7 @@ export async function getBirdseyeAnalysis(
     throw new Error('Invalid Birdseye username')
   const analysis = (await readSnapshot(
     `${manifest.prefix}/birdseye/${username}.json`,
+    publicDataConfig().sourceId,
   )) as BirdseyeAnalysis
   const hidden = new Set(
     manifest.birdseye.find((entry) => entry.username === username)
@@ -124,6 +134,7 @@ async function loadStrands() {
   const manifest = await getAppDataManifest()
   const strands = (await readSnapshot(
     `${manifest.prefix}/strands.json`,
+    publicDataConfig().sourceId,
   )) as Strand[]
   const policy = await getAppPolicy(strands.map((strand) => strand.username))
   return {
@@ -173,6 +184,7 @@ export async function getVisibleStrand(seed: string) {
   const manifest = await getAppDataManifest()
   const strands = (await readSnapshot(
     `${manifest.prefix}/strands.json`,
+    publicDataConfig().sourceId,
   )) as Strand[]
   const strand = strands.find((item) => item.id === seed)
   if (!strand) return null

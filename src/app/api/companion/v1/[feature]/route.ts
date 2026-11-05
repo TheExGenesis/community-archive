@@ -16,8 +16,9 @@ const json = (body: unknown, status = 200) =>
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { feature: string } },
+  { params: paramsPromise }: { params: Promise<{ feature: string }> },
 ) {
+  const params = await paramsPromise
   let input
   try {
     input = parseArchiveInput(params.feature, request.nextUrl.searchParams)

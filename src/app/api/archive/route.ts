@@ -31,7 +31,7 @@ export async function DELETE() {
 
   try {
     const removed = await removeArchiveObjects(
-      createServerServiceRoleClient(),
+      createServerServiceRoleClient({ readSource: 'app' }),
       username,
     )
     return NextResponse.json({ removed })

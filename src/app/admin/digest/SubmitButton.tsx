@@ -1,8 +1,6 @@
 'use client'
 
 import type { ReactNode } from 'react'
-// Next.js 14 supplies React DOM's canary form hook at runtime.
-// @ts-expect-error The installed stable React DOM types do not expose it yet.
 import { useFormStatus } from 'react-dom'
 
 export function SubmitButton({

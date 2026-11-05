@@ -8,14 +8,18 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Params = { params: { seed: string; commentId: string } }
+type RouteParams = { seed: string; commentId: string }
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Authors can remove their own comment even after a strand is hidden, so this
 // deliberately skips the visibility check the other strand routes make.
-export async function DELETE(_request: Request, { params }: Params) {
+export async function DELETE(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

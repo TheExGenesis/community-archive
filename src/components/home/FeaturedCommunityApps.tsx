@@ -9,7 +9,7 @@ import {
 } from '@/lib/communityProjects'
 import { loadPublishedCommunityProjects } from '@/lib/communityProjectDatabase'
 
-/** Admins choose the featured projects from the Community Gallery. */
+/** Admin-featured projects lead the two rows of existing gallery builds. */
 async function LiveFeaturedCommunityApps() {
   const published = await loadPublishedCommunityProjects({ withCounts: false })
   return (

@@ -32,14 +32,14 @@ describe('site navigation', () => {
     expect(navAnalyticsDestination('/community')).toBe('community')
   })
 
-  it('leads with Home and the digest, then three menus, then Research', () => {
+  it('leads with Home and the digest, then Explore, Community, Tools, Research', () => {
     const nav = getPrimaryNav()
     expect(nav.map((entry) => entry.label)).toEqual([
       'Home',
       "Today's Digest",
-      'Ideas',
       'Explore archive',
       'Community',
+      'Tools',
       'Research',
     ])
     const menus = Object.fromEntries(
@@ -51,26 +51,26 @@ describe('site navigation', () => {
         ]),
     )
     expect(menus).toEqual({
-      Ideas: [
-        ['Bangers', '/bangers?period=week'],
-        ['Strands', '/strands'],
-      ],
       'Explore archive': [
         ['Ask the archive', '/search/ask'],
         ['Explore by user', '/user-dir'],
         ['Live Stream', '/stream'],
+      ],
+      Tools: [
+        ['Bangers', '/bangers?period=week'],
+        ['Strands', '/strands'],
+        ['Conversation Map', '/conversation-map'],
+        ['CA Tube', '/tube'],
+        ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
         ['Social Graph', '/social-graph'],
-      ],
-      Community: [
-        ['Bulletin Board', '/bulletin'],
-        ['Community Apps', '/community'],
       ],
     })
     expect(nav.slice(0, 2)).toEqual([
       { href: '/', label: 'Home' },
       { href: '/digest', label: "Today's Digest" },
     ])
+    expect(nav[3]).toEqual({ href: '/community', label: 'Community' })
     expect(nav[5]).toEqual({ href: '/research', label: 'Research' })
     for (const item of nav.filter(isNavGroup).flatMap((g) => g.items)) {
       expect(item.description).toMatch(/\.$/)
@@ -91,8 +91,8 @@ describe('site navigation', () => {
     expect(isNavItemActive('/stream', '/stream')).toBe(true)
     expect(isNavItemActive('/strands/abc', '/strands')).toBe(true)
     expect(isNavItemActive('/search', '/bangers?period=week')).toBe(false)
-    const [ideas, explore] = getPrimaryNav().filter(isNavGroup)
-    expect(isNavGroupActive('/strands/abc', ideas)).toBe(true)
+    const [explore, tools] = getPrimaryNav().filter(isNavGroup)
+    expect(isNavGroupActive('/strands/abc', tools)).toBe(true)
     expect(isNavGroupActive('/strands/abc', explore)).toBe(false)
   })
 })

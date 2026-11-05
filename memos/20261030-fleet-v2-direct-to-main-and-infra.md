@@ -208,6 +208,35 @@ model for the fix), and the size cap. A rough budget for 3–5 fixes a day:
 | Canary, pipeline    | < $20 (scripts; LLM only on anomaly)                                        |
 | Recompile, one area | $50–150 per run                                                             |
 
+## Slack agent (added 2026-11-02)
+
+Decision (Christine, 2026-11-02): start conversationally. Before the fixer
+runs on a timer, a Claude Code she and xiq talk to in Slack picks up the
+obvious issues, asks when something is unclear, and asks whether to merge
+when a change is not obvious or is large. Claude Tag (Anthropic's hosted
+Slack product) was rejected because the system has to stay extensible and
+ours; phase 0 and the `ca-fleet` box stay as they are.
+
+Shape (`fleet/slack/`, PR in the product repo; unit, env and runbook in
+control-panel): a long-running Socket Mode service under the `fleet` user,
+started by `fleet-run slack`. One Slack thread is one Claude session, one
+run directory and one worktree; replies resume the session. The same bash
+underneath as the fixer, exposed as `fleet/bin/task.sh` subcommands: the
+gate, the Tier 1 guard, worktrees, commit/push/PR, read-back, `result.json`,
+metrics, failure signals. Standing rules in `fleet/slack/INSTRUCTIONS.md`
+(the two tiers above, one issue per change, ask before editing when not
+obvious / over 300 lines / near auth, consent, API contracts or data, never
+push to `main`), reloaded per run so they can be edited without a deploy.
+
+What changes in the tiers table: for now nothing lands on `main` without a
+human click. Tier 0 merges from the Slack button after the gate is green and
+CI on the PR is green; Tier 1 always ends in a PR a human merges on GitHub,
+and the button is withheld. `FLEET_MODE=main` stays defined for the fixer
+and unused by the Slack agent. Inbox issues reach Slack every five minutes,
+one thread each, with a one-turn classification and a "Go ahead" button; no
+fix starts without it. The fixer timer stays disabled while this is the way
+work gets done; flipping it on later is the same host operation as before.
+
 ## Phase 1, revised
 
 1. `fleet/bin/fixer.sh` + `fleet/prompts/fixer.md`: inbox → fix → gate →

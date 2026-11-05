@@ -414,6 +414,25 @@ function isPublicInformationRoute(pathname: string): boolean {
   )
 }
 
+function memberPreviewEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' ||
+    process.env.NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW === 'true'
+  )
+}
+
+/**
+ * A link to an Ask the archive conversation. It may be shared, which makes
+ * it readable signed out, and only the page can tell (it reads the share);
+ * an unshared one gets the page's own sign-in prompt, which returns here.
+ */
+function sharedAskLink(url: URL): boolean {
+  return (
+    /^\/search\/ask\/?$/.test(url.pathname) &&
+    /^[A-Za-z0-9_-]{8,100}$/.test(url.searchParams.get('c') ?? '')
+  )
+}
+
 /** Temporary login requirement for archive search and account browsing. */
 function requiresLogin(pathname: string): boolean {
   return [
@@ -662,8 +681,17 @@ export async function middleware(request: NextRequest) {
 
   const loginRequired = requiresLogin(pathname)
   const guestPreview =
-    pathname === '/search' || /^\/user\/[^/]+\/?$/.test(pathname)
-  let authenticated = false
+    pathname === '/search' ||
+    /^\/user-dir\/?$/.test(pathname) ||
+    /^\/user\/[^/]+\/?$/.test(pathname) ||
+    sharedAskLink(request.nextUrl)
+  // In local development the member preview (see the end of this function)
+  // stands in for a signed-in viewer, so it passes the login wall too.
+  let authenticated =
+    process.env.NODE_ENV === 'development' &&
+    (request.nextUrl.searchParams.get('as') === 'member' ||
+      (request.cookies.get('dev_as_member')?.value === '1' &&
+        request.nextUrl.searchParams.get('as') !== 'guest'))
 
   // Chunked Supabase sessions use -auth-token.0, -auth-token.1, etc.
   const hasAuthCookies = request.cookies
@@ -675,7 +703,7 @@ export async function middleware(request: NextRequest) {
       const client = createMiddlewareClient(request)
       if (loginRequired) {
         const { data, error } = await client.supabase.auth.getUser()
-        authenticated = !error && Boolean(data.user)
+        authenticated ||= !error && Boolean(data.user)
       } else {
         await client.supabase.auth.getSession()
       }
@@ -687,15 +715,16 @@ export async function middleware(request: NextRequest) {
     response = NextResponse.next({ request: { headers: request.headers } })
   }
 
-  // A signed-out profile view is the same for everyone, so it is served by
-  // the cached /guest route instead of the per-viewer page. The URL stays
-  // /user/..., and only this response may skip the private cache header.
+  // Signed-out profile and directory views are the same for everyone, so
+  // they are served by the cached /guest routes instead of the per-viewer
+  // pages. The URL stays public, and only this response may skip the private
+  // cache header.
   const guestProfileRewrite =
     loginRequired &&
     !authenticated &&
     guestPreview &&
     request.method === 'GET' &&
-    pathname.startsWith('/user/')
+    pathname.startsWith('/user')
 
   if (loginRequired) {
     if (!authenticated && !guestPreview) {
@@ -719,11 +748,7 @@ export async function middleware(request: NextRequest) {
       }
       response = denied
     } else if (guestProfileRewrite) {
-      response = rewriteToGuestView(
-        request,
-        `/guest/user${pathname.slice('/user'.length)}`,
-        response,
-      )
+      response = rewriteToGuestView(request, `/guest${pathname}`, response)
     }
     if (!guestProfileRewrite) {
       response.headers.set('Cache-Control', 'private, no-store')
@@ -741,6 +766,18 @@ export async function middleware(request: NextRequest) {
     /^\/tweets\/\d{1,20}\/?$/.test(pathname)
   ) {
     response = rewriteToGuestView(request, `/guest${pathname}`, response)
+  }
+
+  // Trends explorer series reads are member-only. Visitors without a session
+  // cookie get the cached preview of this week's terms instead of a redirect.
+  if (
+    request.method === 'GET' &&
+    !hasAuthCookies &&
+    !request.cookies.has('dev_as_member') &&
+    !request.nextUrl.searchParams.has('as') &&
+    /^\/trends\/?$/.test(pathname)
+  ) {
+    response = rewriteToGuestView(request, '/guest/trends', response)
   }
 
   // ── Stage 6: Security Headers (all responses) ──────────────────────────
@@ -775,10 +812,7 @@ export async function middleware(request: NextRequest) {
   // account; ?as=guest clears it. Enabled in development, and on deployments
   // that opt in via NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW (e.g. staging previews
   // where X sign-in isn't wired up). Keep the flag unset in production.
-  if (
-    process.env.NODE_ENV === 'development' ||
-    process.env.NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW === 'true'
-  ) {
+  if (memberPreviewEnabled()) {
     const as = request.nextUrl.searchParams.get('as')
     if (as === 'member') {
       response.cookies.set('dev_as_member', '1', { path: '/', sameSite: 'lax' })

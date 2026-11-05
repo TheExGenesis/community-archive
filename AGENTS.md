@@ -73,6 +73,11 @@
 - Treat new gateway routes as gateway-first dependencies: verify and release the
   gateway before a frontend that requires them. The gateway contract and
   production procedure live in the control-panel repository.
+- Every new page, feature, or tool ships with product analytics in the same
+  change: register each new page route in `src/lib/analyticsRoutes.ts`, and
+  capture its main interactions with `captureProductAction` (add the feature
+  and actions to `src/lib/productActionSchema.ts`). Events carry no content,
+  IDs, search strings, or labels, and PostHog records signed-in users only.
 - Use `src/components/TweetCard.tsx` for full-fidelity tweet rendering and
   `src/lib/tweetText.ts` for archive text normalization. Preserve complete text,
   media, and quoted-tweet payloads in adapters.

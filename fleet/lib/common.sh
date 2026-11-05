@@ -415,11 +415,13 @@ FLEET_TIER1_DIFF_PATTERNS=(
   'sendEmail|resend\.'
 )
 
-# fleet_tier1_violations <worktree> : prints one reason per line; empty when clean.
-fleet_tier1_violations() {
-  local wt="$1" files file pattern added
-  files="$(git -C "$wt" diff --cached --name-only --diff-filter=ACMRD)"
-  for file in $files; do
+# fleet_tier1_path_violations : file paths on stdin, one per line; prints
+# "Tier 1 path changed: <file>" for each that matches the Tier 1 list. Shared
+# by the fixer (staged diff) and the Slack agent's merge guard (PR files).
+fleet_tier1_path_violations() {
+  local file pattern
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
     for pattern in "${FLEET_TIER1_PATH_PATTERNS[@]}"; do
       if [[ "$file" =~ $pattern ]]; then
         echo "Tier 1 path changed: $file"
@@ -427,6 +429,12 @@ fleet_tier1_violations() {
       fi
     done
   done
+}
+
+# fleet_tier1_violations <worktree> : prints one reason per line; empty when clean.
+fleet_tier1_violations() {
+  local wt="$1" added pattern
+  git -C "$wt" diff --cached --name-only --diff-filter=ACMRD | fleet_tier1_path_violations
   added="$(git -C "$wt" diff --cached --diff-filter=ACMR -- . ':(exclude)memos/fleet/learnings/*' | grep '^+' | grep -v '^+++' || true)"
   for pattern in "${FLEET_TIER1_DIFF_PATTERNS[@]}"; do
     if grep -qE -- "$pattern" <<<"$added"; then
@@ -445,6 +453,98 @@ fleet_changed_lines() {
 }
 
 # ─── Lock ───────────────────────────────────────────────────────────────────
+
+# ─── CI gate ────────────────────────────────────────────────────────────────
+# The four CI checks as plain commands, in order; the one source of truth for
+# the fixer and the Slack agent. fleet_run_gate <worktree> <log-dir>: logs under
+# <log-dir>/<name>.log plus summary.txt ("ok <name>" / "FAIL <name>"); returns 1
+# on the first failure.
+FLEET_GATE_CHECKS=(
+  'lint|pnpm lint'
+  'type-check|pnpm type-check'
+  'security|pnpm test:security'
+  'unit|pnpm test:ci'
+)
+fleet_run_gate() {
+  local wt="$1" dir="$2" entry name cmd
+  mkdir -p "$dir"
+  : >"$dir/summary.txt"
+  for entry in "${FLEET_GATE_CHECKS[@]}"; do
+    name="${entry%%|*}"
+    cmd="${entry#*|}"
+    fleet_info "gate: $name ($cmd)"
+    if (cd "$wt" && bash -c "$cmd") >"$dir/$name.log" 2>&1; then
+      echo "ok $name" >>"$dir/summary.txt"
+    else
+      echo "FAIL $name" >>"$dir/summary.txt"
+      fleet_warn "gate: $name failed"
+      return 1
+    fi
+  done
+}
+
+# fleet_gate_failure_prompt <log-dir> <out-file> : the follow-up prompt handed
+# to `claude -p --resume` after a red gate: the summary and the tail of the
+# first failing check's log.
+fleet_gate_failure_prompt() {
+  local dir="$1" out="$2" failed
+  failed="$(awk '/^FAIL/ {print $2}' "$dir/summary.txt" | head -1)"
+  {
+    echo "The CI gate failed on your change. Fix the cause (not the check), keep the Tier 0 rules, and end again with the fenced JSON verdict."
+    echo
+    echo "Gate summary:"
+    cat "$dir/summary.txt"
+    echo
+    echo "Last 200 lines of the failing check ($failed):"
+    echo '```'
+    tail -n 200 "$dir/$failed.log"
+    echo '```'
+  } >"$out"
+}
+
+# ─── Worktrees ──────────────────────────────────────────────────────────────
+# fleet_git_push <worktree> <refspec> : push with GH_TOKEN as the https
+# credential when set (the box has no stored git credentials; gh's own token
+# does not reach git without `gh auth setup-git`). Nothing is written to disk.
+fleet_git_push() {
+  local wt="$1" refspec="$2"
+  if [[ -n "${GH_TOKEN:-}" ]]; then
+    git -C "$wt" \
+      -c credential.helper= \
+      -c 'credential.helper=!f() { echo "username=x-access-token"; echo "password=$GH_TOKEN"; }; f' \
+      push --quiet origin "$refspec"
+  else
+    git -C "$wt" push --quiet origin "$refspec"
+  fi
+}
+
+# fleet_worktree_add <branch> <path> [base-branch] : fresh worktree of
+# origin/<base> (default main) on a new branch, with node_modules linked from
+# the checkout. Prints the base commit.
+fleet_worktree_add() {
+  local branch="$1" path="$2" base="${3:-main}"
+  git -C "$FLEET_ROOT" fetch --quiet origin "$base"
+  mkdir -p "$(dirname "$path")"
+  git -C "$FLEET_ROOT" worktree add --quiet -b "$branch" "$path" "origin/$base"
+  if [[ -d "$FLEET_ROOT/node_modules" && ! -e "$path/node_modules" ]]; then
+    ln -s "$FLEET_ROOT/node_modules" "$path/node_modules"
+  fi
+  git -C "$path" rev-parse HEAD
+}
+
+# fleet_worktree_remove <path> [branch] : removes the worktree (and the local
+# branch when given); never fails.
+fleet_worktree_remove() {
+  local path="$1" branch="${2:-}"
+  if [[ -n "$path" && -d "$path" ]]; then
+    git -C "$FLEET_ROOT" worktree remove --force "$path" >/dev/null 2>&1 || rm -rf "$path"
+  fi
+  git -C "$FLEET_ROOT" worktree prune >/dev/null 2>&1 || true
+  if [[ -n "$branch" ]]; then
+    git -C "$FLEET_ROOT" branch -D "$branch" >/dev/null 2>&1 || true
+  fi
+  return 0
+}
 
 # fleet_acquire_lock <path> : mkdir lock with the pid inside; returns 1 when another
 # live process holds it. Stale locks (dead pid) are taken over.

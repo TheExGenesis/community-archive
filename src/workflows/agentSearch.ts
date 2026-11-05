@@ -13,6 +13,7 @@ import {
   toolsKeepFailing,
   type AgentSearchPromptVariant,
   type AgentSearchToolMode,
+  type AskerProfile,
   type PrepareStepOptions,
   type BashInput,
 } from '@/lib/agentSearch/agent'
@@ -21,6 +22,7 @@ import {
   collectWorkspaceFiles,
   validateCitations,
 } from '@/lib/agentSearch/citations'
+import { lookupAsker } from '@/lib/agentSearch/asker'
 import { buildConversationContext } from '@/lib/agentSearch/context'
 import { buildRunParts } from '@/lib/agentSearch/history'
 import { agentSearchModel } from '@/lib/agentSearch/model'
@@ -162,24 +164,35 @@ semanticSearchStep.maxRetries = 0
 // Earlier turns come from the run store, never from the browser. Only the
 // asker's own runs count, though the route already refused anyone else's
 // conversation.
-// It also reports a run that was stopped before the workflow got going.
+// It also reports a run that was stopped before the workflow got going, and
+// who is asking (handle, name and bio), looked up while the turns load.
 async function loadContextStep(
   conversationId: string,
   accountId: string,
   runId: string,
+  deadlineAt?: number,
 ) {
   'use step'
   const store = getAgentSearchRunStore()
   const current = await store.get(runId)
   if (current?.status !== 'running') {
-    return { stopped: true, messages: [], priorTweetIds: [], workspace: {} }
+    return {
+      stopped: true,
+      messages: [],
+      priorTweetIds: [],
+      workspace: {},
+      asker: null,
+    }
   }
-  const runs = await store.listConversation(conversationId)
+  const [runs, asker] = await Promise.all([
+    store.listConversation(conversationId),
+    lookupAsker(accountId, { deadlineAt }),
+  ])
   const context = await buildConversationContext(
     runs.filter((run) => run.accountId === accountId),
     runId,
   )
-  return { stopped: false, ...context }
+  return { stopped: false, ...context, asker }
 }
 
 interface RunSummary {
@@ -313,16 +326,19 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
             return semanticSearchStep(args, deadlineAt)
           },
         })
-  const agent = new WorkflowAgent({
-    // Each planner call records its own usage on this run.
-    model: agentSearchModel(input.modelSpec, runId, input.sealedKey ?? null),
-    instructions: agentSearchInstructions(
-      input.date,
-      toolMode,
-      input.promptVariant ?? 'v1',
-    ),
-    tools,
-  })
+  // Built once the context step says who is asking.
+  const createAgent = (asker: AskerProfile | null) =>
+    new WorkflowAgent({
+      // Each planner call records its own usage on this run.
+      model: agentSearchModel(input.modelSpec, runId, input.sealedKey ?? null),
+      instructions: agentSearchInstructions(
+        input.date,
+        toolMode,
+        input.promptVariant ?? 'v1',
+        asker,
+      ),
+      tools,
+    })
 
   let error: string | null = null
   let text = ''
@@ -336,6 +352,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       input.conversationId,
       input.accountId,
       runId,
+      deadlineAt,
     )
     // Stopped before it began: nothing was spent and nothing is recorded.
     if (context.stopped) return { runId }
@@ -350,6 +367,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       toolMode === 'bash'
         ? questionWithWorkspace(input.question, describeManifest(workspace))
         : input.question
+    const agent = createAgent(context.asker ?? null)
     const result = await agent.stream({
       messages: [...context.messages, { role: 'user', content: question }],
       writable: getWritable<ModelCallStreamPart>(),

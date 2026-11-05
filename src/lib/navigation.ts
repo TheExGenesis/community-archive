@@ -150,7 +150,8 @@ export type NavIcon =
   | 'trends'
   | 'graph'
   | 'bulletin'
-  | 'apps'
+  | 'map'
+  | 'tube'
   | 'ask'
 
 export interface NavMenuItem extends NavItem {
@@ -171,29 +172,13 @@ export const isNavGroup = (entry: NavEntry): entry is NavGroup =>
   'items' in entry
 
 /**
- * Single source of truth for site navigation: Home, Today's Digest, three
- * grouped menus, then Research — the same for every audience.
+ * Single source of truth for site navigation: Home, Today's Digest, the
+ * archive menu, Community, the Tools menu of first-party products, then
+ * Research — the same for every audience.
  */
 export const getPrimaryNav = (): NavEntry[] => [
   { href: '/', label: 'Home' },
   { href: '/digest', label: "Today's Digest" },
-  {
-    label: 'Ideas',
-    items: [
-      {
-        href: BANGERS_WEEK_HREF,
-        label: 'Bangers',
-        description: 'The best tweets of all time.',
-        icon: 'bangers',
-      },
-      {
-        href: '/strands',
-        label: 'Strands',
-        description: 'Follow ideas and narratives as they evolve over time.',
-        icon: 'strands',
-      },
-    ],
-  },
   {
     label: 'Explore archive',
     items: [
@@ -218,6 +203,42 @@ export const getPrimaryNav = (): NavEntry[] => [
           "Watch tweets arrive from the community's browser extensions.",
         icon: 'stream',
       },
+    ],
+  },
+  { href: '/community', label: 'Community' },
+  {
+    label: 'Tools',
+    items: [
+      {
+        href: BANGERS_WEEK_HREF,
+        label: 'Bangers',
+        description: 'The best tweets of all time.',
+        icon: 'bangers',
+      },
+      {
+        href: '/strands',
+        label: 'Strands',
+        description: 'Follow ideas and narratives as they evolve over time.',
+        icon: 'strands',
+      },
+      {
+        href: '/conversation-map',
+        label: 'Conversation Map',
+        description: 'A zoomable map of each year’s most-quoted posts.',
+        icon: 'map',
+      },
+      {
+        href: '/tube',
+        label: 'CA Tube',
+        description: 'YouTube videos the community keeps sharing.',
+        icon: 'tube',
+      },
+      {
+        href: '/bulletin',
+        label: 'Bulletin Board',
+        description: 'Asks, offers, and opportunities across the community.',
+        icon: 'bulletin',
+      },
       {
         href: '/trends',
         label: 'Trends',
@@ -229,23 +250,6 @@ export const getPrimaryNav = (): NavEntry[] => [
         label: 'Social Graph',
         description: 'Explore connections between people and ideas.',
         icon: 'graph',
-      },
-    ],
-  },
-  {
-    label: 'Community',
-    items: [
-      {
-        href: '/bulletin',
-        label: 'Bulletin Board',
-        description: 'Asks, offers, and opportunities across the community.',
-        icon: 'bulletin',
-      },
-      {
-        href: '/community',
-        label: 'Community Apps',
-        description: 'Explore tools and apps built on the Community Archive.',
-        icon: 'apps',
       },
     ],
   },

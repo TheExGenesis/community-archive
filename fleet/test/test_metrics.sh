@@ -48,7 +48,9 @@ assert_eq "$(metric "$M" 'fleet_consecutive_failures{routine="fixer"}')" "0" "no
 assert_eq "$(metric "$M" 'fleet_needs_decision_issues')" "3" "gauge from file"
 assert_eq "$(metric "$M" 'fleet_canary_check_ok{check="home"}')" "1" "labelled gauge from file"
 assert_eq "$(metric "$M" 'fleet_things_total')" "2" "_total gauge treated as counter"
-assert_eq "$(metric "$M" 'fleet_run_duration_seconds{routine="fixer"}')" "0" "duration recorded"
+# Wall-clock seconds since fleet_init_run: 0 normally, more if the run crosses a second boundary.
+duration="$(metric "$M" 'fleet_run_duration_seconds{routine="fixer"}')"
+assert_eq "$([[ "$duration" =~ ^[0-9]+$ ]] && ((duration < 5)) && echo ok || echo "$duration")" "ok" "duration recorded"
 now="$(date +%s)"
 success="$(metric "$M" 'fleet_last_success_timestamp{routine="fixer"}')"
 assert_eq "$(node -e 'process.stdout.write(String(Math.abs(Number(process.argv[1]) - Number(process.argv[2])) < 5))' "$success" "$now")" "true" "last success is now"

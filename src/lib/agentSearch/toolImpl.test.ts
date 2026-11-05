@@ -32,6 +32,7 @@ import {
   collectAcrossTerms,
   collectAndScoreImpl,
   findPeopleImpl,
+  SEARCH_CONCURRENCY,
   searchPages,
   searchTweetsImpl,
 } from './toolImpl'
@@ -132,6 +133,28 @@ test('collectAcrossTerms searches every term with the same filters', async () =>
   for (const input of calls) expect(input).toMatchObject(filters)
 })
 
+test('collect keeps at most SEARCH_CONCURRENCY searches in flight', async () => {
+  const terms = range('t', 8)
+  serve(Object.fromEntries(terms.map((term, i) => [term, range(`${i}x`, 3)])))
+  const served = (searchTweets as jest.Mock).getMockImplementation()!
+  let inFlight = 0
+  let peak = 0
+  ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+    peak = Math.max(peak, ++inFlight)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    inFlight--
+    return served(input)
+  })
+  const result = await collectAndScoreImpl({
+    terms,
+    criterion: 'Does this tweet name a book?',
+    maxTweets: 100,
+  })
+  expect(peak).toBe(SEARCH_CONCURRENCY)
+  expect(result.collected).toBe(24)
+  expect(result.capped).toBe(false)
+})
+
 test('collect is not capped when every term is exhausted', async () => {
   serve({ a: ['1', '2'], b: ['2', '3'] })
   const result = await collectAndScoreImpl({
@@ -202,10 +225,11 @@ describe('searchPages', () => {
     expect(result.tweets.map((t) => t.id)).toEqual(ids(450))
     expect(result.nextOffset).toBeNull()
     expect(most).toBeGreaterThan(1)
-    // 0 alone, then 100-400 together; nothing asked past the short page's wave.
+    // 0 alone, then SEARCH_CONCURRENCY (3) at a time: 100-300, then 400-600;
+    // nothing asked past the short page's wave.
     expect(
       (searchTweets as jest.Mock).mock.calls.map(([input]) => input.offset),
-    ).toEqual([0, 100, 200, 300, 400])
+    ).toEqual([0, 100, 200, 300, 400, 500, 600])
   })
 
   test('stops at the wanted count and says more exist', async () => {
@@ -290,9 +314,7 @@ describe('searchPages', () => {
     expect(result.tweets).toHaveLength(300)
     expect(result.tweets[299].id).toBe('200-100')
     expect(result.nextOffset).toBeNull()
-    expect(offsetsAsked().map(([offset]) => offset)).toEqual([
-      0, 100, 200, 300, 400,
-    ])
+    expect(offsetsAsked().map(([offset]) => offset)).toEqual([0, 100, 200, 300])
   })
 
   test('never asks past the gateway offset limit, nor twice for one offset', async () => {

@@ -2,7 +2,8 @@
 # Fake `gh` for fleet tests. State lives in $FAKE_GH_STATE:
 #   issues.json  [{number,title,body,state,createdAt,closedAt?,labels:[{name}],comments:[{body}]}]
 #   labels.txt   one label name per line
-#   prs.json     [{number,url,title,body,head,base,state,createdAt?,mergedAt?,closedAt?}]
+#   prs.json     [{number,url,title,body,head,base,state,createdAt?,mergedAt?,closedAt?,checks?}]
+#   pr-checks.json optional statusCheckRollup given to every PR `pr create` makes
 #   commits.json optional GitHub API shape, answers `api repos/.../commits?...`
 #   calls.log    every invocation, one per line
 # FAKE_GH_REMOTE (optional): bare repo used to answer `api repos/.../compare`.
@@ -105,11 +106,25 @@ case "$cmd $sub" in
     TITLE="$(opt --title)" BODY="$body" HEAD="$(opt --head)" BASE="$(opt --base)" REPO="$(opt --repo)" mutate '
       const number = 100 + prs.length;
       const url = "https://github.com/" + env.REPO + "/pull/" + number;
-      prs.push({number, url, title: env.TITLE, body: env.BODY, head: env.HEAD, base: env.BASE, state: "OPEN"});
+      const checksFile = env.STATE + "/pr-checks.json";
+      const checks = fs.existsSync(checksFile) ? JSON.parse(fs.readFileSync(checksFile, "utf8")) : undefined;
+      prs.push({number, url, title: env.TITLE, body: env.BODY, head: env.HEAD, base: env.BASE, state: "OPEN", ...(checks ? {checks} : {})});
       return url + "\n";'
     ;;
   "pr view")
-    N="$3" mutate 'const p = prs.find(x => x.number === Number(env.N)); if (!p) { process.stderr.write("no pr\n"); process.exit(1); } return p.state + "\n";'
+    # `--json state --jq .state` prints the state; any other --json prints an
+    # object with those fields (merge facts default to a green, mergeable PR).
+    N="$3" FIELDS="$(opt --json)" JQ="$(opt --jq)" mutate '
+      const p = prs.find(x => x.number === Number(env.N)); if (!p) { process.stderr.write("no pr\n"); process.exit(1); }
+      if (env.JQ === ".state" || !env.FIELDS) return p.state + "\n";
+      const full = { number: p.number, url: p.url, title: p.title, body: p.body, state: p.state, isDraft: false,
+        mergeable: p.mergeable || "MERGEABLE", mergeStateStatus: "CLEAN", headRefName: p.head, baseRefName: p.base,
+        statusCheckRollup: p.checks || [{ __typename: "CheckRun", name: "pull_request_workflow", status: "COMPLETED", conclusion: "SUCCESS" }],
+        files: p.files || [], additions: p.additions || 0, deletions: p.deletions || 0 };
+      return JSON.stringify(Object.fromEntries(env.FIELDS.split(",").map(f => [f, full[f] === undefined ? null : full[f]]))) + "\n";'
+    ;;
+  "pr merge")
+    N="$3" mutate 'const p = prs.find(x => x.number === Number(env.N)); if (!p) { process.stderr.write("no pr\n"); process.exit(1); } p.state = "MERGED"; p.mergedAt = new Date().toISOString();'
     ;;
   "api "*)
     if [[ "$2" == */commits\?* || "$2" == */commits ]]; then

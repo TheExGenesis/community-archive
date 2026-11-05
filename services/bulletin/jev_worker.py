@@ -21,7 +21,7 @@ import tweet_context
 import worker
 
 MAX_SECONDS = 900
-MAX_PAGES = 100
+MAX_PAGES = 300
 MAX_CALLS = 400
 BATCH = {'disposition': 16, 'enrich': 3, 'value': 1}
 WINDOW_DAYS = 2

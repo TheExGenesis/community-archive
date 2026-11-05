@@ -43,16 +43,17 @@ export const BORDERLINE_THRESHOLD = 0.35
 export const DEFAULT_COLLECT = 300
 export const MAX_COLLECT = 1000
 const PAGE = 100
-/** Search pages after the first run this many at a time. */
-const PAGE_CONCURRENCY = 4
+// Searches one command keeps in flight. The gateway answers 503 "Search is
+// busy" when one caller sends more at once (seen with 7 on 2026-11-02).
+export const SEARCH_CONCURRENCY = 3
 /** The gateway's highest search offset. */
 const MAX_OFFSET = 5000
 
 /**
  * Up to `want` search results from `from` on. The first page goes alone,
- * since most searches fit in one; the rest run a few at a time. A short or
- * empty page is not the end (the gateway leaves out deleted tweets); a null
- * `nextOffset` is, and stays null in the result. A non-null one means more
+ * since most searches fit in one; the rest run `concurrency` at a time. A
+ * short or empty page is not the end (the gateway leaves out deleted tweets);
+ * a null `nextOffset` is, and stays null in the result. A non-null one means more
  * exist, even past the gateway's highest offset, where a later call from it
  * returns nothing.
  */
@@ -61,6 +62,7 @@ export async function searchPages(
   want: number,
   limits: RunLimits,
   from = 0,
+  concurrency = SEARCH_CONCURRENCY,
 ): Promise<{ tweets: AgentTweet[]; nextOffset: number | null }> {
   if (from > MAX_OFFSET) return { tweets: [], nextOffset: null }
   const tweets: AgentTweet[] = []
@@ -96,7 +98,7 @@ export async function searchPages(
       // begins; after a null nextOffset it is past the end.
       if (nextOffset === null || nextOffset !== wave[i + 1]?.offset) break
     }
-    waveSize = PAGE_CONCURRENCY
+    waveSize = concurrency
   }
   return { tweets: tweets.slice(0, want), nextOffset }
 }
@@ -257,10 +259,33 @@ export async function scoreWithParents(
   return { scored, scorer: result.scorer, costUsd: result.costUsd }
 }
 
+/** Runs `run` over every item, `concurrency` at a time, keeping order. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  run: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await run(items[i])
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  )
+  return results
+}
+
 /**
- * Pages through every term in parallel, giving each an equal share of the
- * limit, so the first term cannot use it all. Shares left unused by terms
- * that run out pass to terms that still have pages. `capped` is true when
+ * Pages through every term, SEARCH_CONCURRENCY at a time, giving each an
+ * equal share of the limit, so the first term cannot use it all. Shares left
+ * unused by terms that run out pass to terms that still have pages. Each
+ * term reads its pages one at a time, so the terms together keep at most
+ * SEARCH_CONCURRENCY searches in flight. All terms finish before anything is
+ * returned, so the agent gets one combined result. `capped` is true when
  * matching posts were left unfetched.
  *
  * Every term is searched with the same filters, mode and sort. The merged
@@ -281,17 +306,20 @@ export async function collectAcrossTerms(
   while (collected.size < max && open().length) {
     const active = open()
     const share = Math.max(1, Math.ceil((max - collected.size) / active.length))
-    const results = await Promise.all(
-      active.map(async (term) => {
+    const results = await mapWithConcurrency(
+      active,
+      SEARCH_CONCURRENCY,
+      async (term) => {
         const { tweets, nextOffset } = await searchPages(
           { ...filters, query: term },
           share,
           limits,
           offsets.get(term) ?? 0,
+          1,
         )
         offsets.set(term, nextOffset)
         return tweets
-      }),
+      },
     )
     // Interleave so an overlap between terms does not favour the first one.
     const longest = Math.max(0, ...results.map((tweets) => tweets.length))

@@ -8,25 +8,21 @@ the operator view is the "Phase 1" section of `docs/hyperobservability.md`.
 
 ```
 fleet/
-<<<<<<< HEAD
-  bin/fixer.sh        one signal/bug issue → reproduce, classify, fix, gate, ship, read back
-  bin/canary.sh       six HTTP checks on production, signal on new failure, optional rollback
-  bin/runs.sh         list runs and read one run's transcript from the runs directory (no Grafana needed)
-  lib/common.sh       logging, run directory, gh helpers, read-back checks, verdict parser, Tier 1 guard,
-                      result.json, the Loki export of a run
-  lib/transcript.mjs  scrub, render, summarise a claude -p stream-json transcript
-  prompts/fixer.md    the brief the fixer gives claude -p (the issue body is appended)
-  test/               plain-bash tests with fake gh, claude, pnpm, curl and npx; run.sh = pnpm fleet:test
-=======
   bin/fixer.sh          one signal/bug issue → reproduce, classify, fix, gate, ship, read back
   bin/canary.sh         six HTTP checks on production, signal on new failure, optional rollback
   bin/digest.sh         once a day: one GitHub issue "[fleet:digest] <date>" with what the fleet did
+  bin/runs.sh           list runs and read one run's transcript from the runs directory (no Grafana needed)
+  bin/task.sh           the lib/common.sh helpers as subcommands (gate, Tier 1 guard, worktrees, PR,
+                        read-back, result.json, metrics) for the Slack agent
   lib/common.sh         logging, run directory, gh helpers, read-back checks, verdict parser, Tier 1 guard,
-                        fleet_post_signal (own failures → inbox), fleet_record_metrics (Prometheus textfile)
+                        the CI gate, fleet_post_signal (own failures → inbox), fleet_record_metrics
+                        (Prometheus textfile), result.json, the Loki export of a run
+  lib/transcript.mjs    scrub, render, summarise a claude -p stream-json transcript
   lib/digest-render.mjs renders the digest markdown from run directories and gh output (no network)
   prompts/fixer.md      the brief the fixer gives claude -p (the issue body is appended)
-  test/                 plain-bash tests with fake gh, claude, pnpm, curl and npx; run.sh = pnpm fleet:test
->>>>>>> origin/main
+  slack/                the Slack agent (TypeScript, Socket Mode): talk to Claude Code in a thread; see slack/README.md
+  test/                 plain-bash tests with fake gh, claude, pnpm, curl and npx, plus the Slack agent's
+                        node:test suite; run.sh = pnpm fleet:test
 ```
 
 ## Running
@@ -34,48 +30,30 @@ fleet/
 Everything is configured through the environment; nothing is read from files
 other than the repository itself.
 
-<<<<<<< HEAD
-| Variable | Used by | Meaning |
-| ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FLEET_MODE=pr\|main` | fixer | `pr` (default): push a branch and open a PR. `main`: push straight to `main` and close the issue. |
-| `FLEET_ROLLBACK=true\|false` | canary | Default `false`. `true` rolls production back to the previous deployment on a new failure of a newer deployment. |
-| `RUN_DIR` | both | Where the run writes everything. Default `./.fleet-runs/<UTC timestamp>-<name>/` (gitignored). |
-| `GH_TOKEN` | fixer | GitHub token for `gh` and `git push` (the host mints it per run as `FLEET_GITHUB_TOKEN`; export it as `GH_TOKEN`). |
-| `SIGNALS_WEBHOOK_SECRET` | canary | Bearer for `POST /api/signals/canary`. Unset: the signal is written to the run dir but not sent. |
-| `VERCEL_TOKEN` | canary | Reads production deployments; required for rollback. |
-| `VERCEL_PROTECTION_BYPASS` | canary | Optional `x-vercel-protection-bypass` secret so Vercel's bot challenge does not answer instead of the app. |
-| `CA_URL` | canary | Default `https://www.community-archive.org`. |
-| `FLEET_REPO` | both | Default `TheExGenesis/community-archive`. |
-| `FLEET_MAX_TURNS` | fixer | `claude -p --max-turns`, default 80. |
-| `FLEET_CLAUDE_MODEL` | fixer | Optional `--model` for `claude -p`. |
-| `FLEET_GIT_NAME/EMAIL` | fixer | Commit identity when the checkout has none configured. |
-| `FLEET_LOCK_DIR` | fixer | Default `$TMPDIR/ca-fleet-fixer.lock`; a second fixer exits 0 with `outcome: locked`. |
-| `FLEET_WORKTREE_BASE` | fixer | Where the run git worktree lives, default `$TMPDIR/ca-fleet-worktrees`. Outside the checkout on purpose: `next lint` fails inside a nested worktree. |
-| `FLEET_RUNS_EXPLORE_URL` | both | Grafana Explore link template for a run's transcript in Loki; `{run_id}` is replaced with the run id. Unset: the Run line in comments and PR bodies has no link. |
-=======
-| Variable | Used by | Meaning |
-| ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FLEET_MODE=pr\|main` | fixer | `pr` (default): push a branch and open a PR. `main`: push straight to `main` and close the issue. |
-| `FLEET_ROLLBACK=true\|false` | canary | Default `false`. `true` rolls production back to the previous deployment on a new failure of a newer deployment. |
-| `RUN_DIR` | both | Where the run writes everything. Default `./.fleet-runs/<UTC timestamp>-<name>/` (gitignored). |
-| `GH_TOKEN` | fixer | GitHub token for `gh` and `git push` (the host mints it per run as `FLEET_GITHUB_TOKEN`; export it as `GH_TOKEN`). |
-| `SIGNALS_WEBHOOK_SECRET` | canary | Bearer for `POST /api/signals/canary`. Unset: the signal is written to the run dir but not sent. |
-| `VERCEL_TOKEN` | canary | Reads production deployments; required for rollback. |
-| `VERCEL_PROTECTION_BYPASS` | canary | Optional `x-vercel-protection-bypass` secret so Vercel's bot challenge does not answer instead of the app. |
-| `CA_URL` | canary | Default `https://www.community-archive.org`. |
-| `FLEET_REPO` | both | Default `TheExGenesis/community-archive`. |
-| `FLEET_MAX_TURNS` | fixer | `claude -p --max-turns`, default 80. |
-| `FLEET_CLAUDE_MODEL` | fixer | Optional `--model` for `claude -p`. |
-| `FLEET_GIT_NAME/EMAIL` | fixer | Commit identity when the checkout has none configured. |
-| `FLEET_LOCK_DIR` | fixer | Default `$TMPDIR/ca-fleet-fixer.lock`; a second fixer exits 0 with `outcome: locked`. |
-| `FLEET_WORKTREE_BASE` | fixer | Where the run git worktree lives, default `$TMPDIR/ca-fleet-worktrees`. Outside the checkout on purpose: `next lint` fails inside a nested worktree. |
-| `FLEET_RUNS_DIR` | all | Directory holding every run. Default `$FLEET_HOME/runs` when `FLEET_HOME` is set (the host), else the parent of `RUN_DIR`, else `./.fleet-runs`. |
-| `FLEET_METRICS_FILE` | all | Prometheus textfile every run appends to; default `$FLEET_RUNS_DIR/metrics.prom` (see "Metrics"). |
-| `FLEET_DRY_RUN=true` | digest | Print the digest instead of posting it; closes nothing. |
-| `FLEET_DIGEST_SINCE/UNTIL` | digest | The window (ISO 8601); default the 24 hours ending now. `FLEET_DIGEST_DATE` is the date in the title (default today, UTC). |
-| `FLEET_DASHBOARD_URL` | all | Linked from the digest and the failure signals; default the Grafana "Fleet" dashboard. |
-
-> > > > > > > origin/main
+| Variable                                                                                | Used by | Meaning                                                                                                                                                          |
+| --------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FLEET_MODE=pr\|main`                                                                   | fixer   | `pr` (default): push a branch and open a PR. `main`: push straight to `main` and close the issue.                                                                |
+| `FLEET_ROLLBACK=true\|false`                                                            | canary  | Default `false`. `true` rolls production back to the previous deployment on a new failure of a newer deployment.                                                 |
+| `RUN_DIR`                                                                               | both    | Where the run writes everything. Default `./.fleet-runs/<UTC timestamp>-<name>/` (gitignored).                                                                   |
+| `GH_TOKEN`                                                                              | fixer   | GitHub token for `gh` and `git push` (the host mints it per run as `FLEET_GITHUB_TOKEN`; export it as `GH_TOKEN`).                                               |
+| `SIGNALS_WEBHOOK_SECRET`                                                                | canary  | Bearer for `POST /api/signals/canary`. Unset: the signal is written to the run dir but not sent.                                                                 |
+| `VERCEL_TOKEN`                                                                          | canary  | Reads production deployments; required for rollback.                                                                                                             |
+| `VERCEL_PROTECTION_BYPASS`                                                              | canary  | Optional `x-vercel-protection-bypass` secret so Vercel's bot challenge does not answer instead of the app.                                                       |
+| `CA_URL`                                                                                | canary  | Default `https://www.community-archive.org`.                                                                                                                     |
+| `FLEET_REPO`                                                                            | both    | Default `TheExGenesis/community-archive`.                                                                                                                        |
+| `FLEET_MAX_TURNS`                                                                       | fixer   | `claude -p --max-turns`, default 80.                                                                                                                             |
+| `FLEET_CLAUDE_MODEL`                                                                    | fixer   | Optional `--model` for `claude -p`.                                                                                                                              |
+| `FLEET_GIT_NAME/EMAIL`                                                                  | fixer   | Commit identity when the checkout has none configured.                                                                                                           |
+| `FLEET_LOCK_DIR`                                                                        | fixer   | Default `$TMPDIR/ca-fleet-fixer.lock`; a second fixer exits 0 with `outcome: locked`.                                                                            |
+| `FLEET_WORKTREE_BASE`                                                                   | fixer   | Where the run git worktree lives, default `$TMPDIR/ca-fleet-worktrees`. Outside the checkout on purpose: `next lint` fails inside a nested worktree.             |
+| `FLEET_RUNS_DIR`                                                                        | all     | Directory holding every run. Default `$FLEET_HOME/runs` when `FLEET_HOME` is set (the host), else the parent of `RUN_DIR`, else `./.fleet-runs`.                 |
+| `FLEET_METRICS_FILE`                                                                    | all     | Prometheus textfile every run appends to; default `$FLEET_RUNS_DIR/metrics.prom` (see "Metrics").                                                                |
+| `FLEET_DRY_RUN=true`                                                                    | digest  | Print the digest instead of posting it; closes nothing.                                                                                                          |
+| `FLEET_DIGEST_SINCE/UNTIL`                                                              | digest  | The window (ISO 8601); default the 24 hours ending now. `FLEET_DIGEST_DATE` is the date in the title (default today, UTC).                                       |
+| `FLEET_DASHBOARD_URL`                                                                   | all     | Linked from the digest and the failure signals; default the Grafana "Fleet" dashboard.                                                                           |
+| `FLEET_RUNS_EXPLORE_URL`                                                                | all     | Grafana Explore link template for a run's transcript in Loki; `{run_id}` is replaced with the run id. Unset: the Run line in comments and PR bodies has no link. |
+| `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_SIGNALS_CHANNEL`, `SLACK_ALLOWED_USER_IDS` | slack   | The Slack agent's app tokens, the channel it posts inbox issues to, and the member ids it takes instructions from (`slack/README.md`).                           |
+| `FLEET_SLACK_DB`, `FLEET_SLACK_INTAKE_INTERVAL_S`, `FLEET_SLACK_MAX_CONCURRENT`         | slack   | SQLite file (default `$FLEET_HOME/slack.db`), inbox poll interval (default 300), concurrent tasks (default 1).                                                   |
 
 ```bash
 # one fixer pass against the real inbox, PR mode
@@ -86,6 +64,9 @@ fleet/bin/canary.sh
 
 # the daily digest, printed instead of posted
 FLEET_DRY_RUN=true fleet/bin/digest.sh
+
+# the Slack agent, locally (needs the four SLACK_* variables; see slack/README.md)
+pnpm fleet:slack:build && pnpm fleet:slack:start
 
 # tests + shellcheck (what CI runs)
 pnpm fleet:test
@@ -134,6 +115,17 @@ tool results truncated, the result line and final message of each call),
 `commit-message.txt`, `pr-body.md`, `final-diff.patch`, `log.txt`.
 Outcomes: `idle`, `locked`, `wontfix`, `needs_decision`, `gate_failed`,
 `pr_opened`, `pushed_main`, `error`.
+
+Slack agent (`<ts>-slack`, one directory per thread): the same files as the
+fixer, with `prompt-N.md` / `claude-output-N.json` per turn of the
+conversation (the thread's replies resume one Claude session), `gate-N/`
+per shipping attempt, `commit-message-N.txt`, `pr-body.md`, `worktree-path`,
+and `result-extra.json` carrying the Slack channel and thread. `result.json`
+is rewritten each time the thread ships or stops, so its outcome is the
+latest of `pr_opened`, `pr_updated`, `gate_failed`, `stopped`, `merged`,
+`error`; metrics count each of those as a run. Triage runs
+(`<ts>-slack-triage-<issue>`, outcome `triaged`) hold the one-turn
+classification of an inbox issue.
 
 Scrubbing (`lib/transcript.mjs scrub`): the literal values of `GH_TOKEN`,
 `FLEET_GITHUB_TOKEN`, `SIGNALS_WEBHOOK_SECRET`, `VERCEL_TOKEN`,
@@ -268,16 +260,14 @@ The runs directory is `$FLEET_RUNS_DIR`, else `$FLEET_HOME/runs`, else
 ## Tests
 
 `fleet/test/run.sh` runs `shellcheck` over `fleet/` and then every
-<<<<<<< HEAD
-`test_*.sh`. The fakes in `fleet/test/fakes/` stand in for `gh` (JSON state
-on disk), `claude` (a canned `result` object turned into a short stream-json
-event stream, an optional "edit" snippet and an optional leaked secret), `pnpm` (configurable failures), `curl` (canned statuses and
-=======
 `test_*.sh` (selection, verdict parsing, read-back, Tier 1 guard, fixer and
-canary end to end, metrics/signals, digest). The fakes in `fleet/test/fakes/` stand in for `gh` (JSON state
-on disk), `claude` (canned `--output-format json` output and an optional
-"edit" snippet), `pnpm` (configurable failures), `curl` (canned statuses and
-
-> > > > > > > origin/main
-> > > > > > > timings, captured POST bodies) and `npx`. The fixer tests use a real bare git
-> > > > > > > repository as `origin`. Requires `shellcheck` and `node`; no bats.
+canary end to end, metrics/signals, digest), after type-checking
+`fleet/slack` and running its `node:test` suite (summariser, status
+checklist, SQLite store, merge guard, intake dedupe, Slack routing, and task
+runs end to end through `bin/task.sh`). The fakes in `fleet/test/fakes/`
+stand in for `gh` (JSON state on disk), `claude` (a canned `result` object
+turned into a short stream-json event stream, an optional "edit" snippet and
+an optional leaked secret), `pnpm` (configurable failures), `curl` (canned
+statuses and timings, captured POST bodies) and `npx`. The fixer and Slack
+tests use a real bare git repository as `origin`. Requires `shellcheck` and
+`node`; no bats.

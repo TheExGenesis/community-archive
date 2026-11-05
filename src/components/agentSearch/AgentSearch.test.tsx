@@ -40,6 +40,7 @@ jest.mock('@ai-sdk/workflow/client', () => ({
     }
   },
 }))
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 jest.mock('./AnswerMarkdown', () => ({
   AnswerMarkdown: ({ children }: { children: string }) => <div>{children}</div>,
 }))
@@ -559,5 +560,160 @@ describe('opening a stored conversation', () => {
       '/api/agent-search/conversations/conversation-stored/tweets',
       expect.objectContaining({ method: 'POST', cache: 'no-store' }),
     )
+  })
+})
+
+describe('a shared conversation', () => {
+  // The stored messages are in (the chat is mocked with them already).
+  const opened = () =>
+    waitFor(() =>
+      expect(
+        screen.queryByRole('status', { name: 'Opening the conversation' }),
+      ).toBeNull(),
+    )
+  const storedThread = (extra: Record<string, unknown>) => ({
+    ok: true,
+    json: async () => ({
+      messages: thread,
+      runningRunId: null,
+      tweets: [],
+      pendingTweetIds: [],
+      unavailableTweetIds: [],
+      ...extra,
+    }),
+  })
+
+  test('a guest reads it: no history, no composer, and a way to sign in', async () => {
+    global.fetch = jest.fn(async (url: string) =>
+      String(url).includes('/conversations/')
+        ? storedThread({ readOnly: true, shared: true })
+        : { ok: false, json: async () => ({}) },
+    ) as unknown as typeof fetch
+    mockChat.messages = thread
+    render(<AgentSearch initialConversationId="conversation-shared" guest />)
+    await opened()
+    expect(screen.getByText('Shared')).toBeInTheDocument()
+    expect(
+      screen.getByText(/A member shared this conversation/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/login?redirect=%2Fsearch%2Fask',
+    )
+    expect(screen.getByRole('link', { name: 'Ask your own' })).toHaveAttribute(
+      'href',
+      '/search/ask',
+    )
+    expect(screen.queryByLabelText('Ask a follow-up')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'History' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull()
+    // No history list or quota is asked for.
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      '/api/agent-search/conversations',
+      expect.anything(),
+    )
+  })
+
+  test('a member reads another’s: no follow-ups, and a new question of their own', async () => {
+    global.fetch = jest.fn(async (url: string) =>
+      String(url).includes('/conversations/')
+        ? storedThread({ readOnly: true, shared: true })
+        : {
+            ok: true,
+            json: async () => ({
+              conversations: [],
+              dailyLimit: 10,
+              remainingToday: 10,
+              resetsAt: new Date(Date.now() + 3600_000).toISOString(),
+            }),
+          },
+    ) as unknown as typeof fetch
+    mockChat.messages = thread
+    render(<AgentSearch initialConversationId="conversation-shared" />)
+    await opened()
+    expect(
+      screen.getByText(/Another member shared this conversation/),
+    ).toBeInTheDocument()
+    expect(screen.queryByLabelText('Ask a follow-up')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull()
+    // A question of one's own starts a fresh conversation.
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ask your own question' }),
+    )
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/Another member shared this conversation/),
+      ).toBeNull(),
+    )
+    expect(screen.getByLabelText('Ask a follow-up')).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+  })
+
+  test('the asker shares it from the header, copies the link and stops sharing', async () => {
+    const requests: Array<{ url: string; method?: string }> = []
+    global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+      requests.push({ url: String(url), method: init?.method })
+      if (String(url).endsWith('/share')) {
+        return {
+          ok: true,
+          json: async () => ({ shared: init?.method === 'POST' }),
+        }
+      }
+      if (String(url).includes('/conversations/')) {
+        return storedThread({ readOnly: false, shared: false })
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          conversations: [],
+          dailyLimit: 10,
+          remainingToday: 10,
+          resetsAt: new Date(Date.now() + 3600_000).toISOString(),
+        }),
+      }
+    }) as unknown as typeof fetch
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    mockChat.messages = thread
+    render(<AgentSearch initialConversationId="conversation-mine" />)
+    await opened()
+    expect(screen.getByLabelText('Ask a follow-up')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }))
+    expect(
+      await screen.findByText('Share this conversation'),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Create link' }))
+    expect(
+      await screen.findByText('Anyone with the link can read this'),
+    ).toBeInTheDocument()
+    expect(requests).toContainEqual({
+      url: '/api/agent-search/conversations/conversation-mine/share',
+      method: 'POST',
+    })
+    const link = screen.getByLabelText('Link to this conversation')
+    expect(link).toHaveValue('http://localhost/search/ask?c=conversation-mine')
+    fireEvent.click(screen.getByRole('button', { name: 'Copy link' }))
+    expect(await screen.findByText('Copied')).toBeInTheDocument()
+    expect(writeText).toHaveBeenCalledWith(
+      'http://localhost/search/ask?c=conversation-mine',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Sharing: anyone with the link' }),
+    ).toHaveTextContent('Shared')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop sharing' }))
+    await waitFor(() =>
+      expect(requests).toContainEqual({
+        url: '/api/agent-search/conversations/conversation-mine/share',
+        method: 'DELETE',
+      }),
+    )
+    expect(
+      await screen.findByText('Share this conversation'),
+    ).toBeInTheDocument()
   })
 })

@@ -39,20 +39,19 @@ beforeEach(() => {
   }))
 })
 
-test.each([
-  '/user-dir?search=alice',
-  '/profile',
-  '/user/alice/opengraph-image',
-])('sends guests at %s to login with their destination', async (path) => {
-  const response = await request(path)
-  expect(response.status).toBe(307)
-  const destination = new URL(response.headers.get('location')!)
-  expect(destination.pathname).toBe('/login')
-  expect(destination.searchParams.get('redirect')).toBe(path)
-  expect(response.headers.get('cache-control')).toBe('private, no-store')
-  expect(response.headers.get('x-robots-tag')).toBe('noindex')
-  expect(createMiddlewareClient).not.toHaveBeenCalled()
-})
+test.each(['/profile', '/user/alice/opengraph-image'])(
+  'sends guests at %s to login with their destination',
+  async (path) => {
+    const response = await request(path)
+    expect(response.status).toBe(307)
+    const destination = new URL(response.headers.get('location')!)
+    expect(destination.pathname).toBe('/login')
+    expect(destination.searchParams.get('redirect')).toBe(path)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(response.headers.get('x-robots-tag')).toBe('noindex')
+    expect(createMiddlewareClient).not.toHaveBeenCalled()
+  },
+)
 
 test.each(['/search', '/search?q=open+source&fromUser=alice'])(
   'allows a private guest preview at %s',
@@ -65,10 +64,32 @@ test.each(['/search', '/search?q=open+source&fromUser=alice'])(
   },
 )
 
+// A conversation link may be shared; the page decides, and gates it if not.
+test('lets a signed-out visitor open an Ask the archive conversation link', async () => {
+  const response = await request(
+    '/search/ask?c=5f3735da-1113-4c96-845b-06bfe57d4c1b',
+  )
+  expect(response.headers.get('x-middleware-next')).toBe('1')
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
+  expect(createMiddlewareClient).not.toHaveBeenCalled()
+})
+
+test.each([
+  '/search/ask',
+  '/search/ask?c=../x',
+  '/search/ask/other?c=conv-12345678',
+])('still sends a signed-out visitor at %s to sign in', async (path) => {
+  const response = await request(path)
+  expect(response.status).toBe(307)
+  expect(new URL(response.headers.get('location')!).pathname).toBe('/login')
+})
+
 test.each([
   ['/user/alice?chapter=2025', '/guest/user/alice?chapter=2025'],
   ['/user/42', '/guest/user/42'],
   ['/user/alice/', '/guest/user/alice'],
+  ['/user-dir', '/guest/user-dir'],
+  ['/user-dir/', '/guest/user-dir'],
 ])(
   'serves the cacheable guest preview for %s from %s',
   async (path, guestPath) => {
@@ -153,6 +174,29 @@ test.each([
   },
 )
 
+test.each([
+  ['/trends', '/guest/trends'],
+  ['/trends?terms=ai&range=2024', '/guest/trends?terms=ai&range=2024'],
+])(
+  'serves cookie-less trends %s from the cached %s',
+  async (path, guestPath) => {
+    const response = await request(path)
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      `https://archive.test${guestPath}`,
+    )
+    expect(response.headers.get('cache-control')).toBeNull()
+  },
+)
+
+test.each(['sb-test-auth-token=session', 'dev_as_member=1'])(
+  'sends trends visitors with %s to the explorer',
+  async (cookie) => {
+    const response = await request('/trends', { cookie })
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+  },
+)
+
 test('sends visitors with a session to the consent-checked tweet page', async () => {
   const response = await request('/tweets/123', {
     cookie: 'sb-test-auth-token=session',
@@ -164,9 +208,7 @@ test('sends visitors with a session to the consent-checked tweet page', async ()
 test.each(['/tweets/123/opengraph-image', '/tweets/abc', '/tweets'])(
   'leaves other tweet paths alone: %s',
   async (path) => {
-    expect(
-      (await request(path)).headers.get('x-middleware-rewrite'),
-    ).toBeNull()
+    expect((await request(path)).headers.get('x-middleware-rewrite')).toBeNull()
   },
 )
 
@@ -227,10 +269,10 @@ test.each<{ cookie?: string; headers?: Record<string, string> }>([
 )
 
 test('removes the internal RSC marker from the login destination', async () => {
-  const response = await request('/user-dir?search=hello&_rsc=internal')
+  const response = await request('/profile?tab=keys&_rsc=internal')
   expect(
     new URL(response.headers.get('location')!).searchParams.get('redirect'),
-  ).toBe('/user-dir?search=hello')
+  ).toBe('/profile?tab=keys')
 })
 
 test.each([
@@ -316,4 +358,42 @@ test.each([
 ])('keeps unrelated and login routes accessible: %s', async (path) => {
   expect((await request(path)).headers.get('x-middleware-next')).toBe('1')
   expect(createMiddlewareClient).not.toHaveBeenCalled()
+})
+
+describe('member preview', () => {
+  const env = process.env as Record<string, string | undefined>
+  const nodeEnv = env.NODE_ENV
+  afterEach(() => {
+    env.NODE_ENV = nodeEnv
+  })
+
+  test.each([
+    ['/search/ask?as=member', undefined],
+    ['/search/ask', 'dev_as_member=1'],
+  ])('passes the login wall in development: %s', async (path, cookie) => {
+    env.NODE_ENV = 'development'
+    const response = await request(path, { cookie })
+    expect(response.status).not.toBe(307)
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+  })
+
+  test('?as=guest drops the preview cookie at the login wall', async () => {
+    env.NODE_ENV = 'development'
+    const response = await request('/search/ask?as=guest', {
+      cookie: 'dev_as_member=1',
+    })
+    expect(response.status).toBe(307)
+  })
+
+  test.each(['production', 'test'])(
+    'does not pass the login wall in %s',
+    async (mode) => {
+      env.NODE_ENV = mode
+      const response = await request('/search/ask?as=member', {
+        cookie: 'dev_as_member=1',
+      })
+      expect(response.status).toBe(307)
+      expect(new URL(response.headers.get('location')!).pathname).toBe('/login')
+    },
+  )
 })

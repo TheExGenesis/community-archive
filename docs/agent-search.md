@@ -6,6 +6,17 @@ gateway, follows threads and quote posts, scores candidates, and streams an
 answer whose claims cite tweets inline. The page renders the cited tweets with
 `TweetCard`, the other posts the search found, and a coverage note.
 
+## Who is asking
+
+The workflow's first step looks up the asker's archive profile (handle,
+display name, bio) through the gateway by account id (`asker.ts`), alongside
+the conversation's earlier turns, and appends it to the system prompt
+(`askerInstructions` in `agent.ts`). The model then reads "my tweets" as
+`--from @handle` and can pitch an answer to the asker. The bio is quoted as
+data, clipped to 300 characters, and never stored with the run. The lookup
+has a two-second budget; on a miss or failure, or for the development
+preview's `dev` account, the question runs without it.
+
 ## How a question runs
 
 1. `POST /api/agent-search` checks the viewer (`src/lib/agentSearch/eligibility.ts`),
@@ -102,6 +113,16 @@ command writes a one-line summary to stderr (`search “x”: 120 tweets · 85
 authors · 2023-01 to 2025-06 · more exist`), which the model sees, and a
 shorter one for the page (`Searched “x” · 120 tweets`).
 
+`search` with `--or` or `--with` (and `collect_and_score`) runs one gateway
+search per term, three terms at a time (`SEARCH_CONCURRENCY` in
+`toolImpl.ts`), each reading its pages one at a time, and returns once every
+term is done, so the agent sees one combined result. The gateway
+shares two running and four queued searches across the whole site and
+answers `503 Search is busy` past that; a search retries a busy answer twice
+(after 0.5 s and 1.5 s) while the run has time left. Gateway-side queueing
+for bursts is
+[control-panel#309](https://github.com/TheExGenesis/community-archive-control-panel/issues/309).
+
 Each command runs in a fresh shell, because a workflow step may run in
 another process. Between commands, and between turns of a conversation, the
 workspace is carried as a manifest (`workspace/manifest.ts`): for each tweet
@@ -135,9 +156,11 @@ case-sensitively, so `semantic.ts` sends the member directory's spelling. A
 failed semantic call does not count as the archive being down.
 
 Inside a command, archive calls run in turn unless they are independent:
-`search` asks for its first page alone and the rest four at a time, `--or` and `--with`
-searches its terms together, id lookups go 100 ids per call with four calls in
-flight, and `par` runs whole command lines together. just-bash itself runs
+`search` asks for its first page alone and the rest three at a time, `--or`
+and `--with` search three terms at a time (so one command keeps at most three
+searches in flight), id lookups go 100 ids per call with four calls in
+flight, and `par` runs six command lines together. Each of those lines keeps
+its own three, so a `par` of searches can still pass the gateway's limit. just-bash itself runs
 `&`, `;` and loops one command after another. Deleted tweets are left out of
 a page, so a short or empty page does not end a search; a null `nextOffset`
 does, and no page past offset 5,000 is asked for.
@@ -223,6 +246,29 @@ its id. Workflow keeps a run's own data only 7 days after it ends on Vercel Pro
   `answer.unavailable` so a later change can replace the prose that still
   names those authors.
 - The start route refuses a conversation id that belongs to someone else.
+
+### Sharing
+
+A member may share a conversation from its header (Share). A row in
+`agent_search_shared_conversations` (conversation id, account id, when) makes
+the same link (`/search/ask?c=<id>`) readable by anyone, signed in or not;
+Stop sharing removes the row, and deleting the conversation or all history
+removes it too. Sharing is by conversation, so follow-ups asked later are
+shared as well. The link shows the questions and answers with the tweets they
+cite, never who asked; a run still answering is left out.
+
+- `POST` / `DELETE /api/agent-search/conversations/{id}/share` share and stop
+  sharing. The asker only; `409 no_answer_yet` until an answer is stored.
+- `GET /api/agent-search/conversations/{id}` and its `tweets` route answer a
+  shared conversation to anyone (`conversationAccess.ts`): the asker gets it
+  whole with `shared`, anyone else gets `readOnly: true`. Every run under the
+  id must belong to the member who shared it, or nothing is shown
+  (`sharedConversation.ts`). An unshared conversation is refused as before.
+- The page renders a shared conversation to a visitor who cannot ask (signed
+  out, or not a member) in guest mode: no history, no composer, a note with a
+  sign-in link, and the first question as the link preview's title. A member
+  reading another member's conversation sees it read-only with the way to a
+  question of their own.
 
 ### Follow-up questions
 

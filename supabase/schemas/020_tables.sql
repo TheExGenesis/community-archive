@@ -667,6 +667,17 @@ CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
 );
 ALTER TABLE "public"."agent_search_runs" OWNER TO "postgres";
 
+-- Conversations their asker chose to share. A row makes the conversation
+-- readable by anyone with its link, signed in or not, as long as every run
+-- in it belongs to account_id; removing the row stops sharing. Deleting the
+-- conversation removes it too. Service role only, like the runs.
+CREATE TABLE IF NOT EXISTS "public"."agent_search_shared_conversations" (
+    "conversation_id" text PRIMARY KEY CHECK (length("conversation_id") <= 100),
+    "account_id" text NOT NULL,
+    "shared_at" timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE "public"."agent_search_shared_conversations" OWNER TO "postgres";
+
 -- Reader comments on a published edition. The display identity is captured at
 -- write time so rendering never joins auth.users; writes go through the API's
 -- service-role client after session verification. Deletes are soft so a thread

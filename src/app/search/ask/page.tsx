@@ -9,17 +9,60 @@ import {
 } from '@/lib/askFromSearch'
 import { agentSearchEnabled } from '@/lib/agentSearch/enabled'
 import { getAgentSearchViewer } from '@/lib/agentSearch/eligibility'
+import { sharedConversationRuns } from '@/lib/agentSearch/sharedConversation'
 import { agentSearchVisible } from '@/lib/agentSearch/visibility'
 import { loginHref } from '@/lib/authRedirect'
 
 // Eligibility depends on the session cookie, so this page is never cached.
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
+type AskSearchParams = { c?: string | string[] } & Partial<
+  Record<(typeof ASK_PREFILL_PARAMS)[number], string | string[]>
+>
+
+const BASE_METADATA: Metadata = {
   title: 'Ask the archive · Community Archive',
   description:
     'Members with an uploaded archive can ask questions about the community’s tweets and get answers that cite them.',
   robots: { index: false, follow: false },
+}
+
+const TITLE_LENGTH = 80
+
+function requestedConversation(searchParams: AskSearchParams | undefined) {
+  const requested = typeof searchParams?.c === 'string' ? searchParams.c : null
+  return requested && /^[A-Za-z0-9_-]{8,100}$/.test(requested)
+    ? requested
+    : null
+}
+
+// A shared conversation's link previews with its first question as the
+// title; everything else keeps the page's own.
+export async function generateMetadata({
+  searchParams: searchParamsPromise,
+}: {
+  searchParams?: Promise<AskSearchParams>
+}): Promise<Metadata> {
+  const requested = requestedConversation(await searchParamsPromise)
+  if (!requested || !(await agentSearchVisible())) return BASE_METADATA
+  const runs = await sharedConversationRuns(requested).catch(() => null)
+  if (!runs) return BASE_METADATA
+  const question = runs[0].question.replace(/\s+/g, ' ').trim()
+  const title =
+    question.length > TITLE_LENGTH
+      ? `${question.slice(0, TITLE_LENGTH - 1).trimEnd()}…`
+      : question
+  return {
+    ...BASE_METADATA,
+    title: `${title} · Ask the archive`,
+    description:
+      'A question answered from the Community Archive’s tweets, with the posts it cites. Shared by a member.',
+    openGraph: {
+      title,
+      description: 'Ask the archive · Community Archive',
+      type: 'article',
+    },
+  }
 }
 
 function Gate({
@@ -60,16 +103,20 @@ function Gate({
 export default async function AskTheArchivePage({
   searchParams: searchParamsPromise,
 }: {
-  searchParams?: Promise<
-    { c?: string | string[] } & Partial<
-      Record<(typeof ASK_PREFILL_PARAMS)[number], string | string[]>
-    >
-  >
+  searchParams?: Promise<AskSearchParams>
 }) {
   // Before launch (AGENT_SEARCH_LAUNCHED) the page exists for admins only.
   if (!(await agentSearchVisible())) notFound()
   const searchParams = await searchParamsPromise
   const access = await getAgentSearchViewer()
+  const requested = requestedConversation(searchParams)
+
+  // A shared conversation is readable by anyone with its link: a visitor
+  // who cannot ask (signed out, or not a member) gets it to read, and the
+  // sign-in gate only when it is not shared.
+  if (!access.ok && requested && (await sharedConversationRuns(requested))) {
+    return <AgentSearch initialConversationId={requested} guest />
+  }
 
   if (!access.ok && access.reason === 'signed_out') {
     return (
@@ -115,12 +162,9 @@ export default async function AskTheArchivePage({
     )
   }
 
-  const requested = typeof searchParams?.c === 'string' ? searchParams.c : null
   return (
     <AgentSearch
-      initialConversationId={
-        requested && /^[A-Za-z0-9_-]{8,100}$/.test(requested) ? requested : null
-      }
+      initialConversationId={requested}
       // A search handed over from archive search: prefilled, never sent.
       initialPrefill={askPrefillFrom(searchParams ?? {})}
       paused={!agentSearchEnabled()}

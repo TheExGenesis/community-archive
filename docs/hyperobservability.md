@@ -403,6 +403,56 @@ written by the harnesses themselves (`fleet/lib/common.sh`):
 Operator view, in reading order: dashboard → digest → inbox → run directory
 (control-panel `docs/ca-fleet-operations.md`, "Watching the fleet").
 
+### Talking to the fleet in Slack
+
+The Slack agent (`fleet/slack/`, user unit `fleet-slack` on `ca-fleet`,
+Socket Mode) is the conversational front of the same machinery. It acts
+only on messages and clicks from the member ids in
+`SLACK_ALLOWED_USER_IDS`; everyone else is ignored.
+
+- **Ask for work.** Mention the bot in a channel or DM it. It answers in a
+  thread with one status message it keeps editing (`☑ understanding ▶
+working ☐ gate ☐ PR ☐ waiting on you`, with a one-line progress note such
+  as `working · 12 tool calls · Grep ...`) and its own short text; the
+  message that asked gets 👀, then ✅ or ❌. A thread is a conversation:
+  one Claude session resumed on every reply, before and after anything
+  ships, in one worktree; each change is a job (branch, run directory
+  `<ts>-slack`, PR), and "do these three things" ships them one after the
+  other. Say `stop` to drop the current work. The rules it works under are
+  `fleet/slack/INSTRUCTIONS.md`, appended to the system prompt on every run:
+  terse voice, Tier 0 / Tier 1 from the memo, one issue per change, fix
+  small bugs without asking, ask only when the change is genuinely unclear,
+  Tier 1 or over 300 lines; never push to `main`. It may run any command in
+  its worktree and read GitHub with `gh`; pushes, commits and `gh` writes
+  are denied and done by the harness.
+- **Close.** When an issue turns out outdated or already fixed, Claude
+  lists it under `close` with the evidence and the harness closes it with
+  that reason (read back `CLOSED`).
+- **Ship.** After a green gate (the fixer's four checks) it commits
+  `[fleet:slack] <title>`, pushes `fleet/slack-<ts>`, opens the PR, reads it
+  back and posts the link. A Tier 0 PR under 300 lines merges on its own
+  once CI is green (a **Hold** button stops that); red CI or a timeout hands
+  it back with **Merge** / **Hold**. Tier 1 or large PRs get **Merge** /
+  **Not now** (no Merge button on a Tier 1 path); Merge works only for an
+  allowed user with the PR open, mergeable, every check green and no Tier 1
+  path. Merging squash-merges, confirms, and closes the linked issue.
+  `FLEET_MODE=main` is not used from Slack.
+- **Inbox.** Every five minutes new `signal` and `bug` issues are posted
+  once each into `SLACK_SIGNALS_CHANNEL` (title, severity, route, link,
+  summary) with a one-turn classification in the thread ("looks obvious",
+  "needs a decision: …", "probably not worth fixing: …") and a **Fix it** /
+  **Go ahead** / **Try anyway** button. No fix starts without a click or a
+  reply.
+- **Commands.** `status` (timers, last canary, open fleet PRs, today's cost
+  and runs), `runs` (`runs.sh list 10`), `run <id>` (transcript excerpt plus
+  the Grafana link), `help`.
+
+Every task leaves the usual evidence (`result.json`, `transcript.*`,
+`loki.jsonl`, metrics under `routine="slack"`), and the thread ends with the
+run id and the transcript link when `FLEET_RUNS_EXPLORE_URL` is set. Setup
+(manifest, tokens, enabling the unit) is in the control-panel runbook
+`docs/ca-fleet-operations.md`, section "Slack agent".
+
 ### Tests
 
 `pnpm fleet:test` runs `shellcheck` over `fleet/` and the tests in
@@ -410,5 +460,8 @@ Operator view, in reading order: dashboard → digest → inbox → run director
 guard, full fixer runs in both modes against a bare git remote with fake
 `gh`/`claude`/`pnpm`, canary runs with a fake `curl`/`npx` including the
 rollback path, the metrics textfile and failure signals, and the digest in
-dry-run and posting mode). CI runs it in the pull-request workflow after the
-unit tests.
+dry-run and posting mode), after type-checking `fleet/slack` and running
+its `node:test` suite (summariser, status checklist, SQLite store, merge
+guard, intake dedupe, Slack routing, and whole tasks through `task.sh`
+against a bare git remote with the same fakes). CI runs it in the
+pull-request workflow after the unit tests.

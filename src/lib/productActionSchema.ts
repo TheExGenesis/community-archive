@@ -4,6 +4,9 @@ export const productFeatures = [
   'strands',
   'birdseye',
   'tweet',
+  'tube',
+  'tweet_cleanup',
+  'ask_archive',
 ] as const
 export const productActions = [
   'node_selected',
@@ -17,6 +20,20 @@ export const productActions = [
   'filter_changed',
   'load_more',
   'link_copied',
+  'video_played',
+  'video_liked',
+  'video_disliked',
+  'watch_later_added',
+  'external_opened',
+  'related_opened',
+  'playlist_opened',
+  'shuffled',
+  'setting_changed',
+  'history_cleared',
+  'pattern_selected',
+  'bulk_deleted',
+  'shared',
+  'unshared',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]

@@ -82,3 +82,7 @@ ds-bundle/
 
 # fleet harness run directories (fleet/bin/*.sh)
 .fleet-runs/
+
+# fleet Slack agent: compiled service and its SQLite state
+fleet/slack/dist/
+fleet/slack/*.db

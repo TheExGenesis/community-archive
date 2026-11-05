@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event'
 import ProfileContent from './ProfileContent'
 import { deleteArchive } from '@/lib/db_insert'
 
-const mockGetOwnLatestTweets = jest.fn()
+const mockSearchOwnTweets = jest.fn()
 jest.mock('@/app/settings/tweet-actions', () => ({
-  getOwnLatestTweets: (...args: unknown[]) => mockGetOwnLatestTweets(...args),
+  searchOwnTweets: (...args: unknown[]) => mockSearchOwnTweets(...args),
 }))
 
 const mockFetch = jest.fn()
@@ -319,19 +319,22 @@ describe('ProfileContent opt-in preference', () => {
 })
 
 test('loads tweets only when the tab is opened, with retry instead of an empty result on failure', async () => {
-  mockGetOwnLatestTweets
+  mockSearchOwnTweets
     .mockRejectedValueOnce(new Error('temporary'))
-    .mockResolvedValueOnce([
-      {
-        tweet_id: '10',
-        created_at: '2026-09-06T00:00:00Z',
-        full_text: 'My lazy-loaded tweet',
-        favorite_count: 0,
-        retweet_count: 0,
-      },
-    ])
+    .mockResolvedValueOnce({
+      tweets: [
+        {
+          tweet_id: '10',
+          created_at: '2026-09-06T00:00:00Z',
+          full_text: 'My lazy-loaded tweet',
+          favorite_count: 0,
+          retweet_count: 0,
+        },
+      ],
+      hasMore: false,
+    })
   render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
-  expect(mockGetOwnLatestTweets).not.toHaveBeenCalled()
+  expect(mockSearchOwnTweets).not.toHaveBeenCalled()
   await userEvent.click(screen.getByRole('tab', { name: 'My Tweets' }))
   expect(
     await screen.findByRole('button', { name: 'Retry loading tweets' }),
@@ -345,7 +348,79 @@ test('loads tweets only when the tab is opened, with retry instead of an empty r
   expect(await screen.findByText('My lazy-loaded tweet')).toBeVisible()
   await userEvent.click(screen.getByRole('tab', { name: 'Privacy Settings' }))
   await userEvent.click(screen.getByRole('tab', { name: 'My Tweets' }))
-  expect(mockGetOwnLatestTweets).toHaveBeenCalledTimes(2)
+  expect(screen.getByText('My lazy-loaded tweet')).toBeVisible()
+  expect(mockSearchOwnTweets).toHaveBeenCalledTimes(2)
+})
+
+test('searches with a cleanup pattern and bulk-deletes the selected matches', async () => {
+  const interaction = userEvent.setup()
+  jest.spyOn(window, 'confirm').mockReturnValue(true)
+  const match = (id: string) => ({
+    tweet_id: id,
+    created_at: '2016-01-01T00:00:00Z',
+    full_text: `damn tweet ${id}`,
+    favorite_count: 0,
+    retweet_count: 0,
+  })
+  mockSearchOwnTweets
+    .mockResolvedValueOnce({ tweets: [], hasMore: false })
+    .mockResolvedValueOnce({ tweets: [match('1'), match('2')], hasMore: true })
+    .mockResolvedValueOnce({ tweets: [match('3')], hasMore: false })
+  mockRpc.mockResolvedValue({ data: [{ deleted_tweets: 3 }], error: null })
+  render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
+  await interaction.click(screen.getByRole('tab', { name: 'My Tweets' }))
+  expect(await screen.findByText('No archived tweets found.')).toBeVisible()
+
+  await interaction.click(screen.getByRole('button', { name: 'Swearing' }))
+  expect(mockSearchOwnTweets).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      query: expect.stringContaining('fuck or shit'),
+      offset: 0,
+    }),
+  )
+  expect(await screen.findByText('damn tweet 2')).toBeVisible()
+  await interaction.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(mockSearchOwnTweets).toHaveBeenLastCalledWith(
+    expect.objectContaining({ offset: 2 }),
+  )
+  expect(await screen.findByText('damn tweet 3')).toBeVisible()
+
+  await interaction.click(
+    screen.getByRole('checkbox', { name: 'Select all shown tweets' }),
+  )
+  await interaction.click(
+    screen.getByRole('button', { name: /Delete selected \(3\)/ }),
+  )
+  await waitFor(() =>
+    expect(mockRpc).toHaveBeenCalledWith('delete_own_tweets', {
+      p_tweet_ids: ['1', '2', '3'],
+    }),
+  )
+  expect(await screen.findByText('3 tweets deleted permanently')).toBeVisible()
+  expect(screen.queryByText('damn tweet 1')).not.toBeInTheDocument()
+})
+
+test('free-text search sends the query with the chosen filters', async () => {
+  mockSearchOwnTweets.mockResolvedValue({ tweets: [], hasMore: false })
+  render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
+  await userEvent.click(screen.getByRole('tab', { name: 'My Tweets' }))
+  fireEvent.change(screen.getByRole('combobox', { name: 'Tweet type' }), {
+    target: { value: 'replies' },
+  })
+  await userEvent.type(
+    screen.getByRole('searchbox', { name: 'Search your tweets' }),
+    '"hot take"{enter}',
+  )
+  await waitFor(() =>
+    expect(mockSearchOwnTweets).toHaveBeenLastCalledWith({
+      query: '"hot take"',
+      kind: 'replies',
+      olderThanYears: 0,
+      sort: 'newest',
+      offset: 0,
+    }),
+  )
+  expect(await screen.findByText('No tweets match this search.')).toBeVisible()
 })
 
 describe('ProfileContent data deletion', () => {

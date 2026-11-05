@@ -6,6 +6,8 @@ import {
   type AnalyticsGatewayFetcher,
 } from '@/lib/clickhouseGateway'
 import { devLog } from '@/lib/devLog'
+import { readDirectoryMembers } from '@/lib/directoryMembers'
+import { createPublicReadClient } from '@/lib/publicDataSource'
 import type { ArchiveMediaItem, ArchivePerson } from './types'
 
 const DAY = 86_400
@@ -164,8 +166,45 @@ const personItem = (value: unknown): ArchivePerson | null => {
       typeof row.avatarUrl === 'string' && row.avatarUrl.trim()
         ? row.avatarUrl
         : null,
-    in_archive: true,
+    // Set by withMembership after the cache: the gateway also returns people
+    // who never joined, and their profile links would 404.
+    in_archive: false,
   }
+}
+
+/**
+ * Marks which interaction partners are current directory members, so only
+ * they link to a profile. A live read, never cached, because membership is a
+ * consent decision; if it fails nobody is linked rather than linking a 404.
+ */
+export async function withMembership(
+  people: ArchivePerson[],
+  readMembers: typeof readDirectoryMembers = readDirectoryMembers,
+): Promise<ArchivePerson[]> {
+  if (people.length === 0) return people
+  let rows: Awaited<ReturnType<typeof readDirectoryMembers>>
+  try {
+    rows = await readMembers(
+      createPublicReadClient(),
+      people.map((person) => person.screen_name),
+    )
+  } catch (error) {
+    devLog('metaTwitter withMembership error', { error })
+    return people.map((person) => ({ ...person, in_archive: false }))
+  }
+  const ids = new Set(rows.map((row) => row.account_id).filter(Boolean))
+  // Rows without an ID (opted in before uploading) can only match by handle.
+  const idlessNames = new Set(
+    rows
+      .filter((row) => !row.account_id)
+      .map((row) => row.username.toLowerCase()),
+  )
+  return people.map((person) => ({
+    ...person,
+    in_archive:
+      ids.has(person.user_id) ||
+      idlessNames.has(person.screen_name.toLowerCase()),
+  }))
 }
 
 const profileParams = (year: number | undefined, limit: number) => {
@@ -312,7 +351,8 @@ export async function getClickHouseProfileSidebarOrThrow(
   accountId: string,
   year: number | undefined,
 ): Promise<ClickHouseProfileSidebar> {
-  return getCachedClickHouseProfileSidebar(accountId, year)
+  const sidebar = await getCachedClickHouseProfileSidebar(accountId, year)
+  return { ...sidebar, people: await withMembership(sidebar.people) }
 }
 
 export async function getClickHouseProfileMediaOrThrow(
@@ -326,7 +366,11 @@ export async function getClickHouseProfileInteractionsOrThrow(
   accountId: string,
   year: number | undefined,
 ): Promise<ClickHouseProfileInteractions> {
-  return getCachedClickHouseProfileInteractions(accountId, year)
+  const interactions = await getCachedClickHouseProfileInteractions(
+    accountId,
+    year,
+  )
+  return { people: await withMembership(interactions.people) }
 }
 
 export async function getClickHouseProfileSidebar(

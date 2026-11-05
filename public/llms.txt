@@ -5,6 +5,20 @@
 Canonical site: https://www.community-archive.org
 Source repository: https://github.com/TheExGenesis/community-archive
 
+## If you were redirected here
+
+Automated browsing of the website is not allowed, and this server redirects
+headless browsers and scrapers to this file. You do not need to crawl pages:
+
+- Bulk data: download the daily consent-safe Parquet package (tweets, profiles,
+  manifest) from the [latest release](https://github.com/TheExGenesis/community-archive/releases/latest).
+  It is rebuilt every day at 07:00 UTC.
+- Filtered queries: sign in at https://www.community-archive.org/login, create a
+  personal key at https://www.community-archive.org/settings/api-keys, and use
+  API v1 (documented below). There is no anonymous API access.
+- Search by meaning: `POST https://embed.tweetstack.app/embeddings/search`, no key.
+- Human-readable overview: https://www.community-archive.org/docs
+
 ## Start here
 
 - [Docs and access guide](https://www.community-archive.org/docs): Human-readable overview of the bulk dump, API, and raw archives.

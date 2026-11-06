@@ -67,12 +67,26 @@ Representative results:
 - Titles run long (100–140 characters) because each one now covers every part of its
   story. Consider a 110-character limit once the daily title fix lands.
 
-## Next steps (need approval: schema + production)
+## Productionization (Nov 6, same branch)
 
-1. A `digest_weekly_editions` table (week_start, version, status, content, source
-   daily edition IDs, model trace) with the same public RLS as daily editions.
-   Stored prior weekly editions replace reading prior weeks from local files.
-2. `/digest/week/YYYY-MM-DD` page that reuses the editorial `TweetCard` and links
-   back to the daily stories.
-3. A Monday timer on the nightly-digest host, after Sunday's daily publishes
-   (plus monitoring per the service-catalog rule), and optionally a weekly email.
+Built in this branch: the `digest_weekly_editions` table and migration
+`20261106190000`, the `publishWeekly.ts` publisher with its Monday timer, and the
+`/digest/week` pages. Monitoring lives in the control-panel repo (health function,
+alert and recurring-jobs row).
+
+Verified on a disposable Supabase stack: the full migration history (135 files)
+applied cleanly; then the 26 real published dailies from Oct 12 to Nov 6 were
+seeded and the publisher was run end to end.
+
+- A dry run made no writes. The week of Oct 19 published, then the week of Oct 26
+  published with Oct 19 as continuity. A repeat run skipped, and the week of Nov 2
+  correctly waited for Sunday.
+- Anonymous reads see only published rows and public columns. `select=*`, the
+  private columns and the health RPC are all denied.
+- Health reads `1|1|0|1` when healthy. It drops to 0 when an upcoming week has a
+  failed automated run. A non-Monday `week_start` is rejected.
+- Tombstoning the Oct 22 daily archived the week of Oct 19 (it vanished from anon
+  reads) and dropped the week of Oct 26's private prompt copy, while that week stayed
+  published.
+- `/digest/week/2026-10-26` rendered at desktop width and at 375px with no
+  horizontal scroll, and the Oct 30 daily sidebar links to that week.

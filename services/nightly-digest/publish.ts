@@ -81,7 +81,7 @@ const event = (
   ...(metadata ? { metadata } : {}),
 })
 
-class SupabaseRest {
+export class SupabaseRest {
   private readonly baseUrl: string
   private readonly headers: Record<string, string>
 
@@ -152,7 +152,8 @@ class SupabaseRest {
   }
 }
 
-const query = (values: Record<string, string>) => new URLSearchParams(values)
+export const query = (values: Record<string, string>) =>
+  new URLSearchParams(values)
 
 const mapPrompt = (row: PromptRow): DigestPromptVersion => {
   const parameters =

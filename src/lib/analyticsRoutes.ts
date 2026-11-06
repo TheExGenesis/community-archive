@@ -4,6 +4,8 @@ export const analyticsRoutes = {
   '/bangers': ['bangers', 'product'],
   '/digest': ['digest', 'product'],
   '/digest/[date]': ['digest', 'product'],
+  '/digest/week': ['digest', 'product'],
+  '/digest/week/[weekStart]': ['digest', 'product'],
   '/digest/[date]/[slug]': ['digest_story', 'product'],
   '/stream': ['live_stream', 'product'],
   '/research': ['research', 'product'],

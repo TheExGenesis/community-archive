@@ -17,6 +17,8 @@ import { DigestSubscriberCount } from './DigestSubscriberCount'
 import { DigestViewCount } from './DigestViewCount'
 import { DigestTopTerms } from './DigestTopTerms'
 import { DigestBulletinCards } from './DigestBulletinCards'
+import { getPublishedWeeklyDigest } from '@/lib/digest/weeklyData'
+import { weekStartFor } from '@/lib/digest/weekly'
 import {
   loadDigestBulletinItemsForViewer,
   type DigestBulletinItem,
@@ -167,6 +169,23 @@ async function Calendar({
   )
 }
 
+/** Links the week this edition belongs to, or else the latest weekly edition. */
+async function WeeklyLink({ date }: { date: string }) {
+  const weekly =
+    (await getPublishedWeeklyDigest(weekStartFor(date))) ??
+    (await getPublishedWeeklyDigest())
+  if (!weekly) return null
+  const isThisWeek = weekly.weekStart === weekStartFor(date)
+  return (
+    <Link
+      href={`/digest/week/${weekly.weekStart}`}
+      className="mt-6 block border-t border-zinc-200 pt-4 text-sm font-semibold text-brand hover:underline dark:border-zinc-800"
+    >
+      {isThisWeek ? 'This week in review →' : 'Latest week in review →'}
+    </Link>
+  )
+}
+
 async function Comments({ edition }: { edition: DigestEdition }) {
   const [count, user] = await Promise.all([
     getDigestCommentCount(edition),
@@ -227,6 +246,9 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
               }
             >
               <Calendar archive={archive} date={edition.digestDate} />
+              {edition.isPreview ? null : (
+                <WeeklyLink date={edition.digestDate} />
+              )}
             </Suspense>
           ),
           trendsSidebar: edition.content.trends ? (

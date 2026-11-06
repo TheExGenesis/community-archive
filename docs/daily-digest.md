@@ -230,6 +230,15 @@ provider-supported budget preserves high reasoning while leaving ample room for
 the structured edition; generation still stops naturally when the concise
 response is done.
 
+Stories follow a strict bundling rule (prompt version "strict story
+bundling", migration `20261106180000_strict_digest_story_bundling.sql`):
+bangers share a story only through the same event, claim, thread, or direct
+exchange, never a shared broad topic alone, and a real but lateral link must be
+stated in the subtitle or an `In brief` bullet. Weakly linked bangers become
+their own story or are left out. The receiver enforces the deterministic half:
+a reply, quote, or thread row whose banger is not in the same story is dropped
+with an editorial warning, because borrowed context is a loose bundle.
+
 The candidate corpus spans all authors and marks every banger with
 `authored_by_community_member`. The prompt treats that marker as a strong
 editorial preference: it favors coherent and relevant community-authored

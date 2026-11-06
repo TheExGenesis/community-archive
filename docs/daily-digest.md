@@ -324,3 +324,22 @@ request includes that error and the complete JSON schema and asks the model
 to rewrite complete sentences instead of truncating prose. Each response and
 its cumulative token usage is saved before validation, including when both
 attempts fail. Failures remain private and do not publish an invalid edition.
+
+## Weekly Digest (prototype)
+
+`src/lib/digest/weekly.ts` weaves the published daily stories of one
+Monday–Sunday week into 4–7 weekly stories: "major" ones (most important even if
+covered once) and "ongoing" ones (the same subject on two or more dates). Daily
+stories are bundled only on a concrete shared subject, with the link stated in
+`connection`. Each weekly story may continue a story from the previous two weekly
+editions (`continues_from` plus a `continuity_note` saying what is new). Generate
+locally, oldest week first:
+
+```bash
+CA_ROOT_ENV=../.env pnpm tsx scripts/generate-weekly-digest.ts 2026-10-19 2026-10-26
+```
+
+It reads only published editions through the public API and writes JSON and
+Markdown to `output/weekly-digest/` (override with `WEEKLY_DIGEST_OUTPUT_DIR`).
+There is no weekly table, page or schedule yet; see
+`memos/20261106-1745-weekly-digest-prototype.md`.

@@ -66,3 +66,11 @@ FOR EACH ROW EXECUTE FUNCTION private.enforce_archive_upload_owner();
 CREATE OR REPLACE TRIGGER fill_community_like_slug
 BEFORE INSERT ON public.community_project_likes
 FOR EACH ROW EXECUTE FUNCTION public.fill_community_like_slug();
+
+CREATE OR REPLACE TRIGGER guard_archive_upload_phase
+BEFORE INSERT OR UPDATE OF upload_phase ON public.archive_upload
+FOR EACH ROW EXECUTE FUNCTION private.guard_archive_upload_phase();
+
+CREATE OR REPLACE TRIGGER guard_all_account_owner_write
+BEFORE INSERT OR UPDATE ON public.all_account
+FOR EACH ROW EXECUTE FUNCTION private.guard_all_account_owner_write();

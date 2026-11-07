@@ -249,6 +249,15 @@ CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
     "username" "text",
     "storage_path" "text",
     "storage_sha256" "text",
+    "commit_claim_id" uuid,
+    "commit_heartbeat_at" timestamp with time zone,
+    "commit_attempts" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT archive_upload_commit_lease CHECK (
+      commit_attempts >= 0 AND (
+        upload_phase IS DISTINCT FROM 'committing'
+        OR (commit_claim_id IS NOT NULL AND commit_heartbeat_at IS NOT NULL)
+      )
+    ),
     CONSTRAINT archive_upload_storage_reference CHECK (
       (storage_path IS NULL AND storage_sha256 IS NULL) OR
       (storage_path IS NOT NULL AND storage_sha256 IS NOT NULL AND username IS NOT NULL
@@ -259,6 +268,9 @@ CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
 );
 ALTER TABLE "public"."archive_upload" OWNER TO "postgres";
 COMMENT ON COLUMN "public"."archive_upload"."username" IS 'Username/handle at the time of archive upload - used to locate archive files in storage';
+COMMENT ON COLUMN "public"."archive_upload"."commit_claim_id" IS 'Archive-worker claim for a row in the committing phase; NULL in every other phase.';
+COMMENT ON COLUMN "public"."archive_upload"."commit_heartbeat_at" IS 'Last archive-worker heartbeat for the committing claim; an expired heartbeat lets the next run reclaim the row.';
+COMMENT ON COLUMN "public"."archive_upload"."commit_attempts" IS 'Number of times an expired committing claim was reclaimed; the worker fails the upload once it reaches its limit.';
 
 -- public.likes
 CREATE TABLE IF NOT EXISTS "public"."likes" (

@@ -63,13 +63,15 @@ EXECUTE FUNCTION private.preserve_archive_storage_reference();
 CREATE OR REPLACE TRIGGER enforce_archive_upload_owner
 BEFORE INSERT OR UPDATE OF username, storage_path ON public.archive_upload
 FOR EACH ROW EXECUTE FUNCTION private.enforce_archive_upload_owner();
+
+-- Only the trusted worker may commit an upload; a committing row holds a lease.
+CREATE OR REPLACE TRIGGER enforce_archive_upload_transition
+BEFORE INSERT OR UPDATE ON public.archive_upload
+FOR EACH ROW EXECUTE FUNCTION private.enforce_archive_upload_transition();
+
 CREATE OR REPLACE TRIGGER fill_community_like_slug
 BEFORE INSERT ON public.community_project_likes
 FOR EACH ROW EXECUTE FUNCTION public.fill_community_like_slug();
-
-CREATE OR REPLACE TRIGGER guard_archive_upload_phase
-BEFORE INSERT OR UPDATE OF upload_phase ON public.archive_upload
-FOR EACH ROW EXECUTE FUNCTION private.guard_archive_upload_phase();
 
 CREATE OR REPLACE TRIGGER guard_all_account_owner_write
 BEFORE INSERT OR UPDATE ON public.all_account

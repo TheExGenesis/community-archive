@@ -136,14 +136,14 @@ isOneToOne: false
                   ]
                 },"archive_upload": {
                   Row: {
-                    "account_id": string,"archive_at": string,"created_at": string | null,"end_date": string | null,"id": number,"keep_private": boolean | null,"start_date": string | null,"storage_path": string | null,"storage_sha256": string | null,"upload_likes": boolean | null,"upload_phase": Database["public"]['Enums']["upload_phase_enum"] | null,"username": string | null
+                    "account_id": string,"archive_at": string,"commit_attempts": number,"commit_claim_id": string | null,"commit_heartbeat_at": string | null,"created_at": string | null,"end_date": string | null,"id": number,"keep_private": boolean | null,"start_date": string | null,"storage_path": string | null,"storage_sha256": string | null,"upload_likes": boolean | null,"upload_phase": Database["public"]['Enums']["upload_phase_enum"] | null,"username": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "account_id": string,"archive_at": string,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
+                    "account_id": string,"archive_at": string,"commit_attempts"?: number,"commit_claim_id"?: string | null,"commit_heartbeat_at"?: string | null,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
                   }
                   Update: {
-                    "account_id"?: string,"archive_at"?: string,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
+                    "account_id"?: string,"archive_at"?: string,"commit_attempts"?: number,"commit_claim_id"?: string | null,"commit_heartbeat_at"?: string | null,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
                   }
                   Relationships: [
                     {

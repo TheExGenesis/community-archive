@@ -221,3 +221,6 @@ CREATE INDEX IF NOT EXISTS "community_project_likes_project_id_idx"
   ON "public"."community_project_likes" ("project_id");
 CREATE INDEX IF NOT EXISTS "community_project_comments_project_id_created_at_idx"
   ON "public"."community_project_comments" ("project_id", "created_at");
+
+CREATE INDEX IF NOT EXISTS "trend_stories_date_position_idx"
+  on "public"."trend_stories" ("trend_date" desc, "position");

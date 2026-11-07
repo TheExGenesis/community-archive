@@ -734,6 +734,20 @@ isOneToOne: true
                   Relationships: [
                     
                   ]
+                },"trend_stories": {
+                  Row: {
+                    "bullets": NonNullable<Json>,"generated_at": string,"id": string,"label": string,"lane": string,"model": string | null,"position": number,"slug": string,"stats": NonNullable<Json>,"summary": string,"terms": (string)[],"title": string,"tooltip": string,"trend_date": string,"tweets": NonNullable<Json>,"window_since": string,"window_until": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bullets"?: NonNullable<Json>,"generated_at"?: string,"id"?: string,"label": string,"lane": string,"model"?: string | null,"position": number,"slug": string,"stats"?: NonNullable<Json>,"summary": string,"terms": (string)[],"title": string,"tooltip": string,"trend_date": string,"tweets"?: NonNullable<Json>,"window_since": string,"window_until": string
+                  }
+                  Update: {
+                    "bullets"?: NonNullable<Json>,"generated_at"?: string,"id"?: string,"label"?: string,"lane"?: string,"model"?: string | null,"position"?: number,"slug"?: string,"stats"?: NonNullable<Json>,"summary"?: string,"terms"?: (string)[],"title"?: string,"tooltip"?: string,"trend_date"?: string,"tweets"?: NonNullable<Json>,"window_since"?: string,"window_until"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"tweet_link_previews": {
                   Row: {
                     "canonical_url": string | null,"content_type": string | null,"created_at": string,"description": string | null,"expires_at": string,"fetched_at": string | null,"image_url": string | null,"normalized_url": string,"site_name": string | null,"status": string,"title": string | null,"updated_at": string,"url_hash": string

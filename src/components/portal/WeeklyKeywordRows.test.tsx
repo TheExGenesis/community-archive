@@ -143,3 +143,35 @@ test('makes the explanation available on keyboard focus', async () => {
     'dark blue shows the previous share and bright blue shows the gain',
   )
 })
+
+test('merges story terms into one row that opens the story and explains it on hover', async () => {
+  const user = userEvent.setup()
+  render(
+    <WeeklyKeywordRows
+      weekly={words}
+      failed={false}
+      stories={[
+        {
+          trendDate: '2026-09-07',
+          slug: 'ai-agents',
+          terms: ['ai agents', 'model'],
+          label: 'AI agents',
+          title: 'Agents ship everywhere',
+          tooltip: 'Everyone is posting about their new agent setups.',
+        },
+      ]}
+    />,
+  )
+  const link = screen.getByRole('link', { name: /AI agents/ })
+  expect(link).toHaveAttribute('href', '/trending/2026-09-07/ai-agents')
+  expect(screen.queryByRole('link', { name: 'model' })).toBeNull()
+  // Unstoried terms keep their search link.
+  expect(screen.getByRole('link', { name: 'dolly' })).toHaveAttribute(
+    'href',
+    expect.stringContaining('/search?q=dolly'),
+  )
+  await user.hover(link)
+  const tip = await screen.findByRole('tooltip')
+  expect(tip).toHaveTextContent('Agents ship everywhere')
+  expect(tip).toHaveTextContent('Merged: ai agents · model')
+})

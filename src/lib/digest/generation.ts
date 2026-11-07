@@ -187,6 +187,12 @@ function parseModelDigest(
   }
 
   const usedBangers = new Set<string>()
+  const commentaryIdsByBanger = new Map(
+    candidates.map(({ candidate, commentary }) => [
+      candidate.tweet.id,
+      new Set(commentary.map(({ id }) => id)),
+    ]),
+  )
   const normalizedAllPosts = normalizedCorpus(corpus)
   const editorialWarnings = executiveSummary.flatMap((bullet, index) =>
     bullet.length < 35 || bullet.length > 140
@@ -241,6 +247,26 @@ function parseModelDigest(
         `Story ${index + 1} must include at least one banger index`,
       )
     }
+    // A reply, quote, or thread row belongs only with a banger whose context
+    // it is. Borrowed context is a loose bundle, so drop it rather than fail.
+    const orphanContext = indexedTweets.filter(
+      ({ kind, tweetId }) =>
+        kind !== 'banger' &&
+        !bangerRows.some(({ tweetId: bangerId }) =>
+          commentaryIdsByBanger.get(bangerId)?.has(tweetId),
+        ),
+    )
+    if (orphanContext.length) {
+      editorialWarnings.push(
+        `Story ${index + 1} dropped ${orphanContext.length} context ${orphanContext.length === 1 ? 'post' : 'posts'} whose banger is in no part of the story (indices ${orphanContext.map((row) => row.index).join(', ')}).`,
+      )
+    }
+    const keptIndices = orphanContext.length
+      ? tweetIndices.filter(
+          (tweetIndex) =>
+            !orphanContext.some((row) => row.index === tweetIndex),
+        )
+      : tweetIndices
     const titleWordCount = title.split(/\s+/).length
     if (titleWordCount < 3 || titleWordCount > 18 || title.length > 110) {
       editorialWarnings.push(
@@ -269,7 +295,7 @@ function parseModelDigest(
       subtitle,
       bullets,
       editorialNote,
-      tweetIndices,
+      tweetIndices: keptIndices,
     }
   })
 

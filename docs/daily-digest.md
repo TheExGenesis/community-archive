@@ -333,3 +333,36 @@ request includes that error and the complete JSON schema and asks the model
 to rewrite complete sentences instead of truncating prose. Each response and
 its cumulative token usage is saved before validation, including when both
 attempts fail. Failures remain private and do not publish an invalid edition.
+
+## Weekly Digest
+
+`src/lib/digest/weekly.ts` weaves the published daily stories of one
+Monday–Sunday week into 4–7 weekly stories: "major" ones (most important even if
+covered once) and "ongoing" ones (the same subject on two or more dates). Daily
+stories are bundled only on a concrete shared subject, with the link stated in
+`connection`. Each weekly story may continue a story from the previous two weekly
+editions (`continues_from` plus a `continuity_note` saying what is new).
+
+- Storage: `public.digest_weekly_editions`, one row per generation attempt. Only
+  `published` rows are public, and anonymous readers may select only `id`,
+  `week_start`, `status`, `content` and `published_at`. Prompts, raw responses and
+  errors stay service-role only.
+- Publisher: `services/nightly-digest/publishWeekly.ts` on the
+  `community-archive-weekly-digest.timer` (Mondays 09:00 UTC). Runbook:
+  `ops/nightly-digest/README.md`.
+- Pages: `/digest/week` (latest) and `/digest/week/YYYY-MM-DD` (Monday) show
+  the summary and a table of contents; each story has its own page at
+  `/digest/week/YYYY-MM-DD/<slug>`. Links to daily stories and earlier weeks
+  preview the linked section's title and subtitle on hover or focus, read from
+  the published editions at render time. Each daily edition's sidebar links its
+  week, or the latest week.
+- Opt-out: when `tombstone_policy_account` archives a daily edition, a trigger
+  archives every weekly edition built from it and drops the private prompt
+  copies of later weeks that used it as continuity context.
+
+For prompt work, generate locally without touching the database (oldest week
+first, because each week reads the previous outputs):
+
+```bash
+CA_ROOT_ENV=../.env pnpm tsx scripts/generate-weekly-digest.ts 2026-10-19 2026-10-26
+```

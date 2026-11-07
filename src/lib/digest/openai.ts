@@ -89,6 +89,12 @@ export interface DigestGenerationRequest {
   reasoningEffort?: string
   maxOutputTokens?: number
   temperature?: number
+  /** Structured-output contract; defaults to the daily digest schema. */
+  responseFormat?: {
+    name: string
+    description: string
+    schema: Record<string, unknown>
+  }
 }
 
 export interface DigestGenerationResponse {
@@ -207,6 +213,12 @@ export async function generateDigestWithModel(
   request: DigestGenerationRequest,
   fetchImpl: typeof fetch = fetch,
 ): Promise<DigestGenerationResponse> {
+  const responseFormat = request.responseFormat ?? {
+    name: 'community_archive_daily_digest',
+    description:
+      'A concise daily digest assembled only from supplied tweet snapshots.',
+    schema: DIGEST_JSON_SCHEMA as unknown as Record<string, unknown>,
+  }
   const isOpenRouter = request.model.includes('/')
   const isDeepSeek = request.model.startsWith('deepseek-')
   const provider = isOpenRouter
@@ -242,9 +254,9 @@ export async function generateDigestWithModel(
           : {
               type: 'json_schema',
               json_schema: {
-                name: 'community_archive_daily_digest',
+                name: responseFormat.name,
                 strict: true,
-                schema: DIGEST_JSON_SCHEMA,
+                schema: responseFormat.schema,
               },
             },
     }
@@ -342,8 +354,8 @@ export async function generateDigestWithModel(
     text: {
       format: {
         type: 'json_schema',
-        name: 'community_archive_daily_digest',
-        schema: DIGEST_JSON_SCHEMA,
+        name: responseFormat.name,
+        schema: responseFormat.schema,
       },
     },
   }
@@ -355,8 +367,7 @@ export async function generateDigestWithModel(
       verbosity: 'low',
       format: {
         ...((body.text as { format: Record<string, unknown> }).format ?? {}),
-        description:
-          'A concise daily digest assembled only from supplied tweet snapshots.',
+        description: responseFormat.description,
         strict: true,
       },
     }

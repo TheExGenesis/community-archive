@@ -76,3 +76,49 @@ request includes that error and the complete JSON schema and asks the model
 to rewrite complete sentences instead of truncating prose. Each response and
 its cumulative token usage is saved before validation, including when both
 attempts fail. Failures remain private and do not publish an invalid edition.
+
+## Weekly digest
+
+`community-archive-weekly-digest.timer` runs Mondays at 09:00 UTC on the same
+host, with the same release directory and environment file. The oneshot
+`services/nightly-digest/publishWeekly.ts` weaves the published daily editions
+of the Monday–Sunday week that just ended into one weekly edition, using the
+previous two published weekly editions for continuity, and publishes it to
+`public.digest_weekly_editions` (one Opus 5.5 call plus at most one repair).
+No ClickHouse access is needed.
+
+- It skips a week that is already published.
+- It waits (exits non-zero, systemd retries every 30 minutes, five starts) until
+  Sunday's daily edition is published and at least five dailies exist.
+- Each automated attempt is one row with workflow ID `systemd:weekly:<monday>`.
+  A failed or interrupted attempt stays as a `failed`/`running` row and stops
+  later retries, so no model call repeats implicitly.
+- Health: `public.community_archive_monitoring_weekly_digest()` (aggregate only)
+  feeds `community_archive_weekly_digest_healthy`; the edition is due by Monday
+  12:00 UTC.
+
+Dry-run a week against production data (no writes):
+
+```sh
+ssh prod-firehose 'systemd-run --wait --collect --pipe \
+  --property=EnvironmentFile=/etc/community-archive-nightly-digest.env \
+  --property=WorkingDirectory=/opt/community-archive-nightly-digest \
+  /root/.bun/bin/bun services/nightly-digest/publishWeekly.ts \
+  --week 2026-10-26 --dry-run'
+```
+
+Recover a failed week after fixing the cause, with a new workflow ID:
+
+```sh
+ssh prod-firehose 'systemd-run --wait --collect --pipe \
+  --property=EnvironmentFile=/etc/community-archive-nightly-digest.env \
+  --property=WorkingDirectory=/opt/community-archive-nightly-digest \
+  /root/.bun/bin/bun services/nightly-digest/publishWeekly.ts \
+  --week 2026-10-26 --workflow-run-id operator-recovery:weekly:2026-10-26:1'
+```
+
+Then verify `community_archive_weekly_digest_healthy == 1` and enable the timer:
+
+```sh
+ssh prod-firehose 'systemctl enable --now community-archive-weekly-digest.timer'
+```

@@ -143,3 +143,6 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_comments" FROM "anon"
 GRANT ALL PRIVILEGES ON TABLE "public"."community_project_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."community_project_comments" TO "anon", "authenticated";
 
+REVOKE ALL PRIVILEGES ON TABLE "public"."trend_stories" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."trend_stories" TO "service_role";
+GRANT SELECT ON TABLE "public"."trend_stories" TO "anon", "authenticated";

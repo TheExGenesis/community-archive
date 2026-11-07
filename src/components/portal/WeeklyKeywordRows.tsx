@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRef } from 'react'
 import { Info } from '@phosphor-icons/react'
 import {
   Tooltip,
@@ -9,14 +10,64 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import type { TermWeek } from '@/lib/portal/types'
+import { captureProductAction } from '@/lib/productAnalytics'
+import { groupTermsByStory, type TrendStoryLink } from '@/lib/trendStories/core'
 import { MUTED } from './styles'
+
+/** A term (or merged group of terms) that opens its AI-written story. */
+function StoryTerm({ story }: { story: TrendStoryLink }) {
+  const explained = useRef(false)
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip
+        onOpenChange={(open) => {
+          if (!open || explained.current) return
+          explained.current = true
+          captureProductAction('trend_stories', 'summary_expanded')
+        }}
+      >
+        <TooltipTrigger asChild>
+          <Link
+            href={`/trending/${story.trendDate}/${story.slug}`}
+            prefetch={false}
+            onClick={() =>
+              captureProductAction('trend_stories', 'topic_opened')
+            }
+            className="inline-flex min-w-0 items-center gap-1 text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+          >
+            <span className="truncate">{story.label}</span>
+            <Info aria-hidden="true" className="h-3 w-3 flex-none opacity-60" />
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          align="start"
+          className="max-w-[320px] text-[12.5px] leading-[1.45]"
+        >
+          <p className="font-semibold">{story.title}</p>
+          <p className="mt-1 text-muted-foreground">{story.tooltip}</p>
+          {story.terms.length > 1 ? (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Merged: {story.terms.join(' · ')}
+            </p>
+          ) : null}
+          <p className="mt-1.5 text-[11px] font-semibold text-brand">
+            Click for the story →
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 export function WeeklyKeywordRows({
   weekly,
   failed,
+  stories = [],
 }: {
   weekly: TermWeek[]
   failed: boolean
+  stories?: TrendStoryLink[]
 }) {
   if (failed)
     return (
@@ -33,7 +84,7 @@ export function WeeklyKeywordRows({
     current: weighted ? row.currentPer100k! : row.last7,
     previous: weighted ? row.previousPer100k! : row.prev7,
   })
-  const rows = weekly
+  const sorted = weekly
     .map((row) => ({ ...row, ...activity(row) }))
     .sort(
       (a, b) =>
@@ -41,7 +92,9 @@ export function WeeklyKeywordRows({
         b.current - a.current ||
         a.term.localeCompare(b.term),
     )
-    .slice(0, 6)
+  // Terms the nightly AI pass merged into one story share a single row.
+  const grouped = groupTermsByStory(sorted, stories).slice(0, 6)
+  const rows = grouped.map((entry) => entry.term)
   const max = Math.max(1, ...rows.flatMap((row) => [row.current, row.previous]))
   const width = (value: number) => `${(value / max) * 100}%`
   const until = weekly[0]?.untilDate
@@ -100,7 +153,7 @@ export function WeeklyKeywordRows({
           No clear movers this week.
         </p>
       )}
-      {rows.map((row) => {
+      {grouped.map(({ term: row, story }) => {
         const change =
           row.status === 'new'
             ? 'New'
@@ -116,17 +169,21 @@ export function WeeklyKeywordRows({
             key={row.term}
             className="grid grid-cols-[minmax(0,1fr)_46px_minmax(35px,0.6fr)_68px] items-center gap-2 py-[5px]"
           >
-            <Link
-              href={`/search?${new URLSearchParams({
-                q: row.term,
-                ...(row.sinceDate ? { sinceDate: row.sinceDate } : {}),
-                ...(row.untilDate ? { untilDate: row.untilDate } : {}),
-              })}`}
-              title={`Search tweets mentioning ${row.term}`}
-              className="truncate text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
-            >
-              {row.term}
-            </Link>
+            {story ? (
+              <StoryTerm story={story} />
+            ) : (
+              <Link
+                href={`/search?${new URLSearchParams({
+                  q: row.term,
+                  ...(row.sinceDate ? { sinceDate: row.sinceDate } : {}),
+                  ...(row.untilDate ? { untilDate: row.untilDate } : {}),
+                })}`}
+                title={`Search tweets mentioning ${row.term}`}
+                className="truncate text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+              >
+                {row.term}
+              </Link>
+            )}
             <span className={`text-right text-[11px] tabular-nums ${MUTED}`}>
               {row.last7.toLocaleString('en-US')}
             </span>

@@ -940,6 +940,10 @@ BEGIN
     )
   );
 
+  -- Trend stories freeze tweet snapshots; drop any story that cites the account.
+  DELETE FROM public.trend_stories AS story
+  WHERE public.policy_json_contains_blocked_author(story.tweets);
+
   UPDATE public.tweet_media
   SET archive_upload_id = NULL
   WHERE archive_upload_id = ANY(v_archive_upload_ids);

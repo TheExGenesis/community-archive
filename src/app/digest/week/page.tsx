@@ -4,6 +4,7 @@ import { WeeklyDigestView } from '@/components/digest/WeeklyDigestView'
 import {
   getPublishedWeeklyDigest,
   listPublishedWeeks,
+  loadWeeklyRefPreviews,
 } from '@/lib/digest/weeklyData'
 
 export const revalidate = 300
@@ -20,5 +21,8 @@ export default async function LatestWeeklyDigestPage() {
     listPublishedWeeks(),
   ])
   if (!edition) notFound()
-  return <WeeklyDigestView edition={edition} weeks={weeks} />
+  const previews = await loadWeeklyRefPreviews(edition.content)
+  return (
+    <WeeklyDigestView edition={edition} weeks={weeks} previews={previews} />
+  )
 }

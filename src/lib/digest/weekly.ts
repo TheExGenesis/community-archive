@@ -613,3 +613,15 @@ export function weeklyDigestToMarkdown(
   }
   return lines.join('\n')
 }
+
+/** Text shown when a reader hovers a link to a daily or weekly story. */
+export interface WeeklyRefPreview {
+  kicker: string
+  title: string
+  excerpt: string
+}
+
+export const dailyPreviewKey = (digestDate: string, slug: string) =>
+  `daily:${digestDate}#${slug}`
+export const weeklyPreviewKey = (weekStart: string, slug: string) =>
+  `weekly:${weekStart}#${slug}`

@@ -341,8 +341,12 @@ editions (`continues_from` plus a `continuity_note` saying what is new).
 - Publisher: `services/nightly-digest/publishWeekly.ts` on the
   `community-archive-weekly-digest.timer` (Mondays 09:00 UTC). Runbook:
   `ops/nightly-digest/README.md`.
-- Pages: `/digest/week` (latest) and `/digest/week/YYYY-MM-DD` (Monday). Each
-  daily edition's sidebar links its week, or the latest week.
+- Pages: `/digest/week` (latest) and `/digest/week/YYYY-MM-DD` (Monday) show
+  the summary and a table of contents; each story has its own page at
+  `/digest/week/YYYY-MM-DD/<slug>`. Links to daily stories and earlier weeks
+  preview the linked section's title and subtitle on hover or focus, read from
+  the published editions at render time. Each daily edition's sidebar links its
+  week, or the latest week.
 - Opt-out: when `tombstone_policy_account` archives a daily edition, a trigger
   archives every weekly edition built from it and drops the private prompt
   copies of later weeks that used it as continuity context.

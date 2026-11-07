@@ -1,8 +1,16 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getPublishedDigest } from './data'
 import { createDigestReadClient } from './database'
 import { isRecord } from './types'
-import type { WeeklyDigestContent } from './weekly'
+import {
+  dailyPreviewKey,
+  weeklyPreviewKey,
+  type WeeklyDigestContent,
+  type WeeklyRefPreview,
+} from './weekly'
+
+export type { WeeklyRefPreview } from './weekly'
 
 export interface WeeklyDigestEdition {
   id: string
@@ -102,4 +110,58 @@ export async function listPublishedWeeks(limit = 26): Promise<string[]> {
   return ((data as { week_start: string }[] | null) ?? []).map(
     ({ week_start }) => week_start,
   )
+}
+
+const previewDay = (date: string) =>
+  new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(`${date}T12:00:00Z`))
+
+/**
+ * Resolve every daily and prior-week reference in a weekly edition to a short
+ * excerpt of the section it points at. Reads go through the same published
+ * (anon) sources as the pages, so tombstoned editions simply have no preview.
+ */
+export async function loadWeeklyRefPreviews(
+  content: WeeklyDigestContent,
+): Promise<Record<string, WeeklyRefPreview>> {
+  const dailyDates = new Set<string>()
+  const priorWeeks = new Set<string>()
+  for (const story of content.stories) {
+    story.dailyStories.forEach((ref) => dailyDates.add(ref.digestDate))
+    story.continuesFrom.forEach((ref) => priorWeeks.add(ref.weekStart))
+  }
+  content.alsoNotable.forEach((item) =>
+    dailyDates.add(item.dailyStory.digestDate),
+  )
+
+  const previews: Record<string, WeeklyRefPreview> = {}
+  await Promise.all([
+    ...Array.from(dailyDates).map(async (date) => {
+      const edition = await getPublishedDigest(date).catch(() => null)
+      if (!edition || edition.isPreview) return
+      for (const story of edition.content.stories) {
+        previews[dailyPreviewKey(date, story.slug)] = {
+          kicker: `Daily digest · ${previewDay(date)}`,
+          title: story.title,
+          excerpt: story.subtitle || story.bullets[0] || '',
+        }
+      }
+    }),
+    ...Array.from(priorWeeks).map(async (weekStart) => {
+      const edition = await getPublishedWeeklyDigest(weekStart)
+      if (!edition) return
+      for (const story of edition.content.stories) {
+        previews[weeklyPreviewKey(weekStart, story.slug)] = {
+          kicker: `Week of ${previewDay(weekStart).replace(/^\w+ /, '')}`,
+          title: story.title,
+          excerpt: story.subtitle || story.bullets[0] || '',
+        }
+      }
+    }),
+  ])
+  return previews
 }

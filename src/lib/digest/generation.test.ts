@@ -2,6 +2,7 @@ import type { PortalTweet } from '@/lib/portal/types'
 import {
   assembleDigestEditionContent,
   buildDigestPromptCorpus,
+  classifyDigestTitle,
   fillDailyDigestCandidates,
   renderDigestPrompt,
   selectDailyDigestBangers,
@@ -581,10 +582,159 @@ describe('daily digest generation contract', () => {
     expect(edition.stories[0]).toMatchObject({
       title: 'Taste became the benchmark of the day',
       titleIsQuote: false,
+      titleKind: 'voice',
     })
     expect(edition.editorialWarnings).toContain(
       'Story 1 title is a paraphrase rather than an exact tweet excerpt.',
     )
+  })
+
+  test('classifies quote, composed and voice titles against the story posts', () => {
+    const posts = buildDigestPromptCorpus(candidates)
+
+    expect(
+      classifyDigestTitle(
+        'taste benchmarks are becoming public rituals',
+        posts,
+      ),
+    ).toEqual({
+      title: 'taste benchmarks are becoming public rituals',
+      kind: 'quote',
+      unmatchedParts: [],
+    })
+    expect(
+      classifyDigestTitle(
+        '"taste benchmarks are becoming public rituals" / \u201cthe parquet release now contains reply graphs\u201d',
+        posts,
+      ),
+    ).toEqual({
+      title:
+        '\u201ctaste benchmarks are becoming public rituals\u201d / \u201cthe parquet release now contains reply graphs\u201d',
+      kind: 'composed',
+      unmatchedParts: [],
+    })
+    expect(
+      classifyDigestTitle('taste rituals / parquet graphs everywhere', posts),
+    ).toEqual({
+      title: 'taste rituals / parquet graphs everywhere',
+      kind: 'voice',
+      unmatchedParts: [],
+    })
+    expect(
+      classifyDigestTitle(
+        'taste benchmarks are becoming public rituals / parquet graphs everywhere',
+        posts,
+      ),
+    ).toMatchObject({
+      kind: 'voice',
+      unmatchedParts: ['parquet graphs everywhere'],
+    })
+  })
+
+  test('renders a composed multi-element title in per-excerpt quotation marks', () => {
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: [
+        ...candidates,
+        {
+          candidate: {
+            tweet: tweet('4', 'taste is a coordination problem now'),
+            sourceRank: 4,
+            selected: true,
+          },
+          commentary: [],
+          totalReplyCount: 0,
+        },
+      ],
+      modelOutput: {
+        ...modelOutput,
+        stories: [
+          {
+            ...modelOutput.stories[0],
+            title:
+              'taste benchmarks are becoming public rituals / taste is a coordination problem now',
+            tweet_indices: [0, 3],
+          },
+          ...modelOutput.stories.slice(1),
+        ],
+      },
+    })
+
+    expect(edition.stories[0]).toMatchObject({
+      title:
+        '\u201ctaste benchmarks are becoming public rituals\u201d / \u201ctaste is a coordination problem now\u201d',
+      titleIsQuote: false,
+      titleKind: 'composed',
+    })
+    expect(edition.editorialWarnings).toEqual([])
+  })
+
+  test('accepts a voice title for a multi-banger story without a paraphrase warning', () => {
+    const multi = [
+      ...candidates,
+      {
+        candidate: {
+          tweet: tweet('4', 'reply graphs show who answers whom'),
+          sourceRank: 4,
+          selected: true,
+        },
+        commentary: [],
+        totalReplyCount: 0,
+      },
+    ]
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 4,
+      enrichedCandidates: multi,
+      modelOutput: {
+        ...modelOutput,
+        // Context rows move up by one because there is a fourth banger.
+        stories: [
+          { ...modelOutput.stories[0], tweet_indices: [0, 4] },
+          { ...modelOutput.stories[1], tweet_indices: [1, 5] },
+          {
+            ...modelOutput.stories[2],
+            title: 'everyone is suddenly studying reply graphs',
+            tweet_indices: [2, 3, 6],
+          },
+        ],
+      },
+    })
+
+    expect(edition.stories[2]).toMatchObject({
+      titleIsQuote: false,
+      titleKind: 'voice',
+    })
+    expect(edition.editorialWarnings).toEqual([])
+  })
+
+  test('warns when the third summary bullet is an Also: catch-all', () => {
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: candidates,
+      modelOutput: {
+        ...modelOutput,
+        executive_summary: [
+          ...modelOutput.executive_summary.slice(0, 2),
+          'Also: whiteboards, parquet graphs, and doubted taste launches.',
+        ],
+      },
+    })
+
+    expect(edition.editorialWarnings).toEqual([
+      'Summary bullet 3 is an "Also:" catch-all; name fewer remaining stories clearly instead.',
+    ])
   })
 
   test('uses the model-selected representative tweet instead of forcing rank one', () => {

@@ -11,6 +11,8 @@ Files:
   live in the script; SQL keys are recomputed. Run it after loading a new export.
 - `eval.ts`: the runner. `results/` (gitignored) gets one `<timestamp>.json` and
   one `<timestamp>.md` per run.
+- `timing.mjs`: where a run's time went, from a dev run's timing logs or an eval result
+  file (`--eval results/<timestamp>.json`); see `docs/agent-search.md`.
 - `tsconfig.json`: maps `@/*` to `src/*` and `server-only` to `jest.server-only.js` so
   server modules load outside Next.
 

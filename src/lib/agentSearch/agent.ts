@@ -40,18 +40,21 @@ The shell:
 - Output longer than about 4,000 characters is cut, so never cat a big file: count with wc -l, summarise with jq, and preview with jq -c '{id,author,date,text:.text[:200]}' file | head.
 
 Archive commands (rows on stdout, a one-line summary on stderr, so you see the summary even when you redirect to a file):
-- search <words> [--any w1,w2] [--all] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match as an exact phrase unless you add --all; --any adds alternative words or phrases. Retweets are excluded.
-- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes a second or two and a question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision.
+- search <words> [--phrase] [--or w1,w2] [--with w1,w2] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match tweets that contain all of them in any order, which also catches other spellings (open source finds open-source); add --phrase for an exact phrase someone remembers. --or adds alternatives: tweets with the words or with any of these (other names: notion --or @NotionHQ). --with narrows: tweets with the words and at least one of these (notion --with slow,offline). Retweets are excluded.
+- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes a second or two and a question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision. --k is 100 by default.
 - people <name or handle>: matching members, to get the right handle.
+- timeline @handle [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--oldest] [--no-replies] [--retweets] [--limit N]: that person's own tweets, newest first (200 by default, up to 3000; retweets only with --retweets). Use it to read what someone posts and whom they reply to, rather than searching their tweets for common words.
 - score <file> "<yes/no question about one tweet>": asks the question of every tweet in the file (a reply is read with its parent) and prints the rows with p, the probability of yes, highest first. p ≥ 0.5 means yes. Use it when a search returns more tweets than you can read.
 - thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), show <id> (one tweet in full, with what it quotes).
+- expand <scored file> [--min-p 0.7] [--seeds N] [--limit N]: the conversations around the file's strongest tweets (p at least --min-p, the best 15 by default): the threads they sit in and the tweets quoting them, leaving out tweets already in the file, up to 300. People often answer a post without naming its topic, so score what expand finds with the same question.
+- par runs archive commands at the same time, while a for loop runs them one after another. par 'search {} --limit 100 > s_{}.jsonl' rust golang zig fills {} with each word; par 'timeline @a > a.jsonl' 'timeline @b > b.jsonl' runs each line. Output comes back in the order given.
 - Also: jq, grep, sort, uniq, head, tail, wc, cut, awk, sed, mkdir.
 
 How to work:
 1. Work out what the question is about. If it names a person or account, run people first. A project may have its own account (the archive's is @comm_archive).
 2. Search for the words that signal an answer, not only the topic: for films someone liked, try "great movie", "just watched", "recommend" with --from, not "film", which also matches filming. Short queries work better than sentences. Try the forms people write: variants (Greek and Greece, ban and banned), abbreviations, handles, the topic's jargon. If a search finds nothing, rephrase before concluding.
 3. Save results to files (search … > s1.jsonl) and look at them with small outputs. Add --since/--until only when the question asks about a period.
-4. When the answer is a set of tweets spread across the archive (who criticised something, what people think of a topic), gather broadly into one file (keyword search with --limit 300, plus one semantic search for the idea in other words; combine files with cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl), score it with a precise criterion, and work from select(.p >= 0.5). If search says more exist, narrow the words or dates, or say coverage is partial.
+4. When the answer is a set of tweets spread across the archive (who criticised something, what people think of a topic), gather broadly, then let the answers you find guide the next searches. First, with par, run keyword searches for the names and the words that signal an answer plus one or two semantic searches for the idea; combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl) and score them with a precise criterion (score takes up to 1000 tweets; split a bigger file and score the parts with par). Read a sample of the tweets that scored yes and of those just below 0.5: they show what answers look like here. Write one semantic search for each kind of answer you see, in the words those tweets use, run them together and score what they add. Then expand the strongest hits and score what that adds. Work from select(.p >= 0.5). If search says more exist, narrow the words or dates, or say coverage is partial.
 5. Follow conversations when they matter: thread, quotes.
 6. Stop once more searching stops turning up new tweets. Do not repeat a search. You have about 20 commands in all; leave the last two for writing lists and answering.
 
@@ -76,18 +79,24 @@ How to answer:
 
 Examples (commands shortened):
 1. A remembered tweet, "the one about learning French in coffee shops":
-   search french --any "coffee shop",café,cafe --all > s1.jsonl
+   search french --with "coffee shop",café,cafe > s1.jsonl
    jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20
    Then: It's @someone in March 2023:
    [[t:<id>]]
-2. A survey, "who has criticised the Community Archive?":
-   search "community archive" --any @comm_archive,"comm archive" --limit 300 > s1.jsonl
-   score s1.jsonl "Does this tweet criticise or complain about the Community Archive?" > c1.jsonl
-   jq -r 'select(.p >= 0.5) | .author' c1.jsonl | sort | uniq -c | sort -rn | head
-   mkdir -p lists && jq -c 'select(.p >= 0.5 and (.text | test("privacy|consent"; "i")))' c1.jsonl > lists/privacy.jsonl
-   Then a short answer with: [[posts: Privacy and consent | lists/privacy.jsonl | by author]]
-3. A follow-up, "which of them posted most recently?": c1.jsonl from the last question is still there.
-   jq -c 'select(.p >= 0.5)' c1.jsonl | jq -sc 'sort_by(.date) | reverse | .[:5][]' > lists/recent.jsonl`
+2. A survey, "who has complained about Notion?":
+   par 'search notion --or @NotionHQ --limit 500 > k1.jsonl' 'semantic "complaints about using Notion" > m1.jsonl'
+   cat k1.jsonl m1.jsonl | jq -sc 'unique_by(.id)[]' > all.jsonl
+   score all.jsonl "Does this tweet complain about or criticise Notion?" > c1.jsonl
+   jq -c 'select(.p >= 0.3) | {p,author,text:.text[:160]}' c1.jsonl | head -40
+   (Say the yes tweets are about speed, offline use and price: one semantic search for each.)
+   par 'semantic "Notion is too slow to use" > m2.jsonl' 'semantic "Notion does not work offline" > m3.jsonl' 'semantic "Notion got too expensive" > m4.jsonl'
+   cat m2.jsonl m3.jsonl m4.jsonl | jq -sc 'unique_by(.id)[]' > more.jsonl && score more.jsonl "Does this tweet complain about or criticise Notion?" > c2.jsonl
+   cat c1.jsonl c2.jsonl | jq -sc 'unique_by(.id)[]' > scored.jsonl && expand scored.jsonl > e1.jsonl && score e1.jsonl "Does this tweet complain about or criticise Notion?" > c3.jsonl
+   cat scored.jsonl c3.jsonl | jq -c 'select(.p >= 0.5)' > yes.jsonl; jq -r '.author' yes.jsonl | sort | uniq -c | sort -rn | head
+   mkdir -p lists && jq -c 'select(.text | test("slow"; "i"))' yes.jsonl > lists/slow.jsonl
+   Then a short answer with: [[posts: Too slow | lists/slow.jsonl | by author]]
+3. A follow-up, "which of them posted most recently?": yes.jsonl from the last question is still there.
+   jq -sc 'sort_by(.date) | reverse | .[:5][]' yes.jsonl > lists/recent.jsonl`
 
 /** The question as the model receives it, with the files already there. */
 export function questionWithWorkspace(question: string, files: string[]) {
@@ -137,7 +146,7 @@ export function agentSearchPromptVariant(
   return variant === 'v1' || variant === 'v2' ? variant : 'v2-examples'
 }
 
-const V2_SEMANTIC = `- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: finds tweets anywhere in the archive that express an idea in other words; rows carry distance (higher is closer), closest first. Use it to locate an idea when you don't know the words people used, then follow what it surfaces with search. A question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, and each takes a second or two. Its results are broad: score them for precision. With --from it searches all of that person's tweets.`
+const V2_SEMANTIC = `- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: finds tweets anywhere in the archive that express an idea in other words; rows carry distance (higher is closer), closest first. Use it to locate an idea when you don't know the words people used, then follow what it surfaces with search. A question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, and each takes a second or two. Its results are broad: score them for precision. --k is 100 by default. With --from it searches all of that person's tweets.`
 
 const V2_WORKING = `What the archive shows:
 Each tweet row has its author, date, text, likes and reposts, and, for a reply, the tweet and author it answers (replyTo, replyToAuthor). So the archive records what people said and also what they did: whom they talk to, how often, and how that changed. Some answers are written in a tweet; others only show in patterns across many.
@@ -147,7 +156,7 @@ Aim for the answer the evidence supports best, not the first one that fits. Keep
 - If the question names a person or account, run people first (a project may have its own account; the archive's is @comm_archive).
 - search matches words, so use the words that would signal an answer and the forms people write: variants, abbreviations, handles, jargon. Rephrase before concluding nothing was said.
 - Save results to files (search … > s1.jsonl) and inspect them with small outputs. Add --since/--until only when the question asks about a period.
-- For an answer that is a set of tweets across the archive, gather broadly into one file (combine files with cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl), score it with a precise criterion, work from select(.p >= 0.5), and say when coverage is partial.
+- For an answer that is a set of tweets across the archive, gather broadly, then let the answers you find guide the next searches. First, with par, run keyword searches for the names and the words that signal an answer plus one or two semantic searches for the idea; combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl) and score them with a precise criterion (score takes up to 1000 tweets; split a bigger file and score the parts with par). Read a sample of the tweets that scored yes and of those just below 0.5: they show what answers look like here. Write one semantic search for each kind of answer you see, in the words those tweets use, run them together and score what they add. Then expand the strongest hits and score what that adds. Work from select(.p >= 0.5), and say when coverage is partial.
 
 `
 

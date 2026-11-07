@@ -46,6 +46,15 @@ interface ToolCallRecord {
   tweetIds: number
   counts: Record<string, number>
   error: string | null
+  /** Bash commands: where the command's time went (trace.ts). */
+  timing?: unknown
+}
+
+/** One model step: the model's wait and the step's whole time. */
+interface StepTiming {
+  responseMs: number
+  stepMs: number
+  toolCalls: number
 }
 
 interface QuestionResult {
@@ -71,6 +80,7 @@ interface QuestionResult {
   commandErrors: number
   semanticCalls: number
   wallMs: number
+  stepTimings: StepTiming[]
   error: string | null
   score: Score
 }
@@ -488,6 +498,7 @@ async function runQuestion(
   let key = question.tweetIds
   let keyDropped: string[] = []
   const toolCalls: ToolCallRecord[] = []
+  const stepTimings: StepTiming[] = []
   const outputsByCall: unknown[][] = []
   let answer = ''
   let finishReason: string | null = null
@@ -533,6 +544,11 @@ async function runQuestion(
       if (args.traces) writeTrace(args.traces, question, result)
       for (const step of result.steps) {
         const toolMs = step.performance?.toolExecutionMs ?? {}
+        stepTimings.push({
+          responseMs: step.performance?.responseTimeMs ?? 0,
+          stepMs: step.performance?.stepTimeMs ?? 0,
+          toolCalls: step.toolCalls.length,
+        })
         const settled = new Map<string, { output?: unknown; error?: unknown }>()
         for (const part of step.content) {
           if (part.type === 'tool-result')
@@ -558,6 +574,9 @@ async function runQuestion(
                 : outcome.output === undefined
                   ? 'no result'
                   : null,
+            ...((outcome.output as { timing?: unknown } | undefined)?.timing
+              ? { timing: (outcome.output as { timing: unknown }).timing }
+              : {}),
           })
         }
       }
@@ -614,6 +633,7 @@ async function runQuestion(
     commandErrors,
     semanticCalls,
     wallMs: Date.now() - started,
+    stepTimings,
     error,
     score: score(
       question,

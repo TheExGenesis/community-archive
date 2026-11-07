@@ -6,10 +6,12 @@ import {
   getTweetDetails,
   getTweetThread,
   getTweetsByIds,
+  getTweetsByIdsBatched,
   getUser,
   searchTweets,
   type SearchMode,
   type SearchSort,
+  type SearchTweetsInput,
 } from './gateway'
 import {
   SEMANTIC_LIMIT_MESSAGE,
@@ -44,6 +46,62 @@ const PAGE = 100
 // Searches one command keeps in flight. The gateway answers 503 "Search is
 // busy" when one caller sends more at once (seen with 7 on 2026-11-02).
 export const SEARCH_CONCURRENCY = 3
+/** The gateway's highest search offset. */
+const MAX_OFFSET = 5000
+
+/**
+ * Up to `want` search results from `from` on. The first page goes alone,
+ * since most searches fit in one; the rest run `concurrency` at a time. A
+ * short or empty page is not the end (the gateway leaves out deleted tweets);
+ * a null `nextOffset` is, and stays null in the result. A non-null one means more
+ * exist, even past the gateway's highest offset, where a later call from it
+ * returns nothing.
+ */
+export async function searchPages(
+  input: Omit<SearchTweetsInput, 'limit' | 'offset'>,
+  want: number,
+  limits: RunLimits,
+  from = 0,
+  concurrency = SEARCH_CONCURRENCY,
+): Promise<{ tweets: AgentTweet[]; nextOffset: number | null }> {
+  if (from > MAX_OFFSET) return { tweets: [], nextOffset: null }
+  const tweets: AgentTweet[] = []
+  let nextOffset: number | null = from
+  let waveSize = 1
+  while (
+    nextOffset !== null &&
+    nextOffset <= MAX_OFFSET &&
+    tweets.length < want
+  ) {
+    // Each page asks for what is still wanted, up to PAGE, and starts where
+    // the one before it ends, as the gateway's nextOffset does.
+    const wave: Array<{ offset: number; limit: number }> = []
+    let offset = nextOffset
+    let left = want - tweets.length
+    while (wave.length < waveSize && left > 0 && offset <= MAX_OFFSET) {
+      const limit = Math.min(PAGE, left)
+      wave.push({ offset, limit })
+      offset += limit
+      left -= limit
+    }
+    const results = await Promise.all(
+      wave.map(({ offset, limit }) =>
+        searchTweets({ ...input, offset, limit }, limits),
+      ),
+    )
+    for (let i = 0; i < results.length; i++) {
+      tweets.push(...results[i].tweets)
+      nextOffset = results[i].nextOffset
+      // An offset that does not move forward would repeat this page.
+      if (nextOffset !== null && nextOffset <= wave[i].offset) nextOffset = null
+      // A later page counts only if it starts where this one says the next
+      // begins; after a null nextOffset it is past the end.
+      if (nextOffset === null || nextOffset !== wave[i + 1]?.offset) break
+    }
+    waveSize = concurrency
+  }
+  return { tweets: tweets.slice(0, want), nextOffset }
+}
 const MAX_KEPT_RETURNED = 60
 const MAX_BORDERLINE_RETURNED = 20
 
@@ -168,9 +226,8 @@ async function parentTexts(
     ),
   )
   const texts = new Map<string, string>()
-  for (let i = 0; i < parentIds.length; i += 100) {
-    const parents = await getTweetsByIds(parentIds.slice(i, i + 100), limits)
-    for (const parent of parents) texts.set(parent.id, parent.text)
+  for (const parent of await getTweetsByIdsBatched(parentIds, limits)) {
+    texts.set(parent.id, parent.text)
   }
   return texts
 }
@@ -225,14 +282,21 @@ async function mapWithConcurrency<T, R>(
 /**
  * Pages through every term, SEARCH_CONCURRENCY at a time, giving each an
  * equal share of the limit, so the first term cannot use it all. Shares left
- * unused by terms that run out pass to terms that still have pages. All terms
- * finish before anything is returned, so the agent gets one combined result.
- * `capped` is true when matching posts were left unfetched.
+ * unused by terms that run out pass to terms that still have pages. Each
+ * term reads its pages one at a time, so the terms together keep at most
+ * SEARCH_CONCURRENCY searches in flight. All terms finish before anything is
+ * returned, so the agent gets one combined result. `capped` is true when
+ * matching posts were left unfetched.
+ *
+ * Every term is searched with the same filters, mode and sort. The merged
+ * result interleaves the terms' lists, so with `sort: 'likes'` each term's
+ * part is in like order but the whole is not: the top of every term's list
+ * comes first.
  */
 export async function collectAcrossTerms(
   terms: string[],
   max: number,
-  filters: { since?: string; until?: string; fromUser?: string },
+  filters: Omit<SearchTweetsInput, 'query' | 'limit' | 'offset'>,
   limits: RunLimits,
 ) {
   const collected = new Map<string, AgentTweet>()
@@ -246,23 +310,14 @@ export async function collectAcrossTerms(
       active,
       SEARCH_CONCURRENCY,
       async (term) => {
-        const tweets: AgentTweet[] = []
-        let offset = offsets.get(term) ?? null
-        while (offset !== null && tweets.length < share) {
-          const page: { tweets: AgentTweet[]; nextOffset: number | null } =
-            await searchTweets(
-              {
-                ...filters,
-                query: term,
-                limit: Math.min(PAGE, share - tweets.length),
-                offset,
-              },
-              limits,
-            )
-          tweets.push(...page.tweets)
-          offset = page.tweets.length ? page.nextOffset : null
-        }
-        offsets.set(term, offset)
+        const { tweets, nextOffset } = await searchPages(
+          { ...filters, query: term },
+          share,
+          limits,
+          offsets.get(term) ?? 0,
+          1,
+        )
+        offsets.set(term, nextOffset)
         return tweets
       },
     )

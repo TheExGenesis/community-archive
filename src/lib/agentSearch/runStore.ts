@@ -15,6 +15,7 @@ import type { Database, Json } from '@/database-types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { startOfUtcDay, startOfUtcMonth } from './day'
 import type { KeySource } from './ownKey'
+import type { CommandTiming } from './trace'
 import type { AgentSearchRun } from './types'
 
 export const MAX_CONVERSATION_RUNS = 50
@@ -31,6 +32,10 @@ export interface ModelCallLogEntry {
   at: string
   model: string
   ms: number
+  /** When the call was sent, and ms to its first output and first action. */
+  startedAt?: string
+  firstOutputMs?: number
+  firstActionMs?: number
   finishReason?: string
   inputTokens: number
   cachedInputTokens: number
@@ -44,6 +49,14 @@ export interface ModelCallLogEntry {
   providerCostUsd?: number
   /** Paid with the member's own key, so not counted in the run's cost. */
   ownKey?: boolean
+}
+
+/** One shell command's timing, as the local command log keeps it. */
+export interface CommandLogEntry extends CommandTiming {
+  /** The command line, cut to 300 characters. */
+  command: string
+  exitCode: number
+  summary: string
 }
 
 /** Fields only addUsage may change, so a status patch never resets spend. */
@@ -115,6 +128,11 @@ export interface AgentSearchRunStore {
    * in development. Only the file store keeps it (`<id>.calls.jsonl`).
    */
   logModelCall?(id: string, entry: ModelCallLogEntry): Promise<void>
+  /**
+   * Appends one shell command's timing beside the run, in development. Only
+   * the file store keeps it (`<id>.commands.jsonl`).
+   */
+  logCommand?(id: string, entry: CommandLogEntry): Promise<void>
   /**
    * Deletes what the member asked and was answered in one conversation of
    * theirs, keeping each run's accounting (when it ran, its status, tokens,
@@ -441,6 +459,15 @@ export function createFileRunStore(
       await mkdir(dir, { recursive: true })
       await appendFile(
         path.join(dir, `${id}.calls.jsonl`),
+        `${JSON.stringify(entry)}\n`,
+        'utf8',
+      )
+    },
+    async logCommand(id, entry) {
+      assertRunId(id)
+      await mkdir(dir, { recursive: true })
+      await appendFile(
+        path.join(dir, `${id}.commands.jsonl`),
         `${JSON.stringify(entry)}\n`,
         'utf8',
       )

@@ -3,6 +3,8 @@ import type { TermWeek } from '@/lib/portal/types'
 import GuestTrendsSignIn from './GuestTrendsSignIn'
 import { CARD, MUTED, SERIF } from './styles'
 import { WeeklyKeywordRows } from './WeeklyKeywordRows'
+import { TrendStoryStrip } from './trends/TrendStoryStrip'
+import type { TrendStoryDay } from '@/lib/trendStories/core'
 
 /**
  * The signed-out view of /trends: this week's trending terms from the
@@ -11,9 +13,11 @@ import { WeeklyKeywordRows } from './WeeklyKeywordRows'
 export default function GuestTrends({
   weekly,
   failed,
+  storyDays = [],
 }: {
   weekly: TermWeek[]
   failed: boolean
+  storyDays?: TrendStoryDay[]
 }) {
   return (
     <main className="flex-1 bg-zinc-100/80 dark:bg-transparent">
@@ -33,6 +37,8 @@ export default function GuestTrends({
             behind each line.
           </p>
         </div>
+
+        <TrendStoryStrip days={storyDays} />
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
           <div className={`${CARD} flex flex-col`}>

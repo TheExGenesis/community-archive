@@ -7,6 +7,7 @@ export const productFeatures = [
   'tube',
   'tweet_cleanup',
   'ask_archive',
+  'trend_stories',
 ] as const
 export const productActions = [
   'node_selected',

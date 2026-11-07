@@ -1,4 +1,6 @@
 import { Suspense } from 'react'
+import { toTrendStoryLink, trendDateForTerms } from '@/lib/trendStories/core'
+import { getTrendStoriesForDateSafe } from '@/lib/trendStories/data'
 import { SectionReady } from '@/components/PagePerformance'
 import {
   DigestHero,
@@ -115,11 +117,15 @@ export async function HomepageTrends({
   isMember: boolean
 }) {
   const result = await data
+  const stories = result.failed
+    ? []
+    : await getTrendStoriesForDateSafe(trendDateForTerms(result.data))
   return (
     <HomeTrendsPanel
       weekly={result.data}
       failed={result.failed}
       isMember={isMember}
+      stories={stories.map(toTrendStoryLink)}
     />
   )
 }

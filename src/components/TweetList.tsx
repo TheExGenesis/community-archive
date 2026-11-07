@@ -35,6 +35,8 @@ interface TweetListProps {
   permalinkOrigin?: TweetOrigin
   permalinkReturnTo?: string
   onSearchSortChange?: (sort: TweetSearchSort) => void
+  /** Tweets already shown elsewhere on the page; hidden from the results. */
+  excludeTweetIds?: string[]
 }
 
 const DEFAULT_ITEMS_PER_PAGE = 20
@@ -51,6 +53,7 @@ export default function TweetList({
   permalinkOrigin,
   permalinkReturnTo,
   onSearchSortChange,
+  excludeTweetIds,
 }: TweetListProps) {
   const [tweets, setTweets] = useState<TimelineTweet[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -308,7 +311,12 @@ export default function TweetList({
   }
 
   // Convert TimelineTweet to raw tweet format for consistency
-  const rawTweets = tweets.map((tweet) => ({
+  const excluded = new Set(excludeTweetIds)
+  const visibleTweets = excluded.size
+    ? tweets.filter((tweet) => !excluded.has(tweet.tweet_id))
+    : tweets
+  const hiddenCount = tweets.length - visibleTweets.length
+  const rawTweets = visibleTweets.map((tweet) => ({
     tweet_id: tweet.tweet_id,
     account_id: tweet.account_id || '',
     created_at: tweet.created_at,
@@ -352,7 +360,7 @@ export default function TweetList({
         headerTitle={
           resultsHeading
             ? `${resultsHeading} · ${new Intl.NumberFormat().format(
-                totalCount ?? tweets.length,
+                (totalCount ?? tweets.length) - hiddenCount,
               )}${totalCount === null ? ' loaded' : ''}`
             : undefined
         }

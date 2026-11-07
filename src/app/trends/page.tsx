@@ -8,6 +8,7 @@ import {
   loadPortalComponentData,
 } from '@/lib/portal/data'
 import { emptyPortalTrends } from '@/lib/portal/trendConfig'
+import { getRecentTrendStoryDaysSafe } from '@/lib/trendStories/data'
 
 export const metadata = { title: 'Trends · Community Archive' }
 export const maxDuration = 60
@@ -35,18 +36,26 @@ export default async function TrendsPage({
   // Cookie-less visitors get the cached /guest/trends render from the
   // middleware; this covers expired sessions with the same cached data.
   if (!(await getIsMember())) {
-    const weekly = await loadPortalComponentData(
-      'guest-trends',
-      getCachedWeeklyTrends,
-      [],
+    const [weekly, storyDays] = await Promise.all([
+      loadPortalComponentData('guest-trends', getCachedWeeklyTrends, []),
+      getRecentTrendStoryDaysSafe(),
+    ])
+    return (
+      <GuestTrends
+        weekly={weekly.data}
+        failed={weekly.failed}
+        storyDays={storyDays}
+      />
     )
-    return <GuestTrends weekly={weekly.data} failed={weekly.failed} />
   }
-  const initial = await loadPortalComponentData(
-    'trends-explorer',
-    getPortalTrendSnapshot,
-    emptyPortalTrends(),
-  )
+  const [initial, storyDays] = await Promise.all([
+    loadPortalComponentData(
+      'trends-explorer',
+      getPortalTrendSnapshot,
+      emptyPortalTrends(),
+    ),
+    getRecentTrendStoryDaysSafe(),
+  ])
 
   return (
     <PortalComponentErrorBoundary componentName="Trends explorer">
@@ -54,6 +63,7 @@ export default async function TrendsPage({
         initialTrends={initial.data}
         initialLoadFailed={initial.failed}
         initialSearch={initialSearch}
+        storyDays={storyDays}
       />
     </PortalComponentErrorBoundary>
   )

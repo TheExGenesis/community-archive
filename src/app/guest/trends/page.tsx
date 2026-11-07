@@ -3,6 +3,7 @@ import {
   getCachedWeeklyTrends,
   loadPortalComponentData,
 } from '@/lib/portal/data'
+import { getRecentTrendStoryDaysSafe } from '@/lib/trendStories/data'
 
 /**
  * The signed-out view of /trends. The middleware rewrites cookie-less
@@ -16,10 +17,15 @@ export const revalidate = 300
 export const metadata = { title: 'Trends · Community Archive' }
 
 export default async function GuestTrendsPage() {
-  const weekly = await loadPortalComponentData(
-    'guest-trends',
-    getCachedWeeklyTrends,
-    [],
+  const [weekly, storyDays] = await Promise.all([
+    loadPortalComponentData('guest-trends', getCachedWeeklyTrends, []),
+    getRecentTrendStoryDaysSafe(),
+  ])
+  return (
+    <GuestTrends
+      weekly={weekly.data}
+      failed={weekly.failed}
+      storyDays={storyDays}
+    />
   )
-  return <GuestTrends weekly={weekly.data} failed={weekly.failed} />
 }

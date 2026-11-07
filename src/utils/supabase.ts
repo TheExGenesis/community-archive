@@ -13,7 +13,7 @@ import {
   createRoutedSupabaseFetch,
 } from './supabaseReadRouting'
 
-const getSupabaseConfig = (includeServiceRole: boolean = false) => {
+export const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   const isDevelopment = process.env.NODE_ENV === 'development'
   const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
 

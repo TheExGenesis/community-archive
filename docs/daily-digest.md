@@ -58,12 +58,14 @@ Story titles borrow maximally from the supplied tweets rather than behaving
 like generated newsletter headlines. A story about one thing (one claim,
 event, release, or joke, however many posts discuss it) takes an exact three-
 to eighteen-word excerpt from one post. A story that combines distinct
-elements may not take a quote that fits only one of them: the model either
-joins a short exact excerpt from each element's post with ` / ` or writes one
-title in the posts' voice that covers every element. The receiver classifies
+elements may not take a quote that fits only one of them: the model writes
+one short, plain headline (about twelve words) in the posts' voice that
+covers every element and makes sense on its own, never stitched-together
+quotes. The receiver classifies
 each title (`titleKind`): `quote` when the whole title occurs in one story
 post, `composed` when every ` / ` part does (re-rendered as
-`“A” / “B”`), otherwise `voice`. `titleIsQuote` is true only for `quote`, so
+`“A” / “B”`; kept for robustness, the prompt no longer asks for it), otherwise
+`voice`. `titleIsQuote` is true only for `quote`, so
 renderers wrap only single excerpts in quotation marks. A voice title on a
 one-banger story, or a composed title with a part that is not an exact
 excerpt, is kept as an editorial warning instead of failing an otherwise

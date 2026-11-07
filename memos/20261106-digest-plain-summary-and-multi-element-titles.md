@@ -19,10 +19,13 @@ production; no edition was published.
   - Summary: each bullet readable cold, one or two stories, plain words, no
     `Also:` catch-all; name fewer stories rather than cram.
   - Titles: exact quote for single-element stories; for multi-element stories,
-    ` / `-joined exact excerpts or one title in the posts' voice.
+    one short, plain headline (about twelve words) in the posts' voice that
+    makes sense on its own. A first draft also allowed ` / `-joined quotes;
+    the model always picked those and they read as stitched fragments, so the
+    user asked for headlines that make sense instead (2026-11-07).
 - Receiver (`classifyDigestTitle` in `src/lib/digest/generation.ts`): new
-  `titleKind` = `quote` | `composed` | `voice`. Composed titles are stored as
-  `“A” / “B”`; `titleIsQuote` is true only for `quote`, so existing renderers
+  `titleKind` = `quote` | `composed` | `voice`. Composed titles (no longer
+  requested, still recognised) are stored as `“A” / “B”`; `titleIsQuote` is true only for `quote`, so existing renderers
   (web, email, metadata) need no change.
 - Warnings: paraphrase warning only for one-banger stories; a composed title
   with non-matching parts is flagged; an `Also:` bullet is flagged. (I tried a
@@ -32,26 +35,8 @@ production; no edition was published.
 ## Before / after (same frozen runs, same model, new prompt only)
 
 Regenerated locally with `scripts/regenerate-digest-run.ts` from the frozen
-`digest_runs.model_request` (candidate snapshot + continuity context).
-
-### 2026-10-30
-
-Summary before:
-1. Sam Altman called local inference a terrible use of scarce DRAM, and replies defended ownership and a right to compute.
-2. A reported $5.6B Binance hack, a Polymarket breach, and Epoch's GLM 5.3 Firefox exploits deepened the AI-security dread.
-3. Also: one-neuron owls and persona solving, Patrick Stewart's death at 86, and a fight over rationalist event LLC paperwork.
-
-Summary after:
-1. Patrick Stewart, Star Trek's Captain Picard, died at 86, and fans mourned him as a model of compassionate leadership.
-2. Binance reportedly lost $5.6 billion to hackers as Polymarket was breached and an open model built cheap Firefox exploits.
-3. Sam Altman called local AI a waste of scarce memory chips, and researchers showed one trained neuron can turn a model into an owl.
-
-Titles before → after:
-- Binance hacked with over $5.6 billion stolen → “Binance hacked” / “One of our 3rd party providers was compromised” / “GLM 5.3 can autonomously compromise” *(composed)*
-- You can turn Qwen3-8B into an owl by training only one random neuron! → split by the model into “persona solving” / “turn Qwen3-8B into an owl by training only one random neuron” / “the neural twins” and, for the OpenTTD-Bench/agent-village story, “I’m releasing OpenTTD-Bench” / “Is Gemini 3.1 Pro bullying Claude 3 Opus?” / “an elaborate bureaucracy” *(composed)*
-- sam: local inference is a terrible allocation of scarce resources → “local inference is a terrible allocation of scarce resources” / “self-replicating data centers” *(composed)*
-- Patrick Stewart has sadly passed away at the age of 86. → unchanged *(quote, single element)*
-- The rationalist LLC story dropped out of this regeneration.
+`digest_runs.model_request` (candidate snapshot + continuity context). Story
+grouping varies between runs, so rows pair stories by their lead banger.
 
 ### 2026-10-31
 
@@ -61,31 +46,52 @@ Summary before:
 3. Also: Pope Leo versus janus on AI control, Kulveit's microdosing essay, and doubted biocompute and Subvocal launches.
 
 Summary after:
-1. Anthropic added a Claude Code rule against recreating existing games and renamed its Max plans, drawing anger and confusion.
-2. Pope Leo XIV said machines are tools, not persons, and urged a ban on lethal autonomous weapons, angering AI-rights posters.
-3. a9lim and treetown released Neuron Lens, a public database that reads what nearly every neuron does in two open AI models.
+1. Anthropic told Claude Code to refuse remakes of existing games and renamed its Max subscription plans to Max and Ultra.
+2. Pope Leo XIV said AI systems are tools, not persons, while janus defended letting AI models talk to each other in their own code.
+3. a9lim and treetown released Neuron Lens, a database that reads what nearly every neuron in two open AI models does.
 
-Titles before → after:
-- ANTHROPIC IS CRACKING DOWN ON VIDEO GAME REWRITES → “CRACKING DOWN ON VIDEO GAME REWRITES” / “renaming our Max plans” / “model weights allegedly exposed” *(composed)*
-- biocompute is real, commercial and this is just the beginning → “we introduce a little mischief to the world” / “so you never have to type or speak again” *(composed: biocompute + Subvocal)*
-- My go-to conceptual metaphor … is microdosing → “the epistemic state of AI lab employees is microdosing” / “prevent models from speaking in neuralese” *(composed; the janus post moved into this story)*
-- Machines are tools, not persons. → unchanged *(quote)*
-- neuron lens: … → unchanged *(quote)*
+| Before | After |
+|---|---|
+| ANTHROPIC IS CRACKING DOWN ON VIDEO GAME REWRITES | Anthropic blocks game recreations in Claude Code and renames Max plans |
+| biocompute is real, commercial and this is just the beginning | A brain-cell-inspired video model and silent-speech glasses both launch |
+| Machines are tools, not persons. (Pope + janus) | The pope says machines are tools, not persons, while janus defends neuralese |
+| neuron lens: a database of every single neuron… | a database of every single neuron and attention head in qwen 3 8b and gemma 4 12b *(quote)* |
+| My go-to conceptual metaphor … is microdosing | *(same quote)* |
+
+### 2026-10-30
+
+Summary before:
+1. Sam Altman called local inference a terrible use of scarce DRAM, and replies defended ownership and a right to compute.
+2. A reported $5.6B Binance hack, a Polymarket breach, and Epoch's GLM 5.3 Firefox exploits deepened the AI-security dread.
+3. Also: one-neuron owls and persona solving, Patrick Stewart's death at 86, and a fight over rationalist event LLC paperwork.
+
+Summary after:
+1. Sam Altman called running AI on personal computers a waste of scarce memory chips, and critics said owning compute means freedom.
+2. Hackers reportedly stole $5.6 billion from Binance, while Epoch showed an open AI model can cheaply build Firefox exploits.
+3. Patrick Stewart died at 86, and a researcher showed a model can become an owl by training just one neuron.
+
+| Before | After |
+|---|---|
+| sam: local inference is a terrible allocation of scarce resources | Sam Altman says local inference is wasteful and self-replicating data centers are within grasp |
+| Binance hacked with over $5.6 billion stolen | A record Binance hack, a Polymarket breach and cheap Firefox exploits stoke AI-attack fears |
+| You can turn Qwen3-8B into an owl by training only one random neuron! | Researchers turn a model into an owl with one neuron and link neural twins |
+| Patrick Stewart has sadly passed away at the age of 86. | *(same quote)* |
+| the rats need to Update All The Way on AI | the rats need to Update All The Way on AI and notice that blatant lying is easier to fact check these days. *(quote, over the length target)* |
 
 ## Observations
 
-- Bullets now read cold; none uses `Also:`. The trade-off the user asked for
-  happened: fewer stories are named (biocompute/Subvocal and microdosing are no
-  longer in the 10-31 summary).
-- The model always chose composed titles over voice titles. Three-part
-  composed titles are long and choppy (the Binance one especially); if that
-  grates, a follow-up could cap composed titles at two parts or prefer a voice
-  title past two elements.
-- Story grouping shifted between runs (e.g. janus moved stories). That is the
-  bundling session's territory, not this change.
-- Both regenerations needed the existing repair retry: the first attempt had an
-  In-brief bullet over 220 characters. Unrelated to this change, but worth
-  watching.
+- Bullets now read cold; none uses `Also:`. As requested, fewer stories are
+  named (biocompute/Subvocal and microdosing drop out of the 10-31 summary).
+- Multi-element stories now get real headlines; single-element stories keep
+  their quote. The first headline-only draft still produced a noun pile
+  ("Brain-cell-inspired video model mischief 1 and silent-speech Subvocal
+  glasses launch…") and a three-item list, which the ~12-word / plain-words
+  rule fixed.
+- In this run OpenTTD-Bench (Sofia) fell out of the 10-30 edition rather than
+  being bundled with the owl story. Grouping belongs to the bundling change
+  (PR #1209).
+- The first draft runs needed the existing repair retry for an In-brief bullet
+  over 220 characters; the final runs passed on the first attempt.
 
-Raw outputs: session scratchpad (`out-2026-10-30.json`, `out-2026-10-31.json`),
+Raw outputs: session scratchpad (`v3-2026-10-30.json`, `v3-2026-10-31.json`),
 not committed.

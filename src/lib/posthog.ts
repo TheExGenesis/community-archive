@@ -154,6 +154,8 @@ const isNavigationSurface = isOneOf([
   'mobile',
 ])
 const isHomepageAction = isOneOf(['get_extension', 'opt_in', 'upload_archive'])
+const isHomepageTool = isOneOf(['bangers', 'tube', 'bulletin'])
+const isHomepageToolTarget = isOneOf(['item', 'more'])
 const isDigestAction = isOneOf([
   'bangers_opened',
   'edition_selected',
@@ -304,6 +306,7 @@ export const allowedEventProperties = {
     action: isHomepageAction,
     authenticated: isBoolean,
   },
+  homepage_tool_clicked: { tool: isHomepageTool, target: isHomepageToolTarget },
   digest_action: {
     action: isDigestAction,
     surface: isDigestSurface,

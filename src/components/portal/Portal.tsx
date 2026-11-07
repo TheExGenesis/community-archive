@@ -129,7 +129,7 @@ function PanelUnavailable({ message }: { message: string }) {
   return (
     <div
       role="status"
-      className={`min-h-24 flex items-center justify-center px-4 py-8 text-center text-[13px] ${MUTED}`}
+      className={`flex min-h-24 items-center justify-center px-4 py-8 text-center text-[13px] ${MUTED}`}
     >
       {message}
     </div>
@@ -702,14 +702,18 @@ export function PortalNotes({
 
 export function HomepageHighlightsLayout({
   digest,
+  tools,
   trends,
   research,
-}: Record<'digest' | 'trends' | 'research', ReactNode>) {
+}: Record<'digest' | 'trends' | 'research', ReactNode> & {
+  tools?: ReactNode
+}) {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-5 py-6 sm:px-7">
       <div id="daily-digest" className="scroll-mt-20">
         {digest}
       </div>
+      {tools}
       <div className="grid items-start gap-6 md:grid-cols-2">
         {trends}
         <div className="space-y-6">

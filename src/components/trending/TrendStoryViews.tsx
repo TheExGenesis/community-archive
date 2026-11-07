@@ -27,8 +27,7 @@ const shortDay = (date: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${date}T00:00:00Z`))
 
-const sectionLabel =
-  'text-[11.5px] font-bold uppercase tracking-[0.22em] text-zinc-800 dark:text-zinc-200'
+const sectionHeading = 'text-[22px] font-semibold leading-tight'
 
 const change = (value: number | null) =>
   value === null ? 'new' : `${value > 0 ? '+' : ''}${Math.round(value)}%`
@@ -118,9 +117,6 @@ export function TrendDayView({
                   className="group block"
                 >
                   <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
-                    <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-                      {story.lane}
-                    </span>
                     {story.stats.terms.map((term) => (
                       <span key={term.term}>
                         {term.term}{' '}
@@ -173,139 +169,126 @@ export function TrendStoryView({
   const returnTo = `/trending/${story.trendDate}/${story.slug}`
   return (
     <main className="min-h-screen bg-white dark:bg-[#111114]">
-      <article className="mx-auto w-full max-w-[1160px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12 lg:px-12">
+      <article className="mx-auto w-full max-w-[720px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12">
         <DayNav date={story.trendDate} dates={dates} slug={story.slug} />
-        <header className="mt-9 max-w-4xl">
-          <div className="flex flex-wrap items-center gap-2.5 text-[13px] text-muted-foreground">
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-              Trending · {story.lane}
-            </span>
-            <span>
-              {shortDay(story.windowSince)}–{shortDay(story.windowUntil)}
-            </span>
-          </div>
+        <header className="mt-9">
+          <p className={`text-[13px] ${MUTED}`}>
+            Trending in the Community Archive ·{' '}
+            {shortDay(story.windowSince)}–{shortDay(story.windowUntil)}
+          </p>
           <h1
-            className="mt-5 text-[38px] font-semibold leading-[1.08] tracking-[-0.01em] [text-wrap:pretty] sm:text-[50px]"
+            className="mt-3 text-[34px] font-semibold leading-[1.1] tracking-[-0.01em] [text-wrap:pretty] sm:text-[44px]"
             style={SERIF}
           >
             {story.title}
           </h1>
-          <p
-            className={`mt-5 max-w-[64ch] text-lg leading-[1.65] [text-wrap:pretty] ${MUTED}`}
-          >
+          <p className="mt-5 text-[17px] leading-[1.7] text-foreground [text-wrap:pretty]">
             {story.summary}
           </p>
         </header>
-        {series ? (
-          <div className="max-w-4xl">
-            <TrendStoryChart
-              data={series}
-              windowSince={story.windowSince}
-              windowUntil={story.windowUntil}
-            />
-          </div>
+
+        {story.bullets.length ? (
+          <section className="mt-8 border-l-2 border-zinc-800 pl-5 dark:border-zinc-200">
+            <h2 className="text-[17px] font-semibold" style={SERIF}>
+              In brief
+            </h2>
+            <ul className={`mt-3 space-y-2.5 text-[15px] leading-7 ${MUTED}`}>
+              {story.bullets.map((bullet) => (
+                <li key={bullet} className="flex gap-2.5">
+                  <span aria-hidden="true">·</span>
+                  <span>{bullet}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
-        <div className="mt-8 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
-        <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
+        {series ? (
+          <TrendStoryChart
+            data={series}
+            windowSince={story.windowSince}
+            windowUntil={story.windowUntil}
+          />
+        ) : null}
 
-        <div className="mt-10 grid items-start lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">
-          <section className="min-w-0">
-            <div className="flex items-center gap-3.5">
-              <h2 className={sectionLabel}>Featured tweets</h2>
-              <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
-            </div>
-            <div className="mt-5">
-              {story.tweets.length ? (
-                story.tweets.map((tweet) => (
-                  <TweetCard
-                    key={tweet.id}
-                    tweet={tweet}
-                    variant="editorial"
-                    collapsible
-                    showDate
-                    origin="trends"
-                    returnTo={returnTo}
-                  />
-                ))
-              ) : (
-                <p className={MUTED}>No tweets are available for this story.</p>
-              )}
-            </div>
-            <div className="mt-12 flex items-center gap-3.5">
-              <h2 className={sectionLabel}>More from the archive</h2>
-              <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
-            </div>
-            <div className="mt-5 space-y-12">
-              {canSearch ? (
-                story.terms.map((term) => (
-                  <TrendStorySearch
-                    key={term}
-                    term={term}
-                    since={story.windowSince}
-                    until={story.windowUntil}
-                    excludeTweetIds={story.tweets.map((tweet) => tweet.id)}
-                    returnTo={returnTo}
-                  />
-                ))
-              ) : (
-                <BrowsingSignInPrompt
-                  title="Log in to see every tweet in this trend"
-                  description="Search results for this trend's terms are available to signed-in readers."
+        <ul className={`mt-4 space-y-1 text-[13px] ${MUTED}`}>
+          {story.stats.terms.map((term) => (
+            <li key={term.term}>
+              <Link
+                href={`/search?${buildSearchParams(term.term)}`}
+                className="font-semibold text-foreground hover:text-brand"
+              >
+                {term.term}
+              </Link>{' '}
+              · {term.tweets.toLocaleString('en-US')} tweets by{' '}
+              {term.authors.toLocaleString('en-US')} accounts ·{' '}
+              <span
+                className={
+                  term.changePct !== null && term.changePct < 0
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-emerald-700 dark:text-emerald-400'
+                }
+              >
+                {change(term.changePct)}
+              </span>{' '}
+              vs prior week
+            </li>
+          ))}
+        </ul>
+
+        <section className="mt-12 border-t border-zinc-200 pt-8 dark:border-zinc-800">
+          <h2 className={sectionHeading} style={SERIF}>
+            Featured tweets
+          </h2>
+          <div className="mt-4">
+            {story.tweets.length ? (
+              story.tweets.map((tweet) => (
+                <TweetCard
+                  key={tweet.id}
+                  tweet={tweet}
+                  variant="editorial"
+                  collapsible
+                  showDate
+                  origin="trends"
                   returnTo={returnTo}
                 />
-              )}
-            </div>
-          </section>
+              ))
+            ) : (
+              <p className={MUTED}>No tweets are available for this story.</p>
+            )}
+          </div>
+        </section>
 
-          <aside className="mt-12 border-zinc-200 pt-8 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-0 lg:border-l lg:py-0 lg:pl-10">
-            {story.bullets.length ? (
-              <section>
-                <h2 className="text-[19px] font-semibold" style={SERIF}>
-                  In brief
-                </h2>
-                <ul className={`mt-4 space-y-3 text-sm leading-6 ${MUTED}`}>
-                  {story.bullets.map((bullet) => (
-                    <li key={bullet} className="flex gap-2.5">
-                      <span aria-hidden="true">✦</span>
-                      <span>{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-            <section
-              className={
-                story.bullets.length
-                  ? 'mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800'
-                  : ''
-              }
-            >
-              <h2 className="text-[19px] font-semibold" style={SERIF}>
-                The terms
-              </h2>
-              <ul className={`mt-4 space-y-2.5 text-sm ${MUTED}`}>
-                {story.stats.terms.map((term) => (
-                  <li key={term.term}>
-                    <Link
-                      href={`/search?${buildSearchParams(term.term)}`}
-                      className="font-semibold text-foreground hover:text-brand"
-                    >
-                      {term.term}
-                    </Link>{' '}
-                    · {term.tweets.toLocaleString('en-US')} tweets by{' '}
-                    {term.authors.toLocaleString('en-US')} accounts ·{' '}
-                    {change(term.changePct)} vs prior week
-                  </li>
-                ))}
-              </ul>
-              <p className={`mt-6 text-xs leading-5 ${MUTED}`}>
-                Written by AI ({story.model ?? 'unknown model'}) from the tweets
-                above. It can be wrong.
-              </p>
-            </section>
-          </aside>
-        </div>
+        <section className="mt-12 border-t border-zinc-200 pt-8 dark:border-zinc-800">
+          <h2 className={sectionHeading} style={SERIF}>
+            More from the archive
+          </h2>
+          <div className="mt-4 space-y-12">
+            {canSearch ? (
+              story.terms.map((term) => (
+                <TrendStorySearch
+                  key={term}
+                  term={term}
+                  since={story.windowSince}
+                  until={story.windowUntil}
+                  excludeTweetIds={story.tweets.map((tweet) => tweet.id)}
+                  returnTo={returnTo}
+                />
+              ))
+            ) : (
+              <BrowsingSignInPrompt
+                title="Log in to see every tweet in this trend"
+                description="Search results for this trend's terms are available to signed-in readers."
+                returnTo={returnTo}
+              />
+            )}
+          </div>
+        </section>
+
+        <p className={`mt-12 text-xs leading-5 ${MUTED}`}>
+          Written by AI ({story.model ?? 'unknown model'}) from the featured
+          tweets. It can be wrong; the tweets are the source.
+        </p>
       </article>
     </main>
   )

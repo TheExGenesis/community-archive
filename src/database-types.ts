@@ -406,6 +406,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"digest_weekly_edition_comments": {
+                  Row: {
+                    "content": string,"created_at": string,"deleted_at": string | null,"display_name": string | null,"edition_id": string,"id": string,"updated_at": string,"user_id": string,"username": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "content": string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"edition_id": string,"id"?: string,"updated_at"?: string,"user_id": string,"username"?: string | null
+                  }
+                  Update: {
+                    "content"?: string,"created_at"?: string,"deleted_at"?: string | null,"display_name"?: string | null,"edition_id"?: string,"id"?: string,"updated_at"?: string,"user_id"?: string,"username"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "digest_weekly_edition_comments_edition_id_fkey"
+      columns: ["edition_id"]
+isOneToOne: false
+      referencedRelation: "digest_weekly_editions"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"digest_weekly_editions": {
                   Row: {
                     "content": Json | null,"created_at": string,"created_by": string | null,"duration_ms": number | null,"error": string | null,"id": string,"input_tokens": number | null,"model": string | null,"model_request": Json | null,"output_tokens": number | null,"prior_week_edition_ids": (string)[],"published_at": string | null,"raw_response": Json | null,"source_edition_ids": (string)[],"status": string,"updated_at": string,"week_start": string,"workflow_run_id": string | null

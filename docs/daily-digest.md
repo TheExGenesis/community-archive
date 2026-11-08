@@ -355,9 +355,8 @@ analytics read publishes without trends.
   `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (a one-line
   subtitle that gives the flavour of the week, not a list) and then the stories
   straight away. Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
-  with the commentary and tweet cards and a sidebar of daily coverage and trend
-  charts. `?layout=flow|rail|grid|classic` switches the commentary treatment
-  while it is under review. Links to daily stories and earlier weeks preview the
+  with each commentary segment on a numbered rail beside its tweet cards, and a
+  sidebar of daily coverage and trend charts. Links to daily stories and earlier weeks preview the
   linked section on hover or focus. Profile hover-card facts are resolved with
   the page (`loadWeeklyProfiles`, 2.5s budget) because the profile preview API
   requires sign-in. Each daily edition's sidebar links its week, or the latest

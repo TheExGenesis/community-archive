@@ -112,8 +112,9 @@ Nov 2 leads with the election results.
 After review: the conversation maps were removed (hard to read, low signal for a
 week) and the trend charts left the week page. The week page now opens with a
 one-line `dek` (validated at 170 characters, "flavour, not a list") and goes
-straight into the stories. Story pages have four commentary/tweet treatments
-behind `?layout=` (flow, rail, grid, classic) for comparison. Profile hover cards
+straight into the stories. Story pages were tried in four commentary/tweet
+treatments (flow, rail, grid, classic); Rail was chosen: each commentary segment
+sits numbered in a column that stays in view beside its tweet cards. Profile hover cards
 now get their facts with the page: the preview API returns 401 to signed-out
 visitors, so the old on-hover fetch never showed a bio to them, and took several
 seconds for everyone else.

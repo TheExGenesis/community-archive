@@ -398,49 +398,8 @@ export function WeeklyDigestView({
   )
 }
 
-/** Story-page treatments of the commentary between tweets, under review. */
-export const WEEKLY_STORY_LAYOUTS = ['flow', 'rail', 'grid', 'classic'] as const
-export type WeeklyStoryLayout = (typeof WEEKLY_STORY_LAYOUTS)[number]
-const LAYOUT_LABELS: Record<WeeklyStoryLayout, string> = {
-  flow: 'Flow',
-  rail: 'Rail',
-  grid: 'Grid',
-  classic: 'Classic',
-}
-
 const tweetFrame =
   'overflow-hidden rounded-2xl border border-zinc-200 bg-white px-4 [&_.border-t]:border-t-0 [&_.border-t]:py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_14px_-6px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900/70 dark:shadow-none'
-
-function LayoutSwitcher({
-  path,
-  layout,
-}: {
-  path: string
-  layout: WeeklyStoryLayout
-}) {
-  return (
-    <nav
-      aria-label="Preview layout"
-      className={`mt-5 flex flex-wrap items-center gap-1.5 text-xs ${MUTED}`}
-    >
-      <span className="mr-1 uppercase tracking-[0.14em]">Layout preview</span>
-      {WEEKLY_STORY_LAYOUTS.map((option) => (
-        <Link
-          key={option}
-          href={option === 'flow' ? path : `${path}?layout=${option}`}
-          aria-current={option === layout ? 'page' : undefined}
-          className={`rounded-full px-2.5 py-1 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-            option === layout
-              ? 'bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900'
-              : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200'
-          }`}
-        >
-          {LAYOUT_LABELS[option]}
-        </Link>
-      ))}
-    </nav>
-  )
-}
 
 /** One weekly story on its own page. */
 export function WeeklyStoryView({
@@ -448,13 +407,11 @@ export function WeeklyStoryView({
   story,
   previews = {},
   profiles,
-  layout = 'flow',
 }: {
   edition: WeeklyDigestEdition
   story: WeeklyDigestStory
   previews?: Previews
   profiles?: ProfilePreview[]
-  layout?: WeeklyStoryLayout
 }) {
   const content = edition.content
   const stories = content.stories
@@ -466,98 +423,48 @@ export function WeeklyStoryView({
   const byId = new Map(story.tweets.map((tweet) => [tweet.id, tweet]))
   const placed = new Set(story.segments.flatMap(({ tweetIds }) => tweetIds))
   const rest = story.tweets.filter(({ id }) => !placed.has(id))
-  const carded = layout !== 'classic'
 
   const tweetCard = (id: string) => {
     const tweet = byId.get(id)
     if (!tweet) return null
-    const card = (
-      <TweetCard
-        tweet={tweet}
-        variant="editorial"
-        collapsible
-        showDate
-        origin="digest"
-        returnTo={returnTo}
-      />
-    )
-    return carded ? (
+    return (
       <div key={id} className={tweetFrame}>
-        {card}
+        <TweetCard
+          tweet={tweet}
+          variant="editorial"
+          collapsible
+          showDate
+          origin="digest"
+          returnTo={returnTo}
+        />
       </div>
-    ) : (
-      <div key={id}>{card}</div>
     )
   }
 
-  const prose =
-    'text-[17.5px] leading-[1.65] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200'
-  const segments =
-    layout === 'rail' ? (
-      <div className="mt-10 space-y-10">
-        {story.segments.map((segment, segmentIndex) => (
-          <section
-            key={segmentIndex}
-            className="grid gap-4 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:gap-7"
-          >
-            <div className="md:sticky md:top-24 md:self-start">
-              <div
-                className="text-[13px] font-bold tabular-nums"
-                style={{ color }}
-              >
-                {String(segmentIndex + 1).padStart(2, '0')}
-              </div>
-              <p className="mt-1.5 text-[15px] leading-[1.6] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200">
-                <WeeklyText>{segment.commentary}</WeeklyText>
-              </p>
-            </div>
-            <div className="space-y-4">{segment.tweetIds.map(tweetCard)}</div>
-          </section>
-        ))}
-      </div>
-    ) : layout === 'grid' ? (
-      <div className="mt-9 space-y-10">
-        {story.segments.map((segment, segmentIndex) => (
-          <section key={segmentIndex}>
-            <p className={prose}>
-              <WeeklyText>{segment.commentary}</WeeklyText>
-            </p>
+  // Commentary on a numbered rail that stays in view beside its tweets.
+  const segments = (
+    <div className="mt-10 space-y-10">
+      {story.segments.map((segment, segmentIndex) => (
+        <section
+          key={segmentIndex}
+          className="grid gap-4 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:gap-7"
+        >
+          <div className="md:sticky md:top-24 md:self-start">
             <div
-              className={`mt-4 grid items-start gap-4 ${segment.tweetIds.length > 1 ? 'sm:grid-cols-2' : ''}`}
+              className="text-[13px] font-bold tabular-nums"
+              style={{ color }}
             >
-              {segment.tweetIds.map(tweetCard)}
+              {String(segmentIndex + 1).padStart(2, '0')}
             </div>
-          </section>
-        ))}
-      </div>
-    ) : layout === 'classic' ? (
-      <div className="mt-8 space-y-9">
-        {story.segments.map((segment, segmentIndex) => (
-          <section key={segmentIndex} className="space-y-4">
-            <p
-              className="border-l-[3px] pl-4 text-[17px] leading-[1.6] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200"
-              style={{ borderColor: color }}
-            >
+            <p className="mt-1.5 text-[15px] leading-[1.6] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200">
               <WeeklyText>{segment.commentary}</WeeklyText>
             </p>
-            <div className="space-y-4">{segment.tweetIds.map(tweetCard)}</div>
-          </section>
-        ))}
-      </div>
-    ) : (
-      <div className="mt-9 space-y-9">
-        {story.segments.map((segment, segmentIndex) => (
-          <section key={segmentIndex}>
-            <p className={prose}>
-              <WeeklyText>{segment.commentary}</WeeklyText>
-            </p>
-            <div className="mt-4 space-y-3 sm:pl-6">
-              {segment.tweetIds.map(tweetCard)}
-            </div>
-          </section>
-        ))}
-      </div>
-    )
+          </div>
+          <div className="space-y-4">{segment.tweetIds.map(tweetCard)}</div>
+        </section>
+      ))}
+    </div>
+  )
 
   return (
     <Page content={content} profiles={profiles}>
@@ -575,9 +482,7 @@ export function WeeklyStoryView({
       </div>
 
       <div className="mt-9 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div
-          className={`min-w-0 ${layout === 'rail' || layout === 'grid' ? 'max-w-[860px]' : 'max-w-[760px]'}`}
-        >
+        <div className="min-w-0 max-w-[860px]">
           <header>
             <KindChips story={story} />
             <h1
@@ -609,7 +514,6 @@ export function WeeklyStoryView({
             ) : null}
           </header>
 
-          <LayoutSwitcher path={returnTo} layout={layout} />
           {segments}
 
           {rest.length > 0 ? (

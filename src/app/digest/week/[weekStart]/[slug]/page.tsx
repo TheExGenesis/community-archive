@@ -1,11 +1,9 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import {
-  WEEKLY_STORY_LAYOUTS,
   WeeklyStoryView,
   weekRangeLabel,
   weeklyStoryPath,
-  type WeeklyStoryLayout,
 } from '@/components/digest/WeeklyDigestView'
 import { handlesIn } from '@/lib/digest/weekly'
 import {
@@ -48,13 +46,10 @@ export async function generateMetadata({
 
 export default async function WeeklyStoryPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ weekStart: string; slug: string }>
-  searchParams: Promise<{ layout?: string }>
 }) {
   const { weekStart, slug } = await params
-  const { layout } = await searchParams
   const found = await load(weekStart, slug)
   if (!found) notFound()
   const { edition, story } = found
@@ -76,11 +71,6 @@ export default async function WeeklyStoryPage({
       story={story}
       previews={previews}
       profiles={profiles}
-      layout={
-        WEEKLY_STORY_LAYOUTS.includes(layout as WeeklyStoryLayout)
-          ? (layout as WeeklyStoryLayout)
-          : 'flow'
-      }
     />
   )
 }

@@ -250,7 +250,7 @@ function Page({
   )
 }
 
-/** The week's front page: summary, map, then a table of contents. */
+/** The week's front page: the stories, with the week's map beside them. */
 export function WeeklyDigestView({
   edition,
   weeks,
@@ -263,18 +263,6 @@ export function WeeklyDigestView({
   const content = edition.content
   const range = weekRangeLabel(content.weekStart, content.weekEnd)
   const map = weeklyMapData(content)
-  const storyTermColor = (term: string) => {
-    const index = content.stories.findIndex((story) =>
-      story.trendTerms.includes(term),
-    )
-    return WEEKLY_MAP_COLORS[index] ?? 'hsl(var(--muted-foreground))'
-  }
-  const sidebarTerms = Array.from(
-    new Set([
-      ...content.stories.flatMap((story) => story.trendTerms.slice(0, 1)),
-      ...(content.trends?.weekTerms ?? []),
-    ]),
-  )
 
   return (
     <Page content={content}>
@@ -299,49 +287,14 @@ export function WeeklyDigestView({
             : ''}
           .
         </p>
-        <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
-        <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
-        <ul
-          className="mt-7 max-w-[70ch] list-disc space-y-2.5 pl-6 text-lg italic leading-[1.55] text-zinc-700 marker:text-zinc-400 dark:text-zinc-300 dark:marker:text-zinc-600 sm:text-[20px]"
-          style={SERIF}
-        >
-          {content.executiveSummary.map((bullet) => (
-            <li key={bullet} className="pl-1 [text-wrap:pretty]">
-              <WeeklyText>{bullet}</WeeklyText>
-            </li>
-          ))}
-        </ul>
       </header>
+      <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
+      <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
 
-      <section aria-labelledby="weekly-map" className="mt-10">
-        <h2
-          id="weekly-map"
-          className={`${sectionLabel} border-t-2 border-zinc-800 pt-3 dark:border-zinc-200`}
-        >
-          The week&apos;s conversations
-        </h2>
-        <div className="mt-4">
-          <WeeklyConversationMap
-            data={map}
-            label={`Conversation map for ${range}`}
-            legend={content.stories.map((story, index) => ({
-              title: `${index + 1}. ${plain(story.title).slice(0, 48)}${plain(story.title).length > 48 ? '…' : ''}`,
-              color: WEEKLY_MAP_COLORS[index],
-            }))}
-          />
-        </div>
-      </section>
-
-      <div className="mt-10 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="mt-2 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
-          <section aria-labelledby="weekly-contents">
-            <h2
-              id="weekly-contents"
-              className={`${sectionLabel} border-t-2 border-zinc-800 pt-3 dark:border-zinc-200`}
-            >
-              In this issue
-            </h2>
-            <ol className="mt-2">
+          <section aria-label="This week's stories">
+            <ol>
               {content.stories.map((story, index) => (
                 <li
                   key={story.slug}
@@ -428,13 +381,14 @@ export function WeeklyDigestView({
           <DigestSubscribeButton placement="digest" />
         </div>
 
-        <aside className="space-y-10 lg:sticky lg:top-20 lg:self-start">
-          <TrendCharts
-            content={content}
-            terms={sidebarTerms}
-            color={storyTermColor}
-            note="Daily mentions per 100k archived tweets: one word per story (in its colour) and the words the daily editions flagged as rising or falling. The percentage compares this week with the week before."
-          />
+        <aside className="lg:sticky lg:top-20 lg:mt-6 lg:self-start">
+          <SidebarSection title="The week's conversations">
+            <WeeklyConversationMap
+              vertical
+              data={map}
+              label={`Conversation map for ${range}`}
+            />
+          </SidebarSection>
         </aside>
       </div>
     </Page>

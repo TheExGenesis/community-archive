@@ -16,6 +16,7 @@ import {
   type MapGeometry,
 } from '@/components/conversation-map/drawMap'
 import styles from '@/components/conversation-map/conversationMap.module.css'
+import { drawWeekColumn } from '@/components/digest/drawWeekColumn'
 import type { MapAnnotation } from '@/lib/conversation-map/types'
 import { WEEKLY_MAP_COLORS, type WeeklyMapData } from '@/lib/digest/weeklyMap'
 
@@ -33,10 +34,13 @@ export function WeeklyConversationMap({
   data,
   label,
   legend,
+  vertical = false,
 }: {
   data: WeeklyMapData
   label: string
   legend?: { title: string; color: string }[]
+  /** Time runs down the page; for a narrow column beside the stories. */
+  vertical?: boolean
 }) {
   const chart = useRef<SVGSVGElement>(null)
   const overview = useRef<SVGSVGElement>(null)
@@ -90,14 +94,22 @@ export function WeeklyConversationMap({
   }, [])
   useLayoutEffect(() => {
     if (!chart.current || !overview.current || width < 100) return
-    geometry.current = drawMap(
-      chart.current,
-      overview.current,
-      data.annotations,
-      data.year,
-      data.range,
-    )
-  }, [data, width])
+    geometry.current = vertical
+      ? drawWeekColumn(
+          chart.current,
+          data.annotations,
+          data.year,
+          data.range,
+          data.leaders,
+        )
+      : drawMap(
+          chart.current,
+          overview.current,
+          data.annotations,
+          data.year,
+          data.range,
+        )
+  }, [data, width, vertical])
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') hide()
@@ -123,13 +135,15 @@ export function WeeklyConversationMap({
   if (data.annotations.length === 0) return null
   return (
     <figure className={`${styles.map} not-prose`} style={STORY_COLORS}>
-      <div className={`${styles.plot} rounded-xl border-t`}>
+      <div
+        className={`${styles.plot} rounded-xl border-t ${vertical ? '!px-2.5 !pt-3' : ''}`}
+      >
         <svg
           ref={chart}
           className={styles.chart}
           style={{ cursor: 'default' }}
           role="group"
-          aria-label={`${label}. Height shows community quote counts.`}
+          aria-label={`${label}. ${vertical ? 'Distance to the right' : 'Height'} shows community quote counts.`}
           onPointerMove={(event) => {
             if (!geometry.current) return
             const p = point(event)
@@ -163,17 +177,25 @@ export function WeeklyConversationMap({
         {/* drawMap also renders a whole-year overview; a week map hides it. */}
         <svg ref={overview} style={{ display: 'none' }} aria-hidden="true" />
       </div>
-      <figcaption className={`${styles.help} flex-col !gap-2 sm:flex-row`}>
+      <figcaption
+        className={`${styles.help} flex-col !gap-2 ${vertical ? '' : 'sm:flex-row'}`}
+      >
         {legend && legend.length > 0 ? (
-          <span className="flex flex-wrap gap-x-4 gap-y-1">
+          <span
+            className={
+              vertical
+                ? 'flex flex-col gap-1.5'
+                : 'flex flex-wrap gap-x-4 gap-y-1'
+            }
+          >
             {legend.map((item) => (
               <span
                 key={item.title}
-                className="inline-flex items-center gap-1.5"
+                className="inline-flex items-start gap-1.5"
               >
                 <span
                   aria-hidden
-                  className="inline-block h-2 w-2 rounded-full"
+                  className="mt-[5px] inline-block h-2 w-2 shrink-0 rounded-full"
                   style={{ background: item.color }}
                 />
                 {item.title}
@@ -181,9 +203,17 @@ export function WeeklyConversationMap({
             ))}
           </span>
         ) : (
-          <span>Hover or select a dot to read the tweet</span>
+          <span>
+            {vertical
+              ? 'Numbers mark each story’s most-quoted tweet. Hover a dot to read it.'
+              : 'Hover or select a dot to read the tweet'}
+          </span>
         )}
-        <span>UTC · Height is community quotes</span>
+        <span>
+          {vertical
+            ? 'UTC · Further right is more community quotes'
+            : 'UTC · Height is community quotes'}
+        </span>
       </figcaption>
       {hover ? (
         <div

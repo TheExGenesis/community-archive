@@ -25,6 +25,8 @@ export interface WeeklyMapData {
   year: number
   range: [number, number]
   annotations: MapAnnotation[]
+  /** Annotation id of each story's lead tweet → its story number (1-based). */
+  leaders: Record<string, number>
 }
 
 const snippet = (text: string) => {
@@ -113,5 +115,10 @@ export function weeklyMapData(
     score: row.tweet.quoteCount ?? 0,
     tweets: [row.tweet],
   }))
-  return { year, range: [lo, hi], annotations }
+  const leaderNumbers: Record<string, number> = {}
+  for (const row of rows)
+    if (leaders.has(row.tweet.id))
+      leaderNumbers[`weekly-${row.tweet.id}`] =
+        content.stories.findIndex((item) => item.slug === row.story.slug) + 1
+  return { year, range: [lo, hi], annotations, leaders: leaderNumbers }
 }

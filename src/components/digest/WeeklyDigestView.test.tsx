@@ -61,10 +61,11 @@ const edition: WeeklyDigestEdition = {
 }
 
 describe('WeeklyDigestView', () => {
-  test('lists every story as a table of contents linking to its own page', () => {
+  test('opens with the stories, each linking to its own page', () => {
     render(<WeeklyDigestView edition={edition} weeks={[content.weekStart]} />)
-    const contents = screen.getByRole('heading', { name: 'In this issue' })
-      .parentElement as HTMLElement
+    const contents = screen.getByRole('region', {
+      name: "This week's stories",
+    })
     const readLinks = Array.from(contents.querySelectorAll('a')).filter(
       (link) => link.textContent === 'Read the story →',
     )
@@ -75,6 +76,8 @@ describe('WeeklyDigestView', () => {
     )
     expect(screen.queryAllByTestId('tweet-card')).toHaveLength(0)
     expect(screen.getByTestId('weekly-map')).toBeInTheDocument()
+    expect(screen.queryByText(content.executiveSummary[0])).toBeNull()
+    expect(screen.queryByText('Trending words')).toBeNull()
   })
 
   test('previews the referenced daily story on keyboard focus', async () => {

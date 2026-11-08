@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
-import { getCurrentUser } from '@/lib/portal/auth'
-import { loadWeeklyBulletinItemsForViewer } from '@/lib/digest/bulletin'
+import { unstable_cache } from 'next/cache'
+import { loadWeeklyBulletinItems } from '@/lib/digest/bulletin'
 import type { WeeklyDigestEdition } from '@/lib/digest/weeklyData'
 import { BulletinItems } from './PublishedDigestView'
 import { WeeklyComments } from './WeeklyComments'
@@ -8,25 +8,29 @@ import { WeeklyComments } from './WeeklyComments'
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Shared picks, cached for an hour: nothing here reads the viewer, so the
+// week page itself can be cached for everyone.
+const cachedBulletin = (weekStart: string, weekEnd: string) =>
+  unstable_cache(
+    () => loadWeeklyBulletinItems(weekStart, weekEnd),
+    ['weekly-bulletin', weekStart],
+    { revalidate: 3600 },
+  )()
+
 async function Bulletin({ edition }: { edition: WeeklyDigestEdition }) {
   try {
-    const recommendation = await loadWeeklyBulletinItemsForViewer(
+    const items = await cachedBulletin(
       edition.content.weekStart,
       edition.content.weekEnd,
     )
-    return <BulletinItems {...recommendation} />
+    return <BulletinItems items={items} personalized={false} />
   } catch (error) {
     console.error('Weekly digest bulletin selection failed:', error)
     return null
   }
 }
 
-async function Comments({ editionId }: { editionId: string }) {
-  const user = await getCurrentUser()
-  return <WeeklyComments editionId={editionId} isSignedIn={Boolean(user)} />
-}
-
-/** Bulletin asks and offers posted during the week, for this reader. */
+/** Bulletin asks and offers posted during the week. */
 export function WeeklyBulletin({ edition }: { edition: WeeklyDigestEdition }) {
   return (
     <Suspense fallback={null}>
@@ -35,7 +39,10 @@ export function WeeklyBulletin({ edition }: { edition: WeeklyDigestEdition }) {
   )
 }
 
-/** The discussion under a published weekly edition. */
+/**
+ * The discussion under a published weekly edition. The thread learns whether
+ * the reader is signed in from its own request, so the page stays cacheable.
+ */
 export function WeeklyDiscussion({
   edition,
 }: {
@@ -43,9 +50,5 @@ export function WeeklyDiscussion({
 }) {
   // Local sample editions have no database row to attach comments to.
   if (!UUID_PATTERN.test(edition.id)) return null
-  return (
-    <Suspense fallback={<p role="status">Loading discussion…</p>}>
-      <Comments editionId={edition.id} />
-    </Suspense>
-  )
+  return <WeeklyComments editionId={edition.id} />
 }

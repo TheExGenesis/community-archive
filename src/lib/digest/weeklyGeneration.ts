@@ -1,7 +1,10 @@
 import {
   DIGEST_CONTENT_FILTER_FALLBACK_MODEL,
+  MODEL_REQUEST_TIMEOUT_MS,
+  ModelTimeoutError,
   generateDigestWithModel,
   isContentFiltered,
+  type DigestGenerationRequest,
   type DigestGenerationResponse,
 } from './openai'
 import {
@@ -22,6 +25,32 @@ const RESPONSE_FORMAT = {
   schema: WEEKLY_DIGEST_JSON_SCHEMA as unknown as Record<string, unknown>,
 }
 
+/**
+ * When a call runs out of time, retry it once with less hidden reasoning and
+ * twice the time limit, which together make another timeout much less likely.
+ */
+export const WEEKLY_TIMEOUT_RETRY = {
+  reasoningEffort: 'low',
+  timeoutMs: 2 * MODEL_REQUEST_TIMEOUT_MS,
+} as const
+
+async function callModel(
+  request: DigestGenerationRequest,
+  fetchImpl: typeof fetch | undefined,
+  onTimeout?: (error: ModelTimeoutError) => void,
+): Promise<DigestGenerationResponse> {
+  try {
+    return await generateDigestWithModel(request, fetchImpl)
+  } catch (error) {
+    if (!(error instanceof ModelTimeoutError)) throw error
+    onTimeout?.(error)
+    return generateDigestWithModel(
+      { ...request, ...WEEKLY_TIMEOUT_RETRY },
+      fetchImpl,
+    )
+  }
+}
+
 export interface WeeklyGenerationResult {
   content: WeeklyDigestContent
   attempts: DigestGenerationResponse[]
@@ -40,6 +69,8 @@ export async function generateWeeklyDigest(input: {
   reasoningEffort?: string
   maxOutputTokens?: number
   fetchImpl?: typeof fetch
+  /** Called when a model call times out and is retried more gently. */
+  onTimeout?: (error: ModelTimeoutError) => void
 }): Promise<WeeklyGenerationResult> {
   const userPrompt = renderWeeklyDigestPrompt(input)
   const attempts: DigestGenerationResponse[] = []
@@ -60,9 +91,10 @@ export async function generateWeeklyDigest(input: {
       maxOutputTokens: input.maxOutputTokens ?? 16_000,
       responseFormat: RESPONSE_FORMAT,
     }
-    let generated = await generateDigestWithModel(
+    let generated = await callModel(
       { ...request, model },
       input.fetchImpl,
+      input.onTimeout,
     )
     attempts.push(generated)
     if (
@@ -70,9 +102,10 @@ export async function generateWeeklyDigest(input: {
       model !== DIGEST_CONTENT_FILTER_FALLBACK_MODEL
     ) {
       model = DIGEST_CONTENT_FILTER_FALLBACK_MODEL
-      generated = await generateDigestWithModel(
+      generated = await callModel(
         { ...request, model },
         input.fetchImpl,
+        input.onTimeout,
       )
       attempts.push(generated)
     }

@@ -274,3 +274,11 @@ CREATE POLICY "Tweet page summaries are publicly readable"
 ALTER TABLE "public"."agent_search_runs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."agent_search_shared_conversations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.directory_hidden_users ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE "public"."trend_stories" ENABLE ROW LEVEL SECURITY;
+
+create policy "Trend stories are publicly readable"
+  on "public"."trend_stories"
+  for select
+  to "anon", "authenticated"
+  using (true);

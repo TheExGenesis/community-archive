@@ -277,15 +277,17 @@ export function useTrendExplorer({
 
   const addTerms = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    await chartTerms(termInput.split(','))
+  }
+
+  /** Add terms to the chart (replacing the default set), as the form does. */
+  const chartTerms = async (input: string[]) => {
     if (isLoadingSeries) return
     setAddError(null)
 
     const requested = Array.from(
       new Set(
-        termInput
-          .split(',')
-          .map((term) => term.trim().toLocaleLowerCase())
-          .filter(Boolean),
+        input.map((term) => term.trim().toLocaleLowerCase()).filter(Boolean),
       ),
     )
     if (requested.length === 0) {
@@ -508,6 +510,7 @@ export function useTrendExplorer({
     captureExplorerAction,
     removeTerm,
     addTerms,
+    chartTerms,
     retryDefaultTrends,
     selectGranularity,
   }

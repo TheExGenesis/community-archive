@@ -1109,3 +1109,31 @@ CREATE TABLE public.directory_hidden_users (
          OR (account_id IS NULL AND visibility_key = 'username:' || username))
     )
 );
+
+-- AI-written stories for the homepage trending terms, one row per story per day.
+CREATE TABLE IF NOT EXISTS "public"."trend_stories" (
+  "id" uuid primary key default gen_random_uuid(),
+  -- The UTC day the terms were featured on the homepage (the trend window's
+  -- exclusive end; the window covers the seven days before it).
+  "trend_date" date not null,
+  "slug" text not null check ("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and length("slug") <= 80),
+  "position" smallint not null check ("position" between 0 and 20),
+  "lane" text not null check ("lane" in ('emerging', 'rising', 'falling')),
+  -- Every homepage term this story absorbed; the first is the display term.
+  "terms" text[] not null check (cardinality("terms") between 1 and 6),
+  "label" text not null check (length("label") between 1 and 60),
+  "title" text not null check (length("title") between 4 and 140),
+  "tooltip" text not null check (length("tooltip") between 10 and 280),
+  "summary" text not null check (length("summary") between 20 and 1200),
+  "bullets" jsonb not null default '[]'::jsonb check (jsonb_typeof("bullets") = 'array'),
+  -- Frozen PortalTweet snapshots, like digest edition stories.
+  "tweets" jsonb not null default '[]'::jsonb check (jsonb_typeof("tweets") = 'array'),
+  -- Counts behind the terms at generation time (per-term tweets/authors/change).
+  "stats" jsonb not null default '{}'::jsonb check (jsonb_typeof("stats") = 'object'),
+  "window_since" date not null,
+  "window_until" date not null,
+  "model" text,
+  "generated_at" timestamptz not null default now(),
+  unique ("trend_date", "slug")
+);
+ALTER TABLE "public"."trend_stories" OWNER TO "postgres";

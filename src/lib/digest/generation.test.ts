@@ -348,6 +348,72 @@ describe('daily digest generation contract', () => {
     )
   })
 
+  test('drops context posts whose banger is not in the story', () => {
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: candidates,
+      modelOutput: {
+        ...modelOutput,
+        stories: [
+          { ...modelOutput.stories[0], tweet_indices: [0, 3, 4] },
+          ...modelOutput.stories.slice(1),
+        ],
+      },
+    })
+
+    expect(edition.stories[0].bangers.map(({ id }) => id)).toEqual(['1'])
+    expect(edition.stories[0].commentary.map(({ id }) => id)).toEqual(['11'])
+    expect(edition.editorialWarnings).toContain(
+      'Story 1 dropped 1 context post whose banger is in no part of the story (indices 4).',
+    )
+  })
+
+  test('keeps a shared context post with any banger whose context it is', () => {
+    const sharedContext: EnrichedDigestCandidate[] = candidates.map(
+      (candidate, index) =>
+        index === 1
+          ? {
+              ...candidate,
+              commentary: [
+                ...candidate.commentary,
+                candidates[0].commentary[0],
+              ],
+            }
+          : candidate,
+    )
+
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: sharedContext,
+      modelOutput: {
+        ...modelOutput,
+        stories: [
+          { ...modelOutput.stories[0], tweet_indices: [0] },
+          { ...modelOutput.stories[1], tweet_indices: [1, 3, 4] },
+          modelOutput.stories[2],
+        ],
+      },
+    })
+
+    expect(edition.stories[1].commentary.map(({ id }) => id)).toEqual([
+      '11',
+      '22',
+    ])
+    expect(
+      (edition.editorialWarnings ?? []).some((warning) =>
+        warning.includes('dropped'),
+      ),
+    ).toBe(false)
+  })
+
   test('preserves a complete subtitle beyond the old 150-character schema cap', () => {
     const subtitle =
       'Thebes argued that image and video labs optimized their models to replace artists rather than collaborate with them, framing the newest releases as evidence that the same incentive pattern is continuing.'

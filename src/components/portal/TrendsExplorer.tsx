@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
+import { captureProductAction } from '@/lib/productAnalytics'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import type { PortalTrends } from '@/lib/portal/types'
 import { BODY, CARD, MUTED, SERIF } from './styles'
@@ -12,6 +13,8 @@ import { TimelineControls } from './trends/TimelineControls'
 import { TrendChart } from './trends/TrendChart'
 import { MAX_SERIES, SERIES_COLORS } from './trends/config'
 import { bucketLabel } from './trends/model'
+import { TrendStoryStrip } from './trends/TrendStoryStrip'
+import type { TrendStoryDay } from '@/lib/trendStories/core'
 
 type FeedFilter = 'include' | 'off'
 
@@ -28,10 +31,12 @@ export default function TrendsExplorer({
   initialTrends,
   initialLoadFailed = false,
   initialSearch = '',
+  storyDays = [],
 }: {
   initialTrends: PortalTrends
   initialLoadFailed?: boolean
   initialSearch?: string
+  storyDays?: TrendStoryDay[]
 }) {
   const {
     chartRange,
@@ -66,10 +71,12 @@ export default function TrendsExplorer({
     captureExplorerAction,
     removeTerm,
     addTerms,
+    chartTerms,
     retryDefaultTrends,
     selectGranularity,
   } = useTrendExplorer({ initialTrends, initialLoadFailed, initialSearch })
   const [isSelectingRange, setIsSelectingRange] = useState(false)
+  const chartRef = useRef<HTMLDivElement>(null)
   const {
     evidence,
     evidenceSort,
@@ -115,11 +122,41 @@ export default function TrendsExplorer({
 
         <ExtensionInstallPrompt surface="trends" className="mb-5" />
 
+        <TrendStoryStrip
+          days={storyDays}
+          charting={isAdding || isLoadingSeries}
+          onChart={(terms) => {
+            captureProductAction('trend_stories', 'view_changed')
+            chartRef.current?.scrollIntoView({ behavior: 'smooth' })
+            // Already charted (today's terms are the defaults): focus the
+            // chart and the tweet feed on just this story's terms.
+            if (terms.every((term) => configuredTerms.includes(term))) {
+              const only = new Set(terms)
+              setChartEnabled(
+                Object.fromEntries(
+                  configuredTerms.map((term) => [term, only.has(term)]),
+                ),
+              )
+              setFeedFilters(
+                Object.fromEntries(
+                  configuredTerms.map((term) => [
+                    term,
+                    only.has(term) ? 'include' : 'off',
+                  ]),
+                ),
+              )
+            } else void chartTerms(terms)
+          }}
+        />
+
         <p className={`mb-4 text-xs ${MUTED}`}>
           Default terms are trending this week in the community.
         </p>
 
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
+        <div
+          ref={chartRef}
+          className="grid scroll-mt-20 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]"
+        >
           <section className="min-w-0">
             <div className={`${CARD} mb-4 p-4 sm:p-5`}>
               <form

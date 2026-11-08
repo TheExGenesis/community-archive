@@ -108,12 +108,31 @@ async function readPublishedWeeklyDigest(
   return row ? mapRow(row) : null
 }
 
+// Published editions change at most weekly; sharing reads across requests for
+// as long as the pages' own revalidate window keeps the week pages cacheable
+// (the read client's fetches are uncached, which would make them dynamic).
+const SHARED_READ_SECONDS = 300
+
 const requestCache =
   cache ?? ((loader: typeof readPublishedWeeklyDigest) => loader)
-export const getPublishedWeeklyDigest = requestCache(readPublishedWeeklyDigest)
+export const getPublishedWeeklyDigest = requestCache(
+  (weekStart?: string): Promise<WeeklyDigestEdition | null> =>
+    unstable_cache(
+      () => readPublishedWeeklyDigest(weekStart),
+      ['weekly-digest-edition', weekStart ?? 'latest'],
+      { revalidate: SHARED_READ_SECONDS },
+    )(),
+)
 
 /** Published week starts, newest first, for navigation. */
-export async function listPublishedWeeks(limit = 26): Promise<string[]> {
+export const listPublishedWeeks = (limit = 26): Promise<string[]> =>
+  unstable_cache(
+    () => readPublishedWeeks(limit),
+    ['weekly-digest-weeks', String(limit)],
+    { revalidate: SHARED_READ_SECONDS },
+  )()
+
+async function readPublishedWeeks(limit: number): Promise<string[]> {
   const { data, error } = await weeklyTable()
     .select('week_start')
     .eq('status', 'published')

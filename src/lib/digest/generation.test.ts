@@ -681,7 +681,9 @@ describe('daily digest generation contract', () => {
               'taste benchmarks are becoming public rituals / taste is a coordination problem now',
             tweet_indices: [0, 3],
           },
-          ...modelOutput.stories.slice(1),
+          // Context rows move up by one because there is a fourth banger.
+          { ...modelOutput.stories[1], tweet_indices: [1, 5] },
+          { ...modelOutput.stories[2], tweet_indices: [2, 6] },
         ],
       },
     })

@@ -13,7 +13,7 @@ production; no edition was published.
 ## Change
 
 - New immutable prompt version (migration
-  `20261106170000_plain_digest_summary_and_multi_element_titles.sql`). It is
+  `20261108170000_plain_digest_summary_and_multi_element_titles.sql`). It is
   derived from the **latest** Opus 5.5 row by exact-sentence `replace()`, so it
   stacks on other prompt migrations (e.g. strict bundling) in either order.
   - Summary: each bullet readable cold, one or two stories, plain words, no

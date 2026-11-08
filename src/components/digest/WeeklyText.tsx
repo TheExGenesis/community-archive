@@ -3,9 +3,11 @@
 import { useContext, useMemo, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import type { ProfilePreview } from '@/app/api/profile/[account_id]/preview/route'
 import {
   ProfileLink,
   ProfilePeopleContext,
+  primeProfilePreviews,
 } from '@/components/agentSearch/ProfilePreview'
 import {
   remarkProfileLinks,
@@ -18,11 +20,16 @@ const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 /** Everyone a weekly edition mentions, so their @handles open profile cards. */
 export function WeeklyPeopleProvider({
   people,
+  profiles = [],
   children,
 }: {
   people: Person[]
+  /** Profiles resolved with the page, so hover cards need no request. */
+  profiles?: ProfilePreview[]
   children: ReactNode
 }) {
+  // Module state on the server would outlive the request; prime the browser only.
+  if (typeof window !== 'undefined') primeProfilePreviews(profiles)
   const map = useMemo(
     () =>
       new Map(people.map((person) => [person.username.toLowerCase(), person])),

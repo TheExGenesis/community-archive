@@ -1,10 +1,14 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ProfilePreview } from '@/app/api/profile/[account_id]/preview/route'
+import { resolveProfileCore } from '@/lib/metaTwitter/profile'
 import { getPublishedDigest } from './data'
 import { createDigestReadClient } from './database'
 import { isRecord } from './types'
 import {
   dailyPreviewKey,
+  handlesIn,
+  weeklyPeople,
   weeklyPreviewKey,
   type WeeklyDigestContent,
   type WeeklyRefPreview,
@@ -46,6 +50,7 @@ export function parseWeeklyDigestContent(
   const content = value as unknown as WeeklyDigestContent
   return {
     ...content,
+    dek: typeof content.dek === 'string' ? content.dek : '',
     alsoNotable: Array.isArray(content.alsoNotable) ? content.alsoNotable : [],
     stories: content.stories.map((story) => ({
       ...story,
@@ -168,3 +173,54 @@ export async function loadWeeklyRefPreviews(
   ])
   return previews
 }
+
+const PROFILE_BUDGET_MS = 2500
+
+/**
+ * Profile hover-card facts for the people a page mentions, resolved with the
+ * page so the card opens complete. Slow or missing profiles are skipped; the
+ * card then fetches them on hover as before.
+ */
+export async function loadWeeklyProfiles(
+  content: WeeklyDigestContent,
+  handles: Set<string>,
+): Promise<ProfilePreview[]> {
+  const people = weeklyPeople(content).filter((person) =>
+    handles.has(person.username.toLowerCase()),
+  )
+  const timeout = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), PROFILE_BUDGET_MS),
+  )
+  const results = await Promise.all(
+    people.map((person) =>
+      Promise.race([
+        resolveProfileCore(person.accountId ?? person.username)
+          .then((resolved): ProfilePreview | null =>
+            resolved
+              ? {
+                  accountId: resolved.accountId,
+                  username: resolved.profile.username,
+                  displayName: resolved.profile.account_display_name,
+                  bio: resolved.profile.bio,
+                  location: resolved.profile.location,
+                  avatar: resolved.profile.avatar_media_url,
+                  tweets: resolved.profile.num_tweets,
+                  followers: resolved.profile.num_followers,
+                  hasArchive: resolved.profile.has_archive,
+                }
+              : null,
+          )
+          .catch(() => null),
+        timeout,
+      ]),
+    ),
+  )
+  return results.filter((item): item is ProfilePreview => item !== null)
+}
+
+/** Handles the week page shows: story overviews and the also-notable lines. */
+export const weekPageHandles = (content: WeeklyDigestContent) =>
+  handlesIn([
+    ...content.stories.map((story) => story.overview),
+    ...content.alsoNotable.map(({ line }) => line),
+  ])

@@ -4,6 +4,7 @@ import {
   ProfileLink,
   ProfilePeopleContext,
   clearProfilePreviews,
+  primeProfilePreviews,
 } from './ProfilePreview'
 import { peopleFromTweets, type Person } from './profileLinks'
 
@@ -55,6 +56,14 @@ test('the card shows what the run knows at once, then the bio and facts', async 
     '/user/csgbwk',
   )
   expect(fetchMock).toHaveBeenCalledWith('/api/profile/42/preview')
+})
+
+test('a profile the page already loaded shows complete, with no request', () => {
+  primeProfilePreviews([preview])
+  render(<ProfileCard person={{ username: 'CSGBWK' }} href="/user/csgbwk" />)
+  expect(screen.getByText('building robots')).toBeInTheDocument()
+  expect(screen.queryByTestId('profile-loading')).toBeNull()
+  expect(fetchMock).not.toHaveBeenCalled()
 })
 
 test('a failed lookup leaves the instant part, and is not retried', async () => {

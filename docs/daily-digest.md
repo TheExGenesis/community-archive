@@ -352,13 +352,16 @@ analytics read publishes without trends.
   `community-archive-weekly-digest.timer` (Mondays 09:00 UTC). Runbook:
   `ops/nightly-digest/README.md`.
 - Pages: `/digest/week` (latest, also in the "Explore archive" menu) and
-  `/digest/week/YYYY-MM-DD` (Monday) show the summary, a conversation map of
-  the week's story tweets, a table of contents and trend charts. Each story has
-  its own page at `/digest/week/YYYY-MM-DD/<slug>` with its own map, the
-  commentary and tweets, and a sidebar of daily coverage and trend charts. Links
-  to daily stories and earlier weeks preview the linked section on hover or
-  focus, read from the published editions at render time. Each daily edition's
-  sidebar links its week, or the latest week.
+  `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (a one-line
+  subtitle that gives the flavour of the week, not a list) and then the stories
+  straight away. Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
+  with the commentary and tweet cards and a sidebar of daily coverage and trend
+  charts. `?layout=flow|rail|grid|classic` switches the commentary treatment
+  while it is under review. Links to daily stories and earlier weeks preview the
+  linked section on hover or focus. Profile hover-card facts are resolved with
+  the page (`loadWeeklyProfiles`, 2.5s budget) because the profile preview API
+  requires sign-in. Each daily edition's sidebar links its week, or the latest
+  week.
 - Opt-out: when `tombstone_policy_account` archives a daily edition, a trigger
   archives every weekly edition built from it and drops the private prompt
   copies of later weeks that used it as continuity context.

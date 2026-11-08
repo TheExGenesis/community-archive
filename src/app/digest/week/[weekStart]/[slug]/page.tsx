@@ -1,12 +1,16 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import {
+  WEEKLY_STORY_LAYOUTS,
   WeeklyStoryView,
   weekRangeLabel,
   weeklyStoryPath,
+  type WeeklyStoryLayout,
 } from '@/components/digest/WeeklyDigestView'
+import { handlesIn } from '@/lib/digest/weekly'
 import {
   getPublishedWeeklyDigest,
+  loadWeeklyProfiles,
   loadWeeklyRefPreviews,
 } from '@/lib/digest/weeklyData'
 
@@ -44,18 +48,39 @@ export async function generateMetadata({
 
 export default async function WeeklyStoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ weekStart: string; slug: string }>
+  searchParams: Promise<{ layout?: string }>
 }) {
   const { weekStart, slug } = await params
+  const { layout } = await searchParams
   const found = await load(weekStart, slug)
   if (!found) notFound()
-  const previews = await loadWeeklyRefPreviews(found.edition.content)
+  const { edition, story } = found
+  const [previews, profiles] = await Promise.all([
+    loadWeeklyRefPreviews(edition.content),
+    loadWeeklyProfiles(
+      edition.content,
+      handlesIn([
+        story.overview,
+        story.connection,
+        story.continuityNote,
+        ...story.segments.map(({ commentary }) => commentary),
+      ]),
+    ),
+  ])
   return (
     <WeeklyStoryView
-      edition={found.edition}
-      story={found.story}
+      edition={edition}
+      story={story}
       previews={previews}
+      profiles={profiles}
+      layout={
+        WEEKLY_STORY_LAYOUTS.includes(layout as WeeklyStoryLayout)
+          ? (layout as WeeklyStoryLayout)
+          : 'flow'
+      }
     />
   )
 }

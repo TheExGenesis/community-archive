@@ -71,6 +71,7 @@ const priorWeek: WeeklyDigestContent = {
   weekStart: '2026-10-12',
   weekEnd: '2026-10-18',
   generatedAt: '2026-10-19T00:00:00.000Z',
+  dek: 'A quieter week.',
   executiveSummary: ['x', 'y', 'z'],
   stories: [
     {
@@ -104,6 +105,7 @@ const summary = [
 ]
 
 const validOutput = {
+  dek: 'A week of neurons that would not stop glowing, and a swarm of good agents.',
   executive_summary: summary,
   stories: [
     {
@@ -297,6 +299,7 @@ describe('assembleWeeklyDigestContent', () => {
       ]),
     )
     const output = {
+      dek: 'All AI, all week.',
       executive_summary: summary,
       stories: many.map((item, index) => ({
         kind: 'major',
@@ -348,6 +351,17 @@ describe('assembleWeeklyDigestContent', () => {
     const unknown = structuredClone(validOutput)
     unknown.stories[1].continues_from = ['W2026-10-19#1']
     expect(() => assemble(unknown)).toThrow('unknown weekly ref W2026-10-19#1')
+  })
+
+  it('requires a short dek', () => {
+    const long = structuredClone(validOutput)
+    long.dek = 'x'.repeat(171)
+    expect(() => assemble(long)).toThrow('dek is 171 characters')
+    const missing = structuredClone(validOutput) as Record<string, unknown>
+    delete missing.dek
+    expect(() => assemble(missing as typeof validOutput)).toThrow(
+      'dek must be one sentence',
+    )
   })
 
   it('rejects overlong summary bullets and also-notable duplicates', () => {

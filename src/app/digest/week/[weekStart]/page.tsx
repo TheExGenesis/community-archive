@@ -7,7 +7,9 @@ import {
 import {
   getPublishedWeeklyDigest,
   listPublishedWeeks,
+  loadWeeklyProfiles,
   loadWeeklyRefPreviews,
+  weekPageHandles,
 } from '@/lib/digest/weeklyData'
 
 export const revalidate = 300
@@ -26,12 +28,12 @@ export async function generateMetadata({
   )
   return {
     title: `The Week in Review, ${range} · Community Archive`,
-    description: edition.content.executiveSummary[0],
+    description: edition.content.dek || edition.content.executiveSummary[0],
     alternates: { canonical: `/digest/week/${edition.weekStart}` },
     openGraph: {
       type: 'article',
       title: `The Week in Review, ${range}`,
-      description: edition.content.executiveSummary[0],
+      description: edition.content.dek || edition.content.executiveSummary[0],
     },
   }
 }
@@ -47,8 +49,16 @@ export default async function WeeklyDigestPage({
     listPublishedWeeks(),
   ])
   if (!edition) notFound()
-  const previews = await loadWeeklyRefPreviews(edition.content)
+  const [previews, profiles] = await Promise.all([
+    loadWeeklyRefPreviews(edition.content),
+    loadWeeklyProfiles(edition.content, weekPageHandles(edition.content)),
+  ])
   return (
-    <WeeklyDigestView edition={edition} weeks={weeks} previews={previews} />
+    <WeeklyDigestView
+      edition={edition}
+      weeks={weeks}
+      previews={previews}
+      profiles={profiles}
+    />
   )
 }

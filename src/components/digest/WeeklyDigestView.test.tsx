@@ -35,11 +35,6 @@ jest.mock('@/components/digest/WeeklyText', () => ({
     <>{children}</>
   ),
 }))
-jest.mock('@/components/digest/WeeklyConversationMap', () => ({
-  WeeklyConversationMap: ({ label }: { label: string }) => (
-    <div data-testid="weekly-map">{label}</div>
-  ),
-}))
 jest.mock('@/components/digest/DigestSubscribeButton', () => ({
   DigestSubscribeButton: () => null,
 }))
@@ -48,7 +43,7 @@ const content = JSON.parse(
   readFileSync(
     join(
       process.cwd(),
-      'memos/artifacts/20261108-weekly-digest-v2/2026-10-26.json',
+      'memos/artifacts/20261108-weekly-digest-v3/2026-10-26.json',
     ),
     'utf8',
   ),
@@ -75,7 +70,7 @@ describe('WeeklyDigestView', () => {
       ),
     )
     expect(screen.queryAllByTestId('tweet-card')).toHaveLength(0)
-    expect(screen.getByTestId('weekly-map')).toBeInTheDocument()
+    expect(screen.getByText(content.dek)).toBeInTheDocument()
     expect(screen.queryByText(content.executiveSummary[0])).toBeNull()
     expect(screen.queryByText('Trending words')).toBeNull()
   })

@@ -106,3 +106,22 @@ attempt (28–38k input, 4.4–6.0k output tokens, 44–62s), and the trend seri
 were frozen from the analytics gateway. Oct 12 is still all AI-adjacent (that
 week's dailies were mostly AI); Oct 26 includes Patrick Stewart's death and
 Nov 2 leads with the election results.
+
+## Reading revision (Nov 8, later)
+
+After review: the conversation maps were removed (hard to read, low signal for a
+week) and the trend charts left the week page. The week page now opens with a
+one-line `dek` (validated at 170 characters, "flavour, not a list") and goes
+straight into the stories. Story pages have four commentary/tweet treatments
+behind `?layout=` (flow, rail, grid, classic) for comparison. Profile hover cards
+now get their facts with the page: the preview API returns 401 to signed-out
+visitors, so the old on-hover fetch never showed a bio to them, and took several
+seconds for everyone else.
+
+Samples regenerated with the dek prompt into
+`memos/artifacts/20261108-weekly-digest-v3/` (all four weeks passed on the first
+attempt). Deks: "A week of machines refuting conjectures, hobbyists dissecting
+neurons one at a time, hackers emptying exchanges, and a starship captain's
+final bow." (Oct 26); "A week when the ballot box swung hard, models started
+rewriting each other's weights, and one seemed to drag its feet on safety
+work." (Nov 2).

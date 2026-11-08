@@ -13,6 +13,7 @@ import type { DigestEditionContent, DigestStory } from './types'
 
 export const WEEKLY_DIGEST_MAX_PRIOR_WEEKS = 2
 export const WEEKLY_SUMMARY_MAX_CHARS = 200
+export const WEEKLY_DEK_MAX_CHARS = 170
 export const WEEKLY_MAX_STORIES = 5
 /** At most this many weekly stories may come only from "AI news" daily stories. */
 export const WEEKLY_MAX_AI_STORIES = 3
@@ -94,6 +95,8 @@ export interface WeeklyDigestContent {
   weekStart: string
   weekEnd: string
   generatedAt: string
+  /** One-line subtitle that conveys the week's flavour, not its contents. */
+  dek: string
   executiveSummary: string[]
   stories: WeeklyDigestStory[]
   alsoNotable: WeeklyAlsoNotable[]
@@ -110,8 +113,9 @@ export interface WeeklyDigestContent {
 export const WEEKLY_DIGEST_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['executive_summary', 'stories', 'also_notable'],
+  required: ['dek', 'executive_summary', 'stories', 'also_notable'],
   properties: {
+    dek: { type: 'string', minLength: 30, maxLength: 200 },
     executive_summary: {
       type: 'array',
       minItems: 3,
@@ -219,6 +223,7 @@ WRITING
 - overview: one paragraph (two to four sentences) about the story as a whole: what happened across the week, who drove it, and why it mattered to the community. No bullet lists.
 - segments: walk the reader through the story's tweets in a sensible order (usually chronological). Each segment is one or two short sentences of commentary (context, what the tweet adds, how people reacted) followed by the ids of the one to four tweets it introduces. Choose tweets only from the "tweets" of the daily stories this weekly story cites, and use each tweet at most once. Do not restate what the tweet says; say why it matters or what it answered. Any tweet you skip is still shown after the segments, so prefer a few strong segments over covering everything.
 - trend_terms: up to ${WEEKLY_MAX_TREND_TERMS} single words or short phrases (lower case, as people would actually type them in tweets) whose daily usage would show this story in the archive, such as a product, person, place or coined phrase central to it. Prefer specific terms ("sora", "polymarket") over generic ones ("ai", "model"). Leave empty when nothing distinctive fits.
+- Dek: one sentence under the week's date that gives the flavour of the week, the way a magazine standfirst does. It sets a mood or names the thread running through the week; it is not a list or a summary, and it should not try to mention every story. At most ${WEEKLY_DEK_MAX_CHARS} characters, no @handles, no colon-separated lists. Good shape: "A week of machines doing maths, a captain's farewell, and everyone reading the same neuron." Bad shape: "OpenAI's ETH claim, Qwen neurons, Picard, Binance, and elections."
 - Executive summary: exactly three bullet sentences a reader can understand without opening anything. Aim for about 150 characters each and never exceed 200. Lead each bullet with one story; add a second only if it fits in a short clause. Prefer naming fewer stories clearly over cramming. No compressed noun piles, no unexplained jargon or product names without saying what they are.
 - "also_notable": up to 6 one-line mentions of daily stories that did not make the weekly cut but are worth a click. Each line must be understandable on its own.
 - Each daily ref may appear in at most one weekly story, and not also in also_notable.
@@ -437,6 +442,14 @@ export function assembleWeeklyDigestContent(input: {
 
   const output = input.modelOutput
   if (!isRecord(output)) throw new Error('Response must be a JSON object')
+  const dek =
+    typeof output.dek === 'string' ? output.dek.replace(/\s+/g, ' ').trim() : ''
+  if (!dek) throw new Error('dek must be one sentence')
+  if (dek.length > WEEKLY_DEK_MAX_CHARS) {
+    throw new Error(
+      `dek is ${dek.length} characters; rewrite it as one evocative sentence of at most ${WEEKLY_DEK_MAX_CHARS} characters that does not list the stories`,
+    )
+  }
   const executiveSummary = requireStrings(
     output.executive_summary,
     'executive_summary',
@@ -665,6 +678,7 @@ export function assembleWeeklyDigestContent(input: {
     weekStart: input.weekStart,
     weekEnd: dates[6],
     generatedAt: input.generatedAt ?? new Date().toISOString(),
+    dek,
     executiveSummary,
     stories,
     alsoNotable,
@@ -685,6 +699,7 @@ export function weeklyDigestToMarkdown(
   const lines = [
     `# Community Archive Weekly — ${content.weekStart} to ${content.weekEnd}`,
     '',
+    ...(content.dek ? [`*${content.dek}*`, ''] : []),
     ...content.executiveSummary.map((line) => `- ${line}`),
     '',
   ]
@@ -769,6 +784,15 @@ export interface WeeklyPerson {
  * Everyone whose tweet the edition carries, plus every @handle its text
  * mentions, keyed once per lower-case handle.
  */
+/** Lower-case @handles mentioned in some text. */
+export function handlesIn(texts: string[]): Set<string> {
+  const handles = new Set<string>()
+  for (const text of texts)
+    for (const match of Array.from(text.matchAll(HANDLE)))
+      handles.add(match[2].toLowerCase())
+  return handles
+}
+
 export function weeklyPeople(content: WeeklyDigestContent): WeeklyPerson[] {
   const people = new Map<string, WeeklyPerson>()
   for (const story of content.stories) {

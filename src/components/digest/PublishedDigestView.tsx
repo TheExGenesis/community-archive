@@ -78,7 +78,7 @@ const PREVIEW_BULLETIN_ITEMS: DigestBulletinItem[] = [
   },
 ]
 
-function BulletinItems({
+export function BulletinItems({
   items,
   personalized,
   preview = false,

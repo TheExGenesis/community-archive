@@ -381,7 +381,14 @@ analytics read publishes without trends.
   subtitle that gives the flavour of the week, not a list) and then the stories
   straight away, each like a daily story: a one-line title (preferably an exact
   tweet excerpt, shown in quotation marks), a short `subtitle`, and one or two
-  `featuredTweetIds` in a card grid. Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
+  `featuredTweetIds` in a card grid. The subtitle is written like a daily
+  summary bullet: who did or said what, quoting a few telling words. A sidebar
+  shows cards for earlier-week stories this week continues, the three story
+  words with the most mentions this week, and keyword chips; under the stories
+  come the Bulletin asks and offers posted that week (same ranking as the
+  daily) and the discussion thread (`digest_weekly_edition_comments`, API under
+  `/api/digest/week/<editionId>/comments`, sharing handlers with the daily
+  comments in `src/lib/digest/commentRoutes.ts`). Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
   with each commentary segment on a numbered rail beside its tweet cards, and a
   sidebar of daily coverage and trend charts. Links to daily stories and earlier weeks preview the
   linked section on hover or focus. Profile hover-card facts are resolved with

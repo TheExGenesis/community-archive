@@ -2,6 +2,10 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { WeeklyDigestView } from '@/components/digest/WeeklyDigestView'
 import {
+  WeeklyBulletin,
+  WeeklyDiscussion,
+} from '@/components/digest/WeeklyEngagement'
+import {
   getPublishedWeeklyDigest,
   listPublishedWeeks,
   loadWeeklyProfiles,
@@ -33,6 +37,8 @@ export default async function LatestWeeklyDigestPage() {
       weeks={weeks}
       previews={previews}
       profiles={profiles}
+      bulletin={<WeeklyBulletin edition={edition} />}
+      comments={<WeeklyDiscussion edition={edition} />}
     />
   )
 }

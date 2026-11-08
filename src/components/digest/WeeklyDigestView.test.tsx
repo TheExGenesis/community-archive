@@ -43,7 +43,7 @@ const content = JSON.parse(
   readFileSync(
     join(
       process.cwd(),
-      'memos/artifacts/20261108-weekly-digest-v5/2026-10-26.json',
+      'memos/artifacts/20261108-weekly-digest-v6/2026-10-26.json',
     ),
     'utf8',
   ),
@@ -79,7 +79,21 @@ describe('WeeklyDigestView', () => {
     ).toBeInTheDocument()
     expect(screen.getByText(content.dek)).toBeInTheDocument()
     expect(screen.queryByText(content.executiveSummary[0])).toBeNull()
-    expect(screen.queryByText('Trending words')).toBeNull()
+    expect(screen.getByText('Trending words')).toBeInTheDocument()
+    expect(screen.getByText('Keywords this week')).toBeInTheDocument()
+  })
+
+  test('renders the bulletin and discussion it is given under the stories', () => {
+    render(
+      <WeeklyDigestView
+        edition={edition}
+        weeks={[content.weekStart]}
+        bulletin={<section>Bulletin picks</section>}
+        comments={<section>Discussion</section>}
+      />,
+    )
+    expect(screen.getByText('Bulletin picks')).toBeInTheDocument()
+    expect(screen.getByText('Discussion')).toBeInTheDocument()
   })
 
   test('previews the referenced daily story on keyboard focus', async () => {

@@ -13,6 +13,7 @@ import {
   WeeklyText,
 } from '@/components/digest/WeeklyText'
 import { MUTED, SERIF } from '@/components/portal/styles'
+import { buildSearchHref } from '@/lib/searchParams'
 import {
   dailyPreviewKey,
   weeklyPeople,
@@ -259,6 +260,132 @@ function Page({
   )
 }
 
+const sidebarHeading = 'text-[19px] font-semibold'
+const keywordChip =
+  'rounded-full bg-zinc-100 px-3 py-1.5 text-xs transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100'
+
+/** Week-page terms with the most mentions this week, at most `limit`. */
+function topTrendTerms(content: WeeklyDigestContent, limit: number) {
+  const trends = content.trends
+  if (!trends) return []
+  const thisWeek = (tweets: number[]) =>
+    trends.days.reduce(
+      (sum, day, index) =>
+        day >= content.weekStart && day <= content.weekEnd
+          ? sum + (tweets[index] ?? 0)
+          : sum,
+      0,
+    )
+  const storyTerms = new Set(content.stories.flatMap((s) => s.trendTerms))
+  return trends.series
+    .filter((series) => storyTerms.has(series.term))
+    .sort((a, b) => thisWeek(b.tweets) - thisWeek(a.tweets))
+    .slice(0, limit)
+    .map((series) => series.term)
+}
+
+/** Daily-style sidebar: earlier weeks this one continues, trends, keywords. */
+function WeekSidebar({
+  content,
+  previews,
+}: {
+  content: WeeklyDigestContent
+  previews: Previews
+}) {
+  const continued = content.stories.flatMap((story) =>
+    story.continuesFrom.map((ref) => ({ ref, story })),
+  )
+  const keywords = Array.from(
+    new Set([
+      ...content.stories.flatMap((story) => story.trendTerms),
+      ...(content.trends?.weekTerms ?? []),
+    ]),
+  ).slice(0, 14)
+  const trendTerms = topTrendTerms(content, 3)
+
+  return (
+    <aside className="border-zinc-200 pt-2 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-9 lg:border-l lg:pl-10">
+      {continued.length > 0 ? (
+        <section>
+          <h2 className={sidebarHeading} style={SERIF}>
+            Continued from earlier weeks
+          </h2>
+          <ul className="mt-4 space-y-3">
+            {continued.map(({ ref, story }) => {
+              const preview =
+                previews[weeklyPreviewKey(ref.weekStart, ref.slug)]
+              return (
+                <li key={`${ref.weekStart}-${ref.slug}-${story.slug}`}>
+                  <Link
+                    href={weeklyStoryPath(ref.weekStart, ref.slug)}
+                    className="block rounded-xl border border-zinc-200 p-3.5 transition-colors hover:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-zinc-800 dark:hover:border-zinc-600"
+                  >
+                    <div
+                      className={`text-[11px] uppercase tracking-[0.14em] ${MUTED}`}
+                    >
+                      Week of{' '}
+                      {dayLabel(ref.weekStart, {
+                        day: 'numeric',
+                        month: 'long',
+                      })}
+                    </div>
+                    <div
+                      className="mt-1 font-semibold leading-snug"
+                      style={SERIF}
+                    >
+                      {plain(preview?.title ?? ref.title)}
+                    </div>
+                    {preview?.excerpt ? (
+                      <p
+                        className={`mt-1.5 line-clamp-3 text-[13px] leading-[1.5] ${MUTED}`}
+                      >
+                        {plain(preview.excerpt)}
+                      </p>
+                    ) : null}
+                    <div className="mt-2 text-[12.5px] text-brand">
+                      Continues in “{plain(story.title)}”
+                    </div>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {trendTerms.length > 0 ? (
+        <div className={continued.length > 0 ? 'mt-8' : undefined}>
+          <TrendCharts
+            content={content}
+            terms={trendTerms}
+            note="Daily mentions per 100k archived tweets of the week's most-used story words. The percentage compares this week with the week before."
+          />
+        </div>
+      ) : null}
+
+      {keywords.length > 0 ? (
+        <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
+          <h2 className={sidebarHeading} style={SERIF}>
+            Keywords this week
+          </h2>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {keywords.map((keyword) => (
+              <Link
+                key={keyword}
+                href={buildSearchHref(keyword)}
+                aria-label={`Search Community Archive for ${keyword}`}
+                className={keywordChip}
+              >
+                {keyword}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </aside>
+  )
+}
+
 /** The tweets shown with a story on the week page. */
 const featuredTweets = (story: WeeklyDigestStory) => {
   const byId = new Map(story.tweets.map((tweet) => [tweet.id, tweet]))
@@ -275,19 +402,25 @@ export function WeeklyDigestView({
   weeks,
   previews = {},
   profiles,
+  bulletin,
+  comments,
 }: {
   edition: WeeklyDigestEdition
   weeks: string[]
   previews?: Previews
   profiles?: ProfilePreview[]
+  /** Recommended Bulletin asks and offers, rendered under the stories. */
+  bulletin?: ReactNode
+  /** The edition's discussion thread. */
+  comments?: ReactNode
 }) {
   const content = edition.content
   const range = weekRangeLabel(content.weekStart, content.weekEnd)
 
   return (
     <Page content={content} profiles={profiles}>
-      <div className="mx-auto max-w-[820px]">
-        <header>
+      <div>
+        <header className="max-w-[880px]">
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
             <div className={sectionLabel}>The Week in Review</div>
             <WeekNav weekStart={edition.weekStart} weeks={weeks} />
@@ -320,7 +453,7 @@ export function WeeklyDigestView({
         <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
         <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
 
-        <div className="mt-2">
+        <div className="mt-2 grid items-start gap-y-10 lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">
           <div className="min-w-0">
             <section aria-label="This week's stories">
               <ol>
@@ -332,8 +465,8 @@ export function WeeklyDigestView({
                   >
                     <span
                       aria-hidden
-                      className="text-[30px] font-semibold leading-none sm:text-[38px]"
-                      style={{ ...SERIF, color: WEEKLY_MAP_COLORS[index] }}
+                      className="text-[30px] font-semibold leading-none text-zinc-400 dark:text-zinc-500 sm:text-[38px]"
+                      style={SERIF}
                     >
                       {index + 1}
                     </span>
@@ -417,7 +550,12 @@ export function WeeklyDigestView({
             ) : null}
             <DigestSubscribeButton placement="digest" />
           </div>
+
+          <WeekSidebar content={content} previews={previews} />
         </div>
+
+        {bulletin}
+        {comments}
       </div>
     </Page>
   )

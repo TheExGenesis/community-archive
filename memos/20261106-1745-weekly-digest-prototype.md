@@ -149,8 +149,31 @@ Exponential Time Hypothesis is false.", "Democrats are winning EVERYTHING!!!",
 The `connection` field is gone from the schema, validation and story page. When a
 weekly story bundles several daily stories, the overview must weave in what links
 them unless it is self-evident. Samples regenerated into
-`memos/artifacts/20261108-weekly-digest-v5/` (Oct 26 needed one repair attempt,
+`memos/artifacts/20261108-weekly-digest-v5/` (since replaced by v6; Oct 26 needed one repair attempt,
 the rest passed first time); the bundled overviews state their links in passing,
 e.g. "Saturday's viral 'CLAUDE FOUND THE SEEDS' post was read explicitly against
 that episode".
+
+## Direct subtitles, sidebar, bulletin and comments (Nov 8, evening)
+
+- Subtitles are now written like daily summary bullets: actor first, who did or
+  said what, two to six quoted words with @handle attribution, no scene-setting
+  or arc words. Prompt target 200 characters; validation rejects only above 240
+  (one run missed 200 by one character after its repair attempt). Example:
+  "@AnthropicAI put 'roughly 20%' of its shares toward public benefit;
+  @elonmusk urged giving shares 'directly to the public,' then pledged one
+  SpaceX share per American kid." Samples in
+  `memos/artifacts/20261108-weekly-digest-v6/`.
+- Story numbers on the week page are neutral grey.
+- Sidebar: "Continued from earlier weeks" cards, three trend charts (story words
+  with the most mentions this week), keyword chips.
+- Bottom: Bulletin picks posted during the week (the daily selection, windowed
+  Monday 00:00 to the next Monday 00:00 UTC) and a discussion thread.
+- New migration `20261108200000_digest_weekly_edition_comments.sql`, mirroring
+  the daily comments table. Checked in a rolled-back transaction on a local
+  Supabase Postgres: anon reads only comments of published weeks, cannot write,
+  empty comments fail the length check, deleting a week cascades. The daily and
+  weekly comment routes now share `src/lib/digest/commentRoutes.ts`.
+- Not seen locally: the bulletin needs the service-role key and comments need a
+  real edition row, so both stay hidden in the sample preview.
 

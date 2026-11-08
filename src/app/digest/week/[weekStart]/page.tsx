@@ -5,6 +5,10 @@ import {
   weekRangeLabel,
 } from '@/components/digest/WeeklyDigestView'
 import {
+  WeeklyBulletin,
+  WeeklyDiscussion,
+} from '@/components/digest/WeeklyEngagement'
+import {
   getPublishedWeeklyDigest,
   listPublishedWeeks,
   loadWeeklyProfiles,
@@ -59,6 +63,8 @@ export default async function WeeklyDigestPage({
       weeks={weeks}
       previews={previews}
       profiles={profiles}
+      bulletin={<WeeklyBulletin edition={edition} />}
+      comments={<WeeklyDiscussion edition={edition} />}
     />
   )
 }

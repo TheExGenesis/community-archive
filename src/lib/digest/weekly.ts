@@ -24,7 +24,9 @@ export const WEEKLY_MAX_STORIES = 5
 export const WEEKLY_MAX_AI_STORIES = 3
 export const WEEKLY_MAX_TREND_TERMS = 3
 export const WEEKLY_TITLE_MAX_CHARS = 90
-export const WEEKLY_SUBTITLE_MAX_CHARS = 280
+export const WEEKLY_SUBTITLE_MAX_CHARS = 200
+/** Validation allows a little slack over the prompt's target. */
+const WEEKLY_SUBTITLE_HARD_MAX = 240
 export const WEEKLY_MAX_FEATURED = 2
 
 export const WEEKLY_STORY_KINDS = ['ongoing', 'major'] as const
@@ -157,7 +159,7 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
         properties: {
           kind: { type: 'string', enum: WEEKLY_STORY_KINDS },
           title: { type: 'string', minLength: 4, maxLength: 120 },
-          subtitle: { type: 'string', minLength: 40, maxLength: 360 },
+          subtitle: { type: 'string', minLength: 40, maxLength: 260 },
           featured_tweet_ids: {
             type: 'array',
             minItems: 1,
@@ -240,7 +242,7 @@ Refer to people by their Twitter/X @handle exactly as it appears in the tweets' 
 WRITING
 - Ground every claim in the supplied daily stories and tweets. Do not add outside knowledge, dates, or numbers.
 - title: ONE line of at most ${WEEKLY_TITLE_MAX_CHARS} characters that points the reader at the story. Strongly prefer an exact excerpt copied character for character from one of the story's tweets: the line people kept quoting, the claim at the centre, the reaction that captures the mood. The quote is a pointer to the broader story, not a summary of it, so it does not need to cover every part. Do not add quotation marks (the page adds them). Do NOT compose titles from several parts: no " / " joins, no "X, Y and Z" chains, no "A, as B says C". If no single excerpt works, write one short plain headline about the story's core thread. A quote that means nothing without the story ("whew", "Anyway, it's Wednesday.") is not a title.
-- subtitle: about three lines (one or two sentences, at most ${WEEKLY_SUBTITLE_MAX_CHARS} characters) shown under the title on the week page. Say what happened across the week and, if the title is a quote, who said it and why it mattered. Plain words; @handles allowed.
+- subtitle: one or two short, direct sentences (at most ${WEEKLY_SUBTITLE_MAX_CHARS} characters) under the title on the week page, written like a daily-digest summary bullet: who did or said what, as close to the tweets' own words as possible. Quote two to six telling words inline where they carry the point, and attribute them by @handle. Start with the actor or the event, not with scene-setting ("The week's dominant thread began…", "What started as…", "By the weekend…"); no story arcs, no evaluative filler ("captured the mood", "sparked debate"). Good: "@mattvanswol couldn't believe 'Democrats are winning EVERYTHING' as Texas, Georgia and South Carolina were projected blue; @JDVance blamed 'the war'." Bad: "Election Day jokes gave way to projections, and the timeline argued over blame.
 - featured_tweet_ids: the ${WEEKLY_MAX_FEATURED} tweets (or one, if the story has one) that best show the story on the week page, chosen from the story's tweets. Prefer the tweet the title quotes plus the strongest reaction or development.
 - overview: one paragraph (two to four sentences) about the story as a whole: what happened across the week, who drove it, and why it mattered to the community. When the story bundles several daily stories, weave in what connects them unless it is self-evident. No bullet lists.
 - segments: walk the reader through the story's tweets in a sensible order (usually chronological). Each segment is one or two short sentences of commentary (context, what the tweet adds, how people reacted) followed by the ids of the one to four tweets it introduces. Choose tweets only from the "tweets" of the daily stories this weekly story cites, and use each tweet at most once. Do not restate what the tweet says; say why it matters or what it answered. Any tweet you skip is still shown after the segments, so prefer a few strong segments over covering everything.
@@ -625,9 +627,9 @@ export function assembleWeeklyDigestContent(input: {
         `${label}.title joins several parts with " / "; use one excerpt or one plain headline`,
       )
     }
-    if (subtitle.length < 40 || subtitle.length > WEEKLY_SUBTITLE_MAX_CHARS) {
+    if (subtitle.length < 40 || subtitle.length > WEEKLY_SUBTITLE_HARD_MAX) {
       errors.push(
-        `${label}.subtitle is ${subtitle.length} characters; write one or two sentences of at most ${WEEKLY_SUBTITLE_MAX_CHARS}`,
+        `${label}.subtitle is ${subtitle.length} characters; write one or two direct sentences of at most ${WEEKLY_SUBTITLE_MAX_CHARS}: who did or said what, quoting a few telling words`,
       )
     }
     const featuredTweetIds = Array.from(new Set(featuredRaw)).slice(

@@ -82,6 +82,12 @@ export type DigestEditionCommentRow = {
   deleted_at: string | null
 }
 
+/** The columns the comment API reads from a weekly edition. */
+export type DigestWeeklyEditionStatusRow = {
+  id: string
+  status: string
+}
+
 type TableDefinition<Row, Insert, Update> = {
   Row: Row
   Insert: Insert
@@ -130,6 +136,17 @@ type DigestDatabase = {
         Partial<DigestEditionLikeRow>
       >
       digest_edition_comments: TableDefinition<
+        DigestEditionCommentRow,
+        Partial<DigestEditionCommentRow> &
+          Pick<DigestEditionCommentRow, 'edition_id' | 'user_id' | 'content'>,
+        Partial<DigestEditionCommentRow>
+      >
+      digest_weekly_editions: TableDefinition<
+        DigestWeeklyEditionStatusRow,
+        never,
+        never
+      >
+      digest_weekly_edition_comments: TableDefinition<
         DigestEditionCommentRow,
         Partial<DigestEditionCommentRow> &
           Pick<DigestEditionCommentRow, 'edition_id' | 'user_id' | 'content'>,

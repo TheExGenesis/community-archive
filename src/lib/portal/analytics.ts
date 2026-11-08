@@ -353,6 +353,51 @@ export async function fetchPortalTrendSeries(
   return { granularity, buckets, series, computedAt: now.toISOString() }
 }
 
+/**
+ * Daily matching-tweet counts for each term over a fixed UTC date range
+ * (inclusive). Days without corpus coverage are reported as null, never as a
+ * measured zero.
+ */
+export async function fetchPortalTermDailySeries(
+  terms: string[],
+  from: string,
+  to: string,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<{
+  days: string[]
+  series: { term: string; tweets: number[]; per100k: (number | null)[] }[]
+}> {
+  const days: string[] = []
+  for (
+    let day = new Date(`${from}T00:00:00Z`);
+    dayKey(day) <= to;
+    day = new Date(day.getTime() + 86_400_000)
+  )
+    days.push(dayKey(day))
+  const responses = await runBatched(
+    terms.map((term) => () => fetchTrend(term, 'day', from, to, fetcher)),
+  )
+  const series = terms.map((term, index) => {
+    const rows = new Map<string, ClickHouseTrendRow>()
+    for (const row of responses[index].data)
+      rows.set(trendBucketKey(row.bucket, 'day'), row)
+    return {
+      term,
+      tweets: days.map((day) => {
+        const row = rows.get(day)
+        return row ? safeCount(row.tweets, 'trend tweet count') : 0
+      }),
+      per100k: days.map((day) => {
+        const row = rows.get(day)
+        return row && safeCount(row.totalTweets, 'trend corpus count') > 0
+          ? ratePerHundredThousand(row)
+          : null
+      }),
+    }
+  })
+  return { days, series }
+}
+
 interface PortalTrendEvidenceOptions {
   limit?: number
   offset?: number

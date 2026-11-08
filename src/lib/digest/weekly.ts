@@ -13,6 +13,10 @@ import type { DigestEditionContent, DigestStory } from './types'
 
 export const WEEKLY_DIGEST_MAX_PRIOR_WEEKS = 2
 export const WEEKLY_SUMMARY_MAX_CHARS = 200
+export const WEEKLY_MAX_STORIES = 5
+/** At most this many weekly stories may come only from "AI news" daily stories. */
+export const WEEKLY_MAX_AI_STORIES = 3
+export const WEEKLY_MAX_TREND_TERMS = 3
 
 export const WEEKLY_STORY_KINDS = ['ongoing', 'major'] as const
 export type WeeklyStoryKind = (typeof WEEKLY_STORY_KINDS)[number]
@@ -36,12 +40,35 @@ export interface WeeklyContinuityRef {
   title: string
 }
 
+/** A short piece of commentary followed by the tweets it introduces. */
+export interface WeeklyStorySegment {
+  commentary: string
+  tweetIds: string[]
+}
+
+/** Daily word-trend counts frozen when the edition was published. */
+export interface WeeklyTrendSeries {
+  term: string
+  /** Tweets matching the term, one entry per day in `WeeklyTrends.days`. */
+  tweets: number[]
+  /** Matches per 100k archived tweets that day; null where the corpus has no data. */
+  per100k: (number | null)[]
+}
+
+export interface WeeklyTrends {
+  /** UTC days covered, ascending (the week before and the week itself). */
+  days: string[]
+  series: WeeklyTrendSeries[]
+  /** Terms the daily editions froze as rising or falling during the week. */
+  weekTerms: string[]
+}
+
 export interface WeeklyDigestStory {
   slug: string
   kind: WeeklyStoryKind
   title: string
-  subtitle: string
-  bullets: string[]
+  /** One paragraph about the story as a whole. */
+  overview: string
   /** Why the bundled daily stories belong together; empty for a single source. */
   connection: string
   /** What this week adds to a story from a previous weekly digest. */
@@ -50,8 +77,12 @@ export interface WeeklyDigestStory {
   dailyStories: WeeklyDailyStoryRef[]
   /** Distinct daily dates the story appeared on, ascending. */
   days: string[]
-  /** Representative banger snapshots copied from the daily editions. */
+  /** Commentary interleaved with the story's tweets, in reading order. */
+  segments: WeeklyStorySegment[]
+  /** Every banger from the cited daily stories, copied from the daily editions. */
   tweets: PortalTweet[]
+  /** Words whose daily trend lines are shown beside the story. */
+  trendTerms: string[]
 }
 
 export interface WeeklyAlsoNotable {
@@ -66,6 +97,8 @@ export interface WeeklyDigestContent {
   executiveSummary: string[]
   stories: WeeklyDigestStory[]
   alsoNotable: WeeklyAlsoNotable[]
+  /** Absent until the publisher freezes the analytics series. */
+  trends?: WeeklyTrends
   source: {
     editionDates: string[]
     missingDates: string[]
@@ -88,30 +121,25 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
     stories: {
       type: 'array',
       minItems: 3,
-      maxItems: 7,
+      maxItems: WEEKLY_MAX_STORIES,
       items: {
         type: 'object',
         additionalProperties: false,
         required: [
           'kind',
           'title',
-          'subtitle',
-          'bullets',
+          'overview',
           'connection',
           'daily_refs',
           'continues_from',
           'continuity_note',
+          'segments',
+          'trend_terms',
         ],
         properties: {
           kind: { type: 'string', enum: WEEKLY_STORY_KINDS },
           title: { type: 'string', minLength: 8, maxLength: 140 },
-          subtitle: { type: 'string', minLength: 60, maxLength: 500 },
-          bullets: {
-            type: 'array',
-            minItems: 1,
-            maxItems: 5,
-            items: { type: 'string', minLength: 12, maxLength: 260 },
-          },
+          overview: { type: 'string', minLength: 80, maxLength: 600 },
           connection: { type: 'string', maxLength: 400 },
           daily_refs: {
             type: 'array',
@@ -125,6 +153,30 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
             items: { type: 'string', minLength: 3, maxLength: 20 },
           },
           continuity_note: { type: 'string', maxLength: 400 },
+          segments: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 6,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['commentary', 'tweet_ids'],
+              properties: {
+                commentary: { type: 'string', minLength: 20, maxLength: 320 },
+                tweet_ids: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 4,
+                  items: { type: 'string', minLength: 1, maxLength: 30 },
+                },
+              },
+            },
+          },
+          trend_terms: {
+            type: 'array',
+            maxItems: WEEKLY_MAX_TREND_TERMS,
+            items: { type: 'string', minLength: 2, maxLength: 40 },
+          },
         },
       },
     },
@@ -144,13 +196,13 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
   },
 } as const
 
-export const WEEKLY_DIGEST_SYSTEM_PROMPT = `You are the editor of the Community Archive Weekly Digest. Every day the Daily Digest publishes three to five stories about what the Community Archive's corner of Twitter/X was talking about. Once a week you read all of that week's daily stories and write the weekly edition: the few stories a reader who skipped every daily edition most needs.
+export const WEEKLY_DIGEST_SYSTEM_PROMPT = `You are the editor of the Community Archive Weekly Digest. Every day the Daily Digest publishes three to five stories about what the Community Archive's corner of Twitter/X was talking about. Once a week you read all of that week's daily stories and write the weekly edition: the few stories a reader who skipped every daily edition most needs. The weekly edition is led by the community's own tweets; your text is short connective commentary between them.
 
 SELECTING STORIES
-Pick 4 to 7 weekly stories. Two kinds earn a place:
+Pick exactly ${WEEKLY_MAX_STORIES} weekly stories (fewer only if the week has fewer qualifying stories). Two kinds earn a place:
 - "major": the week's most important or most engaged-with developments, even if they were covered on a single day and briefly. Weigh real-world stakes and community engagement (likes, quote counts, how many community members took part).
 - "ongoing": a story that returned on two or more days of the week, consecutive or not, because the same event, actor, claim, release, or debate kept developing. An ongoing story must cite daily stories from at least two different dates.
-Order stories by importance to the reader, not chronologically.
+Keep the edition varied. At most ${WEEKLY_MAX_AI_STORIES} stories may be built only from "AI news" daily stories; when the week has strong culture, news, meme, joke, opportunity or community stories, include at least one or two of them even if an AI story had slightly more engagement. Order stories by importance to the reader, not chronologically.
 
 BUNDLING DAILY STORIES
 Only put several daily stories in one weekly story when they share a concrete subject: the same event, the same people or organisation, the same release or paper, the same claim being argued over, or a direct reply/response. A shared broad theme ("AI safety", "elections", "launches", "the community") is NOT enough; such stories stay separate or are left out. When a weekly story cites more than one daily story, "connection" must say in one or two plain sentences exactly what links them (who/what is common and how one led to or answered the other). For a single daily story, leave "connection" empty.
@@ -158,11 +210,15 @@ Only put several daily stories in one weekly story when they share a concrete su
 CONTINUITY WITH PREVIOUS WEEKS
 You also get up to two previous weekly digests. If a weekly story genuinely continues one of their stories (same concrete subject, as above), list those stories' refs in "continues_from" and write "continuity_note": one sentence on what is new this week compared with before. Check every selected story against every previous weekly story before deciding; a returning subject from two weeks ago counts even if last week skipped it. Do not link stories that are only thematically similar. A story that merely repeats last week with nothing new should not be selected. Leave both empty when there is no continuation.
 
+PEOPLE
+Refer to people by their Twitter/X @handle exactly as it appears in the tweets' "username" (for example @sama), never by display name. Organisations without a handle in the tweets keep their plain name. Readers can hover a handle to see the profile.
+
 WRITING
-- Ground every claim in the supplied daily stories. Do not add outside knowledge, dates, or numbers.
+- Ground every claim in the supplied daily stories and tweets. Do not add outside knowledge, dates, or numbers.
 - Title: plain and specific, in the voice of the community's own posts rather than newsletter-speak. A reader who sees only the title must learn what happened. A short exact quote from a source tweet is welcome when the story has one element and the quote itself says what happened; a quote that only makes sense after reading the story ("Anyway, it's Wednesday.", "whew") is not a title. When a story has several distinct elements, the title must cover all of them: either join two short quotes ("'quote one' / 'quote two'") or write a plain title naming each element. Never title a multi-part story with a quote that fits only one part.
-- Subtitle: one or two sentences saying what happened across the week and why it matters, naming the people or organisations involved.
-- Bullets: 2 to 4 for ongoing stories (in chronological order, each starting with the weekday, e.g. "Tue: ..."), 1 to 3 for major stories. Each bullet is one concrete development.
+- overview: one paragraph (two to four sentences) about the story as a whole: what happened across the week, who drove it, and why it mattered to the community. No bullet lists.
+- segments: walk the reader through the story's tweets in a sensible order (usually chronological). Each segment is one or two short sentences of commentary (context, what the tweet adds, how people reacted) followed by the ids of the one to four tweets it introduces. Choose tweets only from the "tweets" of the daily stories this weekly story cites, and use each tweet at most once. Do not restate what the tweet says; say why it matters or what it answered. Any tweet you skip is still shown after the segments, so prefer a few strong segments over covering everything.
+- trend_terms: up to ${WEEKLY_MAX_TREND_TERMS} single words or short phrases (lower case, as people would actually type them in tweets) whose daily usage would show this story in the archive, such as a product, person, place or coined phrase central to it. Prefer specific terms ("sora", "polymarket") over generic ones ("ai", "model"). Leave empty when nothing distinctive fits.
 - Executive summary: exactly three bullet sentences a reader can understand without opening anything. Aim for about 150 characters each and never exceed 200. Lead each bullet with one story; add a second only if it fits in a short clause. Prefer naming fewer stories clearly over cramming. No compressed noun piles, no unexplained jargon or product names without saying what they are.
 - "also_notable": up to 6 one-line mentions of daily stories that did not make the weekly cut but are worth a click. Each line must be understandable on its own.
 - Each daily ref may appear in at most one weekly story, and not also in also_notable.
@@ -244,8 +300,10 @@ export function renderWeeklyDigestPrompt(input: {
       bullets: story.bullets,
       editorial_note: story.editorialNote ?? null,
       ...storyEngagement(story),
-      top_tweets: (story.bangers ?? []).slice(0, 3).map((tweet) => ({
+      tweets: (story.bangers ?? []).map((tweet) => ({
+        id: tweet.id,
         username: tweet.username,
+        posted: tweet.createdAt,
         likes: tweet.likes,
         community_quotes: tweet.quoteCount ?? 0,
         text: clip(tweet.text, 400),
@@ -262,8 +320,7 @@ export function renderWeeklyDigestPrompt(input: {
         ref: weeklyRef(week.weekStart, index),
         kind: story.kind,
         title: story.title,
-        subtitle: story.subtitle,
-        bullets: story.bullets,
+        overview: story.overview,
         days: story.days,
       })),
     }),
@@ -407,6 +464,7 @@ export function assembleWeeklyDigestContent(input: {
   const errors: string[] = []
   const usedDaily = new Map<string, number>()
   const slugCounts = new Map<string, number>()
+  const aiStories: number[] = []
 
   const stories: WeeklyDigestStory[] = output.stories.map((raw, index) => {
     const label = `stories[${index}]`
@@ -418,8 +476,7 @@ export function assembleWeeklyDigestContent(input: {
       )
     }
     const title = requireString(raw.title, `${label}.title`)
-    const subtitle = requireString(raw.subtitle, `${label}.subtitle`)
-    const bullets = requireStrings(raw.bullets, `${label}.bullets`)
+    const overview = requireString(raw.overview, `${label}.overview`)
     const connection = requireString(
       raw.connection ?? '',
       `${label}.connection`,
@@ -436,10 +493,18 @@ export function assembleWeeklyDigestContent(input: {
         requireStrings(raw.continues_from ?? [], `${label}.continues_from`),
       ),
     )
+    const trendTerms = Array.from(
+      new Set(
+        requireStrings(raw.trend_terms ?? [], `${label}.trend_terms`)
+          .map((term) => term.toLowerCase().replace(/\s+/g, ' '))
+          .filter(Boolean),
+      ),
+    ).slice(0, WEEKLY_MAX_TREND_TERMS)
 
     const dailyStories: WeeklyDailyStoryRef[] = []
     const tweets: PortalTweet[] = []
     const days = new Set<string>()
+    const categories: (string | null)[] = []
     for (const ref of refs) {
       const found = daily.get(ref)
       if (!found) {
@@ -454,15 +519,20 @@ export function assembleWeeklyDigestContent(input: {
       }
       usedDaily.set(ref, index)
       days.add(found.digestDate)
+      categories.push(found.story.category ?? null)
       dailyStories.push({
         digestDate: found.digestDate,
         slug: found.story.slug,
         title: found.story.title,
       })
-      const lead = found.story.bangers?.[0]
-      if (lead && !tweets.some(({ id }) => id === lead.id)) tweets.push(lead)
+      for (const tweet of found.story.bangers ?? []) {
+        if (!tweets.some(({ id }) => id === tweet.id)) tweets.push(tweet)
+      }
     }
     dailyStories.sort((a, b) => a.digestDate.localeCompare(b.digestDate))
+    if (categories.length > 0 && categories.every((c) => c === 'AI news')) {
+      aiStories.push(index)
+    }
 
     if (kind === 'ongoing' && days.size < 2) {
       errors.push(
@@ -474,6 +544,43 @@ export function assembleWeeklyDigestContent(input: {
         `${label} bundles ${refs.length} daily stories, so "connection" must explain concretely what links them`,
       )
     }
+
+    const tweetIds = new Set(tweets.map(({ id }) => id))
+    const placed = new Set<string>()
+    const rawSegments = Array.isArray(raw.segments) ? raw.segments : []
+    if (rawSegments.length === 0) {
+      errors.push(`${label}.segments must contain at least one segment`)
+    }
+    const segments: WeeklyStorySegment[] = rawSegments.flatMap(
+      (segment, segmentIndex) => {
+        const segmentLabel = `${label}.segments[${segmentIndex}]`
+        if (!isRecord(segment)) {
+          errors.push(`${segmentLabel} must be an object`)
+          return []
+        }
+        const commentary = requireString(
+          segment.commentary,
+          `${segmentLabel}.commentary`,
+        )
+        const ids = requireStrings(
+          segment.tweet_ids,
+          `${segmentLabel}.tweet_ids`,
+        )
+        for (const id of ids) {
+          if (!tweetIds.has(id)) {
+            errors.push(
+              `${segmentLabel}.tweet_ids contains ${id}, which is not a tweet of the daily stories this weekly story cites`,
+            )
+          } else if (placed.has(id)) {
+            errors.push(
+              `${segmentLabel}.tweet_ids repeats tweet ${id}; use each tweet once`,
+            )
+          }
+          placed.add(id)
+        }
+        return [{ commentary, tweetIds: ids.filter((id) => tweetIds.has(id)) }]
+      },
+    )
 
     const continuesFrom: WeeklyContinuityRef[] = []
     for (const ref of continuesFromRefs) {
@@ -500,16 +607,28 @@ export function assembleWeeklyDigestContent(input: {
       slug: occurrence === 1 ? baseSlug : `${baseSlug}-${occurrence}`,
       kind,
       title,
-      subtitle,
-      bullets,
+      overview,
       connection: refs.length > 1 ? connection : '',
       continuityNote: continuesFrom.length > 0 ? continuityNote : '',
       continuesFrom,
       dailyStories,
       days: Array.from(days).sort(),
+      segments,
       tweets,
+      trendTerms,
     }
   })
+
+  if (stories.length > WEEKLY_MAX_STORIES) {
+    errors.push(
+      `stories has ${stories.length} entries; keep at most ${WEEKLY_MAX_STORIES}`,
+    )
+  }
+  if (aiStories.length > WEEKLY_MAX_AI_STORIES) {
+    errors.push(
+      `stories ${aiStories.map((i) => `[${i}]`).join(', ')} are all built only from "AI news" daily stories; keep at most ${WEEKLY_MAX_AI_STORIES} and replace the rest with the strongest non-AI stories of the week`,
+    )
+  }
 
   const alsoNotable: WeeklyAlsoNotable[] = []
   const rawAlso = Array.isArray(output.also_notable) ? output.also_notable : []
@@ -573,11 +692,20 @@ export function weeklyDigestToMarkdown(
     lines.push(
       `## ${story.title}`,
       '',
-      `*${story.kind === 'ongoing' ? `Ongoing · ${story.days.length} days` : 'Major'}* — ${story.subtitle}`,
-      '',
-      ...story.bullets.map((bullet) => `- ${bullet}`),
+      `*${story.kind === 'ongoing' ? `Ongoing · ${story.days.length} days` : 'Major'}* — ${story.overview}`,
       '',
     )
+    for (const segment of story.segments) {
+      lines.push(segment.commentary, '')
+      for (const id of segment.tweetIds) {
+        const tweet = story.tweets.find((item) => item.id === id)
+        if (tweet)
+          lines.push(
+            `> @${tweet.username}: ${tweet.text.replace(/\n+/g, ' ')}`,
+            '',
+          )
+      }
+    }
     if (story.connection)
       lines.push(`**How these connect:** ${story.connection}`, '')
     if (story.continuesFrom.length > 0) {
@@ -625,3 +753,56 @@ export const dailyPreviewKey = (digestDate: string, slug: string) =>
   `daily:${digestDate}#${slug}`
 export const weeklyPreviewKey = (weekStart: string, slug: string) =>
   `weekly:${weekStart}#${slug}`
+
+const HANDLE = /(^|[^\w/@])@(\w{1,15})(?!\w)/g
+
+/** A person a weekly edition shows or mentions, for @handle profile cards. */
+export interface WeeklyPerson {
+  username: string
+  accountId?: string
+  name?: string
+  avatar?: string | null
+  tweetId?: string
+}
+
+/**
+ * Everyone whose tweet the edition carries, plus every @handle its text
+ * mentions, keyed once per lower-case handle.
+ */
+export function weeklyPeople(content: WeeklyDigestContent): WeeklyPerson[] {
+  const people = new Map<string, WeeklyPerson>()
+  for (const story of content.stories) {
+    for (const tweet of story.tweets) {
+      if (!tweet.username) continue
+      const key = tweet.username.toLowerCase()
+      const known = people.get(key)
+      if (!known || (!known.avatar && tweet.avatar)) {
+        people.set(key, {
+          username: tweet.username,
+          accountId: tweet.accountId ?? known?.accountId,
+          name: tweet.name ?? known?.name,
+          avatar: tweet.avatar ?? known?.avatar ?? null,
+          tweetId: tweet.id,
+        })
+      }
+    }
+  }
+  const texts = [
+    ...content.executiveSummary,
+    ...content.alsoNotable.map(({ line }) => line),
+    ...content.stories.flatMap((story) => [
+      story.title,
+      story.overview,
+      story.connection,
+      story.continuityNote,
+      ...story.segments.map(({ commentary }) => commentary),
+    ]),
+  ]
+  for (const text of texts) {
+    for (const match of Array.from(text.matchAll(HANDLE))) {
+      const key = match[2].toLowerCase()
+      if (!people.has(key)) people.set(key, { username: match[2] })
+    }
+  }
+  return Array.from(people.values())
+}

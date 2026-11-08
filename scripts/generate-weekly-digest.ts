@@ -23,6 +23,7 @@ import {
   type WeeklySourceEdition,
 } from '../src/lib/digest/weekly'
 import { generateWeeklyDigest } from '../src/lib/digest/weeklyGeneration'
+import { snapshotWeeklyTrends } from '../src/lib/digest/weeklyTrends'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 config({ path: resolve(process.cwd(), '..', '.env') })
@@ -88,11 +89,15 @@ async function main() {
         .join(', ')}]`,
     )
     const started = Date.now()
-    const result = await generateWeeklyDigest({
+    const generated = await generateWeeklyDigest({
       weekStart,
       editions,
       priorWeeks,
     })
+    const result = {
+      ...generated,
+      content: await snapshotWeeklyTrends(generated.content, editions),
+    }
     const usage = result.attempts.map((attempt) => ({
       model: attempt.model,
       inputTokens: attempt.inputTokens,

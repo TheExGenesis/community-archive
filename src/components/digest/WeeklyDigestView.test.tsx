@@ -29,8 +29,16 @@ jest.mock('@/components/TweetCard', () => ({
     <div data-testid="tweet-card">{tweet.id}</div>
   ),
 }))
-jest.mock('@/components/digest/DigestMarkdown', () => ({
-  DigestMarkdown: ({ children }: { children: string }) => <>{children}</>,
+jest.mock('@/components/digest/WeeklyText', () => ({
+  WeeklyText: ({ children }: { children: string }) => <>{children}</>,
+  WeeklyPeopleProvider: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+}))
+jest.mock('@/components/digest/WeeklyConversationMap', () => ({
+  WeeklyConversationMap: ({ label }: { label: string }) => (
+    <div data-testid="weekly-map">{label}</div>
+  ),
 }))
 jest.mock('@/components/digest/DigestSubscribeButton', () => ({
   DigestSubscribeButton: () => null,
@@ -40,7 +48,7 @@ const content = JSON.parse(
   readFileSync(
     join(
       process.cwd(),
-      'memos/artifacts/20261106-weekly-digest/2026-10-26.json',
+      'memos/artifacts/20261108-weekly-digest-v2/2026-10-26.json',
     ),
     'utf8',
   ),
@@ -66,6 +74,7 @@ describe('WeeklyDigestView', () => {
       ),
     )
     expect(screen.queryAllByTestId('tweet-card')).toHaveLength(0)
+    expect(screen.getByTestId('weekly-map')).toBeInTheDocument()
   })
 
   test('previews the referenced daily story on keyboard focus', async () => {
@@ -107,9 +116,16 @@ describe('WeeklyDigestView', () => {
         ),
       ).not.toBeNull()
     }
+    // Every banger appears once: in a commentary segment or in "More".
+    expect(
+      screen.queryAllByTestId('tweet-card').map((card) => card.textContent),
+    ).toEqual(expect.arrayContaining(story.tweets.map(({ id }) => id)))
     expect(screen.queryAllByTestId('tweet-card')).toHaveLength(
       story.tweets.length,
     )
+    for (const segment of story.segments) {
+      expect(screen.getByText(segment.commentary)).toBeInTheDocument()
+    }
     expect(screen.getByText('← Previous story')).toBeInTheDocument()
   })
 })

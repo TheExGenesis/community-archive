@@ -1,16 +1,25 @@
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import TweetCard from '@/components/TweetCard'
-import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import { DigestRefLink } from '@/components/digest/DigestRefLink'
 import { DigestSubscribeButton } from '@/components/digest/DigestSubscribeButton'
+import { WeeklyConversationMap } from '@/components/digest/WeeklyConversationMap'
+import { WeeklyTrendChart } from '@/components/digest/WeeklyTrendChart'
+import {
+  WeeklyPeopleProvider,
+  WeeklyText,
+} from '@/components/digest/WeeklyText'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import {
   dailyPreviewKey,
+  weeklyPeople,
   weeklyPreviewKey,
+  type WeeklyDigestContent,
   type WeeklyDigestStory,
   type WeeklyRefPreview,
 } from '@/lib/digest/weekly'
 import type { WeeklyDigestEdition } from '@/lib/digest/weeklyData'
+import { WEEKLY_MAP_COLORS, weeklyMapData } from '@/lib/digest/weeklyMap'
 
 type Previews = Record<string, WeeklyRefPreview>
 
@@ -32,6 +41,11 @@ export const weekRangeLabel = (start: string, end: string) =>
 export const weeklyStoryPath = (weekStart: string, slug: string) =>
   `/digest/week/${weekStart}/${slug}`
 
+const plain = (markdown: string) => markdown.replace(/[*_`]/g, '')
+const storyColor = (content: WeeklyDigestContent, slug: string) =>
+  WEEKLY_MAP_COLORS[content.stories.findIndex((item) => item.slug === slug)] ??
+  WEEKLY_MAP_COLORS[0]
+
 const sectionLabel =
   'text-[11.5px] font-bold uppercase tracking-[0.22em] text-zinc-800 dark:text-zinc-200'
 const chip =
@@ -49,11 +63,11 @@ function PreviewCard({ preview }: { preview?: WeeklyRefPreview }) {
         {preview.kicker}
       </div>
       <div className="font-semibold leading-snug" style={SERIF}>
-        <DigestMarkdown allowLinks={false}>{preview.title}</DigestMarkdown>
+        {plain(preview.title)}
       </div>
       {preview.excerpt ? (
         <p className="line-clamp-4 text-[13px] leading-[1.5] text-muted-foreground">
-          <DigestMarkdown allowLinks={false}>{preview.excerpt}</DigestMarkdown>
+          {plain(preview.excerpt)}
         </p>
       ) : null}
     </div>
@@ -70,7 +84,7 @@ function DailyRef({
   digestDate: string
   slug: string
   previews: Previews
-  children: React.ReactNode
+  children: ReactNode
   className?: string
 }) {
   const preview = previews[dailyPreviewKey(digestDate, slug)]
@@ -127,6 +141,9 @@ function KindChips({ story }: { story: WeeklyDigestStory }) {
       {story.continuesFrom.length > 0 ? (
         <span className={chip}>Continuing story</span>
       ) : null}
+      <span>
+        {story.tweets.length} {story.tweets.length === 1 ? 'tweet' : 'tweets'}
+      </span>
     </div>
   )
 }
@@ -157,7 +174,83 @@ function WeekNav({ weekStart, weeks }: { weekStart: string; weeks: string[] }) {
   )
 }
 
-/** The week's front page: summary, then a table of contents of its stories. */
+function SidebarSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="border-t-2 border-zinc-800 pt-3 dark:border-zinc-200">
+      <h2 className={sectionLabel}>{title}</h2>
+      <div className="mt-4">{children}</div>
+    </section>
+  )
+}
+
+function TrendCharts({
+  content,
+  terms,
+  color,
+  note,
+}: {
+  content: WeeklyDigestContent
+  terms: string[]
+  color?: (term: string) => string
+  note?: string
+}) {
+  const trends = content.trends
+  const series = trends
+    ? terms.flatMap((term) => {
+        const found = trends.series.find((item) => item.term === term)
+        return found ? [found] : []
+      })
+    : []
+  if (!trends || series.length === 0) return null
+  return (
+    <SidebarSection title="Trending words">
+      <div className="space-y-5">
+        {series.map((item) => (
+          <WeeklyTrendChart
+            key={item.term}
+            days={trends.days}
+            series={item}
+            weekStart={content.weekStart}
+            color={color?.(item.term)}
+          />
+        ))}
+      </div>
+      <p className={`mt-4 text-[11.5px] leading-[1.5] ${MUTED}`}>
+        {note ??
+          'Daily mentions per 100k archived tweets. The percentage compares this week with the week before.'}{' '}
+        <Link href="/trends" className={navLink}>
+          Explore trends →
+        </Link>
+      </p>
+    </SidebarSection>
+  )
+}
+
+function Page({
+  content,
+  children,
+}: {
+  content: WeeklyDigestContent
+  children: ReactNode
+}) {
+  return (
+    <WeeklyPeopleProvider people={weeklyPeople(content)}>
+      <main className="min-h-screen bg-white dark:bg-[#111114]">
+        <article className="mx-auto w-full max-w-[1180px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12">
+          {children}
+        </article>
+      </main>
+    </WeeklyPeopleProvider>
+  )
+}
+
+/** The week's front page: summary, map, then a table of contents. */
 export function WeeklyDigestView({
   edition,
   weeks,
@@ -168,141 +261,183 @@ export function WeeklyDigestView({
   previews?: Previews
 }) {
   const content = edition.content
+  const range = weekRangeLabel(content.weekStart, content.weekEnd)
+  const map = weeklyMapData(content)
+  const storyTermColor = (term: string) => {
+    const index = content.stories.findIndex((story) =>
+      story.trendTerms.includes(term),
+    )
+    return WEEKLY_MAP_COLORS[index] ?? 'hsl(var(--muted-foreground))'
+  }
+  const sidebarTerms = Array.from(
+    new Set([
+      ...content.stories.flatMap((story) => story.trendTerms.slice(0, 1)),
+      ...(content.trends?.weekTerms ?? []),
+    ]),
+  )
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#111114]">
-      <article className="mx-auto w-full max-w-[880px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12">
-        <header>
-          <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
-            <div className={sectionLabel}>The Week in Review</div>
-            <WeekNav weekStart={edition.weekStart} weeks={weeks} />
-          </div>
-          <h1
-            className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.01em] sm:text-[52px]"
-            style={SERIF}
-          >
-            {weekRangeLabel(content.weekStart, content.weekEnd)}
-          </h1>
-          <p className={`mt-3 text-sm ${MUTED}`}>
-            Woven from {content.source.editionDates.length} daily{' '}
-            {content.source.editionDates.length === 1 ? 'edition' : 'editions'}
-            {content.source.missingDates.length > 0
-              ? ` (no edition on ${content.source.missingDates
-                  .map((date) => dayLabel(date, { weekday: 'long' }))
-                  .join(', ')})`
-              : ''}
-            .
-          </p>
-          <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
-          <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
-          <ul
-            className="mt-7 max-w-[70ch] list-disc space-y-2.5 pl-6 text-lg italic leading-[1.55] text-zinc-700 marker:text-zinc-400 dark:text-zinc-300 dark:marker:text-zinc-600 sm:text-[20px]"
-            style={SERIF}
-          >
-            {content.executiveSummary.map((bullet) => (
-              <li key={bullet} className="pl-1 [text-wrap:pretty]">
-                <DigestMarkdown>{bullet}</DigestMarkdown>
-              </li>
-            ))}
-          </ul>
-          <DigestSubscribeButton placement="digest" />
-        </header>
+    <Page content={content}>
+      <header className="max-w-[880px]">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
+          <div className={sectionLabel}>The Week in Review</div>
+          <WeekNav weekStart={edition.weekStart} weeks={weeks} />
+        </div>
+        <h1
+          className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.01em] sm:text-[52px]"
+          style={SERIF}
+        >
+          {range}
+        </h1>
+        <p className={`mt-3 text-sm ${MUTED}`}>
+          Woven from {content.source.editionDates.length} daily{' '}
+          {content.source.editionDates.length === 1 ? 'edition' : 'editions'}
+          {content.source.missingDates.length > 0
+            ? ` (no edition on ${content.source.missingDates
+                .map((date) => dayLabel(date, { weekday: 'long' }))
+                .join(', ')})`
+            : ''}
+          .
+        </p>
+        <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
+        <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
+        <ul
+          className="mt-7 max-w-[70ch] list-disc space-y-2.5 pl-6 text-lg italic leading-[1.55] text-zinc-700 marker:text-zinc-400 dark:text-zinc-300 dark:marker:text-zinc-600 sm:text-[20px]"
+          style={SERIF}
+        >
+          {content.executiveSummary.map((bullet) => (
+            <li key={bullet} className="pl-1 [text-wrap:pretty]">
+              <WeeklyText>{bullet}</WeeklyText>
+            </li>
+          ))}
+        </ul>
+      </header>
 
-        <section aria-labelledby="weekly-contents" className="mt-12">
-          <h2
-            id="weekly-contents"
-            className={`${sectionLabel} border-t-2 border-zinc-800 pt-3 dark:border-zinc-200`}
-          >
-            In this issue
-          </h2>
-          <ol className="mt-2">
-            {content.stories.map((story, index) => (
-              <li
-                key={story.slug}
-                id={story.slug}
-                className="grid grid-cols-[2.25rem_1fr] gap-x-3 border-b border-zinc-200 py-6 last:border-b-0 dark:border-zinc-800 sm:grid-cols-[3rem_1fr]"
-              >
-                <span
-                  aria-hidden
-                  className="text-[30px] font-semibold leading-none text-zinc-300 dark:text-zinc-600 sm:text-[38px]"
-                  style={SERIF}
+      <section aria-labelledby="weekly-map" className="mt-10">
+        <h2
+          id="weekly-map"
+          className={`${sectionLabel} border-t-2 border-zinc-800 pt-3 dark:border-zinc-200`}
+        >
+          The week&apos;s conversations
+        </h2>
+        <div className="mt-4">
+          <WeeklyConversationMap
+            data={map}
+            label={`Conversation map for ${range}`}
+            legend={content.stories.map((story, index) => ({
+              title: `${index + 1}. ${plain(story.title).slice(0, 48)}${plain(story.title).length > 48 ? '…' : ''}`,
+              color: WEEKLY_MAP_COLORS[index],
+            }))}
+          />
+        </div>
+      </section>
+
+      <div className="mt-10 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0">
+          <section aria-labelledby="weekly-contents">
+            <h2
+              id="weekly-contents"
+              className={`${sectionLabel} border-t-2 border-zinc-800 pt-3 dark:border-zinc-200`}
+            >
+              In this issue
+            </h2>
+            <ol className="mt-2">
+              {content.stories.map((story, index) => (
+                <li
+                  key={story.slug}
+                  id={story.slug}
+                  className="grid grid-cols-[2.25rem_1fr] gap-x-3 border-b border-zinc-200 py-6 last:border-b-0 dark:border-zinc-800 sm:grid-cols-[3rem_1fr]"
                 >
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <KindChips story={story} />
-                  <h3
-                    className="mt-3 text-[23px] font-semibold leading-[1.2] [text-wrap:pretty] sm:text-[27px]"
-                    style={SERIF}
+                  <span
+                    aria-hidden
+                    className="text-[30px] font-semibold leading-none sm:text-[38px]"
+                    style={{ ...SERIF, color: WEEKLY_MAP_COLORS[index] }}
                   >
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <KindChips story={story} />
+                    <h3
+                      className="mt-3 text-[23px] font-semibold leading-[1.2] [text-wrap:pretty] sm:text-[27px]"
+                      style={SERIF}
+                    >
+                      <Link
+                        href={weeklyStoryPath(edition.weekStart, story.slug)}
+                        className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      >
+                        {plain(story.title)}
+                      </Link>
+                    </h3>
+                    <p className="mt-2 leading-[1.6] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300">
+                      <WeeklyText>{story.overview}</WeeklyText>
+                    </p>
+                    <p className={`mt-3 text-[13px] leading-[1.7] ${MUTED}`}>
+                      {story.dailyStories.map((ref, refIndex) => (
+                        <span key={`${ref.digestDate}-${ref.slug}`}>
+                          {refIndex > 0 ? ' · ' : ''}
+                          <DailyRef
+                            digestDate={ref.digestDate}
+                            slug={ref.slug}
+                            previews={previews}
+                          >
+                            {shortDay(ref.digestDate)}
+                          </DailyRef>
+                        </span>
+                      ))}
+                      {story.continuesFrom.length > 0 ? (
+                        <>
+                          {' — '}
+                          <ContinuesFrom story={story} previews={previews} />
+                        </>
+                      ) : null}
+                    </p>
                     <Link
                       href={weeklyStoryPath(edition.weekStart, story.slug)}
-                      className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      className={`mt-3 inline-block text-sm font-semibold ${navLink}`}
                     >
-                      <DigestMarkdown allowLinks={false}>
-                        {story.title}
-                      </DigestMarkdown>
+                      Read the story →
                     </Link>
-                  </h3>
-                  <p className="mt-2 leading-[1.55] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300">
-                    <DigestMarkdown>{story.subtitle}</DigestMarkdown>
-                  </p>
-                  <p className={`mt-3 text-[13px] leading-[1.7] ${MUTED}`}>
-                    {story.dailyStories.map((ref, refIndex) => (
-                      <span key={`${ref.digestDate}-${ref.slug}`}>
-                        {refIndex > 0 ? ' · ' : ''}
-                        <DailyRef
-                          digestDate={ref.digestDate}
-                          slug={ref.slug}
-                          previews={previews}
-                        >
-                          {shortDay(ref.digestDate)}
-                        </DailyRef>
-                      </span>
-                    ))}
-                    {story.continuesFrom.length > 0 ? (
-                      <>
-                        {' — '}
-                        <ContinuesFrom story={story} previews={previews} />
-                      </>
-                    ) : null}
-                  </p>
-                  <Link
-                    href={weeklyStoryPath(edition.weekStart, story.slug)}
-                    className={`mt-3 inline-block text-sm font-semibold ${navLink}`}
-                  >
-                    Read the story →
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        {content.alsoNotable.length > 0 ? (
-          <section className="mt-6 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
-            <h2 className={sectionLabel}>Also this week</h2>
-            <ul className="mt-5 space-y-3 leading-[1.6]">
-              {content.alsoNotable.map((item) => (
-                <li
-                  key={`${item.dailyStory.digestDate}-${item.dailyStory.slug}`}
-                >
-                  <DigestMarkdown>{item.line}</DigestMarkdown>{' '}
-                  <DailyRef
-                    digestDate={item.dailyStory.digestDate}
-                    slug={item.dailyStory.slug}
-                    previews={previews}
-                    className={`text-[13px] ${refLink}`}
-                  >
-                    {shortDay(item.dailyStory.digestDate)} →
-                  </DailyRef>
+                  </div>
                 </li>
               ))}
-            </ul>
+            </ol>
           </section>
-        ) : null}
-      </article>
-    </main>
+
+          {content.alsoNotable.length > 0 ? (
+            <section className="mt-6 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
+              <h2 className={sectionLabel}>Also this week</h2>
+              <ul className="mt-5 space-y-3 leading-[1.6]">
+                {content.alsoNotable.map((item) => (
+                  <li
+                    key={`${item.dailyStory.digestDate}-${item.dailyStory.slug}`}
+                  >
+                    <WeeklyText>{item.line}</WeeklyText>{' '}
+                    <DailyRef
+                      digestDate={item.dailyStory.digestDate}
+                      slug={item.dailyStory.slug}
+                      previews={previews}
+                      className={`text-[13px] ${refLink}`}
+                    >
+                      {shortDay(item.dailyStory.digestDate)} →
+                    </DailyRef>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          <DigestSubscribeButton placement="digest" />
+        </div>
+
+        <aside className="space-y-10 lg:sticky lg:top-20 lg:self-start">
+          <TrendCharts
+            content={content}
+            terms={sidebarTerms}
+            color={storyTermColor}
+            note="Daily mentions per 100k archived tweets: one word per story (in its colour) and the words the daily editions flagged as rising or falling. The percentage compares this week with the week before."
+          />
+        </aside>
+      </div>
+    </Page>
   )
 }
 
@@ -322,149 +457,184 @@ export function WeeklyStoryView({
   const previous = index > 0 ? stories[index - 1] : null
   const next = index < stories.length - 1 ? stories[index + 1] : null
   const returnTo = weeklyStoryPath(edition.weekStart, story.slug)
+  const color = storyColor(content, story.slug)
+  const byId = new Map(story.tweets.map((tweet) => [tweet.id, tweet]))
+  const placed = new Set(story.segments.flatMap(({ tweetIds }) => tweetIds))
+  const rest = story.tweets.filter(({ id }) => !placed.has(id))
+  const map = weeklyMapData(content, [story], { titleLabels: false })
+
+  const tweetCard = (id: string) => {
+    const tweet = byId.get(id)
+    return tweet ? (
+      <TweetCard
+        key={id}
+        tweet={tweet}
+        variant="editorial"
+        collapsible
+        showDate
+        origin="digest"
+        returnTo={returnTo}
+      />
+    ) : null
+  }
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#111114]">
-      <article className="mx-auto w-full max-w-[880px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12">
-        <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-3 dark:border-zinc-200">
-          <Link
-            href={`/digest/week/${edition.weekStart}`}
-            className="rounded-sm text-sm font-semibold text-muted-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    <Page content={content}>
+      <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-3 dark:border-zinc-200">
+        <Link
+          href={`/digest/week/${edition.weekStart}`}
+          className="rounded-sm text-sm font-semibold text-muted-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          ← The Week in Review,{' '}
+          {weekRangeLabel(content.weekStart, content.weekEnd)}
+        </Link>
+        <span className={`text-xs ${MUTED}`}>
+          Story {index + 1} of {stories.length}
+        </span>
+      </div>
+
+      <div className="mt-9 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 max-w-[760px]">
+          <header>
+            <KindChips story={story} />
+            <h1
+              className="mt-4 text-[32px] font-semibold leading-[1.12] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
+              style={SERIF}
+            >
+              {plain(story.title)}
+            </h1>
+            <p className="mt-5 text-lg leading-[1.6] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200 sm:text-[19px]">
+              <WeeklyText>{story.overview}</WeeklyText>
+            </p>
+            {story.connection ? (
+              <p className={`mt-5 text-[15px] leading-[1.6] ${MUTED}`}>
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                  How these connect.{' '}
+                </span>
+                <WeeklyText>{story.connection}</WeeklyText>
+              </p>
+            ) : null}
+            {story.continuesFrom.length > 0 ? (
+              <p className={`mt-3 text-[15px] leading-[1.6] ${MUTED}`}>
+                <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                  <ContinuesFrom story={story} previews={previews} />.{' '}
+                </span>
+                {story.continuityNote ? (
+                  <WeeklyText>{story.continuityNote}</WeeklyText>
+                ) : null}
+              </p>
+            ) : null}
+          </header>
+
+          {map.annotations.length > 1 ? (
+            <section
+              aria-label="This story on the conversation map"
+              className="mt-8"
+            >
+              <WeeklyConversationMap
+                data={map}
+                label={`Conversation map for “${plain(story.title)}”`}
+              />
+            </section>
+          ) : null}
+
+          <div className="mt-8 space-y-9">
+            {story.segments.map((segment, segmentIndex) => (
+              <section key={segmentIndex} className="space-y-4">
+                <p
+                  className="border-l-[3px] pl-4 text-[17px] leading-[1.6] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200"
+                  style={{ borderColor: color }}
+                >
+                  <WeeklyText>{segment.commentary}</WeeklyText>
+                </p>
+                <div className="space-y-4">
+                  {segment.tweetIds.map(tweetCard)}
+                </div>
+              </section>
+            ))}
+          </div>
+
+          {rest.length > 0 ? (
+            <section className="mt-12 border-t-2 border-zinc-800 pt-5 dark:border-zinc-200">
+              <h2 className={sectionLabel}>More from the daily coverage</h2>
+              <div className="mt-5 space-y-4">
+                {rest.map(({ id }) => tweetCard(id))}
+              </div>
+            </section>
+          ) : null}
+
+          <nav
+            aria-label="Other stories this week"
+            className="mt-12 grid gap-4 border-t border-zinc-300 pt-5 dark:border-zinc-700 sm:grid-cols-2"
           >
-            ← The Week in Review,{' '}
-            {weekRangeLabel(content.weekStart, content.weekEnd)}
-          </Link>
-          <span className={`text-xs ${MUTED}`}>
-            Story {index + 1} of {stories.length}
-          </span>
+            {previous ? (
+              <Link
+                href={weeklyStoryPath(edition.weekStart, previous.slug)}
+                className="group rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <div className={`text-xs uppercase tracking-[0.16em] ${MUTED}`}>
+                  ← Previous story
+                </div>
+                <div
+                  className="mt-1 font-semibold leading-snug group-hover:text-brand"
+                  style={SERIF}
+                >
+                  {plain(previous.title)}
+                </div>
+              </Link>
+            ) : (
+              <span />
+            )}
+            {next ? (
+              <Link
+                href={weeklyStoryPath(edition.weekStart, next.slug)}
+                className="group rounded-sm text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <div className={`text-xs uppercase tracking-[0.16em] ${MUTED}`}>
+                  Next story →
+                </div>
+                <div
+                  className="mt-1 font-semibold leading-snug group-hover:text-brand"
+                  style={SERIF}
+                >
+                  {plain(next.title)}
+                </div>
+              </Link>
+            ) : null}
+          </nav>
         </div>
 
-        <header className="mt-9">
-          <KindChips story={story} />
-          <h1
-            className="mt-4 text-[32px] font-semibold leading-[1.12] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
-            style={SERIF}
-          >
-            <DigestMarkdown allowLinks={false}>{story.title}</DigestMarkdown>
-          </h1>
-          <p className="mt-4 text-lg leading-[1.55] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300 sm:text-xl">
-            <DigestMarkdown>{story.subtitle}</DigestMarkdown>
-          </p>
-        </header>
-
-        <ul className="mt-7 list-disc space-y-2.5 pl-6 text-[17px] leading-[1.6] marker:text-zinc-400">
-          {story.bullets.map((bullet) => (
-            <li key={bullet}>
-              <DigestMarkdown>{bullet}</DigestMarkdown>
-            </li>
-          ))}
-        </ul>
-
-        {story.connection ? (
-          <p className={`mt-6 text-[15px] leading-[1.6] ${MUTED}`}>
-            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-              How these connect.{' '}
-            </span>
-            <DigestMarkdown>{story.connection}</DigestMarkdown>
-          </p>
-        ) : null}
-        {story.continuesFrom.length > 0 ? (
-          <p className={`mt-3 text-[15px] leading-[1.6] ${MUTED}`}>
-            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-              <ContinuesFrom story={story} previews={previews} />.{' '}
-            </span>
-            {story.continuityNote ? (
-              <DigestMarkdown>{story.continuityNote}</DigestMarkdown>
-            ) : null}
-          </p>
-        ) : null}
-
-        <section className="mt-10 border-t-2 border-zinc-800 pt-5 dark:border-zinc-200">
-          <h2 className={sectionLabel}>Daily coverage</h2>
-          <ul className="mt-4 space-y-3">
-            {story.dailyStories.map((ref) => (
-              <li
-                key={`${ref.digestDate}-${ref.slug}`}
-                className="grid grid-cols-[6.5rem_1fr] gap-3 leading-[1.5]"
-              >
-                <span className={`text-[13px] ${MUTED}`}>
-                  {shortDay(ref.digestDate)}
-                </span>
-                <DailyRef
-                  digestDate={ref.digestDate}
-                  slug={ref.slug}
-                  previews={previews}
+        <aside className="space-y-10 lg:sticky lg:top-20 lg:self-start">
+          <SidebarSection title="Daily coverage">
+            <ul className="space-y-3">
+              {story.dailyStories.map((ref) => (
+                <li
+                  key={`${ref.digestDate}-${ref.slug}`}
+                  className="text-[14px] leading-[1.45]"
                 >
-                  <DigestMarkdown allowLinks={false}>
-                    {ref.title}
-                  </DigestMarkdown>
-                </DailyRef>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {story.tweets.length > 0 ? (
-          <section className="mt-10 border-t-2 border-zinc-800 pt-5 dark:border-zinc-200">
-            <h2 className={sectionLabel}>From the timeline</h2>
-            <div className="mt-5 space-y-5">
-              {story.tweets.map((tweet) => (
-                <TweetCard
-                  key={tweet.id}
-                  tweet={tweet}
-                  variant="editorial"
-                  collapsible
-                  showDate
-                  origin="digest"
-                  returnTo={returnTo}
-                />
+                  <div
+                    className={`text-[11.5px] uppercase tracking-[0.12em] ${MUTED}`}
+                  >
+                    {shortDay(ref.digestDate)}
+                  </div>
+                  <DailyRef
+                    digestDate={ref.digestDate}
+                    slug={ref.slug}
+                    previews={previews}
+                  >
+                    {plain(ref.title)}
+                  </DailyRef>
+                </li>
               ))}
-            </div>
-          </section>
-        ) : null}
-
-        <nav
-          aria-label="Other stories this week"
-          className="mt-12 grid gap-4 border-t border-zinc-300 pt-5 dark:border-zinc-700 sm:grid-cols-2"
-        >
-          {previous ? (
-            <Link
-              href={weeklyStoryPath(edition.weekStart, previous.slug)}
-              className="group rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              <div className={`text-xs uppercase tracking-[0.16em] ${MUTED}`}>
-                ← Previous story
-              </div>
-              <div
-                className="mt-1 font-semibold leading-snug group-hover:text-brand"
-                style={SERIF}
-              >
-                <DigestMarkdown allowLinks={false}>
-                  {previous.title}
-                </DigestMarkdown>
-              </div>
-            </Link>
-          ) : (
-            <span />
-          )}
-          {next ? (
-            <Link
-              href={weeklyStoryPath(edition.weekStart, next.slug)}
-              className="group rounded-sm text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              <div className={`text-xs uppercase tracking-[0.16em] ${MUTED}`}>
-                Next story →
-              </div>
-              <div
-                className="mt-1 font-semibold leading-snug group-hover:text-brand"
-                style={SERIF}
-              >
-                <DigestMarkdown allowLinks={false}>{next.title}</DigestMarkdown>
-              </div>
-            </Link>
-          ) : null}
-        </nav>
-      </article>
-    </main>
+            </ul>
+          </SidebarSection>
+          <TrendCharts
+            content={content}
+            terms={story.trendTerms}
+            color={() => color}
+          />
+        </aside>
+      </div>
+    </Page>
   )
 }

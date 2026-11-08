@@ -7,6 +7,7 @@ import {
   type WeeklyDigestContent,
   type WeeklySourceEdition,
 } from '@/lib/digest/weekly'
+import { snapshotWeeklyTrends } from '@/lib/digest/weeklyTrends'
 import {
   generateWeeklyDigest,
   WEEKLY_DIGEST_MODEL,
@@ -79,6 +80,7 @@ export async function publishWeeklyDigest(
     workflowRunId?: string
     db?: WeeklyDigestDb
     generate?: typeof generateWeeklyDigest
+    snapshotTrends?: typeof snapshotWeeklyTrends
   } = {},
 ) {
   const weekStart = weekStartFor(
@@ -88,6 +90,7 @@ export async function publishWeeklyDigest(
   const dryRun = options.dryRun === true
   const db = options.db ?? new SupabaseRest()
   const generate = options.generate ?? generateWeeklyDigest
+  const snapshotTrends = options.snapshotTrends ?? snapshotWeeklyTrends
   const workflowRunId = options.workflowRunId ?? automatedWorkflowId(weekStart)
 
   if (!dryRun) {
@@ -202,7 +205,17 @@ export async function publishWeeklyDigest(
   })
 
   try {
-    const result = await generate({ weekStart, editions, priorWeeks })
+    const generated = await generate({ weekStart, editions, priorWeeks })
+    const result = {
+      ...generated,
+      content: await snapshotTrends(
+        generated.content,
+        editions,
+        undefined,
+        (message, error) =>
+          log(message, { weekStart, error: describeError(error) }),
+      ),
+    }
     const durationMs = Date.now() - startedAt.getTime()
     const tokens = (key: 'inputTokens' | 'outputTokens') =>
       result.attempts.reduce((sum, attempt) => sum + (attempt[key] ?? 0), 0)

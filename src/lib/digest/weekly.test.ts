@@ -7,6 +7,7 @@ import {
   weekDates,
   weekStartFor,
   weeklyDigestToMarkdown,
+  weeklyPeople,
   type WeeklyDigestContent,
   type WeeklySourceEdition,
 } from './weekly'
@@ -76,14 +77,15 @@ const priorWeek: WeeklyDigestContent = {
       slug: 'neurons-are-clean',
       kind: 'ongoing',
       title: 'Neurons are already clean',
-      subtitle: 'subtitle',
-      bullets: ['b'],
+      overview: 'overview',
       connection: '',
       continuityNote: '',
       continuesFrom: [],
       dailyStories: [],
       days: ['2026-10-13', '2026-10-15'],
+      segments: [],
       tweets: [],
+      trendTerms: [],
     },
   ],
   alsoNotable: [],
@@ -107,9 +109,13 @@ const validOutput = {
     {
       kind: 'ongoing',
       title: 'From a green neuron to a persona-neuron library',
-      subtitle:
-        'Researchers built on one another across the week, from a joke find to a searchable library.',
-      bullets: ['Mon: a green neuron.', 'Wed: a persona library.'],
+      overview:
+        'Researchers built on one another across the week, from a joke find by @user_1 to a searchable library.',
+      segments: [
+        { commentary: 'It started with a joke find.', tweet_ids: ['1'] },
+        { commentary: 'Two days later it was a library.', tweet_ids: ['3'] },
+      ],
+      trend_terms: ['Neurons', 'neurons'],
       connection:
         'The persona library author credits the green-neuron post as the inspiration.',
       daily_refs: ['2026-10-26#1', '2026-10-28#1'],
@@ -120,9 +126,12 @@ const validOutput = {
     {
       kind: 'major',
       title: 'Binance reportedly hacked for $5.6 billion',
-      subtitle:
+      overview:
         'The largest reported theft of the week drew questions about exchange custody.',
-      bullets: ['Fri: the hack was reported.'],
+      segments: [
+        { commentary: 'The first report came on Friday.', tweet_ids: ['4'] },
+      ],
+      trend_terms: [] as string[],
       connection: '',
       daily_refs: ['2026-10-30#1'],
       continues_from: [],
@@ -131,9 +140,10 @@ const validOutput = {
     {
       kind: 'major',
       title: 'Only a good guy with a swarm can stop a bad guy with one',
-      subtitle:
+      overview:
         'A defensive-security argument that agents must defend against agents.',
-      bullets: ['Mon: the argument went viral.'],
+      segments: [{ commentary: 'The argument went viral.', tweet_ids: ['2'] }],
+      trend_terms: [] as string[],
       connection: 'ignored for one source',
       daily_refs: ['2026-10-26#2'],
       continues_from: [],
@@ -221,6 +231,11 @@ describe('assembleWeeklyDigestContent', () => {
       'persona-neurons',
     ])
     expect(ongoing.tweets.map(({ id }) => id)).toEqual(['1', '3'])
+    expect(ongoing.segments.map(({ tweetIds }) => tweetIds)).toEqual([
+      ['1'],
+      ['3'],
+    ])
+    expect(ongoing.trendTerms).toEqual(['neurons'])
     expect(ongoing.continuesFrom).toEqual([
       {
         weekStart: '2026-10-12',
@@ -233,6 +248,79 @@ describe('assembleWeeklyDigestContent', () => {
     expect(weeklyDigestToMarkdown(content)).toContain(
       '/digest/2026-10-28/persona-neurons',
     )
+    expect(weeklyPeople(content).map(({ username }) => username)).toEqual([
+      'user_1',
+      'user_3',
+      'user_4',
+      'user_2',
+    ])
+  })
+
+  it('carries every banger of the cited daily stories', () => {
+    const extra = editions.map((item) =>
+      item.digestDate === '2026-10-30'
+        ? edition('2026-10-30', [
+            {
+              ...story('binance', 'Binance hacked', '4'),
+              bangers: [tweet('4'), tweet('5'), tweet('6')],
+            },
+          ])
+        : item,
+    )
+    const content = assembleWeeklyDigestContent({
+      weekStart: WEEK,
+      editions: extra,
+      priorWeeks: [priorWeek],
+      modelOutput: validOutput,
+    })
+    expect(content.stories[1].tweets.map(({ id }) => id)).toEqual([
+      '4',
+      '5',
+      '6',
+    ])
+  })
+
+  it('rejects segment tweets from other stories and repeated tweets', () => {
+    const output = structuredClone(validOutput)
+    output.stories[1].segments = [
+      { commentary: 'Wrong story tweet here.', tweet_ids: ['1', '4', '4'] },
+    ]
+    expect(() => assemble(output)).toThrow(
+      /contains 1, which is not a tweet.*repeats tweet 4/,
+    )
+  })
+
+  it('caps stories built only from AI news', () => {
+    const many = [1, 2, 3, 4].map((n) =>
+      edition(`2026-10-${26 + n - 1}`, [
+        story(`ai-${n}`, `AI story ${n}`, `a${n}`),
+      ]),
+    )
+    const output = {
+      executive_summary: summary,
+      stories: many.map((item, index) => ({
+        kind: 'major',
+        title: `AI story number ${index + 1}`,
+        overview: 'An AI story that took over the timeline this week, again.',
+        connection: '',
+        daily_refs: [`${item.digestDate}#1`],
+        continues_from: [],
+        continuity_note: '',
+        segments: [
+          { commentary: 'This happened.', tweet_ids: [`a${index + 1}`] },
+        ],
+        trend_terms: [],
+      })),
+      also_notable: [],
+    }
+    expect(() =>
+      assembleWeeklyDigestContent({
+        weekStart: WEEK,
+        editions: many,
+        priorWeeks: [],
+        modelOutput: output,
+      }),
+    ).toThrow('keep at most 3')
   })
 
   it('rejects unknown refs, reused refs and single-day ongoing stories', () => {

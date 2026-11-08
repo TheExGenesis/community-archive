@@ -55,6 +55,7 @@ describe('site navigation', () => {
         ['Ask the archive', '/search/ask'],
         ['Explore by user', '/user-dir'],
         ['Live Stream', '/stream'],
+        ['The Week in Review', '/digest/week'],
       ],
       Tools: [
         ['Bangers', '/bangers?period=week'],

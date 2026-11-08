@@ -153,6 +153,7 @@ export type NavIcon =
   | 'map'
   | 'tube'
   | 'ask'
+  | 'week'
 
 export interface NavMenuItem extends NavItem {
   description: string
@@ -202,6 +203,12 @@ export const getPrimaryNav = (): NavEntry[] => [
         description:
           "Watch tweets arrive from the community's browser extensions.",
         icon: 'stream',
+      },
+      {
+        href: '/digest/week',
+        label: 'The Week in Review',
+        description: "The week's top stories, woven from the daily digests.",
+        icon: 'week',
       },
     ],
   },

@@ -49,10 +49,13 @@ export function parseWeeklyDigestContent(
     alsoNotable: Array.isArray(content.alsoNotable) ? content.alsoNotable : [],
     stories: content.stories.map((story) => ({
       ...story,
+      overview: story.overview ?? '',
       continuesFrom: story.continuesFrom ?? [],
       dailyStories: story.dailyStories ?? [],
       days: story.days ?? [],
+      segments: story.segments ?? [],
       tweets: story.tweets ?? [],
+      trendTerms: story.trendTerms ?? [],
     })),
   }
 }
@@ -158,7 +161,7 @@ export async function loadWeeklyRefPreviews(
         previews[weeklyPreviewKey(weekStart, story.slug)] = {
           kicker: `Week of ${previewDay(weekStart).replace(/^\w+ /, '')}`,
           title: story.title,
-          excerpt: story.subtitle || story.bullets[0] || '',
+          excerpt: story.overview,
         }
       }
     }),

@@ -1,0 +1,1645 @@
+{
+  "weekStart": "2026-10-26",
+  "weekEnd": "2026-11-01",
+  "generatedAt": "2026-11-08T16:57:03.214Z",
+  "executiveSummary": [
+    "OpenAI said its models proved the Exponential Time Hypothesis false and found new math and physics results, and outside experts are now organizing independent review.",
+    "Community researchers spent all week reading and steering single neurons in Qwen, moving from a 'humble muffin' to a full database of every neuron in two models.",
+    "Anthropic filed to go public with a startling insurance risk factor, Binance reportedly lost $5.6B to hackers, and Patrick Stewart died at 86."
+  ],
+  "stories": [
+    {
+      "slug": "openai-claims-its-models-refuted-the-exponential-time-hypothesis-and-found-new-k",
+      "kind": "major",
+      "title": "OpenAI claims its models refuted the Exponential Time Hypothesis and found new Kakeya and QCD results; roon: 'and then losing'",
+      "overview": "OpenAI announced three AI-produced discoveries: a local smoothing result tied to the Kakeya conjecture, a Lean-verified refutation of the Exponential Time Hypothesis, and results on the existence of QCD. Complexity theorists were asked to run an open review of the ETH claim. Reactions ranged from awe to calls that the result was 'somewhat deflationary,' and @tszzl used the announcement to predict how humans would lose control of an intelligence explosion. These are claims still under verification, but they were the week's biggest AI science story.",
+      "connection": "@tszzl's 'bits and atoms' post directly quoted @danintheory's announcement of OpenAI's three discoveries, and the next day's discussion folded in Axiom's own Lean formalization milestone.",
+      "continuityNote": "Two weeks ago the fight was over OpenAI's flood of AI math manuscripts; this week OpenAI claimed a headline refutation of a major complexity conjecture and handed it to outside experts to check.",
+      "continuesFrom": [
+        {
+          "weekStart": "2026-10-12",
+          "slug": "they-have-annihilated-my-field-of-research-claude-found-the-seeds-ai-math-result",
+          "title": "\"They have annihilated my field of research\" / \"CLAUDE FOUND THE SEEDS\": AI math results from OpenAI and Anthropic"
+        }
+      ],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-27",
+          "slug": "the-exponential-time-hypothesis-is-false",
+          "title": "The Exponential Time Hypothesis is false."
+        },
+        {
+          "digestDate": "2026-10-28",
+          "slug": "wow-i-didn-t-know-you-could-do-that-with-mere-bits-and-atoms",
+          "title": "wow I didn't know you could DO that with mere bits and atoms"
+        }
+      ],
+      "days": [
+        "2026-10-27",
+        "2026-10-28"
+      ],
+      "segments": [
+        {
+          "commentary": "The announcement came from OpenAI's own leadership and researchers, framed as three discoveries in three fields.",
+          "tweetIds": [
+            "2114837059462627533",
+            "2114833682469122314"
+          ]
+        },
+        {
+          "commentary": "The ETH claim drew the most attention, and @AndrewCurran_'s blunt one-liner became the meme version of the news.",
+          "tweetIds": [
+            "2114836647821107422",
+            "2114836071028785289",
+            "2114833687296847930"
+          ]
+        },
+        {
+          "commentary": "What gave the claim weight was @rrwilliams saying he, Impagliazzo and Paturi would organize an open, independent examination.",
+          "tweetIds": [
+            "2114833319431209352"
+          ]
+        },
+        {
+          "commentary": "The next day @tszzl read it as a preview of losing control, while Axiom showed formal verification scaling to a 15,000-page proof.",
+          "tweetIds": [
+            "2114962843921678444",
+            "2115089794867040584"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2114837059462627533",
+          "rts": 1765,
+          "name": "Greg Brockman",
+          "text": "Announcing three major scientific discoveries, one each in mathematics (harmonic analysis), computer science (complexity theory), and physics (quantum field theory).\n\nAI starting to help us improve our understanding of the universe! https://t.co/VkfacopR2R",
+          "likes": 10544,
+          "avatar": "https://pbs.twimg.com/profile_images/1347621377503711233/bHg3ipfD_normal.jpg",
+          "username": "gdb",
+          "accountId": "162124540",
+          "createdAt": "2026-10-26T21:50:21.000Z",
+          "observedAt": "2026-10-27T07:13:45.868Z",
+          "quoteCount": 7
+        },
+        {
+          "id": "2114836071028785289",
+          "rts": 327,
+          "name": "Andrew Curran",
+          "text": "OpenAI has announced to three new discoveries in mathematics, computer science, and physics:\n- Local smoothing and the Kakeya conjecture\n- The Exponential Time Hypothesis is false\n- Existence of quantum chromodynamics and completions of the Standard Model https://t.co/FIgVlNIEyY",
+          "likes": 2234,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVloMu2aYAAYX5k.jpg",
+              "type": "photo",
+              "width": 1080,
+              "height": 753
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
+          "username": "AndrewCurran_",
+          "accountId": "1538525334781370368",
+          "createdAt": "2026-10-26T21:46:25.000Z",
+          "observedAt": "2026-10-27T07:24:05.380Z",
+          "quoteCount": 4
+        },
+        {
+          "id": "2114836647821107422",
+          "rts": 145,
+          "name": "Andrew Curran",
+          "text": "The Exponential Time Hypothesis is false. https://t.co/zkvLFeUo8K",
+          "likes": 857,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVlouN9bgAA6K9x.jpg",
+              "type": "photo",
+              "width": 1080,
+              "height": 1851
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
+          "username": "AndrewCurran_",
+          "accountId": "1538525334781370368",
+          "createdAt": "2026-10-26T21:48:43.000Z",
+          "observedAt": "2026-10-27T06:47:48.644Z",
+          "quoteCount": 7
+        },
+        {
+          "id": "2114833682469122314",
+          "rts": 1245,
+          "name": "Dan Roberts",
+          "text": "We are announcing three new discoveries in mathematics, computer science, and physics about harmonic analysis, complexity theory, and quantum field theory.\n\nhttps://t.co/9BX8HWQDTJ",
+          "likes": 5278,
+          "avatar": "https://pbs.twimg.com/profile_images/450003768709353472/Nod6R8y0_normal.jpeg",
+          "username": "danintheory",
+          "accountId": "45825798",
+          "createdAt": "2026-10-26T21:36:56.000Z",
+          "observedAt": "2026-10-27T07:29:05.902Z",
+          "quoteCount": 6
+        },
+        {
+          "id": "2114833319431209352",
+          "rts": 468,
+          "name": "Ryan Williams @rrwilliams.bsky.social",
+          "text": "An internal model at OpenAI has produced a claimed refutation of ETH! Russell Impagliazzo, Mohan Paturi, and I have been asked to help organize an open and independent examination of this claim. 1/4",
+          "likes": 2437,
+          "avatar": "https://pbs.twimg.com/profile_images/1587257679726133248/En7AKJHO_normal.jpg",
+          "username": "rrwilliams",
+          "accountId": "14594687",
+          "createdAt": "2026-10-26T21:35:29.000Z",
+          "observedAt": "2026-10-27T03:47:31.574Z",
+          "quoteCount": 4
+        },
+        {
+          "id": "2114833687296847930",
+          "rts": 116,
+          "name": "Dan Roberts",
+          "text": "The computer science collaboration will understand and explain a result concerning the Exponential Time Hypothesis (ETH), a longstanding conjecture about the computational complexity of Boolean formula satisfiability, a problem deeply related to the P vs. NP problem.\n\nSurprisingly, our system has recently proved that the ETH is false, a result that was subsequently verified in Lean.\n\nThe refutation of the ETH reopens questions about how much faster these tasks could become, and may help guide the search for better algorithms. Finding such algorithms, and turning theoretical advances into practical improvements, will require significant further research.\n\nOur system found its natural language disproof for the ETH we reached out to to @rrwilliams. Ryan will form a collaboration with Russell Impagliazzo and Ramamohan Paturi to verify and shepherd this result. Impagliazzo and Paturi, along with Francis Zane, are the original proposers of the Exponential Time Hypothesis, and Williams has refuted strong versions of the ETH, used ETH for hardness results, and connected algorithms and lower bounds.\n\nThis group asked us to make all raw data of the results public to facilitate independent verification by the community, which we have done by posting the natural language proof and Lean formalization to our GitHub repo. The group also invites the community to help organize an open examination of the ETH claim and to discuss the broader questions that AI-generated breakthroughs raise about verification, access, credit, and the future of research.\n\nhttps://t.co/fkLJX9a2Zi",
+          "likes": 425,
+          "avatar": "https://pbs.twimg.com/profile_images/450003768709353472/Nod6R8y0_normal.jpeg",
+          "username": "danintheory",
+          "accountId": "45825798",
+          "createdAt": "2026-10-26T21:36:57.000Z",
+          "observedAt": "2026-10-27T03:47:31.574Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2114962843921678444",
+          "rts": 82,
+          "name": "roon",
+          "text": "fighting for control over a runaway intelligence explosion will continuously look like “wow I didn’t know you could DO that with mere bits and atoms” and then losing",
+          "likes": 1456,
+          "avatar": "https://pbs.twimg.com/profile_images/1918970926668054530/fy-ZsgJ7_normal.jpg",
+          "username": "tszzl",
+          "accountId": "1460283925",
+          "createdAt": "2026-10-27T06:10:10.000Z",
+          "observedAt": "2026-10-28T06:17:54.534Z",
+          "quoteCount": 3,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115089794867040584",
+          "rts": 2567,
+          "name": "Axiom",
+          "text": "The largest math proof in human history is now computer-verified.\n\nToday, Axiom announces a complete Lean auto-formalization of the Classification of Finite Simple Groups, the \"periodic table of symmetry.\"\n\nAbout 15,000 pages, built by over 100 mathematicians across generations. https://t.co/Y1P26abyPQ",
+          "likes": 5621,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVpOm-eaUAAZZVL.jpg",
+              "type": "video",
+              "width": 1920,
+              "height": 1080
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2020254827117432832/Yad4149b_normal.jpg",
+          "username": "axiommathai",
+          "accountId": "1972828074908749824",
+          "createdAt": "2026-10-27T14:34:38.000Z",
+          "observedAt": "2026-10-28T06:17:54.534Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2115223171746140277",
+          "rts": 26,
+          "name": "Oliver Traldi",
+          "text": "There's probably not a knockdown argument here, but I feel like there's a kind of dilemma for anthropocentrism. If you lean heavily on intellection, human value ends up continuous with machines. If you lean heavily on experience, human value ends up continuous with animals.",
+          "likes": 203,
+          "avatar": "https://pbs.twimg.com/profile_images/1982864645758091264/tLdbdemO_normal.jpg",
+          "username": "olivertraldi",
+          "accountId": "778952476565368832",
+          "createdAt": "2026-10-27T23:24:37.000Z",
+          "observedAt": "2026-10-28T06:17:54.534Z",
+          "quoteCount": 2,
+          "communityAuthored": true
+        }
+      ],
+      "trendTerms": [
+        "eth",
+        "exponential time hypothesis",
+        "kakeya"
+      ]
+    },
+    {
+      "slug": "from-a-green-neuron-to-a-humble-muffin-to-neuron-lens-the-week-the-community-rea",
+      "kind": "ongoing",
+      "title": "From a green neuron to a 'humble muffin' to Neuron Lens: the week the community read Qwen's neurons",
+      "overview": "A playful find by @Sauers_ of a neuron that 'makes the model green' set off a week of single-neuron experiments on Qwen. @jfonsecarivera published a searchable library of 34,220 persona neurons, others shared steering recipes for an 'evil qwen,' and @maxsloef trained a whole persona into one neuron. @voooooogel warned that steering-induced persona shifts may be 'persona solving' rather than proof of persona neurons. By Saturday @_a9lim and @treetowntree had released Neuron Lens, a database of every neuron and attention head in two models.",
+      "connection": "All five daily stories are the same community thread on reading and steering individual neurons, mostly in Qwen: josh credited @Sauers_ for his library, J-lens was pitched as the next step, the owl and persona-solving posts responded to the 'persona neurons' trend, and Neuron Lens is the full release of J-lens.",
+      "continuityNote": "",
+      "continuesFrom": [],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-26",
+          "slug": "i-found-a-neuron-that-makes-the-model-green",
+          "title": "I found a neuron that makes the model green."
+        },
+        {
+          "digestDate": "2026-10-28",
+          "slug": "i-made-a-library-of-34-220-persona-neurons-in-qwen",
+          "title": "i made a library of 34,220 persona neurons in qwen"
+        },
+        {
+          "digestDate": "2026-10-29",
+          "slug": "turns-out-it-s-possible-to-read-neurons-directly-via-j-lens",
+          "title": "turns out it's possible to read neurons directly, via J-lens!"
+        },
+        {
+          "digestDate": "2026-10-30",
+          "slug": "you-can-turn-qwen3-8b-into-an-owl-by-training-only-one-random-neuron",
+          "title": "You can turn Qwen3-8B into an owl by training only one random neuron!"
+        },
+        {
+          "digestDate": "2026-10-31",
+          "slug": "neuron-lens-a-database-of-every-single-neuron-and-attention-head-in-qwen-3-8b-an",
+          "title": "neuron lens: a database of every single neuron and attention head in qwen 3 8b and gemma 4 12b"
+        }
+      ],
+      "days": [
+        "2026-10-26",
+        "2026-10-28",
+        "2026-10-29",
+        "2026-10-30",
+        "2026-10-31"
+      ],
+      "segments": [
+        {
+          "commentary": "It started half as a joke, and replies treated it as pure mechinterp delight.",
+          "tweetIds": [
+            "2114481373876801557"
+          ]
+        },
+        {
+          "commentary": "Two days later @jfonsecarivera turned the idea into a toy everyone could play with, swept with Haiku and rated by weirdness.",
+          "tweetIds": [
+            "2115093117917659372",
+            "2115109334090920065",
+            "2115096024859705532"
+          ]
+        },
+        {
+          "commentary": "The play quickly got a darker edge, with a reproducible recipe for steering one neuron to make the model evil.",
+          "tweetIds": [
+            "2115274388425900291"
+          ]
+        },
+        {
+          "commentary": "@_a9lim previewed a way to read what neurons mean instead of guessing from steering.",
+          "tweetIds": [
+            "2115628110871924892"
+          ]
+        },
+        {
+          "commentary": "Friday brought both an escalation and a caution: one trained neuron can make an owl, but steering results may not mean a neuron is persona-specific.",
+          "tweetIds": [
+            "2115858480016011420",
+            "2115685944615649286"
+          ]
+        },
+        {
+          "commentary": "The week ended with the full release, which its authors say predicts steering results over 90% of the time.",
+          "tweetIds": [
+            "2116314514199068915"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2114481373876801557",
+          "rts": 37,
+          "name": "Sauers",
+          "text": "I found a neuron that makes the model green. https://t.co/wwDUqGiUD7",
+          "likes": 512,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVglaEcagAAWtr8.jpg",
+              "type": "photo",
+              "width": 2300,
+              "height": 1840
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1942938514011627522/WpmPB8Ih_normal.jpg",
+          "username": "Sauers_",
+          "accountId": "1763797553513103360",
+          "createdAt": "2026-10-25T22:16:59.000Z",
+          "observedAt": "2026-10-26T06:32:37.292Z",
+          "quoteCount": 4
+        },
+        {
+          "id": "2114445425398931614",
+          "rts": 22,
+          "name": "Vishesh Anand",
+          "text": "New Paper: Subliminal Learning doesn’t need a shared base model 🤯.\n\nWe show how a “teacher’s” hidden animal preferences reaches the “student” even when both differ in weight initialization, data order, pretraining corpus or even architectures! 🧵",
+          "likes": 128,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVf9klLXYAAM5d-.jpg",
+              "type": "photo",
+              "width": 2000,
+              "height": 1125
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1902440362573963264/hlHUf71Y_normal.jpg",
+          "username": "Vishesh1301",
+          "accountId": "1889042200727859200",
+          "createdAt": "2026-10-25T19:54:08.000Z",
+          "observedAt": "2026-10-26T06:32:37.292Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115109334090920065",
+          "rts": 76,
+          "name": "josh :)",
+          "text": "i made a library of 34,220 persona neurons in qwen\n\nplease help me find the weirdest ones:\n\nhttps://t.co/MOm9vdQDfa https://t.co/1EHcoPtV4Y",
+          "likes": 616,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVpgparbMAAJE-x.jpg",
+              "type": "photo",
+              "width": 2400,
+              "height": 1350
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HVpgpataQAA_Rb1.jpg",
+              "type": "photo",
+              "width": 2400,
+              "height": 1350
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HVpgpavbcAAe-Zu.jpg",
+              "type": "photo",
+              "width": 2400,
+              "height": 1350
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HVpgpbAbQAAxxMK.jpg",
+              "type": "photo",
+              "width": 2400,
+              "height": 1350
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2080648251238195202/unrarUDe_normal.jpg",
+          "username": "jfonsecarivera",
+          "accountId": "1495116577179639812",
+          "createdAt": "2026-10-27T15:52:16.000Z",
+          "observedAt": "2026-10-28T06:54:33.120Z",
+          "quoteCount": 4,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115093117917659372",
+          "rts": 49,
+          "name": "josh :)",
+          "text": "if you mix the \"yeast starter\" neuron and the \"existential crisis\" neuron in qwen, you get a humble muffin https://t.co/e34hImykF2",
+          "likes": 783,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVpR6IoaAAAKCmD.jpg",
+              "type": "photo",
+              "width": 2400,
+              "height": 1350
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2080648251238195202/unrarUDe_normal.jpg",
+          "username": "jfonsecarivera",
+          "accountId": "1495116577179639812",
+          "createdAt": "2026-10-27T14:47:50.000Z",
+          "observedAt": "2026-10-28T06:59:52.990Z",
+          "quoteCount": 4,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115096024859705532",
+          "rts": 62,
+          "name": "josh :)",
+          "text": "@Sauers_ https://t.co/MOm9vdQDfa\n\ni did a sweep on every neuron and had haiku categorize and rate by weirdness :)\n\nthe search and the combos are fun!",
+          "likes": 459,
+          "avatar": "https://pbs.twimg.com/profile_images/2080648251238195202/unrarUDe_normal.jpg",
+          "username": "jfonsecarivera",
+          "accountId": "1495116577179639812",
+          "createdAt": "2026-10-27T14:59:23.000Z",
+          "observedAt": "2026-10-28T07:25:46.167Z",
+          "quoteCount": 3,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115274388425900291",
+          "rts": 42,
+          "name": "chiefofautism",
+          "text": "if you have a qwen3.8 27b around, try steering L34 N3838 +0.75, now you have evil qwen 27b\n\nfor extra evil add L38 N17180 +0.75\n\nsame recipe as @_lyraaaa_: dose × median(‖resid‖ leaving layer L, tokens 1:) / ‖W_down[:, n]‖ at the down_proj input, every token https://t.co/j95pjjvSCu",
+          "likes": 404,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVr2isvWQAAub_b.png",
+              "type": "photo",
+              "width": 566,
+              "height": 279
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2062044048810971136/UX0AXRA__normal.jpg",
+          "username": "chiefofautism",
+          "accountId": "1945909917031731200",
+          "createdAt": "2026-10-28T02:48:08.000Z",
+          "observedAt": "2026-10-28T06:59:52.990Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115628110871924892",
+          "rts": 28,
+          "name": "a9lim",
+          "text": "turns out it's possible to read neurons directly, via J-lens! full repo coming soon with @treetowntree. https://t.co/cDil7SshUR",
+          "likes": 229,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVw4VwoWcAAtiwd.png",
+              "type": "photo",
+              "width": 1450,
+              "height": 600
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2043020826497421312/Li6AUEnu_normal.jpg",
+          "username": "_a9lim",
+          "accountId": "2027216163147767808",
+          "createdAt": "2026-10-29T02:13:42.000Z",
+          "observedAt": "2026-10-29T06:21:37.122Z",
+          "quoteCount": 2,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115394340357116169",
+          "rts": 0,
+          "name": "div (fp32)",
+          "text": "1/4\n\nMeet Qwenputer: Qwen3.5-4B with a full RISC-V CPU inside its weights, using the model's own Gated DeltaNet layers as RAM.\n\nIt runs C and MicroPython in its forward passes, no external runtime.\n\nOn DeepMind math: base 55–90%, base + Python tool 95–100%, Qwenputer 97.5–100%. https://t.co/aA7sAX8sDe",
+          "likes": 2748,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/amplify_video_thumb/2115390746090237952/img/O2d_O9rEssR_l5qF.jpg",
+              "type": "video",
+              "width": 1280,
+              "height": 720
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2103115932990332929/wKj91D1E_normal.jpg",
+          "username": "divagr1925",
+          "accountId": "1930581594705924096",
+          "createdAt": "2026-10-28T10:44:47.000Z",
+          "observedAt": "2026-10-29T06:21:37.122Z",
+          "quoteCount": 5
+        },
+        {
+          "id": "2115858480016011420",
+          "rts": 17,
+          "name": "max!",
+          "text": "You can turn Qwen3-8B into an owl by training only one random neuron! 🦉\n\nPerformance on owliness evals approaches full SFT. Compare SFT vs one-neuron eval responses side by side here: https://t.co/D8TiKeJbyx https://t.co/84wcdcEut0",
+          "likes": 90,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HV0JkNXbsAAo9pK.jpg",
+              "type": "photo",
+              "width": 2400,
+              "height": 2400
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2076364689605640192/0YnsIDt0_normal.jpg",
+          "username": "maxsloef",
+          "accountId": "1708265603604336640",
+          "createdAt": "2026-10-29T17:29:07.000Z",
+          "observedAt": "2026-10-30T07:28:42.978Z",
+          "quoteCount": 2,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115685944615649286",
+          "rts": 52,
+          "name": "thebes",
+          "text": "worth noting with the recent \"persona neurons\" trend: just because a steering intervention induces a persona change, doesn't mean the vector or neuron being steered is persona-specific. models seem to do something like \"persona solving\" under steering\n\nhttps://t.co/C5QXiGncEs https://t.co/9WaZ33UNXy",
+          "likes": 380,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVxs6FkaQAAckY_.jpg",
+              "type": "photo",
+              "width": 607,
+              "height": 945
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1876662518631829504/USrP45mT_normal.jpg",
+          "username": "voooooogel",
+          "accountId": "281798056",
+          "createdAt": "2026-10-29T06:03:31.000Z",
+          "observedAt": "2026-10-30T06:47:23.653Z",
+          "quoteCount": 3,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115851937061183681",
+          "rts": 45,
+          "name": "Sophia Xu",
+          "text": "I’m releasing OpenTTD-Bench, a benchmark for measuring frontier LLM agents on real-time, long-horizon tasks, based on a complex business simulation game OpenTTD, where models run competing transportation companies and must make the most amount of profit. https://t.co/DeweIqRgdA",
+          "likes": 340,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/amplify_video_thumb/2115849668638986242/img/hRE_WRRgu-ArKaeQ.jpg",
+              "type": "video",
+              "width": 1920,
+              "height": 1080
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1445628091733188614/fq0gRsLg_normal.jpg",
+          "username": "thesophiaxu",
+          "accountId": "1099843636886466560",
+          "createdAt": "2026-10-29T17:03:07.000Z",
+          "observedAt": "2026-10-30T06:57:44.301Z",
+          "quoteCount": 2,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115726641410482580",
+          "rts": 242,
+          "name": "Sauers",
+          "text": "Introducing the neural twins: models trained to be made for each other, that communicate entirely in neuralese. 🧵 https://t.co/dktxgCCCOL",
+          "likes": 1659,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/amplify_video_thumb/2115720174322249728/img/9inhKyn28mucRZZo.jpg",
+              "type": "video",
+              "width": 1920,
+              "height": 1080
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1942938514011627522/WpmPB8Ih_normal.jpg",
+          "username": "Sauers_",
+          "accountId": "1763797553513103360",
+          "createdAt": "2026-10-29T08:45:14.000Z",
+          "observedAt": "2026-10-30T03:24:56.467Z",
+          "quoteCount": 9
+        },
+        {
+          "id": "2116314514199068915",
+          "rts": 22,
+          "name": "a9lim",
+          "text": "@treetowntree and i created neuron lens: a database of every single neuron and attention head in qwen 3 8b and gemma 4 12b read using the R-lens (a J-lens variant) and what we call the \"S-lens\". you can find it at https://t.co/DI2Cpajc3M, along with the tools we used to make it. \n\nusing the R-lens to read neurons' input and output projections turns out to be very effective at determining what a neuron does. we're able to legibly read what a majority of neurons do when fired: the lens qualitatively predicts the result of steering over 90% of the time!\n\nthe same trick lets us read attention heads' QK circuits and OV circuits, showing us both what they attend to and what they do with it. however, the R-lens has two important flaws: its accuracy degrades in early layers, and it can't separate the MLP block and the attention block.\n\nwe found ways around both these issues. we first modified the r-lens by fitting it on input tokens rather than output tokens to get the s-lens, which is accurate in early layers but inaccurate in late layers. we then fitted R- and S-lenses to the activations after attention but before the MLP to get \"mid-lenses\", which are much better at deciphering MLP inputs and attention outputs. using both of these techniques, we were able to interpret most of the models' layers.",
+          "likes": 137,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/amplify_video_thumb/2116314487133208576/img/--GWrBjls_fQdaTs.jpg",
+              "type": "video",
+              "width": 1080,
+              "height": 1080
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2043020826497421312/Li6AUEnu_normal.jpg",
+          "username": "_a9lim",
+          "accountId": "2027216163147767808",
+          "createdAt": "2026-10-30T23:41:14.000Z",
+          "observedAt": "2026-10-31T07:03:53.158Z",
+          "quoteCount": 5,
+          "communityAuthored": true
+        }
+      ],
+      "trendTerms": [
+        "persona neurons",
+        "neuron lens",
+        "j-lens"
+      ]
+    },
+    {
+      "slug": "anthropic-files-its-s-1-says-no-insurer-could-cover-its-risk-and-staff-start-cou",
+      "kind": "ongoing",
+      "title": "Anthropic files its S-1, says no insurer could cover its risk, and staff start counting their millions",
+      "overview": "Anthropic filed for its IPO, and the community zeroed in on a risk factor saying the whole insurance industry could not cover the catastrophic risk the company poses. Posters also passed around reported first-half revenue of $16.3 billion. Two days later the filing fed back-of-envelope math that about 1 in 70 Americans worth $100M+ would be Anthropic staff, alongside a viral post about technical workers feeling their skills are useless.",
+      "connection": "@jakehalloran1's wealth estimate and the follow-up share-price math were built on Anthropic's S-1 filing from two days earlier.",
+      "continuityNote": "",
+      "continuesFrom": [],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-27",
+          "slug": "anthropic-has-filed-an-s-1-registration-statement-with-the-sec-related-to-its-pr",
+          "title": "Anthropic has filed an S-1 registration statement with the SEC related to its proposed IPO."
+        },
+        {
+          "digestDate": "2026-10-29",
+          "slug": "1-in-70-americans-with-100mm-net-worth-will-be-anthropic-staff",
+          "title": "~1 in 70 americans with 100MM+ net worth will be anthropic staff"
+        }
+      ],
+      "days": [
+        "2026-10-27",
+        "2026-10-29"
+      ],
+      "segments": [
+        {
+          "commentary": "The filing itself was a short legal notice, but it was the most-liked post of its day.",
+          "tweetIds": [
+            "2114705042817110293"
+          ]
+        },
+        {
+          "commentary": "The insurance language became the instant talking point, read as either alarming or classic histrionic risk-factor boilerplate.",
+          "tweetIds": [
+            "2114734798186983537",
+            "2114713401444470853"
+          ]
+        },
+        {
+          "commentary": "Others went straight to the revenue numbers in the filing.",
+          "tweetIds": [
+            "2114837894187950245"
+          ]
+        },
+        {
+          "commentary": "By Thursday the talk had turned to what the IPO means for lab employees' wealth, and to unease among everyone else.",
+          "tweetIds": [
+            "2115468340311605282",
+            "2115544056038350960"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2114705042817110293",
+          "rts": 4344,
+          "name": "Anthropic",
+          "text": "Anthropic has filed an S-1 registration statement with the SEC related to its proposed IPO.\n\nRead more: https://t.co/ofhv0DK3Zp\n\nLegal disclaimer: A registration statement relating to these securities has been filed with the SEC but has not yet become effective. These securities may not be sold, nor may offers to buy be accepted, prior to the time the registration statement becomes effective. This post does not constitute an offer to sell or the solicitation of an offer to buy these securities, nor shall there be any sale of these securities in any state or jurisdiction in which such offer, solicitation or sale would be unlawful prior to registration or qualification under the securities laws of any such state or jurisdiction.",
+          "likes": 16763,
+          "avatar": "https://pbs.twimg.com/profile_images/1798110641414443008/XP8gyBaY_normal.jpg",
+          "username": "AnthropicAI",
+          "accountId": "1353836358901501952",
+          "createdAt": "2026-10-26T13:05:46.000Z",
+          "observedAt": "2026-10-27T07:24:05.380Z",
+          "quoteCount": 6
+        },
+        {
+          "id": "2114734798186983537",
+          "rts": 587,
+          "name": "Dave Banerjee",
+          "text": "Anthropic says that even the entire insurance industry in the aggregate will not have the capacity to insure the catastrophic risk that ANTHROPIC ITSELF poses to the world\n\nlol https://t.co/POeUmvCifU",
+          "likes": 2980,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVkL5BdWUAED0y0.png",
+              "type": "photo",
+              "width": 1908,
+              "height": 982
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1999598045214760970/zfHzQwG0_normal.jpg",
+          "username": "DaveRBanerjee",
+          "accountId": "1283243967392493571",
+          "createdAt": "2026-10-26T15:04:00.000Z",
+          "observedAt": "2026-10-27T06:32:07.421Z",
+          "quoteCount": 5
+        },
+        {
+          "id": "2114713401444470853",
+          "rts": 221,
+          "name": "nic carter",
+          "text": "I knew that the Anthropic S1 would have some goofy risk factors but this has to take the cake https://t.co/4cYxVZpIfo",
+          "likes": 2144,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVj4eBHXkAAUbiK.jpg",
+              "type": "photo",
+              "width": 1200,
+              "height": 526
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2074152376831766528/3jIANGyy_normal.jpg",
+          "username": "nic_carter",
+          "accountId": "420308365",
+          "createdAt": "2026-10-26T13:38:59.000Z",
+          "observedAt": "2026-10-27T03:47:31.574Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2114837894187950245",
+          "rts": 10,
+          "name": "Abhi",
+          "text": "There's a lot of news surrounding Anthropic's S-1, such as first-half revenue reported as $16.3 billion, up 1,300% YoY. Chat with the filing and see the exact citations to these claims with Claudit. https://t.co/jol5L6l5zb",
+          "likes": 32,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/amplify_video_thumb/2114833824601534464/img/6fiRGaFpDdhof6cr.jpg",
+              "type": "video",
+              "width": 1652,
+              "height": 1080
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2108263459070824449/m9Tm861N_normal.jpg",
+          "username": "abhiarya",
+          "accountId": "1890330211486711808",
+          "createdAt": "2026-10-26T21:53:40.000Z",
+          "observedAt": "2026-10-27T03:47:31.574Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115468340311605282",
+          "rts": 93,
+          "name": "Jake Halloran",
+          "text": "~1 in 70 americans with 100MM+ net worth will be  anthropic staff. include openai employees and the labs will be like ~1 in 50 to even more lol",
+          "likes": 1460,
+          "avatar": "https://pbs.twimg.com/profile_images/1677760112109264897/KvsMmOMk_normal.jpg",
+          "username": "jakehalloran1",
+          "accountId": "974359057560719361",
+          "createdAt": "2026-10-28T15:38:50.000Z",
+          "observedAt": "2026-10-29T06:21:37.122Z",
+          "quoteCount": 4
+        },
+        {
+          "id": "2115544056038350960",
+          "rts": 1796,
+          "name": "Thariq",
+          "text": "very weird thing happening rn\n\ntechnical people are sad, they think their skills are now useless\n\nnon-technical people are desperately wishing they were more technical so they could use agents better",
+          "likes": 23096,
+          "avatar": "https://pbs.twimg.com/profile_images/1976939058741039104/r3GgzqRh_normal.jpg",
+          "username": "trq212",
+          "accountId": "352806502",
+          "createdAt": "2026-10-28T20:39:42.000Z",
+          "observedAt": "2026-10-29T06:37:23.394Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2115406521672835239",
+          "rts": 97,
+          "name": "Colossus",
+          "text": "The people of Silicon Valley are unwell.\n\nIf you work at a frontier lab or decacorn, you’ve got it bad. You haven’t seen your kids, your girlfriend’s annoyed, invites from friends to hang out are waning, even weddings are on hold. This is the time to make your mark and make your money, after all.\n\nIf you’re building a startup that’s trying to compete with or be one of these companies, you’ve got it bad. Maybe you passed up a job offer at one a couple years back, which means you left $100M on the table, you fucking idiot. Being an underdog isn't as fun as you thought.\n\nIf you’re working on a pre-AI startup, you’ve got it bad. Not too long ago you were the belle of the ball, but now your 30% year-on-year growth doesn’t feel like growth at all. It feels like death.\n\n\"Too many of my friends are spiraling,\" Brie Wolfson writes. \"I don’t know how we’re supposed to live and work like this.\"\n\nIt’s all too much, too fast. Too much money, too much growth, too much power, too much change. Every month, a new frontier model is released. Every day, a new unicorn is minted. Seriously. 300 days into the year 2026, and 311 unicorns have been minted so far.\n\nSo what’s left for the sane ones? Brie went looking for teams playing a different game. She found one in Ottawa: a search infrastructure company that many of the AI darlings rely on.\n\nIt's growing fast, and its people are well.\n\nRead @zebriez’s latest company dispatch from inside the sane asylum of turbopuffer.\n\nhttps://t.co/wn0zpo9Gld",
+          "likes": 780,
+          "avatar": "https://pbs.twimg.com/profile_images/2011815065876643842/y70Ap2E__normal.jpg",
+          "username": "colossusmag",
+          "accountId": "1338296768845451266",
+          "createdAt": "2026-10-28T11:33:11.000Z",
+          "observedAt": "2026-10-29T06:21:37.122Z",
+          "quoteCount": 3
+        }
+      ],
+      "trendTerms": [
+        "s-1",
+        "anthropic ipo"
+      ]
+    },
+    {
+      "slug": "patrick-stewart-captain-picard-has-died-at-86",
+      "kind": "major",
+      "title": "Patrick Stewart, Captain Picard, has died at 86",
+      "overview": "Patrick Stewart's death was announced from his own account, which asked for donations to Alzheimer's research and caregiver support in place of flowers. It was by far the week's most-liked event. Community members went beyond routine tributes, describing Picard as a moral ideal and a model of empathetic masculinity, and remembering his years of Shakespeare and stage work.",
+      "connection": "",
+      "continuityNote": "",
+      "continuesFrom": [],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-30",
+          "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
+          "title": "Patrick Stewart has sadly passed away at the age of 86."
+        }
+      ],
+      "days": [
+        "2026-10-30"
+      ],
+      "segments": [
+        {
+          "commentary": "The news first came through his own account's memorial request, then spread through film outlets.",
+          "tweetIds": [
+            "2115891266131300517",
+            "2115893413233016885",
+            "2115894208355590181"
+          ]
+        },
+        {
+          "commentary": "Community tributes credited the stage work behind the pop-culture roles.",
+          "tweetIds": [
+            "2115909714731049217"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2115891266131300517",
+          "rts": 89158,
+          "name": "Patrick Stewart",
+          "text": "In lieu of flowers, memorial contributions may be made to:\nJohns Hopkins Alzheimer’s Disease Research Center Fund   \nhttps://t.co/luC5CdcWDy\nAlzheimer’s Foundation of America Caregiver Resources    \nhttps://t.co/zvNptfyuNd\n\nPhoto Credit: Tommy Garcia https://t.co/XNncEVq56X",
+          "likes": 312427,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HV0nTn4XoAAU9O8.jpg",
+              "type": "photo",
+              "width": 959,
+              "height": 1200
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HV0nTpuXAAAIeIB.jpg",
+              "type": "photo",
+              "width": 960,
+              "height": 1200
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HV0nTqUXAAAMkla.jpg",
+              "type": "photo",
+              "width": 958,
+              "height": 1200
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/790573246596931586/V8uV5TcL_normal.jpg",
+          "username": "SirPatStew",
+          "accountId": "602317143",
+          "createdAt": "2026-10-29T19:39:23.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115893413233016885",
+          "rts": 84806,
+          "name": "DiscussingFilm",
+          "text": "Patrick Stewart has sadly passed away at the age of 86. https://t.co/fRJjlM86eP",
+          "likes": 421526,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HV0p2HrWoAA9Rs8.jpg",
+              "type": "photo",
+              "width": 804,
+              "height": 700
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1706429397467549696/hmvwfChQ_normal.jpg",
+          "username": "DiscussingFilm",
+          "accountId": "780460754910732288",
+          "createdAt": "2026-10-29T19:47:55.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2115894208355590181",
+          "rts": 4072,
+          "name": "Variety",
+          "text": "Patrick Stewart, 'Star Trek's' Captain Picard and 'X-Men's' Charles Xavier, Dies at 86 https://t.co/7VBS83Rv3Q",
+          "likes": 11046,
+          "avatar": "https://pbs.twimg.com/profile_images/1610752949550186496/X5zYP9oV_normal.jpg",
+          "username": "Variety",
+          "accountId": "17525171",
+          "createdAt": "2026-10-29T19:51:05.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115909714731049217",
+          "rts": 3,
+          "name": "Fullmetal Anarchist",
+          "text": "Sir Patrick Stewart's talent was an undeniable gift from God, but he also put in the work for years in Shakespearean theatre and Broadway honing his craft. He would spend the rest of his life lending his considerable credibility to nerdy pop culture projects",
+          "likes": 55,
+          "avatar": "https://pbs.twimg.com/profile_images/1960778140961165312/i6WSX0J5_normal.jpg",
+          "username": "spacedogpope",
+          "accountId": "1761374017959743488",
+          "createdAt": "2026-10-29T20:52:42.000Z",
+          "observedAt": "2026-10-30T04:16:53.505Z",
+          "quoteCount": 2
+        }
+      ],
+      "trendTerms": [
+        "patrick stewart",
+        "picard"
+      ]
+    },
+    {
+      "slug": "binance-reportedly-hacked-for-5-6b-as-polymarket-halts-trading-and-an-open-model",
+      "kind": "major",
+      "title": "Binance reportedly hacked for $5.6B as Polymarket halts trading and an open model exploits Firefox",
+      "overview": "A breaking post claimed Binance lost over $5.6 billion, which would make it the largest hack in crypto history. The same day Polymarket halted trading after a third-party provider was compromised, and Epoch AI showed the open-weight GLM 5.3 reliably building Firefox exploits from published but unshipped fixes for about $1,000 per version. patio11 summed up the mood: attackers used to be 'rate-limited on cognition.' The Binance figures were reported, not confirmed.",
+      "connection": "",
+      "continuityNote": "",
+      "continuesFrom": [],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-30",
+          "slug": "binance-hacked-with-over-5-6-billion-stolen",
+          "title": "Binance hacked with over $5.6 billion stolen"
+        }
+      ],
+      "days": [
+        "2026-10-30"
+      ],
+      "segments": [
+        {
+          "commentary": "The headline number came from an aggregator's breaking post, with a coin-by-coin breakdown.",
+          "tweetIds": [
+            "2115922259739349132"
+          ]
+        },
+        {
+          "commentary": "Polymarket's halt hours earlier made it feel like a wave rather than a single incident.",
+          "tweetIds": [
+            "2115874609014726842"
+          ]
+        },
+        {
+          "commentary": "Epoch's experiment explained why people were nervous: cheap AI can now turn public patches into working exploits.",
+          "tweetIds": [
+            "2115921730682404869"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2115922259739349132",
+          "rts": 11636,
+          "name": "Watcher.Guru",
+          "text": "BREAKING: World's largest crypto exchange Binance hacked with over $5.6 billion stolen:\n\n• $1.45 billion $BTC \n• $875 million $ETH\n• $234 million $TRX\n• $50 million $XAUT\n• $1.57 billion $USDT\n• $823 million $USDC\n• $75 million $WBETH \n• $88.5 million $RLUSD\n+ $447.5 million additional cryptocurrencies \n\nThis is the largest hack in crypto history.",
+          "likes": 38526,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HV1EE82aAAAXwuB.jpg",
+              "type": "photo",
+              "width": 1087,
+              "height": 737
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1641221212578754562/DfiC0KW2_normal.png",
+          "username": "WatcherGuru",
+          "accountId": "1387497871751196672",
+          "createdAt": "2026-10-29T21:42:33.000Z",
+          "observedAt": "2026-10-30T06:42:13.651Z",
+          "quoteCount": 5
+        },
+        {
+          "id": "2115874609014726842",
+          "rts": 827,
+          "name": "Polymarket Traders",
+          "text": "We've identified & fixed an issue impacting our international platform, Polymarket⁠.com. One of our 3rd party providers was compromised, and we have referred this to relevant law enforcement.\n\nAnyone who has been impacted will be made whole.\n\nOut of an abundance of caution, we have temporarily halted trading & are working to bring the platform back online.",
+          "likes": 2901,
+          "avatar": "https://pbs.twimg.com/profile_images/1984009470628761600/g0ajJ_4j_normal.jpg",
+          "username": "PolymarketTrade",
+          "accountId": "1965783030062022656",
+          "createdAt": "2026-10-29T18:33:12.000Z",
+          "observedAt": "2026-10-30T03:19:53.759Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2115921730682404869",
+          "rts": 60,
+          "name": "Epoch AI",
+          "text": "In recent experiments, we found that GLM 5.3 can autonomously compromise recent versions of Mozilla Firefox using security fixes that have been published but not yet shipped to users.\n\nWe used a deliberately basic setup meant to emulate a relatively unsophisticated attacker with limited resources. After basic initial instructions to inspect those not-yet-shipped fixes, the model reliably built successful exploits for six recent Firefox versions on its own using only information available at the time of release.\n\nThese exploits, which cost about $1,000 per compromised version, would let an attacker steal passwords and authentication cookies stored in the browser, or read any files on the user's computer, after the user opens a single webpage, with no further interaction.\n\nThe exploits make use of the \"patch gap,\" the time between when security fixes are made public in beta or \"nightly\" software updates and when those fixes are generally released to users. Until now, exploiting it required significant human time and skill, or special access to frontier models with advanced cyber capabilities.\n\nOur results show that widely available open-weight models can now do this relatively cheaply and quickly. We gave GLM 5.3 up to 48 hours to find an exploit, but its fastest attempt needed only 12 hours.\n\nIn all of its successful attacks, the patch gap gave GLM 5.3 an initial foothold in the browser. To turn that foothold into reading files off the user's computer, the model also independently discovered and used a previously unpublished vulnerability.\n\nWe shared our findings with Mozilla, which patched the vulnerability in its October 27 Firefox 159.0 release. We haven't yet confirmed whether the attack still succeeds without it, but expect the fix makes it substantially harder. We're grateful to Mozilla for their responsiveness and collaboration.",
+          "likes": 315,
+          "avatar": "https://pbs.twimg.com/profile_images/1866142753127616512/DYcE9bN1_normal.jpg",
+          "username": "EpochAIResearch",
+          "accountId": "1529761561170124800",
+          "createdAt": "2026-10-29T21:40:27.000Z",
+          "observedAt": "2026-10-30T06:16:23.289Z",
+          "quoteCount": 4
+        }
+      ],
+      "trendTerms": [
+        "binance",
+        "polymarket",
+        "glm 5.3"
+      ]
+    }
+  ],
+  "alsoNotable": [
+    {
+      "line": "Netanyahu's Likud claimed Arab parties stole Israel's election through fraud, and critics asked whether right-wing losers now always refuse to concede.",
+      "dailyStory": {
+        "digestDate": "2026-10-29",
+        "slug": "the-elections-in-the-state-of-israel-were-stolen-by-arab-parties",
+        "title": "The elections in the State of Israel were stolen by Arab parties"
+      }
+    },
+    {
+      "line": "Discord will let Google index public messages in Discoverable servers from mid-December, splitting posters between privacy fears and forum nostalgia.",
+      "dailyStory": {
+        "digestDate": "2026-10-28",
+        "slug": "soon-discord-messages-will-be-indexable-on-google",
+        "title": "Soon Discord messages will be indexable on Google"
+      }
+    },
+    {
+      "line": "Google launched Gemini 4 Carbon two weeks after Argon, topping benchmarks and drawing jokes about its periodic-table naming.",
+      "dailyStory": {
+        "digestDate": "2026-10-29",
+        "slug": "introducing-gemini-4-carbon-it-s-a-big-jump-over-argon-which-we-released-just-2-",
+        "title": "Introducing Gemini 4 Carbon, it's a big jump over Argon which we released just 2 weeks ago"
+      }
+    },
+    {
+      "line": "Sam Altman called local AI inference a terrible use of scarce memory chips, and replies pushed back with 'right to compute.'",
+      "dailyStory": {
+        "digestDate": "2026-10-30",
+        "slug": "sam-local-inference-is-a-terrible-allocation-of-scarce-resources",
+        "title": "sam: local inference is a terrible allocation of scarce resources"
+      }
+    },
+    {
+      "line": "A post said Claude Code quietly got a rule against recreating existing video games, the same day Anthropic renamed its Max plans.",
+      "dailyStory": {
+        "digestDate": "2026-10-31",
+        "slug": "anthropic-is-cracking-down-on-video-game-rewrites",
+        "title": "ANTHROPIC IS CRACKING DOWN ON VIDEO GAME REWRITES"
+      }
+    },
+    {
+      "line": "An SF Halloween costume of the sankey diagram from Aella's birthday gangbang went viral, and Aella replied 'oh my god.'",
+      "dailyStory": {
+        "digestDate": "2026-11-01",
+        "slug": "i-hate-sf-halloween-what-do-you-mean-you-re-the-sankey-diagram-from-aella-s-birt",
+        "title": "I hate SF Halloween, what do you mean you're the sankey diagram from Aella's birthday gangbang"
+      }
+    }
+  ],
+  "source": {
+    "editionDates": [
+      "2026-10-26",
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+      "2026-10-30",
+      "2026-10-31",
+      "2026-11-01"
+    ],
+    "missingDates": [],
+    "dailyStoryCount": 35,
+    "priorWeekStarts": [
+      "2026-10-19",
+      "2026-10-12"
+    ]
+  },
+  "trends": {
+    "days": [
+      "2026-10-19",
+      "2026-10-20",
+      "2026-10-21",
+      "2026-10-22",
+      "2026-10-23",
+      "2026-10-24",
+      "2026-10-25",
+      "2026-10-26",
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+      "2026-10-30",
+      "2026-10-31",
+      "2026-11-01"
+    ],
+    "series": [
+      {
+        "term": "eth",
+        "tweets": [
+          17,
+          24,
+          7,
+          13,
+          9,
+          7,
+          6,
+          48,
+          124,
+          50,
+          37,
+          27,
+          32,
+          19
+        ],
+        "per100k": [
+          31.60908854263508,
+          46.94284708367562,
+          12.788891933863159,
+          23.406553835073822,
+          14.86816890239873,
+          13.430287216285183,
+          11.417480162128218,
+          80.16969251582516,
+          211.53911767716403,
+          89.32878352062602,
+          67.1896564247839,
+          50.5324624281784,
+          65.22492407411181,
+          39.69000020889474
+        ]
+      },
+      {
+        "term": "exponential time hypothesis",
+        "tweets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          29,
+          44,
+          5,
+          0,
+          1,
+          2,
+          0
+        ],
+        "per100k": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          48.435855894977706,
+          75.06226756286465,
+          8.932878352062602,
+          0,
+          1.871572682525126,
+          4.076557754631988,
+          0
+        ]
+      },
+      {
+        "term": "kakeya",
+        "tweets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          13,
+          5,
+          3,
+          0,
+          0,
+          0,
+          0
+        ],
+        "per100k": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.9029133603547033,
+          21.712625056369316,
+          8.52980313214371,
+          5.3597270112375615,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "term": "persona neurons",
+        "tweets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          6,
+          21,
+          12,
+          32,
+          5,
+          16,
+          1
+        ],
+        "per100k": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          10.021211564478145,
+          35.82517315500358,
+          21.438908044950246,
+          58.109973124137426,
+          9.35786341262563,
+          32.612462037055906,
+          2.0889473794155125
+        ]
+      },
+      {
+        "term": "neuron lens",
+        "tweets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          1,
+          0,
+          1,
+          2,
+          12,
+          7,
+          1
+        ],
+        "per100k": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3.8058267207094065,
+          1.6702019274130242,
+          0,
+          1.7865756704125204,
+          3.631873320258589,
+          22.45887219030151,
+          14.26795214121196,
+          2.0889473794155125
+        ]
+      },
+      {
+        "term": "j-lens",
+        "tweets": [
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          3,
+          3,
+          0,
+          1,
+          13,
+          6,
+          2,
+          1
+        ],
+        "per100k": [
+          1.8593581495667695,
+          0,
+          1.8269845619804512,
+          0,
+          0,
+          0,
+          5.708740081064109,
+          5.010605782239073,
+          0,
+          1.7865756704125204,
+          23.607176581680832,
+          11.229436095150755,
+          4.076557754631988,
+          2.0889473794155125
+        ]
+      },
+      {
+        "term": "s-1",
+        "tweets": [
+          187,
+          206,
+          187,
+          191,
+          195,
+          161,
+          143,
+          296,
+          248,
+          206,
+          170,
+          171,
+          136,
+          137
+        ],
+        "per100k": [
+          347.6999739689859,
+          402.92610413488245,
+          341.6461130903444,
+          343.8962909614692,
+          322.1436595519725,
+          308.8966059745592,
+          272.11661053072254,
+          494.3797705142552,
+          423.07823535432806,
+          368.0345881049792,
+          308.7092322219801,
+          320.03892871179653,
+          277.2059273149752,
+          286.18579097992523
+        ]
+      },
+      {
+        "term": "anthropic ipo",
+        "tweets": [
+          4,
+          5,
+          3,
+          5,
+          5,
+          5,
+          10,
+          58,
+          20,
+          13,
+          6,
+          7,
+          9,
+          2
+        ],
+        "per100k": [
+          7.437432598267078,
+          9.779759809099088,
+          5.480953685941354,
+          9.002520705797624,
+          8.26009383466596,
+          9.59306229734656,
+          19.02913360354703,
+          96.87171178995541,
+          34.11921252857484,
+          23.225483715362763,
+          10.895619960775768,
+          13.101008777675883,
+          18.34450989584395,
+          4.177894758831025
+        ]
+      },
+      {
+        "term": "patrick stewart",
+        "tweets": [
+          2,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          286,
+          204,
+          40,
+          12
+        ],
+        "per100k": [
+          3.718716299133539,
+          0,
+          0,
+          1.8005041411595246,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          519.3578847969783,
+          381.80082723512567,
+          81.53115509263976,
+          25.06736855298615
+        ]
+      },
+      {
+        "term": "picard",
+        "tweets": [
+          0,
+          2,
+          0,
+          0,
+          1,
+          0,
+          1,
+          1,
+          0,
+          1,
+          80,
+          72,
+          38,
+          41
+        ],
+        "per100k": [
+          0,
+          3.9119039236396356,
+          0,
+          0,
+          1.6520187669331923,
+          0,
+          1.9029133603547033,
+          1.6702019274130242,
+          0,
+          1.7865756704125204,
+          145.27493281034359,
+          134.75323314180906,
+          77.45459733800779,
+          85.64684255603602
+        ]
+      },
+      {
+        "term": "binance",
+        "tweets": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1,
+          1,
+          2,
+          1,
+          5,
+          104,
+          143,
+          41,
+          24
+        ],
+        "per100k": [
+          0,
+          0,
+          1.8269845619804512,
+          1.8005041411595246,
+          0,
+          1.918612459469312,
+          1.9029133603547033,
+          3.3404038548260484,
+          1.7059606264287421,
+          8.932878352062602,
+          188.85741265344666,
+          267.634893601093,
+          83.56943396995577,
+          50.1347371059723
+        ]
+      },
+      {
+        "term": "polymarket",
+        "tweets": [
+          18,
+          14,
+          22,
+          22,
+          18,
+          21,
+          32,
+          35,
+          20,
+          25,
+          52,
+          32,
+          38,
+          10
+        ],
+        "per100k": [
+          33.46844669220185,
+          27.383327465477446,
+          40.19366036356993,
+          39.611091105509544,
+          29.73633780479746,
+          40.29086164885555,
+          60.893227531350504,
+          58.45706745945584,
+          34.11921252857484,
+          44.66439176031301,
+          94.42870632672333,
+          59.89032584080403,
+          77.45459733800779,
+          20.889473794155126
+        ]
+      },
+      {
+        "term": "glm 5.3",
+        "tweets": [
+          9,
+          2,
+          11,
+          10,
+          27,
+          12,
+          16,
+          4,
+          6,
+          12,
+          7,
+          6,
+          5,
+          4
+        ],
+        "per100k": [
+          16.734223346100926,
+          3.9119039236396356,
+          20.096830181784966,
+          18.005041411595247,
+          44.604506707196194,
+          23.02334951363174,
+          30.446613765675252,
+          6.680807709652097,
+          10.235763758572451,
+          21.438908044950246,
+          12.711556620905064,
+          11.229436095150755,
+          10.19139438657997,
+          8.35578951766205
+        ]
+      },
+      {
+        "term": "php",
+        "tweets": [
+          3,
+          26,
+          539,
+          305,
+          122,
+          38,
+          11,
+          26,
+          7,
+          3,
+          20,
+          8,
+          7,
+          11
+        ],
+        "per100k": [
+          5.578074448700308,
+          50.85475100731526,
+          984.7446789074633,
+          549.153763053655,
+          201.5462895658495,
+          72.90727345983385,
+          20.932046963901733,
+          43.42525011273863,
+          11.941724385001194,
+          5.3597270112375615,
+          36.318733202585896,
+          14.972581460201008,
+          14.26795214121196,
+          22.978421173570638
+        ]
+      },
+      {
+        "term": "interpretability",
+        "tweets": [
+          15,
+          8,
+          1,
+          5,
+          5,
+          3,
+          9,
+          29,
+          16,
+          8,
+          6,
+          4,
+          10,
+          3
+        ],
+        "per100k": [
+          27.890372243501545,
+          15.647615694558542,
+          1.8269845619804512,
+          9.002520705797624,
+          8.26009383466596,
+          5.755837378407935,
+          17.126220243192325,
+          48.435855894977706,
+          27.295370022859874,
+          14.292605363300163,
+          10.895619960775768,
+          7.486290730100504,
+          20.38278877315994,
+          6.266842138246537
+        ]
+      },
+      {
+        "term": "security",
+        "tweets": [
+          129,
+          159,
+          375,
+          334,
+          304,
+          203,
+          137,
+          186,
+          137,
+          101,
+          153,
+          177,
+          99,
+          89
+        ],
+        "per100k": [
+          239.85720129411328,
+          310.996361929351,
+          685.1192107426692,
+          601.3683831472812,
+          502.21370514769046,
+          389.4783292722703,
+          260.6991303685943,
+          310.65755849882254,
+          233.71660582073767,
+          180.44414271166457,
+          277.8383089997821,
+          331.2683648069473,
+          201.78960885428344,
+          185.91631676798062
+        ]
+      }
+    ],
+    "weekTerms": [
+      "php",
+      "interpretability",
+      "security"
+    ]
+  }
+}

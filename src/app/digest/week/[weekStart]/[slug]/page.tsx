@@ -36,9 +36,9 @@ export async function generateMetadata({
   const title = plain(story.title)
   return {
     title: `${title} · The Week in Review, ${range}`,
-    description: plain(story.subtitle),
+    description: plain(story.overview),
     alternates: { canonical: weeklyStoryPath(edition.weekStart, story.slug) },
-    openGraph: { type: 'article', title, description: plain(story.subtitle) },
+    openGraph: { type: 'article', title, description: plain(story.overview) },
   }
 }
 

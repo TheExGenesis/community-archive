@@ -90,3 +90,19 @@ seeded and the publisher was run end to end.
   published.
 - `/digest/week/2026-10-26` rendered at desktop width and at 375px with no
   horizontal scroll, and the Oct 30 daily sidebar links to that week.
+
+## Tweet-led revision (Nov 8)
+
+After review: at most 5 stories with a cap of 3 AI-only stories; one overview
+paragraph instead of bullets; commentary interleaved with tweets; every daily
+banger carried into the weekly story; @handles with profile hover cards; daily
+coverage and trend charts in a sidebar; a week-scoped conversation map on the
+week page and each story page; a "The Week in Review" entry in the navbar.
+
+The four sample weeks were regenerated from prod dailies into
+`memos/artifacts/20261108-weekly-digest-v2/` (the earlier samples were removed
+because they use the old story shape). Each passed validation on the first
+attempt (28–38k input, 4.4–6.0k output tokens, 44–62s), and the trend series
+were frozen from the analytics gateway. Oct 12 is still all AI-adjacent (that
+week's dailies were mostly AI); Oct 26 includes Patrick Stewart's death and
+Nov 2 leads with the election results.

@@ -165,7 +165,7 @@ export function SelectedTrendStory({
         <Link
           href={href}
           onClick={() => captureProductAction('trend_stories', 'topic_opened')}
-          className="text-[22px] font-semibold leading-tight hover:text-brand [text-wrap:pretty]"
+          className="text-[22px] font-semibold leading-tight [text-wrap:pretty] hover:text-brand"
           style={SERIF}
         >
           {story.title}

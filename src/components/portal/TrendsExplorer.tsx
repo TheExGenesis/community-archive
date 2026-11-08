@@ -6,10 +6,10 @@ import TweetCard from '@/components/TweetCard'
 import { captureProductAction } from '@/lib/productAnalytics'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import type { PortalTrends } from '@/lib/portal/types'
-import { BODY, CARD, MUTED, SERIF } from './styles'
+import { CARD, MUTED, SERIF } from './styles'
 import { useTrendExplorer } from './trends/useTrendExplorer'
 import { useTrendEvidence } from './trends/useTrendEvidence'
-import { TimelineControls } from './trends/TimelineControls'
+import { TimelineControls, timelineNote } from './trends/TimelineControls'
 import { TrendChart } from './trends/TrendChart'
 import { MAX_SERIES, SERIES_COLORS } from './trends/config'
 import { bucketLabel } from './trends/model'
@@ -330,11 +330,6 @@ export default function TrendsExplorer({
                 onPreset={selectTimeline}
                 disabled={isLoadingSeries || isAdding}
               />
-              {axis === 'log' && (
-                <p className={`px-4 pt-2 text-[11px] ${MUTED}`}>
-                  Log scale compresses large peaks while keeping zero visible.
-                </p>
-              )}
               {chartError && (
                 <div
                   className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100 sm:mx-5"
@@ -375,11 +370,10 @@ export default function TrendsExplorer({
 
               <div className="border-t border-zinc-100 px-4 py-3 dark:border-[#202023] sm:px-5">
                 <div
-                  className={`mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${MUTED}`}
+                  className="flex flex-wrap gap-1.5"
+                  role="group"
+                  aria-label="Series shown"
                 >
-                  Series shown
-                </div>
-                <div className="flex flex-wrap gap-1.5">
                   {configuredTerms.map((term, index) => {
                     const item = series.find((entry) => entry.term === term)
                     const active = !!chartEnabled[term]
@@ -439,11 +433,19 @@ export default function TrendsExplorer({
               </div>
             </div>
 
-            <p className={`mt-3 text-[12px] leading-relaxed ${BODY}`}>
-              Normalization divides each term’s {granularity} count by all
-              archived tweets from that {granularity}, then scales the result to
-              100,000. This makes periods with different archive coverage
-              comparable.
+            <p className={`mt-3 text-[11.5px] leading-relaxed ${MUTED}`}>
+              {[
+                scale === 'normalized'
+                  ? `Per 100k divides each term’s ${granularity} count by all archived tweets from that ${granularity}, so periods with different archive coverage stay comparable.`
+                  : null,
+                axis === 'log'
+                  ? 'Log scale compresses large peaks while keeping zero visible.'
+                  : null,
+                timelineNote(granularity),
+                'Dates use UTC.',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             </p>
           </section>
 

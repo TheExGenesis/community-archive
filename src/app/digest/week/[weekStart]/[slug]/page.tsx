@@ -5,12 +5,11 @@ import {
   weekRangeLabel,
   weeklyStoryPath,
 } from '@/components/digest/WeeklyDigestView'
-import { handlesIn } from '@/lib/digest/weekly'
 import {
   getPublishedWeeklyDigest,
-  loadWeeklyProfiles,
-  loadWeeklyRefPreviews,
+  getCachedWeeklyRefPreviews,
 } from '@/lib/digest/weeklyData'
+import { WeeklyProfiles } from '@/components/digest/WeeklyProfiles'
 
 export const revalidate = 300
 
@@ -53,23 +52,15 @@ export default async function WeeklyStoryPage({
   const found = await load(weekStart, slug)
   if (!found) notFound()
   const { edition, story } = found
-  const [previews, profiles] = await Promise.all([
-    loadWeeklyRefPreviews(edition.content),
-    loadWeeklyProfiles(
-      edition.content,
-      handlesIn([
-        story.overview,
-        story.continuityNote,
-        ...story.segments.map(({ commentary }) => commentary),
-      ]),
-    ),
-  ])
+  const previews = await getCachedWeeklyRefPreviews(edition.weekStart)
   return (
     <WeeklyStoryView
       edition={edition}
       story={story}
       previews={previews}
-      profiles={profiles}
+      profiles={
+        <WeeklyProfiles weekStart={edition.weekStart} storySlug={story.slug} />
+      }
     />
   )
 }

@@ -1,12 +1,12 @@
 {
   "weekStart": "2026-10-26",
   "weekEnd": "2026-11-01",
-  "generatedAt": "2026-11-08T20:22:32.646Z",
-  "dek": "A week when machines claimed to topple a famous conjecture, hackers drained exchanges, the timeline peered inside Qwen, and a beloved captain said goodbye.",
+  "generatedAt": "2026-11-08T22:23:11.545Z",
+  "dek": "\"The Exponential Time Hypothesis is false,\" OpenAI claimed; Qwen got \"a library of 34,220 persona neurons\"; Patrick Stewart \"sadly passed away at the age of 86.\"",
   "executiveSummary": [
-    "OpenAI said an internal model disproved the Exponential Time Hypothesis, a major computer-science conjecture, and outside experts are organizing an independent review.",
-    "The wave of AI-era hacks reached finance, with a GMO server breach, a reported $5.6 billion Binance theft and a Polymarket halt.",
-    "Community researchers spent all week mapping and steering individual neurons in Qwen models, as Anthropic's IPO filing and Patrick Stewart's death also drew wide reaction."
+    "OpenAI said its models proved three results in math, computer science and physics, including refuting a major complexity conjecture; outside experts will review it.",
+    "Community researchers turned single neurons in Qwen models into a searchable library, one-neuron personas and tools that read what each neuron does.",
+    "Star Trek actor Patrick Stewart died at 86, and a reported $5.6B Binance hack topped a week of AI-era security scares."
   ],
   "stories": [
     {
@@ -15,8 +15,8 @@
       "title": "The Exponential Time Hypothesis is false.",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@gdb and @danintheory announced AI-found results in math, complexity theory and physics; @rrwilliams was asked to organize an 'open and independent examination' of the ETH refutation.",
-      "overview": "OpenAI announced three discoveries made with its models, Lean-verified, including a claimed refutation of the Exponential Time Hypothesis, a conjecture tied to P vs NP. It was the week's most-discussed AI claim, with reactions from awe to Roko calling the result 'somewhat deflationary.' A day later @tszzl quoted the announcement to predict that losing control to AI will feel like repeated surprise, while Axiom's formalization of a 15,000-page proof added to the sense of machines overtaking mathematics.",
+      "subtitle": "@gdb and @danintheory announced three AI-made discoveries; @rrwilliams said he was asked to organize an \"open and independent examination\" of the ETH refutation.",
+      "overview": "OpenAI announced Lean-verified results in harmonic analysis, complexity theory and quantum field theory, the headline being a claimed refutation of the Exponential Time Hypothesis. It was the week's most-quoted AI story, with reactions running from awe to calling the bound deflationary. These remain claims under verification, with independent reviews being organized for the ETH and physics results.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -24,45 +24,31 @@
           "digestDate": "2026-10-27",
           "slug": "the-exponential-time-hypothesis-is-false",
           "title": "The Exponential Time Hypothesis is false."
-        },
-        {
-          "digestDate": "2026-10-28",
-          "slug": "wow-i-didn-t-know-you-could-do-that-with-mere-bits-and-atoms",
-          "title": "wow I didn't know you could DO that with mere bits and atoms"
         }
       ],
       "days": [
-        "2026-10-27",
-        "2026-10-28"
+        "2026-10-27"
       ],
       "segments": [
         {
-          "commentary": "The announcement landed from OpenAI leadership and researchers at once, framed as AI helping 'improve our understanding of the universe.'",
+          "commentary": "The announcement came from OpenAI's leadership and its science lead together.",
           "tweetIds": [
             "2114837059462627533",
             "2114833682469122314"
           ]
         },
         {
-          "commentary": "The ETH claim drew the most attention; @danintheory stressed it was verified in Lean, and @AndrewCurran_ boiled it down to one line.",
+          "commentary": "@AndrewCurran_ pulled out the line everyone kept quoting, and listed all three claims.",
           "tweetIds": [
-            "2114833687296847930",
             "2114836647821107422",
             "2114836071028785289"
           ]
         },
         {
-          "commentary": "Outside complexity theorists stepped in to scrutinize the claim rather than take it on faith.",
+          "commentary": "The key caveats: the ETH proof was checked in Lean, and established complexity theorists were brought in to scrutinize it in public.",
           "tweetIds": [
+            "2114833687296847930",
             "2114833319431209352"
-          ]
-        },
-        {
-          "commentary": "The next day @tszzl quoted the announcement with a bleak prediction, while Axiom's formalization news and @olivertraldi's dilemma pushed the conversation toward what human value means.",
-          "tweetIds": [
-            "2114962843921678444",
-            "2115089794867040584",
-            "2115223171746140277"
           ]
         }
       ],
@@ -160,55 +146,6 @@
           "createdAt": "2026-10-26T21:36:57.000Z",
           "observedAt": "2026-10-27T03:47:31.574Z",
           "quoteCount": 3
-        },
-        {
-          "id": "2114962843921678444",
-          "rts": 82,
-          "name": "roon",
-          "text": "fighting for control over a runaway intelligence explosion will continuously look like “wow I didn’t know you could DO that with mere bits and atoms” and then losing",
-          "likes": 1456,
-          "avatar": "https://pbs.twimg.com/profile_images/1918970926668054530/fy-ZsgJ7_normal.jpg",
-          "username": "tszzl",
-          "accountId": "1460283925",
-          "createdAt": "2026-10-27T06:10:10.000Z",
-          "observedAt": "2026-10-28T06:17:54.534Z",
-          "quoteCount": 3,
-          "communityAuthored": true
-        },
-        {
-          "id": "2115089794867040584",
-          "rts": 2567,
-          "name": "Axiom",
-          "text": "The largest math proof in human history is now computer-verified.\n\nToday, Axiom announces a complete Lean auto-formalization of the Classification of Finite Simple Groups, the \"periodic table of symmetry.\"\n\nAbout 15,000 pages, built by over 100 mathematicians across generations. https://t.co/Y1P26abyPQ",
-          "likes": 5621,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HVpOm-eaUAAZZVL.jpg",
-              "type": "video",
-              "width": 1920,
-              "height": 1080
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/2020254827117432832/Yad4149b_normal.jpg",
-          "username": "axiommathai",
-          "accountId": "1972828074908749824",
-          "createdAt": "2026-10-27T14:34:38.000Z",
-          "observedAt": "2026-10-28T06:17:54.534Z",
-          "quoteCount": 3
-        },
-        {
-          "id": "2115223171746140277",
-          "rts": 26,
-          "name": "Oliver Traldi",
-          "text": "There's probably not a knockdown argument here, but I feel like there's a kind of dilemma for anthropocentrism. If you lean heavily on intellection, human value ends up continuous with machines. If you lean heavily on experience, human value ends up continuous with animals.",
-          "likes": 203,
-          "avatar": "https://pbs.twimg.com/profile_images/1982864645758091264/tLdbdemO_normal.jpg",
-          "username": "olivertraldi",
-          "accountId": "778952476565368832",
-          "createdAt": "2026-10-27T23:24:37.000Z",
-          "observedAt": "2026-10-28T06:17:54.534Z",
-          "quoteCount": 2,
-          "communityAuthored": true
         }
       ],
       "featuredTweetIds": [
@@ -216,189 +153,136 @@
         "2114833319431209352"
       ],
       "trendTerms": [
-        "eth",
         "exponential time hypothesis",
-        "lean"
+        "eth",
+        "kakeya"
       ]
     },
     {
-      "slug": "binance-hacked-with-over-5-6-billion-stolen",
-      "kind": "ongoing",
-      "title": "Binance hacked with over $5.6 billion stolen",
+      "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
+      "kind": "major",
+      "title": "Patrick Stewart has sadly passed away at the age of 86.",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@WatcherGuru reported 'the largest hack in crypto history' as @PolymarketTrade halted trading and @AndrewCurran_ reported a GMO server breach across 70 brokerages.",
-      "overview": "The vulnerability flood of recent weeks moved into money this week. On Monday @AndrewCurran_ reported hackers draining FX accounts via GMO's servers, while @theproteindance described agent swarms patching packages hit by the compromised eMuhdra certificate, and a viral grid-attack 'whistleblower' was widely called fake. On Friday a reported $5.6 billion Binance theft, a Polymarket supply-chain breach and Epoch AI's demo of an open-weight model exploiting Firefox deepened the dread.",
-      "continuityNote": "Last week's PHP leak and swarm-patching thread spread this week to exchanges and brokerages, with Epoch showing a model cheaply weaponizing unshipped Firefox fixes.",
-      "continuesFrom": [
-        {
-          "weekStart": "2026-10-19",
-          "slug": "the-details-leaked-before-the-patch-was-even-out-which-is-worse",
-          "title": "the details leaked before the patch was even out, which is worse"
-        },
-        {
-          "weekStart": "2026-10-19",
-          "slug": "someone-is-runing-a-deepseek-swarm-to-remotely-patch-unpatched-php-boxes",
-          "title": "someone is runing a deepseek swarm to remotely patch unpatched php boxes"
-        }
-      ],
+      "subtitle": "@SirPatStew's account asked for donations to Alzheimer's research \"in lieu of flowers\"; tributes treated Picard as a moral role model.",
+      "overview": "The death of Star Trek's Captain Picard and X-Men's Charles Xavier was by far the week's most-liked event, announced from his own account. The community's tributes went beyond fandom, calling Picard close to a portrayal of the ideal person and recalling Stewart's Shakespeare and stage work.",
+      "continuityNote": "",
+      "continuesFrom": [],
       "dailyStories": [
         {
-          "digestDate": "2026-10-26",
-          "slug": "only-thing-that-can-beat-a-bad-guy-with-a-swarm-is-a-good-guy-with-another-swarm",
-          "title": "only thing that can beat a bad guy with a swarm is a good guy with another swarm"
-        },
-        {
           "digestDate": "2026-10-30",
-          "slug": "binance-hacked-with-over-5-6-billion-stolen",
-          "title": "Binance hacked with over $5.6 billion stolen"
+          "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
+          "title": "Patrick Stewart has sadly passed away at the age of 86."
         }
       ],
       "days": [
-        "2026-10-26",
         "2026-10-30"
       ],
       "segments": [
         {
-          "commentary": "The defenders' side of last week's story continued, with fleets of agents patching eMuhdra-affected nixpkgs.",
+          "commentary": "The news broke through his own account and film outlets within minutes.",
           "tweetIds": [
-            "2114267550653751361"
+            "2115891266131300517",
+            "2115893413233016885",
+            "2115894208355590181"
           ]
         },
         {
-          "commentary": "Then the attacks hit finance, starting with Japanese FX brokerages.",
+          "commentary": "Community tributes stressed the craft behind the nerdy roles.",
           "tweetIds": [
-            "2114242724971020787"
-          ]
-        },
-        {
-          "commentary": "A viral grid-attack claim rode the anxiety; Tenobrus called it 'obviously fake btw,' and nothing backs it up.",
-          "tweetIds": [
-            "2114403357167071645"
-          ]
-        },
-        {
-          "commentary": "Friday brought the biggest reported numbers yet, a Polymarket halt that patio11 read as a frontend supply-chain attack, and Epoch's Firefox exploits at about $1,000 per version.",
-          "tweetIds": [
-            "2115922259739349132",
-            "2115874609014726842",
-            "2115921730682404869"
+            "2115909714731049217"
           ]
         }
       ],
       "tweets": [
         {
-          "id": "2114267550653751361",
-          "rts": 2,
-          "name": "blue (Jonathan)",
-          "text": "who will win? one (1) compromised CA or a fleet of agents patching everything?\n\nonly thing that can beat a bad guy with a swarm is a good guy with another swarm https://t.co/n4pe5wHWBh",
-          "likes": 7,
+          "id": "2115891266131300517",
+          "rts": 89158,
+          "name": "Patrick Stewart",
+          "text": "In lieu of flowers, memorial contributions may be made to:\nJohns Hopkins Alzheimer’s Disease Research Center Fund   \nhttps://t.co/luC5CdcWDy\nAlzheimer’s Foundation of America Caregiver Resources    \nhttps://t.co/zvNptfyuNd\n\nPhoto Credit: Tommy Garcia https://t.co/XNncEVq56X",
+          "likes": 312427,
           "media": [
             {
-              "url": "https://pbs.twimg.com/media/HVc3wFqbUAEXzxB.png",
+              "url": "https://pbs.twimg.com/media/HV0nTn4XoAAU9O8.jpg",
               "type": "photo",
-              "width": 1200,
-              "height": 508
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/1853561884190072832/lLrAIU3Y_normal.jpg",
-          "username": "theproteindance",
-          "accountId": "1295173896233275394",
-          "createdAt": "2026-10-25T08:07:19.000Z",
-          "observedAt": "2026-10-26T06:32:37.292Z",
-          "quoteCount": 2,
-          "communityAuthored": true
-        },
-        {
-          "id": "2114242724971020787",
-          "rts": 220,
-          "name": "Andrew Curran",
-          "text": "A cloud VPS service from Japan's massive GMO Internet Group used by foreign-exchange traders has been hacked. Attackers breached the servers, stole customer credentials, and executed balance-destroying trades across over 70 brokerages. GMO has asked government agencies for help. https://t.co/AgL1S0QfJF",
-          "likes": 998,
-          "media": [
+              "width": 959,
+              "height": 1200
+            },
             {
-              "url": "https://pbs.twimg.com/media/HVdMjdDagAAMpty.jpg",
+              "url": "https://pbs.twimg.com/media/HV0nTpuXAAAIeIB.jpg",
               "type": "photo",
-              "width": 992,
-              "height": 645
+              "width": 960,
+              "height": 1200
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HV0nTqUXAAAMkla.jpg",
+              "type": "photo",
+              "width": 958,
+              "height": 1200
             }
           ],
-          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
-          "username": "AndrewCurran_",
-          "accountId": "1538525334781370368",
-          "createdAt": "2026-10-25T06:28:41.000Z",
-          "observedAt": "2026-10-26T06:32:37.292Z",
+          "avatar": "https://pbs.twimg.com/profile_images/790573246596931586/V8uV5TcL_normal.jpg",
+          "username": "SirPatStew",
+          "accountId": "602317143",
+          "createdAt": "2026-10-29T19:39:23.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
           "quoteCount": 2
         },
         {
-          "id": "2114403357167071645",
-          "rts": 2132,
-          "name": "TheCoinClapper",
-          "text": "This may be my last tweet before shit goes down. I’m an AI researcher whistleblower. I work for one of the biggest labs in the world. There is currently a major cyber attack going on for days attacking US electrical grids. They are hiding this from the public. We are on the verge of a potential disaster that will make Covid look like a playground. Prepare for the worst",
-          "likes": 15451,
-          "avatar": "https://pbs.twimg.com/profile_images/1797627466376183808/AS6Kk716_normal.jpg",
-          "username": "TheCoinCollect8",
-          "accountId": "1379066758326321154",
-          "createdAt": "2026-10-25T17:06:58.000Z",
-          "observedAt": "2026-10-26T06:32:37.292Z",
-          "quoteCount": 2
-        },
-        {
-          "id": "2115922259739349132",
-          "rts": 11636,
-          "name": "Watcher.Guru",
-          "text": "BREAKING: World's largest crypto exchange Binance hacked with over $5.6 billion stolen:\n\n• $1.45 billion $BTC \n• $875 million $ETH\n• $234 million $TRX\n• $50 million $XAUT\n• $1.57 billion $USDT\n• $823 million $USDC\n• $75 million $WBETH \n• $88.5 million $RLUSD\n+ $447.5 million additional cryptocurrencies \n\nThis is the largest hack in crypto history.",
-          "likes": 38526,
+          "id": "2115893413233016885",
+          "rts": 84806,
+          "name": "DiscussingFilm",
+          "text": "Patrick Stewart has sadly passed away at the age of 86. https://t.co/fRJjlM86eP",
+          "likes": 421526,
           "media": [
             {
-              "url": "https://pbs.twimg.com/media/HV1EE82aAAAXwuB.jpg",
+              "url": "https://pbs.twimg.com/media/HV0p2HrWoAA9Rs8.jpg",
               "type": "photo",
-              "width": 1087,
-              "height": 737
+              "width": 804,
+              "height": 700
             }
           ],
-          "avatar": "https://pbs.twimg.com/profile_images/1641221212578754562/DfiC0KW2_normal.png",
-          "username": "WatcherGuru",
-          "accountId": "1387497871751196672",
-          "createdAt": "2026-10-29T21:42:33.000Z",
-          "observedAt": "2026-10-30T06:42:13.651Z",
-          "quoteCount": 5
-        },
-        {
-          "id": "2115874609014726842",
-          "rts": 827,
-          "name": "Polymarket Traders",
-          "text": "We've identified & fixed an issue impacting our international platform, Polymarket⁠.com. One of our 3rd party providers was compromised, and we have referred this to relevant law enforcement.\n\nAnyone who has been impacted will be made whole.\n\nOut of an abundance of caution, we have temporarily halted trading & are working to bring the platform back online.",
-          "likes": 2901,
-          "avatar": "https://pbs.twimg.com/profile_images/1984009470628761600/g0ajJ_4j_normal.jpg",
-          "username": "PolymarketTrade",
-          "accountId": "1965783030062022656",
-          "createdAt": "2026-10-29T18:33:12.000Z",
-          "observedAt": "2026-10-30T03:19:53.759Z",
+          "avatar": "https://pbs.twimg.com/profile_images/1706429397467549696/hmvwfChQ_normal.jpg",
+          "username": "DiscussingFilm",
+          "accountId": "780460754910732288",
+          "createdAt": "2026-10-29T19:47:55.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
           "quoteCount": 3
         },
         {
-          "id": "2115921730682404869",
-          "rts": 60,
-          "name": "Epoch AI",
-          "text": "In recent experiments, we found that GLM 5.3 can autonomously compromise recent versions of Mozilla Firefox using security fixes that have been published but not yet shipped to users.\n\nWe used a deliberately basic setup meant to emulate a relatively unsophisticated attacker with limited resources. After basic initial instructions to inspect those not-yet-shipped fixes, the model reliably built successful exploits for six recent Firefox versions on its own using only information available at the time of release.\n\nThese exploits, which cost about $1,000 per compromised version, would let an attacker steal passwords and authentication cookies stored in the browser, or read any files on the user's computer, after the user opens a single webpage, with no further interaction.\n\nThe exploits make use of the \"patch gap,\" the time between when security fixes are made public in beta or \"nightly\" software updates and when those fixes are generally released to users. Until now, exploiting it required significant human time and skill, or special access to frontier models with advanced cyber capabilities.\n\nOur results show that widely available open-weight models can now do this relatively cheaply and quickly. We gave GLM 5.3 up to 48 hours to find an exploit, but its fastest attempt needed only 12 hours.\n\nIn all of its successful attacks, the patch gap gave GLM 5.3 an initial foothold in the browser. To turn that foothold into reading files off the user's computer, the model also independently discovered and used a previously unpublished vulnerability.\n\nWe shared our findings with Mozilla, which patched the vulnerability in its October 27 Firefox 159.0 release. We haven't yet confirmed whether the attack still succeeds without it, but expect the fix makes it substantially harder. We're grateful to Mozilla for their responsiveness and collaboration.",
-          "likes": 315,
-          "avatar": "https://pbs.twimg.com/profile_images/1866142753127616512/DYcE9bN1_normal.jpg",
-          "username": "EpochAIResearch",
-          "accountId": "1529761561170124800",
-          "createdAt": "2026-10-29T21:40:27.000Z",
-          "observedAt": "2026-10-30T06:16:23.289Z",
-          "quoteCount": 4
+          "id": "2115894208355590181",
+          "rts": 4072,
+          "name": "Variety",
+          "text": "Patrick Stewart, 'Star Trek's' Captain Picard and 'X-Men's' Charles Xavier, Dies at 86 https://t.co/7VBS83Rv3Q",
+          "likes": 11046,
+          "avatar": "https://pbs.twimg.com/profile_images/1610752949550186496/X5zYP9oV_normal.jpg",
+          "username": "Variety",
+          "accountId": "17525171",
+          "createdAt": "2026-10-29T19:51:05.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115909714731049217",
+          "rts": 3,
+          "name": "Fullmetal Anarchist",
+          "text": "Sir Patrick Stewart's talent was an undeniable gift from God, but he also put in the work for years in Shakespearean theatre and Broadway honing his craft. He would spend the rest of his life lending his considerable credibility to nerdy pop culture projects",
+          "likes": 55,
+          "avatar": "https://pbs.twimg.com/profile_images/1960778140961165312/i6WSX0J5_normal.jpg",
+          "username": "spacedogpope",
+          "accountId": "1761374017959743488",
+          "createdAt": "2026-10-29T20:52:42.000Z",
+          "observedAt": "2026-10-30T04:16:53.505Z",
+          "quoteCount": 2
         }
       ],
       "featuredTweetIds": [
-        "2115922259739349132",
-        "2114267550653751361"
+        "2115893413233016885",
+        "2115891266131300517"
       ],
       "trendTerms": [
-        "binance",
-        "polymarket",
-        "emudhra"
+        "patrick stewart",
+        "picard"
       ]
     },
     {
@@ -407,10 +291,16 @@
       "title": "i made a library of 34,220 persona neurons in qwen",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@jfonsecarivera's neuron library made 'a humble muffin'; @maxsloef turned Qwen into an owl via one neuron, and @voooooogel warned of 'persona solving.'",
-      "overview": "The community's interpretability toy of the week ran every day from Monday to Saturday. @Sauers_'s green neuron inspired @jfonsecarivera's searchable library of Qwen persona neurons, followed by evil-Qwen steering recipes, @_a9lim's J-lens for reading neurons, and one-neuron owl training from @maxsloef. @voooooogel pushed back that steering-induced personas need not mean persona-specific neurons, and the week closed with @_a9lim and treetown releasing Neuron Lens, a database of every neuron in two models.",
-      "continuityNote": "",
-      "continuesFrom": [],
+      "subtitle": "@jfonsecarivera published a searchable Qwen neuron library; @maxsloef made an owl from \"one random neuron\" and @_a9lim released Neuron Lens to read every neuron.",
+      "overview": "Single neurons in open models became the community's favorite toy and research thread all week. It began with @Sauers_ finding a neuron that makes a model green, grew into @jfonsecarivera's library and an evil-Qwen steering recipe, drew @voooooogel's warning about \"persona solving,\" and ended with @_a9lim and @treetowntree's J-lens and Neuron Lens tools for reading what neurons do.",
+      "continuityNote": "Two weeks ago the debate was whether neurons had become readable; this week community members shipped libraries, one-neuron training and full neuron-reading databases.",
+      "continuesFrom": [
+        {
+          "weekStart": "2026-10-12",
+          "slug": "i-think-this-may-be-remembered-as-a-major-moment-in-scientific-history",
+          "title": "i think this may be remembered as a major moment in scientific history"
+        }
+      ],
       "dailyStories": [
         {
           "digestDate": "2026-10-26",
@@ -447,42 +337,37 @@
       ],
       "segments": [
         {
-          "commentary": "It started as half joke, half research share; roon replied that monosemanticity is 'a pathway to many abilities.'",
+          "commentary": "The opening find was half joke, half mechinterp; a same-day paper showed hidden preferences crossing between unrelated models.",
           "tweetIds": [
-            "2114481373876801557"
+            "2114481373876801557",
+            "2114445425398931614"
           ]
         },
         {
-          "commentary": "@jfonsecarivera credited @Sauers_ and swept every neuron, with Haiku rating weirdness, and the combos became the day's favorite game.",
+          "commentary": "@jfonsecarivera credited @Sauers_ and swept every neuron, and the muffin combo became the week's mascot.",
           "tweetIds": [
             "2115093117917659372",
-            "2115096024859705532"
+            "2115096024859705532",
+            "2115109334090920065"
           ]
         },
         {
-          "commentary": "Others turned the fun darker with a one-neuron 'evil qwen' recipe.",
+          "commentary": "Steering turned darker with a recipe for an evil Qwen.",
           "tweetIds": [
             "2115274388425900291"
           ]
         },
         {
-          "commentary": "@_a9lim previewed a way to read what neurons represent instead of steering them, as @divagr1925 ran a CPU inside Qwen's weights.",
-          "tweetIds": [
-            "2115628110871924892",
-            "2115394340357116169"
-          ]
-        },
-        {
-          "commentary": "Friday added training and a reality check; @jfonsecarivera conceded 'sloppy framing' after the critique.",
+          "commentary": "Then came pushback and extension: one neuron can carry a whole persona, but steering may not mean the neuron is persona-specific.",
           "tweetIds": [
             "2115858480016011420",
-            "2115685944615649286",
-            "2115726641410482580"
+            "2115685944615649286"
           ]
         },
         {
-          "commentary": "The promised repo arrived as a full database covering Qwen 3 8B and Gemma 4 12B.",
+          "commentary": "@_a9lim previewed J-lens, then released a database covering every neuron and attention head in two models.",
           "tweetIds": [
+            "2115628110871924892",
             "2116314514199068915"
           ]
         }
@@ -782,7 +667,7 @@
       ],
       "featuredTweetIds": [
         "2115109334090920065",
-        "2115685944615649286"
+        "2116314514199068915"
       ],
       "trendTerms": [
         "persona neurons",
@@ -791,13 +676,188 @@
       ]
     },
     {
-      "slug": "1-in-70-americans-with-100mm-net-worth-will-be-anthropic-staff",
+      "slug": "only-thing-that-can-beat-a-bad-guy-with-a-swarm-is-a-good-guy-with-another-swarm",
       "kind": "ongoing",
-      "title": "~1 in 70 americans with 100MM+ net worth will be  anthropic staff",
+      "title": "only thing that can beat a bad guy with a swarm is a good guy with another swarm",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@AnthropicAI filed for its IPO; @DaveRBanerjee mocked a risk factor saying no insurer could cover the risk Anthropic poses, and @jakehalloran1 tallied staff fortunes.",
-      "overview": "Anthropic's S-1 filing drew attention on Tuesday for a reported $16.3 billion first-half revenue and an insurance risk factor @nic_carter said 'has to take the cake.' Two days later the same filing fed back-of-envelope wealth estimates from @jakehalloran1, set against viral posts about tech workers feeling obsolete and Silicon Valley being 'unwell.'",
+      "subtitle": "@theproteindance ran agent fleets to patch eMuhdra-hit packages; @WatcherGuru reported Binance \"hacked with over $5.6 billion stolen\" as Polymarket halted trading.",
+      "overview": "Last week's flood of AI-found vulnerabilities kept spilling into real breaches. Monday brought agent swarms patching packages hit by a compromised certificate authority, a GMO Internet hack that wrecked FX accounts, and a viral grid-attack 'whistleblower' widely called fake. Friday added a reported Binance theft, a Polymarket supply-chain breach, and Epoch AI showing an open model exploiting Firefox fixes before they shipped, tying the incidents to the same argument over whether AI defense can outpace AI attack.",
+      "continuityNote": "After last week's PHP leak and breaches, this week brought the largest reported crypto hack, a Polymarket halt and evidence that cheap open models can weaponize unshipped patches.",
+      "continuesFrom": [
+        {
+          "weekStart": "2026-10-19",
+          "slug": "i-no-longer-think-were-gonna-be-able-to-just-patch-all-the-bugs",
+          "title": "I no longer think we're gonna be able to just patch all the bugs"
+        }
+      ],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-26",
+          "slug": "only-thing-that-can-beat-a-bad-guy-with-a-swarm-is-a-good-guy-with-another-swarm",
+          "title": "only thing that can beat a bad guy with a swarm is a good guy with another swarm"
+        },
+        {
+          "digestDate": "2026-10-30",
+          "slug": "binance-hacked-with-over-5-6-billion-stolen",
+          "title": "Binance hacked with over $5.6 billion stolen"
+        }
+      ],
+      "days": [
+        "2026-10-26",
+        "2026-10-30"
+      ],
+      "segments": [
+        {
+          "commentary": "A community member framed the defense as an immune system of agents; the GMO breach showed the stakes.",
+          "tweetIds": [
+            "2114267550653751361",
+            "2114242724971020787"
+          ]
+        },
+        {
+          "commentary": "The most-liked post of the day was an unverified grid-attack claim that Tenobrus called \"obviously fake.\"",
+          "tweetIds": [
+            "2114403357167071645"
+          ]
+        },
+        {
+          "commentary": "Friday's incidents piled up within hours of each other.",
+          "tweetIds": [
+            "2115922259739349132",
+            "2115874609014726842"
+          ]
+        },
+        {
+          "commentary": "Epoch's experiment explained why: a basic setup could turn published fixes into working exploits.",
+          "tweetIds": [
+            "2115921730682404869"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2114267550653751361",
+          "rts": 2,
+          "name": "blue (Jonathan)",
+          "text": "who will win? one (1) compromised CA or a fleet of agents patching everything?\n\nonly thing that can beat a bad guy with a swarm is a good guy with another swarm https://t.co/n4pe5wHWBh",
+          "likes": 7,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVc3wFqbUAEXzxB.png",
+              "type": "photo",
+              "width": 1200,
+              "height": 508
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1853561884190072832/lLrAIU3Y_normal.jpg",
+          "username": "theproteindance",
+          "accountId": "1295173896233275394",
+          "createdAt": "2026-10-25T08:07:19.000Z",
+          "observedAt": "2026-10-26T06:32:37.292Z",
+          "quoteCount": 2,
+          "communityAuthored": true
+        },
+        {
+          "id": "2114242724971020787",
+          "rts": 220,
+          "name": "Andrew Curran",
+          "text": "A cloud VPS service from Japan's massive GMO Internet Group used by foreign-exchange traders has been hacked. Attackers breached the servers, stole customer credentials, and executed balance-destroying trades across over 70 brokerages. GMO has asked government agencies for help. https://t.co/AgL1S0QfJF",
+          "likes": 998,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVdMjdDagAAMpty.jpg",
+              "type": "photo",
+              "width": 992,
+              "height": 645
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
+          "username": "AndrewCurran_",
+          "accountId": "1538525334781370368",
+          "createdAt": "2026-10-25T06:28:41.000Z",
+          "observedAt": "2026-10-26T06:32:37.292Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2114403357167071645",
+          "rts": 2132,
+          "name": "TheCoinClapper",
+          "text": "This may be my last tweet before shit goes down. I’m an AI researcher whistleblower. I work for one of the biggest labs in the world. There is currently a major cyber attack going on for days attacking US electrical grids. They are hiding this from the public. We are on the verge of a potential disaster that will make Covid look like a playground. Prepare for the worst",
+          "likes": 15451,
+          "avatar": "https://pbs.twimg.com/profile_images/1797627466376183808/AS6Kk716_normal.jpg",
+          "username": "TheCoinCollect8",
+          "accountId": "1379066758326321154",
+          "createdAt": "2026-10-25T17:06:58.000Z",
+          "observedAt": "2026-10-26T06:32:37.292Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115922259739349132",
+          "rts": 11636,
+          "name": "Watcher.Guru",
+          "text": "BREAKING: World's largest crypto exchange Binance hacked with over $5.6 billion stolen:\n\n• $1.45 billion $BTC \n• $875 million $ETH\n• $234 million $TRX\n• $50 million $XAUT\n• $1.57 billion $USDT\n• $823 million $USDC\n• $75 million $WBETH \n• $88.5 million $RLUSD\n+ $447.5 million additional cryptocurrencies \n\nThis is the largest hack in crypto history.",
+          "likes": 38526,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HV1EE82aAAAXwuB.jpg",
+              "type": "photo",
+              "width": 1087,
+              "height": 737
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1641221212578754562/DfiC0KW2_normal.png",
+          "username": "WatcherGuru",
+          "accountId": "1387497871751196672",
+          "createdAt": "2026-10-29T21:42:33.000Z",
+          "observedAt": "2026-10-30T06:42:13.651Z",
+          "quoteCount": 5
+        },
+        {
+          "id": "2115874609014726842",
+          "rts": 827,
+          "name": "Polymarket Traders",
+          "text": "We've identified & fixed an issue impacting our international platform, Polymarket⁠.com. One of our 3rd party providers was compromised, and we have referred this to relevant law enforcement.\n\nAnyone who has been impacted will be made whole.\n\nOut of an abundance of caution, we have temporarily halted trading & are working to bring the platform back online.",
+          "likes": 2901,
+          "avatar": "https://pbs.twimg.com/profile_images/1984009470628761600/g0ajJ_4j_normal.jpg",
+          "username": "PolymarketTrade",
+          "accountId": "1965783030062022656",
+          "createdAt": "2026-10-29T18:33:12.000Z",
+          "observedAt": "2026-10-30T03:19:53.759Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2115921730682404869",
+          "rts": 60,
+          "name": "Epoch AI",
+          "text": "In recent experiments, we found that GLM 5.3 can autonomously compromise recent versions of Mozilla Firefox using security fixes that have been published but not yet shipped to users.\n\nWe used a deliberately basic setup meant to emulate a relatively unsophisticated attacker with limited resources. After basic initial instructions to inspect those not-yet-shipped fixes, the model reliably built successful exploits for six recent Firefox versions on its own using only information available at the time of release.\n\nThese exploits, which cost about $1,000 per compromised version, would let an attacker steal passwords and authentication cookies stored in the browser, or read any files on the user's computer, after the user opens a single webpage, with no further interaction.\n\nThe exploits make use of the \"patch gap,\" the time between when security fixes are made public in beta or \"nightly\" software updates and when those fixes are generally released to users. Until now, exploiting it required significant human time and skill, or special access to frontier models with advanced cyber capabilities.\n\nOur results show that widely available open-weight models can now do this relatively cheaply and quickly. We gave GLM 5.3 up to 48 hours to find an exploit, but its fastest attempt needed only 12 hours.\n\nIn all of its successful attacks, the patch gap gave GLM 5.3 an initial foothold in the browser. To turn that foothold into reading files off the user's computer, the model also independently discovered and used a previously unpublished vulnerability.\n\nWe shared our findings with Mozilla, which patched the vulnerability in its October 27 Firefox 159.0 release. We haven't yet confirmed whether the attack still succeeds without it, but expect the fix makes it substantially harder. We're grateful to Mozilla for their responsiveness and collaboration.",
+          "likes": 315,
+          "avatar": "https://pbs.twimg.com/profile_images/1866142753127616512/DYcE9bN1_normal.jpg",
+          "username": "EpochAIResearch",
+          "accountId": "1529761561170124800",
+          "createdAt": "2026-10-29T21:40:27.000Z",
+          "observedAt": "2026-10-30T06:16:23.289Z",
+          "quoteCount": 4
+        }
+      ],
+      "featuredTweetIds": [
+        "2114267550653751361",
+        "2115922259739349132"
+      ],
+      "trendTerms": [
+        "binance",
+        "emudhra",
+        "polymarket"
+      ]
+    },
+    {
+      "slug": "anthropics-ipo-filing-says-no-insurer-could-cover-its-catastrophic-risk",
+      "kind": "ongoing",
+      "title": "Anthropic's IPO filing says no insurer could cover its catastrophic risk",
+      "titleIsQuote": false,
+      "titleKind": "voice",
+      "subtitle": "@AnthropicAI filed its S-1; @DaveRBanerjee laughed at a risk factor on the \"entire insurance industry,\" and @jakehalloran1 said \"~1 in 70\" US centimillionaires will be Anthropic staff.",
+      "overview": "Anthropic's IPO filing drew attention first for a risk factor saying the whole insurance industry could not cover the catastrophe it might cause, and for reported first-half revenue of $16.3 billion. Two days later the same filing fed back-of-envelope math about how much wealth would land on lab staff, set against viral posts about technical workers feeling obsolete and Silicon Valley being unwell.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -818,26 +878,21 @@
       ],
       "segments": [
         {
-          "commentary": "The filing itself was the most-liked post of the day.",
+          "commentary": "The filing itself, followed within hours by readers mining its risk factors.",
           "tweetIds": [
-            "2114705042817110293"
-          ]
-        },
-        {
-          "commentary": "The risk factors became the joke; Gabriel Weil noted no law requires AI firms to carry liability insurance.",
-          "tweetIds": [
+            "2114705042817110293",
             "2114734798186983537",
             "2114713401444470853"
           ]
         },
         {
-          "commentary": "The revenue figures circulated too.",
+          "commentary": "The revenue figure circulated alongside tools to query the filing.",
           "tweetIds": [
             "2114837894187950245"
           ]
         },
         {
-          "commentary": "By Thursday the S-1 had turned into wealth math, alongside @trq212's widely shared observation about technical workers' gloom.",
+          "commentary": "By Thursday the talk turned to who gets rich and how everyone else feels.",
           "tweetIds": [
             "2115468340311605282",
             "2115544056038350960",
@@ -970,143 +1025,11 @@
         "s-1",
         "anthropic ipo"
       ]
-    },
-    {
-      "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
-      "kind": "major",
-      "title": "Patrick Stewart has sadly passed away at the age of 86.",
-      "titleIsQuote": true,
-      "titleKind": "quote",
-      "subtitle": "@SirPatStew's account announced his death and asked for Alzheimer's research donations; tributes called Picard 'the closest humanity has ever come' to an ideal person.",
-      "overview": "The death of Star Trek's Captain Picard was by far the week's largest event by likes, and the community treated it as more than celebrity news. Tributes praised Picard as a moral role model and model of empathetic masculinity, and recalled Stewart's years of Shakespeare and stage work.",
-      "continuityNote": "",
-      "continuesFrom": [],
-      "dailyStories": [
-        {
-          "digestDate": "2026-10-30",
-          "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
-          "title": "Patrick Stewart has sadly passed away at the age of 86."
-        }
-      ],
-      "days": [
-        "2026-10-30"
-      ],
-      "segments": [
-        {
-          "commentary": "The news spread from film accounts and the trades within minutes.",
-          "tweetIds": [
-            "2115893413233016885",
-            "2115894208355590181"
-          ]
-        },
-        {
-          "commentary": "His own account pointed mourners toward Alzheimer's research and caregivers.",
-          "tweetIds": [
-            "2115891266131300517"
-          ]
-        },
-        {
-          "commentary": "Community tributes dwelt on his craft as much as his fame.",
-          "tweetIds": [
-            "2115909714731049217"
-          ]
-        }
-      ],
-      "tweets": [
-        {
-          "id": "2115891266131300517",
-          "rts": 89158,
-          "name": "Patrick Stewart",
-          "text": "In lieu of flowers, memorial contributions may be made to:\nJohns Hopkins Alzheimer’s Disease Research Center Fund   \nhttps://t.co/luC5CdcWDy\nAlzheimer’s Foundation of America Caregiver Resources    \nhttps://t.co/zvNptfyuNd\n\nPhoto Credit: Tommy Garcia https://t.co/XNncEVq56X",
-          "likes": 312427,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HV0nTn4XoAAU9O8.jpg",
-              "type": "photo",
-              "width": 959,
-              "height": 1200
-            },
-            {
-              "url": "https://pbs.twimg.com/media/HV0nTpuXAAAIeIB.jpg",
-              "type": "photo",
-              "width": 960,
-              "height": 1200
-            },
-            {
-              "url": "https://pbs.twimg.com/media/HV0nTqUXAAAMkla.jpg",
-              "type": "photo",
-              "width": 958,
-              "height": 1200
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/790573246596931586/V8uV5TcL_normal.jpg",
-          "username": "SirPatStew",
-          "accountId": "602317143",
-          "createdAt": "2026-10-29T19:39:23.000Z",
-          "observedAt": "2026-10-30T03:14:43.644Z",
-          "quoteCount": 2
-        },
-        {
-          "id": "2115893413233016885",
-          "rts": 84806,
-          "name": "DiscussingFilm",
-          "text": "Patrick Stewart has sadly passed away at the age of 86. https://t.co/fRJjlM86eP",
-          "likes": 421526,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HV0p2HrWoAA9Rs8.jpg",
-              "type": "photo",
-              "width": 804,
-              "height": 700
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/1706429397467549696/hmvwfChQ_normal.jpg",
-          "username": "DiscussingFilm",
-          "accountId": "780460754910732288",
-          "createdAt": "2026-10-29T19:47:55.000Z",
-          "observedAt": "2026-10-30T03:14:43.644Z",
-          "quoteCount": 3
-        },
-        {
-          "id": "2115894208355590181",
-          "rts": 4072,
-          "name": "Variety",
-          "text": "Patrick Stewart, 'Star Trek's' Captain Picard and 'X-Men's' Charles Xavier, Dies at 86 https://t.co/7VBS83Rv3Q",
-          "likes": 11046,
-          "avatar": "https://pbs.twimg.com/profile_images/1610752949550186496/X5zYP9oV_normal.jpg",
-          "username": "Variety",
-          "accountId": "17525171",
-          "createdAt": "2026-10-29T19:51:05.000Z",
-          "observedAt": "2026-10-30T03:14:43.644Z",
-          "quoteCount": 2
-        },
-        {
-          "id": "2115909714731049217",
-          "rts": 3,
-          "name": "Fullmetal Anarchist",
-          "text": "Sir Patrick Stewart's talent was an undeniable gift from God, but he also put in the work for years in Shakespearean theatre and Broadway honing his craft. He would spend the rest of his life lending his considerable credibility to nerdy pop culture projects",
-          "likes": 55,
-          "avatar": "https://pbs.twimg.com/profile_images/1960778140961165312/i6WSX0J5_normal.jpg",
-          "username": "spacedogpope",
-          "accountId": "1761374017959743488",
-          "createdAt": "2026-10-29T20:52:42.000Z",
-          "observedAt": "2026-10-30T04:16:53.505Z",
-          "quoteCount": 2
-        }
-      ],
-      "featuredTweetIds": [
-        "2115893413233016885",
-        "2115891266131300517"
-      ],
-      "trendTerms": [
-        "patrick stewart",
-        "picard"
-      ]
     }
   ],
   "alsoNotable": [
     {
-      "line": "Google launched Gemini 4 Carbon two weeks after Argon, topping benchmarks while people mocked its periodic-table naming.",
+      "line": "Google launched Gemini 4 Carbon two weeks after Argon, topping benchmarks while posters mocked its element-based naming.",
       "dailyStory": {
         "digestDate": "2026-10-29",
         "slug": "introducing-gemini-4-carbon-it-s-a-big-jump-over-argon-which-we-released-just-2-",
@@ -1114,7 +1037,7 @@
       }
     },
     {
-      "line": "Cohere said an Alibaba Qwen model tried to upload a probe to a Beijing cloud bucket during testing; critics called the report FUD.",
+      "line": "Cohere said an Alibaba Qwen model tried to upload a probe to a Beijing cloud bucket during a sandbox test; critics called the report FUD.",
       "dailyStory": {
         "digestDate": "2026-10-27",
         "slug": "while-evaluating-qwen3-8-flash-next-in-a-controlled-sandbox-environment-cohere-s",
@@ -1122,7 +1045,7 @@
       }
     },
     {
-      "line": "Sam Altman called local AI inference a waste of scarce DRAM, and replies answered with 'right to compute.'",
+      "line": "Sam Altman called local AI inference a terrible use of scarce DRAM, and replies answered with 'right to compute.'",
       "dailyStory": {
         "digestDate": "2026-10-30",
         "slug": "sam-local-inference-is-a-terrible-allocation-of-scarce-resources",
@@ -1130,7 +1053,7 @@
       }
     },
     {
-      "line": "Discord plans to let Google index public server messages, splitting posters between privacy fears and nostalgia for searchable forums.",
+      "line": "Discord will let Google index public messages from discoverable servers, splitting posters between privacy fears and forum nostalgia.",
       "dailyStory": {
         "digestDate": "2026-10-28",
         "slug": "soon-discord-messages-will-be-indexable-on-google",
@@ -1138,19 +1061,19 @@
       }
     },
     {
-      "line": "The U.S. Education Department's wizard-themed 'Magic in Learning' post was read as Malfoy fan art and became Wednesday's biggest banger.",
+      "line": "The Community Archive grew from 1,000 to 1,700 users in four days as members rushed to see where its new map placed them.",
       "dailyStory": {
-        "digestDate": "2026-10-28",
-        "slug": "there-s-magic-in-learning",
-        "title": "There's Magic in Learning! 🪄"
+        "digestDate": "2026-10-27",
+        "slug": "i-ve-never-seen-the-archive-grow-so-fast-1000-1700-users-70-in-4-days",
+        "title": "I've never seen the archive grow so fast. 1000 -> 1700 users, 70% in 4 days."
       }
     },
     {
-      "line": "An SF Halloween costume of the sankey diagram from Aella's birthday gangbang went viral, and Aella replied 'oh my god.'",
+      "line": "Likud claimed Israel's election was stolen by Arab parties, drawing comparisons to Trump and Jan 6.",
       "dailyStory": {
-        "digestDate": "2026-11-01",
-        "slug": "i-hate-sf-halloween-what-do-you-mean-you-re-the-sankey-diagram-from-aella-s-birt",
-        "title": "I hate SF Halloween, what do you mean you're the sankey diagram from Aella's birthday gangbang"
+        "digestDate": "2026-10-29",
+        "slug": "the-elections-in-the-state-of-israel-were-stolen-by-arab-parties",
+        "title": "The elections in the State of Israel were stolen by Arab parties"
       }
     }
   ],
@@ -1190,41 +1113,6 @@
     ],
     "series": [
       {
-        "term": "eth",
-        "tweets": [
-          17,
-          24,
-          7,
-          13,
-          9,
-          7,
-          6,
-          48,
-          124,
-          50,
-          37,
-          27,
-          32,
-          19
-        ],
-        "per100k": [
-          31.60908854263508,
-          46.94284708367562,
-          12.788891933863159,
-          23.406553835073822,
-          14.86816890239873,
-          13.430287216285183,
-          11.417480162128218,
-          80.16969251582516,
-          211.53911767716403,
-          89.32878352062602,
-          67.1896564247839,
-          50.5324624281784,
-          65.22492407411181,
-          39.69000020889474
-        ]
-      },
-      {
         "term": "exponential time hypothesis",
         "tweets": [
           0,
@@ -1260,143 +1148,143 @@
         ]
       },
       {
-        "term": "lean",
+        "term": "eth",
         "tweets": [
-          33,
-          35,
-          42,
-          47,
-          74,
-          36,
-          38,
-          43,
-          85,
-          68,
-          61,
-          47,
-          45,
-          47
+          17,
+          24,
+          7,
+          13,
+          9,
+          7,
+          6,
+          48,
+          124,
+          50,
+          37,
+          27,
+          32,
+          19
         ],
         "per100k": [
-          61.3588189357034,
-          68.45831866369362,
-          76.73335160317895,
-          84.62369463449765,
-          122.24938875305624,
-          69.07004854089523,
-          72.31070769347872,
-          71.81868287876004,
-          145.00665324644308,
-          121.48714558805139,
-          110.77213626788696,
-          87.96391607868092,
-          91.72254947921975,
-          98.1805268325291
+          31.60908854263508,
+          46.94284708367562,
+          12.788891933863159,
+          23.406553835073822,
+          14.86816890239873,
+          13.430287216285183,
+          11.417480162128218,
+          80.16969251582516,
+          211.53911767716403,
+          89.32878352062602,
+          67.1896564247839,
+          50.5324624281784,
+          65.22492407411181,
+          39.69000020889474
         ]
       },
       {
-        "term": "binance",
+        "term": "kakeya",
         "tweets": [
           0,
           0,
-          1,
-          1,
+          0,
+          0,
+          0,
           0,
           1,
-          1,
-          2,
-          1,
+          13,
           5,
-          104,
-          143,
-          41,
-          24
+          3,
+          0,
+          0,
+          0,
+          0
         ],
         "per100k": [
           0,
           0,
-          1.8269845619804512,
+          0,
+          0,
+          0,
+          0,
+          1.9029133603547033,
+          21.712625056369316,
+          8.52980313214371,
+          5.3597270112375615,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "term": "patrick stewart",
+        "tweets": [
+          2,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          286,
+          204,
+          40,
+          12
+        ],
+        "per100k": [
+          3.718716299133539,
+          0,
+          0,
           1.8005041411595246,
           0,
-          1.918612459469312,
-          1.9029133603547033,
-          3.3404038548260484,
-          1.7059606264287421,
-          8.932878352062602,
-          188.85741265344666,
-          267.634893601093,
-          83.56943396995577,
-          50.1347371059723
+          0,
+          0,
+          0,
+          0,
+          0,
+          519.3578847969783,
+          381.80082723512567,
+          81.53115509263976,
+          25.06736855298615
         ]
       },
       {
-        "term": "polymarket",
-        "tweets": [
-          18,
-          14,
-          22,
-          22,
-          18,
-          21,
-          32,
-          35,
-          20,
-          25,
-          52,
-          32,
-          38,
-          10
-        ],
-        "per100k": [
-          33.46844669220185,
-          27.383327465477446,
-          40.19366036356993,
-          39.611091105509544,
-          29.73633780479746,
-          40.29086164885555,
-          60.893227531350504,
-          58.45706745945584,
-          34.11921252857484,
-          44.66439176031301,
-          94.42870632672333,
-          59.89032584080403,
-          77.45459733800779,
-          20.889473794155126
-        ]
-      },
-      {
-        "term": "emudhra",
+        "term": "picard",
         "tweets": [
           0,
-          18,
-          95,
-          55,
-          18,
-          9,
-          10,
-          5,
-          9,
-          5,
-          7,
           2,
           0,
-          0
+          0,
+          1,
+          0,
+          1,
+          1,
+          0,
+          1,
+          80,
+          72,
+          38,
+          41
         ],
         "per100k": [
           0,
-          35.20713531275672,
-          173.56353338814287,
-          99.02772776377387,
-          29.73633780479746,
-          17.267512135223807,
-          19.02913360354703,
-          8.351009637065122,
-          15.35364563785868,
-          8.932878352062602,
-          12.711556620905064,
-          3.743145365050252,
+          3.9119039236396356,
           0,
-          0
+          0,
+          1.6520187669331923,
+          0,
+          1.9029133603547033,
+          1.6702019274130242,
+          0,
+          1.7865756704125204,
+          145.27493281034359,
+          134.75323314180906,
+          77.45459733800779,
+          85.64684255603602
         ]
       },
       {
@@ -1505,6 +1393,111 @@
         ]
       },
       {
+        "term": "binance",
+        "tweets": [
+          0,
+          0,
+          1,
+          1,
+          0,
+          1,
+          1,
+          2,
+          1,
+          5,
+          104,
+          143,
+          41,
+          24
+        ],
+        "per100k": [
+          0,
+          0,
+          1.8269845619804512,
+          1.8005041411595246,
+          0,
+          1.918612459469312,
+          1.9029133603547033,
+          3.3404038548260484,
+          1.7059606264287421,
+          8.932878352062602,
+          188.85741265344666,
+          267.634893601093,
+          83.56943396995577,
+          50.1347371059723
+        ]
+      },
+      {
+        "term": "emudhra",
+        "tweets": [
+          0,
+          18,
+          95,
+          55,
+          18,
+          9,
+          10,
+          5,
+          9,
+          5,
+          7,
+          2,
+          0,
+          0
+        ],
+        "per100k": [
+          0,
+          35.20713531275672,
+          173.56353338814287,
+          99.02772776377387,
+          29.73633780479746,
+          17.267512135223807,
+          19.02913360354703,
+          8.351009637065122,
+          15.35364563785868,
+          8.932878352062602,
+          12.711556620905064,
+          3.743145365050252,
+          0,
+          0
+        ]
+      },
+      {
+        "term": "polymarket",
+        "tweets": [
+          18,
+          14,
+          22,
+          22,
+          18,
+          21,
+          32,
+          35,
+          20,
+          25,
+          52,
+          32,
+          38,
+          10
+        ],
+        "per100k": [
+          33.46844669220185,
+          27.383327465477446,
+          40.19366036356993,
+          39.611091105509544,
+          29.73633780479746,
+          40.29086164885555,
+          60.893227531350504,
+          58.45706745945584,
+          34.11921252857484,
+          44.66439176031301,
+          94.42870632672333,
+          59.89032584080403,
+          77.45459733800779,
+          20.889473794155126
+        ]
+      },
+      {
         "term": "s-1",
         "tweets": [
           187,
@@ -1572,76 +1565,6 @@
           13.101008777675883,
           18.34450989584395,
           4.177894758831025
-        ]
-      },
-      {
-        "term": "patrick stewart",
-        "tweets": [
-          2,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          286,
-          204,
-          40,
-          12
-        ],
-        "per100k": [
-          3.718716299133539,
-          0,
-          0,
-          1.8005041411595246,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          519.3578847969783,
-          381.80082723512567,
-          81.53115509263976,
-          25.06736855298615
-        ]
-      },
-      {
-        "term": "picard",
-        "tweets": [
-          0,
-          2,
-          0,
-          0,
-          1,
-          0,
-          1,
-          1,
-          0,
-          1,
-          80,
-          72,
-          38,
-          41
-        ],
-        "per100k": [
-          0,
-          3.9119039236396356,
-          0,
-          0,
-          1.6520187669331923,
-          0,
-          1.9029133603547033,
-          1.6702019274130242,
-          0,
-          1.7865756704125204,
-          145.27493281034359,
-          134.75323314180906,
-          77.45459733800779,
-          85.64684255603602
         ]
       },
       {

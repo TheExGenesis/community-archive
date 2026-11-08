@@ -2,13 +2,27 @@ import 'server-only'
 
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
+/** The email lists one subscription can be on. */
+export type DigestEmailList = 'daily' | 'weekly'
+
+export const isDigestEmailList = (value: unknown): value is DigestEmailList =>
+  value === 'daily' || value === 'weekly'
+
+const LIST_COLUMN = {
+  daily: 'daily_enabled',
+  weekly: 'weekly_enabled',
+} as const
+
 /** Public aggregate only: never fetch addresses or unsubscribe tokens here. */
-export async function getActiveDigestSubscriberCount(): Promise<number> {
+export async function getActiveDigestSubscriberCount(
+  list: DigestEmailList = 'daily',
+): Promise<number> {
   const { count, error } = await createServerServiceRoleClient()
     .from('digest_email_subscriptions')
     .select('id', { count: 'exact', head: true })
     .not('confirmed_at', 'is', null)
     .is('unsubscribed_at', null)
+    .eq(LIST_COLUMN[list], true)
   if (error) throw error
   if (count === null) throw new Error('Digest subscriber count unavailable')
   return count
@@ -21,6 +35,8 @@ export interface DigestEmailSubscription {
   accountId: string | null
   confirmedAt: string | null
   unsubscribedAt: string | null
+  daily: boolean
+  weekly: boolean
 }
 
 interface SubscriptionRow {
@@ -30,10 +46,12 @@ interface SubscriptionRow {
   account_id: string | null
   confirmed_at: string | null
   unsubscribed_at: string | null
+  daily_enabled: boolean
+  weekly_enabled: boolean
 }
 
 const SUBSCRIPTION_COLUMNS =
-  'id, email, token, account_id, confirmed_at, unsubscribed_at'
+  'id, email, token, account_id, confirmed_at, unsubscribed_at, daily_enabled, weekly_enabled'
 
 const mapRow = (row: SubscriptionRow): DigestEmailSubscription => ({
   id: row.id,
@@ -42,7 +60,18 @@ const mapRow = (row: SubscriptionRow): DigestEmailSubscription => ({
   accountId: row.account_id,
   confirmedAt: row.confirmed_at,
   unsubscribedAt: row.unsubscribed_at,
+  daily: row.daily_enabled,
+  weekly: row.weekly_enabled,
 })
+
+/** Whether a subscription currently receives a list's emails. */
+export const receivesList = (
+  subscription: DigestEmailSubscription,
+  list: DigestEmailList,
+) =>
+  Boolean(subscription.confirmedAt) &&
+  !subscription.unsubscribedAt &&
+  subscription[list]
 
 /** "christine@example.com" -> "ch•••••••@example.com" for read-back UI. */
 export const maskSubscriptionEmail = (email: string) => {
@@ -63,14 +92,16 @@ export const isValidSubscriptionEmail = (email: string) => {
 }
 
 /**
- * Create or revive the subscription for an address and return it active.
+ * Create or revive the subscription for an address and turn `list` on.
  * Single opt-in: confirmed_at is stamped on insert, on revival of an
  * unsubscribed row, and on any legacy row still waiting on the old
- * confirmation link.
+ * confirmation link. Reviving an unsubscribed address turns on only the
+ * requested list; an active address keeps its other list as it was.
  */
 export async function upsertSubscription(
   email: string,
   accountId?: string | null,
+  list: DigestEmailList = 'daily',
 ): Promise<DigestEmailSubscription> {
   const normalized = normalizeSubscriptionEmail(email)
   const admin = createServerServiceRoleClient({ readSource: 'app' })
@@ -86,8 +117,16 @@ export async function upsertSubscription(
       unsubscribed_at?: null
       confirmed_at?: string
       account_id?: string
+      daily_enabled?: boolean
+      weekly_enabled?: boolean
     } = {}
-    if (existing.data.unsubscribed_at) patch.unsubscribed_at = null
+    if (existing.data.unsubscribed_at) {
+      patch.unsubscribed_at = null
+      patch.daily_enabled = list === 'daily'
+      patch.weekly_enabled = list === 'weekly'
+    } else if (!existing.data[LIST_COLUMN[list]]) {
+      patch[LIST_COLUMN[list]] = true
+    }
     if (existing.data.unsubscribed_at || !existing.data.confirmed_at) {
       patch.confirmed_at = new Date().toISOString()
     }
@@ -111,6 +150,8 @@ export async function upsertSubscription(
       email: normalized,
       account_id: accountId ?? null,
       confirmed_at: new Date().toISOString(),
+      daily_enabled: list === 'daily',
+      weekly_enabled: list === 'weekly',
     })
     .select(SUBSCRIPTION_COLUMNS)
     .single()
@@ -139,21 +180,92 @@ export async function getSubscriptionForAccount(
   return result.data ? mapRow(result.data) : null
 }
 
-/** Returns false only for an unknown token; unsubscribing twice succeeds. */
-export async function unsubscribe(token: string): Promise<boolean> {
+/**
+ * Stop emails for a token. Without `list` every email stops; with a list only
+ * that list turns off, and the whole subscription ends once no list is left.
+ * Returns false only for an unknown token; unsubscribing twice succeeds.
+ */
+export async function unsubscribe(
+  token: string,
+  list?: DigestEmailList,
+): Promise<boolean> {
   const admin = createServerServiceRoleClient()
-  const result = await admin
+  if (!list) {
+    const result = await admin
+      .from('digest_email_subscriptions')
+      .update({ unsubscribed_at: new Date().toISOString() })
+      .eq('token', token)
+      .select('id')
+      .maybeSingle()
+    if (result.error) throw result.error
+    return Boolean(result.data)
+  }
+  const existing = await admin
     .from('digest_email_subscriptions')
-    .update({ unsubscribed_at: new Date().toISOString() })
+    .select(SUBSCRIPTION_COLUMNS)
     .eq('token', token)
-    .select('id')
     .maybeSingle()
-  if (result.error) throw result.error
-  return Boolean(result.data)
+  if (existing.error) throw existing.error
+  if (!existing.data) return false
+  await setListEnabled(mapRow(existing.data), list, false)
+  return true
 }
 
-/** Active (confirmed_at set), not unsubscribed, and not yet sent this edition. */
+/**
+ * Turn one list on or off for a subscription. Turning the last list off ends
+ * the subscription; turning a list on for an ended one revives it with only
+ * that list.
+ */
+export async function setListEnabled(
+  subscription: DigestEmailSubscription,
+  list: DigestEmailList,
+  enabled: boolean,
+): Promise<DigestEmailSubscription> {
+  const other: DigestEmailList = list === 'daily' ? 'weekly' : 'daily'
+  const patch: {
+    daily_enabled?: boolean
+    weekly_enabled?: boolean
+    unsubscribed_at?: string | null
+    confirmed_at?: string
+  } = { [LIST_COLUMN[list]]: enabled }
+  if (enabled && subscription.unsubscribedAt) {
+    patch.unsubscribed_at = null
+    patch[LIST_COLUMN[other]] = false
+    patch.confirmed_at = new Date().toISOString()
+  } else if (enabled && !subscription.confirmedAt) {
+    patch.confirmed_at = new Date().toISOString()
+  } else if (!enabled && !subscription[other] && !subscription.unsubscribedAt) {
+    patch.unsubscribed_at = new Date().toISOString()
+  }
+  const result = await createServerServiceRoleClient({ readSource: 'app' })
+    .from('digest_email_subscriptions')
+    .update(patch)
+    .eq('id', subscription.id)
+    .select(SUBSCRIPTION_COLUMNS)
+    .single()
+  if (result.error) throw result.error
+  return mapRow(result.data)
+}
+
+/**
+ * Daily-list subscribers (confirmed_at set, not unsubscribed) not yet sent
+ * this edition.
+ */
 export async function listUnsentRecipients(
+  editionId: string,
+): Promise<DigestEmailSubscription[]> {
+  return listUnsent('daily', editionId)
+}
+
+/** Weekly-list subscribers not yet sent this weekly edition. */
+export async function listUnsentWeeklyRecipients(
+  editionId: string,
+): Promise<DigestEmailSubscription[]> {
+  return listUnsent('weekly', editionId)
+}
+
+async function listUnsent(
+  list: DigestEmailList,
   editionId: string,
 ): Promise<DigestEmailSubscription[]> {
   // PostgREST caps result sets, so both reads paginate with stable ordering.
@@ -167,6 +279,7 @@ export async function listUnsentRecipients(
       .select(SUBSCRIPTION_COLUMNS)
       .not('confirmed_at', 'is', null)
       .is('unsubscribed_at', null)
+      .eq(LIST_COLUMN[list], true)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(offset, offset + PAGE - 1)
@@ -178,7 +291,9 @@ export async function listUnsentRecipients(
   const alreadySent = new Set<string>()
   for (let offset = 0; ; offset += PAGE) {
     const page = await admin
-      .from('digest_email_sends')
+      .from(
+        list === 'daily' ? 'digest_email_sends' : 'digest_weekly_email_sends',
+      )
       .select('subscription_id')
       .eq('edition_id', editionId)
       .order('subscription_id', { ascending: true })
@@ -204,6 +319,21 @@ export async function recordSend(
     message_id: messageId,
     open_token: openToken,
   })
+  if (result.error) throw result.error
+}
+
+export async function recordWeeklySend(
+  editionId: string,
+  subscriptionId: string,
+  messageId: string,
+): Promise<void> {
+  const result = await createServerServiceRoleClient()
+    .from('digest_weekly_email_sends')
+    .insert({
+      edition_id: editionId,
+      subscription_id: subscriptionId,
+      message_id: messageId,
+    })
   if (result.error) throw result.error
 }
 

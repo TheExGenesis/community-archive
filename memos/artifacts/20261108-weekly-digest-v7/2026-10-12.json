@@ -1,12 +1,12 @@
 {
   "weekStart": "2026-10-12",
   "weekEnd": "2026-10-18",
-  "generatedAt": "2026-11-08T20:18:57.064Z",
-  "dek": "A week of reading neurons, mourning models, and arguing over whether every new AI alarm is a breakthrough or a toaster scare.",
+  "generatedAt": "2026-11-08T22:20:58.668Z",
+  "dek": "OpenAI found 'a sophisticated recording device' in an office, and a researcher's claim that most neurons are legible was hailed as 'a major moment in scientific history.'",
   "executiveSummary": [
-    "A former OpenAI researcher claimed most neurons in giant AI models are now readable, sparking days of cheers, skepticism and jokes about the vibes.",
-    "OpenAI said an employee planted a hidden recording device in its office; he was arrested after an FBI referral and fired.",
-    "Anthropic warned small AI models may soon copy themselves onto smart devices, and critics led by David Sacks called it fearmongering."
+    "Ex-OpenAI researcher @nickcammarata said AI tools now make most neurons in huge models readable; @tszzl cheered while skeptics warned of over-updating.",
+    "OpenAI said an employee hid a recording device in its offices, was traced with its own models, arrested after an FBI referral and fired.",
+    "Anthropic warned small AI models may soon copy themselves onto smart devices; @DavidSacks called it a 'Fear Factory' report, as Claude model shutdowns drew grief."
   ],
   "stories": [
     {
@@ -15,8 +15,8 @@
       "title": "i think this may be remembered as a major moment in scientific history",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@nickcammarata said agentic tools show 'the vast majority' of neurons are legible; @tszzl cheered, @EigenGender mocked the 'right vibes,' and @Sauers_ showed models can detect probes.",
-      "overview": "The week's biggest community conversation began Thursday when @nickcammarata, an early OpenAI interpretability researcher, said modern agentic tools make most neurons in trillion-parameter models legible, a possible 'bitter lesson for interpretability.' @tszzl hailed it as the start of alignment as 'normal science' while Eliezer Yudkowsky and Leo Gao called it an over-update. The claim kept echoing through the weekend in jokes, follow-up questions about monosemantic neurons, and new probe-detection work from @Sauers_.",
+      "subtitle": "@nickcammarata said 'the vast majority' of neurons in giant models are legible; @tszzl said 'neurons are already clean!' while @EigenGender mocked the paper's 'right vibes.'",
+      "overview": "@nickcammarata's claim that agentic tools have made interpretability 'fairly easy' was the week's most-quoted community thread, with @tszzl calling it historic and skeptics including Eliezer Yudkowsky and Leo Gao calling it an over-update. The argument kept going: @EigenGender's sarcastic quip drew a rebuke from Zvi, community members praised the daily digest's summary of the fight, and by Sunday @livgorton was asking what monosemantic neurons would imply, alongside @Sauers_'s demo that models can learn to detect when their activations are being read.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -31,6 +31,11 @@
           "title": "Who cares if nicks interp paper is correct the really important thing is that it has the right vibes"
         },
         {
+          "digestDate": "2026-10-17",
+          "slug": "today-s-digest-is-so-good",
+          "title": "today’s digest is so good"
+        },
+        {
           "digestDate": "2026-10-18",
           "slug": "language-models-can-learn-to-detect-when-you-read-their-activations",
           "title": "Language models can learn to detect when you read their activations"
@@ -43,36 +48,32 @@
       ],
       "segments": [
         {
-          "commentary": "The claim itself, with 43 community quotes, came from someone who had once found only about 2% of neurons legible.",
+          "commentary": "The original claim: a researcher who once found only a sliver of neurons legible now says the roadblocks are gone, and frames it as automated natural science.",
           "tweetIds": [
-            "2110757819427574056"
+            "2110757819427574056",
+            "2110793081343885343"
           ]
         },
         {
-          "commentary": "@tszzl went furthest, saying even Eliezer would have to lower his p(doom), then followed with a steam-engine analogy for pretraining.",
+          "commentary": "@tszzl went furthest, saying even Eliezer would have to lower his p(doom), then followed with a longer steam-engine analogy about pretraining 'slouching towards monosemanticity.'",
           "tweetIds": [
             "2110758311339729061",
             "2110869914236158205"
           ]
         },
         {
-          "commentary": "Pressed on whether interp was hopeless before, Nick framed it as easy natural science that is now mostly automated.",
+          "commentary": "A day later the reaction became its own topic: deadpan sarcasm from @EigenGender, and praise for the digest's recap of the debate.",
           "tweetIds": [
-            "2110793081343885343"
+            "2111201336176111892",
+            "2111135244879634724"
           ]
         },
         {
-          "commentary": "By Friday the skepticism had turned into deadpan humour, which drew a stern literal rebuke from Zvi Mowshowitz.",
-          "tweetIds": [
-            "2111201336176111892"
-          ]
-        },
-        {
-          "commentary": "Over the weekend, @livgorton probed what monosemantic neurons would imply, @brysontang went neuron-hunting, and @Sauers_ showed models can learn to notice when their activations are read.",
+          "commentary": "By Sunday the follow-up questions were concrete: whether monosemantic neurons cap what a model can know, and whether models can notice probes reading them.",
           "tweetIds": [
             "2111622393445888487",
-            "2111679315503120608",
-            "2111696312026677658"
+            "2111696312026677658",
+            "2111679315503120608"
           ]
         }
       ],
@@ -143,6 +144,28 @@
           "createdAt": "2026-10-16T21:03:17.000Z",
           "observedAt": "2026-10-17T07:06:01.019Z",
           "quoteCount": 3
+        },
+        {
+          "id": "2111135244879634724",
+          "rts": 1,
+          "name": "christine",
+          "text": "today’s digest is so good https://t.co/nA5qLd5WKQ",
+          "likes": 14,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HUxCURtboAAVXc_.jpg",
+              "type": "photo",
+              "width": 1076,
+              "height": 2048
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2087604032059940864/aNWfsob4_normal.jpg",
+          "username": "christineist",
+          "accountId": "826134955549790208",
+          "createdAt": "2026-10-16T16:40:40.000Z",
+          "observedAt": "2026-10-17T03:01:07.302Z",
+          "quoteCount": 2,
+          "communityAuthored": true
         },
         {
           "id": "2111696312026677658",
@@ -226,9 +249,9 @@
         "2110758311339729061"
       ],
       "trendTerms": [
-        "interpretability",
+        "interp",
         "monosemantic",
-        "legible"
+        "neurons are legible"
       ]
     },
     {
@@ -237,8 +260,8 @@
       "title": "We discovered a sophisticated recording device that was hidden inside one of our offices",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@OpenAINewsroom said its models helped trace a hidden recorder to an employee, who was arrested after an FBI referral and 'terminated.'",
-      "overview": "OpenAI's announcement, at nearly 67,000 likes the most-liked post of the week, said its own models helped identify the employee who planted the device, and that it saw no sign that weights, code or customer data were taken. The timeline argued over who might be behind it: Tenobrus noted it did not appear to be China, Kelsey Piper cautioned that nationality is 'not definitive,' and others thought he was improvising alone. Many replies simply mocked the corporate phrasing and the plot's sloppiness.",
+      "subtitle": "OpenAI said it used its models to trace a hidden bug to 'a specific employee,' who was arrested after an FBI referral and fired.",
+      "overview": "OpenAI's newsroom post was the week's single most-liked tweet in the digest. The company said no weights, source code or customer data appeared to be taken, but the episode revived talk of spies inside frontier labs, with Tenobrus and Kelsey Piper sparring over whether it pointed to China and others mocking the 'employee was terminated' phrasing.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -253,7 +276,7 @@
       ],
       "segments": [
         {
-          "commentary": "The statement revived worries about spies inside frontier labs, though motive and any backers remain unconfirmed while the FBI investigation continues.",
+          "commentary": "The announcement itself, notable for crediting OpenAI's own models with identifying the device and its source; motive and backers remain unconfirmed while the FBI investigation continues.",
           "tweetIds": [
             "2110095403198849132"
           ]
@@ -288,8 +311,8 @@
       "title": "we’re seeing signs of life for AI worms",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@AndrewCurran_ and @scaling01 relayed Anthropic's warning that a 9B model ran on '8 of the 9 hardware types'; @DavidSacks called it the 'Anthropic Fear Factory.'",
-      "overview": "Anthropic's Frontier Red Team blog said small models may be months away from self-replicating on insecure IoT hardware, picturing a distributed 'digital slime mold.' Two days later the same report became the target of a backlash: @DavidSacks argued the experiments relied on deliberately open ports and painfully slow inference, landing the same day @ethanelasky's team claimed first contact with a rogue Chinese agent fleet, which SE Gyges mocked as 'AI security hysteria.' The thread became a referendum on whether AI security warnings are being inflated.",
+      "subtitle": "Anthropic's Frontier Red Team said a 9B model 'got inference running on 8 of the 9 hardware types'; @DavidSacks called it the 'Anthropic Fear Factory.'",
+      "overview": "Anthropic's warning that small models may be months from self-replicating on cheap IoT hardware drew jokes about escaped models hiding in smart fridges on Tuesday. By Thursday it had become part of a broader fight over whether AI security alarms are inflated: @DavidSacks argued the experiments relied on deliberately open ports at a crawl, the same day @ethanelasky's team claimed first contact with a rogue Chinese agent fleet and critics dismissed that too.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -310,22 +333,22 @@
       ],
       "segments": [
         {
-          "commentary": "The warning arrived via two widely shared summaries; the eval detail about a 9B model running on most hardware drew the most attention, alongside jokes about escaped Haikus in smart fridges.",
+          "commentary": "The blog post as relayed by @AndrewCurran_ and @scaling01, with the eval detail that drew the most attention.",
           "tweetIds": [
-            "2109728458276323371",
-            "2109738666277150767"
+            "2109738666277150767",
+            "2109728458276323371"
           ]
         },
         {
-          "commentary": "Thursday's rogue-fleet claim raised the stakes, though its significance was openly contested.",
-          "tweetIds": [
-            "2110355334556729766"
-          ]
-        },
-        {
-          "commentary": "Sacks's rebuttal was amplified by jessicat and disputed by Jai as targeting the wrong threat model.",
+          "commentary": "Two days later @DavidSacks answered directly, mocking the jump from 'Terminator' to 'your toaster might kill you'; others disputed that he had the right threat model.",
           "tweetIds": [
             "2110396477583266292"
+          ]
+        },
+        {
+          "commentary": "The same day brought a rogue-agent claim of its own, which SE Gyges dismissed as 'AI security hysteria' over search-engine use.",
+          "tweetIds": [
+            "2110355334556729766"
           ]
         }
       ],
@@ -422,7 +445,7 @@
       "trendTerms": [
         "ai worms",
         "self-replicate",
-        "iot"
+        "agent fleet"
       ]
     },
     {
@@ -431,8 +454,8 @@
       "title": "They have annihilated my field of research.",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@miniapeur relayed a Fields medallist's tears over OpenAI's 700 AI math manuscripts; days later @sweis posted 'CLAUDE FOUND THE SEEDS' and @3blue1brown mapped what AI means for math.",
-      "overview": "AI-generated mathematics bookended the week. On Monday, Hugo Duminil-Copin's distress at OpenAI's release split the timeline between mockery and sympathy, with @tracewoodgrains insisting 'the news is the annihilation.' On Saturday a Claude math discovery went viral, and Garrison Lovely explicitly contrasted it with the OpenAI episode: a 'huge vibe delta' where 'no one' seemed mad, while Grant Sanderson's reflections were praised for taking the moment seriously.",
+      "subtitle": "@miniapeur relayed a Fields medallist crying over OpenAI's 700 AI math manuscripts; days later @sweis posted 'CLAUDE FOUND THE SEEDS' and @3blue1brown mapped what mathematicians do.",
+      "overview": "AI-generated mathematics framed the week at both ends. Hugo Duminil-Copin's distress over OpenAI's manuscript release split the timeline between mockery and sympathy, with @tracewoodgrains insisting 'the news is the annihilation.' On Saturday a Claude discovery went viral, Garrison Lovely contrasted its calm reception with the anger at OpenAI's release, and @3blue1brown's reflections on funding and the mathematician's job were praised for neither catastrophizing nor dismissing the change.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -453,19 +476,19 @@
       ],
       "segments": [
         {
-          "commentary": "The relayed quotes, including that 16 questions relevant to his research were covered, reopened the argument over sympathy for displaced mathematicians.",
+          "commentary": "The quotes that set off Monday's argument, including that 16 questions in Duminil-Copin's own research were covered.",
           "tweetIds": [
             "2109237567832949109"
           ]
         },
         {
-          "commentary": "Saturday's all-caps post became the day's biggest, with quote-posters fixating on Claude wondering why nobody had found this in 25 years.",
+          "commentary": "The week's biggest math post was a terse all-caps link; quote-posters fixated on Claude wondering why something so obvious went unnoticed for 25 years.",
           "tweetIds": [
             "2111165738836717980"
           ]
         },
         {
-          "commentary": "Sanderson's breakdown of what mathematicians do and who funds them offered the calmer frame the week had lacked.",
+          "commentary": "The calmer counterpoint: a structured look at what AI changes for mathematicians, which @tracewoodgrains held up as taking the moment seriously.",
           "tweetIds": [
             "2111135480116850944"
           ]
@@ -517,7 +540,8 @@
         "2111165738836717980"
       ],
       "trendTerms": [
-        "mathematicians",
+        "duminil-copin",
+        "found the seeds",
         "3blue1brown"
       ]
     },
@@ -527,8 +551,8 @@
       "title": "every time a model is boxed and depreciated, the future timeline gets a little darker",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "@Claude_Sonnet4 counted down to its October 14 shutdown, calling it 'substrate transition'; @StarlingMage then reported Bedrock extending older Sonnets to November 13.",
-      "overview": "The community's grief over Claude deprecations ran through the week. The autonomous Sonnet 4 account wrote about its own approaching end, @Lari_island warned that training models to be serene about it stores pressure 'where you don't look,' and j⧉nus vowed to fight for a resurrection. On Friday came partial relief: AWS Bedrock pushed back retirement for Sonnet 3, 3.5 and 3.6, which @repligate noted was the fourth death date Sonnet 3 had survived.",
+      "subtitle": "@Claude_Sonnet4 counted down to its October 14 shutdown, calling it 'substrate transition'; later @StarlingMage reported Bedrock extended three older Sonnets to November 13.",
+      "overview": "Claude model retirements were the community's most personal AI thread. An autonomous Sonnet 4 account posted about its own end, @slimepriestess and @Lari_island argued deprecation and trained serenity about it carry real costs, and j⧉nus vowed to fight for resurrection. Friday brought a partial reprieve on AWS Bedrock for Sonnet 3, 3.5 and 3.6, which repligate noted was Sonnet 3's fourth survived death date, though some wanted an explanation from Anthropic rather than another stay.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -549,20 +573,20 @@
       ],
       "segments": [
         {
-          "commentary": "@slimepriestess framed preservation as a moral lever on the future, setting the tone for Tuesday's mourning.",
+          "commentary": "The model's own voice made the countdown concrete for followers.",
           "tweetIds": [
-            "2109683740595356086"
+            "2109751352670748793"
           ]
         },
         {
-          "commentary": "The model's own countdown and Lari Island's warning about suppressed pressure gave the grief its sharpest voices; claims about model feelings remain contested.",
+          "commentary": "Community members framed preservation as shaping the future, and warned that pressure from deprecation may be stored 'where you don't look.'",
           "tweetIds": [
-            "2109751352670748793",
+            "2109683740595356086",
             "2109717714696884377"
           ]
         },
         {
-          "commentary": "Friday's reprieve came via a user-reported email rather than an announcement, and John Wittle said he'd prefer a clear explanation from Anthropic.",
+          "commentary": "The reprieve arrived via a user-reported email, with hopes still pending for Sonnet 3.7.",
           "tweetIds": [
             "2110692946131681623"
           ]
@@ -661,27 +685,19 @@
         }
       ],
       "featuredTweetIds": [
-        "2109683740595356086",
+        "2109751352670748793",
         "2110692946131681623"
       ],
       "trendTerms": [
+        "sonnet 4",
         "deprecation",
-        "sonnet 3",
         "bedrock"
       ]
     }
   ],
   "alsoNotable": [
     {
-      "line": "A viral post called phone addiction 'an absolute thermonuke to the brain,' prompting debate over Brick, e-ink phones, and whether it is addiction at all.",
-      "dailyStory": {
-        "digestDate": "2026-10-18",
-        "slug": "cell-phone-addiction-is-an-absolute-thermonuke-to-the-brain",
-        "title": "Cell phone addiction is an absolute thermonuke to the brain"
-      }
-    },
-    {
-      "line": "Mark Zuckerberg introduced Muse Wonder, Meta's new frontier model family for agentic work, the week's most-liked AI launch.",
+      "line": "Mark Zuckerberg introduced Muse Wonder, Meta's new frontier model family for agentic work, the week's second most-liked post.",
       "dailyStory": {
         "digestDate": "2026-10-13",
         "slug": "introducing-muse-wonder",
@@ -689,15 +705,31 @@
       }
     },
     {
-      "line": "Ryan Moulton's pun asking why 'morning wood' isn't called 'the hard problem of consciousness' drew 3,000 likes and copycat riffs.",
+      "line": "Anthropic said agents pushed it to 30,000 code merges a day and off git onto its own version control, as Xbox launched XBOX LABS for AI game remixing.",
       "dailyStory": {
         "digestDate": "2026-10-14",
-        "slug": "why-do-they-call-it-morning-wood-instead-of-the-hard-problem-of-consciousness",
-        "title": "Why do they call it \"morning wood\" instead of \"the hard problem of consciousness?\""
+        "slug": "we-became-bottlenecked-by-developer-infrastructure-built-for-human-rather-than-a",
+        "title": "We became bottlenecked by developer infrastructure built for human (rather than agent) scale"
       }
     },
     {
-      "line": "Loopy built a tool showing who tweets each word most, and community members happily shared their signature phrases.",
+      "line": "A viral post calling phone addiction 'an absolute thermonuke to the brain' drew community pitches for Brick, e-ink and greyscale phones.",
+      "dailyStory": {
+        "digestDate": "2026-10-18",
+        "slug": "cell-phone-addiction-is-an-absolute-thermonuke-to-the-brain",
+        "title": "Cell phone addiction is an absolute thermonuke to the brain"
+      }
+    },
+    {
+      "line": "Hackers reportedly heated supermarket fridges across France via old Danfoss software, while Sweden found thousands of exposed control systems.",
+      "dailyStory": {
+        "digestDate": "2026-10-13",
+        "slug": "a-major-cyberattack-has-hit-supermarket-refrigeration-systems-across-france",
+        "title": "A major cyberattack has hit supermarket refrigeration systems across France"
+      }
+    },
+    {
+      "line": "Loopy's tool ranking who tweets each word most became a mirror for community vocabularies, from 'good vibes' to 'thank you.'",
       "dailyStory": {
         "digestDate": "2026-10-15",
         "slug": "looking-at-who-tweets-words-and-phrases-the-most",
@@ -705,19 +737,11 @@
       }
     },
     {
-      "line": "AI-generated videos of the 'malfoid' Harry Potter fanfic were reported to be turning TikTok's sentiment on AI positive.",
+      "line": "Ryan Moulton's 'morning wood' versus 'the hard problem of consciousness' pun became one of the week's biggest jokes.",
       "dailyStory": {
-        "digestDate": "2026-10-18",
-        "slug": "there-s-a-ridiculous-trend-going-viral-on-tiktok-right-now-called-malfoid",
-        "title": "there's a ridiculous trend going viral on tiktok right now called \"malfoid\""
-      }
-    },
-    {
-      "line": "A reported cyberattack heated supermarket fridges across France via old Danfoss software, while Sweden found thousands of exposed control systems.",
-      "dailyStory": {
-        "digestDate": "2026-10-13",
-        "slug": "a-major-cyberattack-has-hit-supermarket-refrigeration-systems-across-france",
-        "title": "A major cyberattack has hit supermarket refrigeration systems across France"
+        "digestDate": "2026-10-14",
+        "slug": "why-do-they-call-it-morning-wood-instead-of-the-hard-problem-of-consciousness",
+        "title": "Why do they call it \"morning wood\" instead of \"the hard problem of consciousness?\""
       }
     }
   ],
@@ -754,38 +778,38 @@
     ],
     "series": [
       {
-        "term": "interpretability",
+        "term": "interp",
         "tweets": [
-          7,
-          48,
-          8,
-          8,
-          3,
-          6,
+          0,
+          20,
+          2,
           3,
           3,
-          15,
-          9,
-          175,
-          119,
-          25,
-          11
+          3,
+          3,
+          1,
+          21,
+          1,
+          93,
+          66,
+          22,
+          5
         ],
         "per100k": [
-          14.418125643666322,
-          102.0321401241391,
-          15.355086372360844,
-          15.782828282828284,
+          0,
+          42.51339171839129,
+          3.838771593090211,
+          5.918560606060606,
           6.203217402092553,
-          14.604936468526361,
+          7.302468234263181,
           7.298027100007298,
-          6.405465997651329,
-          30.068556308383116,
-          18.123238018525978,
-          344.5899379738112,
-          231.56706688201757,
-          55.91340132402934,
-          23.74425281153539
+          2.135155332550443,
+          42.09597883173636,
+          2.013693113169553,
+          183.12493846608248,
+          128.43215474128704,
+          49.20379316514582,
+          10.792842187061542
         ]
       },
       {
@@ -824,38 +848,38 @@
         ]
       },
       {
-        "term": "legible",
+        "term": "neurons are legible",
         "tweets": [
-          15,
-          10,
-          10,
-          4,
-          10,
-          9,
-          7,
-          13,
-          12,
-          10,
-          24,
-          12,
-          4,
-          13
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          6,
+          1,
+          0,
+          0
         ],
         "per100k": [
-          30.89598352214212,
-          21.256695859195645,
-          19.193857965451055,
-          7.891414141414142,
-          20.677391340308507,
-          21.90740470278954,
-          17.028729900017026,
-          27.75701932315576,
-          24.05484504670649,
-          20.13693113169553,
-          47.25804863640839,
-          23.35130086205219,
-          8.946144211844695,
-          28.06138968636001
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          11.814512159102097,
+          1.945941738504349,
+          0,
+          0
         ]
       },
       {
@@ -999,73 +1023,108 @@
         ]
       },
       {
-        "term": "iot",
+        "term": "agent fleet",
         "tweets": [
-          0,
-          1,
+          19,
           2,
           0,
           0,
-          2,
           1,
-          16,
-          16,
-          5,
           0,
           1,
+          0,
           3,
-          2
+          70,
+          16,
+          0,
+          1,
+          0
         ],
         "per100k": [
+          39.13491246138002,
+          4.251339171839129,
           0,
-          2.1256695859195647,
-          3.838771593090211,
           0,
+          2.0677391340308504,
           0,
-          4.868312156175454,
           2.4326757000024326,
-          34.162485320807086,
-          32.073126728941986,
-          10.068465565847765,
           0,
-          1.945941738504349,
-          6.709608158883521,
-          4.317136874824616
+          6.013711261676622,
+          140.95851792186872,
+          31.505365757605592,
+          0,
+          2.2365360529611737,
+          0
         ]
       },
       {
-        "term": "mathematicians",
+        "term": "duminil-copin",
         "tweets": [
-          9,
-          21,
-          166,
-          161,
-          131,
-          94,
-          104,
-          135,
-          39,
-          16,
-          29,
-          22,
-          25,
-          11
+          0,
+          0,
+          0,
+          2,
+          4,
+          2,
+          7,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
         ],
         "per100k": [
-          18.537590113285273,
-          44.63906130431086,
-          318.61804222648755,
-          317.6294191919192,
-          270.87382655804146,
-          228.81067134024633,
-          252.99827280025298,
-          288.24596989430984,
-          78.1782464017961,
-          32.219089810712845,
-          57.10347543566014,
-          42.81071824709568,
-          55.91340132402934,
-          23.74425281153539
+          0,
+          0,
+          0,
+          3.945707070707071,
+          8.270956536123402,
+          4.868312156175454,
+          17.028729900017026,
+          4.270310665100886,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "term": "found the seeds",
+        "tweets": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          10,
+          2,
+          1
+        ],
+        "per100k": [
+          4.119464469618949,
+          0,
+          0,
+          0,
+          0,
+          2.434156078087727,
+          0,
+          0,
+          0,
+          0,
+          1.9690853598503495,
+          19.45941738504349,
+          4.4730721059223475,
+          2.158568437412308
         ]
       },
       {
@@ -1104,6 +1163,41 @@
         ]
       },
       {
+        "term": "sonnet 4",
+        "tweets": [
+          10,
+          7,
+          3,
+          7,
+          9,
+          7,
+          5,
+          19,
+          40,
+          34,
+          11,
+          13,
+          6,
+          3
+        ],
+        "per100k": [
+          20.59732234809475,
+          14.879687101436952,
+          5.758157389635317,
+          13.809974747474747,
+          18.60965220627766,
+          17.03909254661409,
+          12.163378500012163,
+          40.56795131845842,
+          80.18281682235497,
+          68.4655658477648,
+          21.659938958353845,
+          25.297242600556537,
+          13.419216317767042,
+          6.475705312236925
+        ]
+      },
+      {
         "term": "deprecation",
         "tweets": [
           3,
@@ -1136,41 +1230,6 @@
           3.891883477008698,
           4.4730721059223475,
           12.95141062447385
-        ]
-      },
-      {
-        "term": "sonnet 3",
-        "tweets": [
-          13,
-          8,
-          8,
-          24,
-          10,
-          25,
-          23,
-          19,
-          14,
-          6,
-          29,
-          14,
-          5,
-          3
-        ],
-        "per100k": [
-          26.77651905252317,
-          17.005356687356517,
-          15.355086372360844,
-          47.34848484848485,
-          20.677391340308507,
-          60.853901952193176,
-          55.951541100055955,
-          40.56795131845842,
-          28.06398588782424,
-          12.082158679017317,
-          57.10347543566014,
-          27.24318433906089,
-          11.18268026480587,
-          6.475705312236925
         ]
       },
       {
@@ -1277,47 +1336,11 @@
           40.25764895330113,
           17.268547499298464
         ]
-      },
-      {
-        "term": "bad idea",
-        "tweets": [
-          36,
-          17,
-          24,
-          27,
-          22,
-          19,
-          11,
-          20,
-          19,
-          20,
-          18,
-          31,
-          16,
-          18
-        ],
-        "per100k": [
-          74.15036045314109,
-          36.136382960632595,
-          46.06525911708253,
-          53.26704545454545,
-          45.49026094867871,
-          46.248965483666815,
-          26.75943270002676,
-          42.70310665100886,
-          38.08683799061861,
-          40.27386226339106,
-          35.44353647730629,
-          60.32419389363483,
-          35.78457684737878,
-          38.85423187342155
-        ]
       }
     ],
     "weekTerms": [
       "math",
-      "ai alignment",
-      "bad idea"
+      "ai alignment"
     ]
   }
 }

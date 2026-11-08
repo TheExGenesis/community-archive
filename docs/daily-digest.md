@@ -377,8 +377,9 @@ analytics read publishes without trends.
   `community-archive-weekly-digest.timer` (Mondays 09:00 UTC). Runbook:
   `ops/nightly-digest/README.md`.
 - Pages: `/digest/week` (latest, also in the "Explore archive" menu) and
-  `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (a one-line
-  subtitle that gives the flavour of the week, not a list) and then the stories
+  `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (one sentence built
+  from short quoted phrases of the week's tweets; it may not open with "A week",
+  "This week" or "The week", and avoids metaphor) and then the stories
   straight away, each like a daily story: a one-line title (preferably an exact
   tweet excerpt, shown in quotation marks), a short `subtitle`, and one or two
   `featuredTweetIds` in a card grid. The subtitle is written like a daily
@@ -391,10 +392,22 @@ analytics read publishes without trends.
   comments in `src/lib/digest/commentRoutes.ts`). Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
   with each commentary segment on a numbered rail beside its tweet cards, and a
   sidebar of daily coverage and trend charts. Links to daily stories and earlier weeks preview the
-  linked section on hover or focus. Profile hover-card facts are resolved with
-  the page (`loadWeeklyProfiles`, 2.5s budget) because the profile preview API
-  requires sign-in. Each daily edition's sidebar links its week, or the latest
+  linked section on hover or focus. Profile hover-card facts are resolved on
+  the server because the profile preview API requires sign-in; they stream in
+  after the stories (`WeeklyProfiles`) and are cached for a day, and the day and
+  week previews are cached for an hour, so the stories never wait on either. Each daily edition's sidebar links its week, or the latest
   week.
+- Email: one `digest_email_subscriptions` row per address carries
+  `daily_enabled` (on for existing subscribers) and `weekly_enabled` (off until
+  chosen). The week page's subscribe box turns the weekly list on; settings
+  shows a switch per list. `unsubscribed_at` still stops every email, and
+  turning both lists off sets it. `/api/cron/weekly-digest-email` (Vercel cron,
+  Mondays 12:30 UTC) mails the latest published week to weekly subscribers,
+  records each delivery in `digest_weekly_email_sends` so a re-run never repeats
+  one, and skips a week that ended more than eight days ago. Weekly emails link
+  `…/unsubscribe?token=…&list=weekly`, which turns off only the weekly list;
+  daily links keep ending the whole subscription. Operators can POST
+  `{"weekStart": "YYYY-MM-DD"}` with the cron secret to send a specific week.
 - Opt-out: when `tombstone_policy_account` archives a daily edition, a trigger
   archives every weekly edition built from it and drops the private prompt
   copies of later weeks that used it as continuity context.

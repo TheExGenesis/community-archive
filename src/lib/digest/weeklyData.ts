@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { unstable_cache } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ProfilePreview } from '@/app/api/profile/[account_id]/preview/route'
 import { resolveProfileCore } from '@/lib/metaTwitter/profile'
@@ -178,7 +179,9 @@ export async function loadWeeklyRefPreviews(
   return previews
 }
 
-const PROFILE_BUDGET_MS = 2500
+// Profiles now load after the page has rendered and are cached for a day, so
+// this only bounds a stuck lookup rather than the page.
+const PROFILE_BUDGET_MS = 15_000
 
 /**
  * Profile hover-card facts for the people a page mentions, resolved with the
@@ -228,3 +231,44 @@ export const weekPageHandles = (content: WeeklyDigestContent) =>
     ...content.stories.map((story) => story.subtitle),
     ...content.alsoNotable.map(({ line }) => line),
   ])
+
+/**
+ * Day and week previews for an edition, shared across requests: the linked
+ * editions are already published, so an hour of staleness is harmless and
+ * the page never waits on several edition reads.
+ */
+export const getCachedWeeklyRefPreviews = (weekStart: string) =>
+  unstable_cache(
+    async () => {
+      const edition = await getPublishedWeeklyDigest(weekStart)
+      return edition ? loadWeeklyRefPreviews(edition.content) : {}
+    },
+    ['weekly-ref-previews', weekStart],
+    { revalidate: 3600 },
+  )()
+
+/**
+ * Hover-card profiles for the week page (no `storySlug`) or one story page,
+ * cached for a day across requests.
+ */
+export const getCachedWeeklyProfiles = (weekStart: string, storySlug = '') =>
+  unstable_cache(
+    async (): Promise<ProfilePreview[]> => {
+      const edition = await getPublishedWeeklyDigest(weekStart)
+      if (!edition) return []
+      const story = storySlug
+        ? edition.content.stories.find((item) => item.slug === storySlug)
+        : null
+      if (storySlug && !story) return []
+      const handles = story
+        ? handlesIn([
+            story.overview,
+            story.continuityNote,
+            ...story.segments.map(({ commentary }) => commentary),
+          ])
+        : weekPageHandles(edition.content)
+      return loadWeeklyProfiles(edition.content, handles)
+    },
+    ['weekly-profiles', weekStart, storySlug],
+    { revalidate: 86_400 },
+  )()

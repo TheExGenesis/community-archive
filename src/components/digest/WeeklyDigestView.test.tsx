@@ -43,7 +43,7 @@ const content = JSON.parse(
   readFileSync(
     join(
       process.cwd(),
-      'memos/artifacts/20261108-weekly-digest-v6/2026-10-26.json',
+      'memos/artifacts/20261108-weekly-digest-v7/2026-10-26.json',
     ),
     'utf8',
   ),

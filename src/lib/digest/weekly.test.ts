@@ -108,7 +108,7 @@ const summary = [
 ]
 
 const validOutput = {
-  dek: 'A week of neurons that would not stop glowing, and a swarm of good agents.',
+  dek: "'I found a neuron that makes the model green,' then a library of persona neurons and 'a good guy with a swarm.'",
   executive_summary: summary,
   stories: [
     {
@@ -306,7 +306,7 @@ describe('assembleWeeklyDigestContent', () => {
       ]),
     )
     const output = {
-      dek: 'All AI, all week.',
+      dek: "'AI story number one' and its sequels.",
       executive_summary: summary,
       stories: many.map((item, index) => ({
         kind: 'major',
@@ -381,6 +381,12 @@ describe('assembleWeeklyDigestContent', () => {
     expect(() => assemble(foreign)).toThrow(
       'stories[1].featured_tweet_ids contains 1',
     )
+  })
+
+  it('rejects a dek that opens with framing about the week', () => {
+    const framed = structuredClone(validOutput)
+    framed.dek = 'A week of neurons and swarms.'
+    expect(() => assemble(framed)).toThrow('opens with framing about the week')
   })
 
   it('requires a short dek', () => {

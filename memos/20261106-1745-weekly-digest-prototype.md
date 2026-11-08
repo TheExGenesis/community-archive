@@ -120,9 +120,27 @@ visitors, so the old on-hover fetch never showed a bio to them, and took several
 seconds for everyone else.
 
 Samples regenerated with the dek prompt into
-`memos/artifacts/20261108-weekly-digest-v3/` (all four weeks passed on the first
+`memos/artifacts/20261108-weekly-digest-v3/` (since replaced by v4; all four weeks passed on the first
 attempt). Deks: "A week of machines refuting conjectures, hobbyists dissecting
 neurons one at a time, hackers emptying exchanges, and a starship captain's
 final bow." (Oct 26); "A week when the ballot box swung hard, models started
 rewriting each other's weights, and one seemed to drag its feet on safety
 work." (Nov 2).
+
+## Daily-style front page (Nov 8, later)
+
+The week page now reads like the daily: each story has a one-line title (at
+most 90 characters, strongly preferring an exact excerpt of one story tweet that
+points at the broader story; " / " composites are rejected), a `subtitle` of
+about three lines (at most 280 characters), and one or two `featured_tweet_ids`
+shown as framed cards. The longer `overview`, segments and remaining tweets stay
+on the story page. Titles are classified with the daily `classifyDigestTitle`, so
+quote titles get curly marks. Featured tweets on both the weekly and the daily
+front page now sit in a card grid (`TweetCardGrid`, two across when the column
+fits two ~300px cards).
+
+Samples regenerated into `memos/artifacts/20261108-weekly-digest-v4/`; all four
+weeks passed on the first attempt and 19 of 20 titles are exact quotes, e.g. "The
+Exponential Time Hypothesis is false.", "Democrats are winning EVERYTHING!!!",
+"haha we have a lil neighborhood". The one written title: "Rest in peace BioWare".
+

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
+import { TweetCardGrid } from '@/components/digest/TweetCardGrid'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import { DigestJingleButton } from '@/components/digest/DigestJingleButton'
 import { DigestComments } from '@/components/digest/DigestComments'
@@ -205,18 +206,11 @@ export function DigestEditionView({
                       <DigestMarkdown>{story.subtitle}</DigestMarkdown>
                     </p>
 
-                    <div className="mt-8">
-                      {story.bangers.slice(0, 2).map((tweet) => (
-                        <TweetCard
-                          key={tweet.id}
-                          tweet={tweet}
-                          variant="editorial"
-                          collapsible
-                          showDate
-                          origin="digest"
-                          returnTo={returnTo}
-                        />
-                      ))}
+                    <div className="mt-7">
+                      <TweetCardGrid
+                        tweets={story.bangers.slice(0, 2)}
+                        returnTo={returnTo}
+                      />
                     </div>
 
                     <PostHogLink

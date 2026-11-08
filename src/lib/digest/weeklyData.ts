@@ -55,6 +55,10 @@ export function parseWeeklyDigestContent(
     stories: content.stories.map((story) => ({
       ...story,
       overview: story.overview ?? '',
+      titleIsQuote: story.titleIsQuote ?? false,
+      titleKind: story.titleKind ?? 'voice',
+      subtitle: story.subtitle ?? story.overview ?? '',
+      featuredTweetIds: story.featuredTweetIds ?? [],
       continuesFrom: story.continuesFrom ?? [],
       dailyStories: story.dailyStories ?? [],
       days: story.days ?? [],
@@ -221,6 +225,6 @@ export async function loadWeeklyProfiles(
 /** Handles the week page shows: story overviews and the also-notable lines. */
 export const weekPageHandles = (content: WeeklyDigestContent) =>
   handlesIn([
-    ...content.stories.map((story) => story.overview),
+    ...content.stories.map((story) => story.subtitle),
     ...content.alsoNotable.map(({ line }) => line),
   ])

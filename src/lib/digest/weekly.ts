@@ -1,5 +1,10 @@
 import type { PortalTweet } from '@/lib/portal/types'
-import type { DigestEditionContent, DigestStory } from './types'
+import { classifyDigestTitle, type DigestPromptCorpusRow } from './generation'
+import type {
+  DigestEditionContent,
+  DigestStory,
+  DigestTitleKind,
+} from './types'
 
 /**
  * Weekly Digest: weaves the published daily stories of one Monday–Sunday week
@@ -18,6 +23,9 @@ export const WEEKLY_MAX_STORIES = 5
 /** At most this many weekly stories may come only from "AI news" daily stories. */
 export const WEEKLY_MAX_AI_STORIES = 3
 export const WEEKLY_MAX_TREND_TERMS = 3
+export const WEEKLY_TITLE_MAX_CHARS = 90
+export const WEEKLY_SUBTITLE_MAX_CHARS = 280
+export const WEEKLY_MAX_FEATURED = 2
 
 export const WEEKLY_STORY_KINDS = ['ongoing', 'major'] as const
 export type WeeklyStoryKind = (typeof WEEKLY_STORY_KINDS)[number]
@@ -68,7 +76,12 @@ export interface WeeklyDigestStory {
   slug: string
   kind: WeeklyStoryKind
   title: string
-  /** One paragraph about the story as a whole. */
+  /** True when the whole title is one exact excerpt of a story tweet. */
+  titleIsQuote: boolean
+  titleKind: DigestTitleKind
+  /** About three lines for the front page, like a daily story's subtitle. */
+  subtitle: string
+  /** One paragraph about the story as a whole, for the story page. */
   overview: string
   /** Why the bundled daily stories belong together; empty for a single source. */
   connection: string
@@ -82,6 +95,8 @@ export interface WeeklyDigestStory {
   segments: WeeklyStorySegment[]
   /** Every banger from the cited daily stories, copied from the daily editions. */
   tweets: PortalTweet[]
+  /** The one or two tweets shown with the story on the front page. */
+  featuredTweetIds: string[]
   /** Words whose daily trend lines are shown beside the story. */
   trendTerms: string[]
 }
@@ -132,6 +147,8 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
         required: [
           'kind',
           'title',
+          'subtitle',
+          'featured_tweet_ids',
           'overview',
           'connection',
           'daily_refs',
@@ -142,7 +159,14 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
         ],
         properties: {
           kind: { type: 'string', enum: WEEKLY_STORY_KINDS },
-          title: { type: 'string', minLength: 8, maxLength: 140 },
+          title: { type: 'string', minLength: 4, maxLength: 120 },
+          subtitle: { type: 'string', minLength: 40, maxLength: 360 },
+          featured_tweet_ids: {
+            type: 'array',
+            minItems: 1,
+            maxItems: WEEKLY_MAX_FEATURED,
+            items: { type: 'string', minLength: 1, maxLength: 30 },
+          },
           overview: { type: 'string', minLength: 80, maxLength: 600 },
           connection: { type: 'string', maxLength: 400 },
           daily_refs: {
@@ -219,7 +243,9 @@ Refer to people by their Twitter/X @handle exactly as it appears in the tweets' 
 
 WRITING
 - Ground every claim in the supplied daily stories and tweets. Do not add outside knowledge, dates, or numbers.
-- Title: plain and specific, in the voice of the community's own posts rather than newsletter-speak. A reader who sees only the title must learn what happened. A short exact quote from a source tweet is welcome when the story has one element and the quote itself says what happened; a quote that only makes sense after reading the story ("Anyway, it's Wednesday.", "whew") is not a title. When a story has several distinct elements, the title must cover all of them: either join two short quotes ("'quote one' / 'quote two'") or write a plain title naming each element. Never title a multi-part story with a quote that fits only one part.
+- title: ONE line of at most ${WEEKLY_TITLE_MAX_CHARS} characters that points the reader at the story. Strongly prefer an exact excerpt copied character for character from one of the story's tweets: the line people kept quoting, the claim at the centre, the reaction that captures the mood. The quote is a pointer to the broader story, not a summary of it, so it does not need to cover every part. Do not add quotation marks (the page adds them). Do NOT compose titles from several parts: no " / " joins, no "X, Y and Z" chains, no "A, as B says C". If no single excerpt works, write one short plain headline about the story's core thread. A quote that means nothing without the story ("whew", "Anyway, it's Wednesday.") is not a title.
+- subtitle: about three lines (one or two sentences, at most ${WEEKLY_SUBTITLE_MAX_CHARS} characters) shown under the title on the week page. Say what happened across the week and, if the title is a quote, who said it and why it mattered. Plain words; @handles allowed.
+- featured_tweet_ids: the ${WEEKLY_MAX_FEATURED} tweets (or one, if the story has one) that best show the story on the week page, chosen from the story's tweets. Prefer the tweet the title quotes plus the strongest reaction or development.
 - overview: one paragraph (two to four sentences) about the story as a whole: what happened across the week, who drove it, and why it mattered to the community. No bullet lists.
 - segments: walk the reader through the story's tweets in a sensible order (usually chronological). Each segment is one or two short sentences of commentary (context, what the tweet adds, how people reacted) followed by the ids of the one to four tweets it introduces. Choose tweets only from the "tweets" of the daily stories this weekly story cites, and use each tweet at most once. Do not restate what the tweet says; say why it matters or what it answered. Any tweet you skip is still shown after the segments, so prefer a few strong segments over covering everything.
 - trend_terms: up to ${WEEKLY_MAX_TREND_TERMS} single words or short phrases (lower case, as people would actually type them in tweets) whose daily usage would show this story in the archive, such as a product, person, place or coined phrase central to it. Prefer specific terms ("sora", "polymarket") over generic ones ("ai", "model"). Leave empty when nothing distinctive fits.
@@ -488,7 +514,14 @@ export function assembleWeeklyDigestContent(input: {
         `${label}.kind must be one of ${WEEKLY_STORY_KINDS.join(', ')}`,
       )
     }
-    const title = requireString(raw.title, `${label}.title`)
+    const rawTitle = requireString(raw.title, `${label}.title`)
+      .replace(/^["\u201c\u2018']+|["\u201d\u2019']+$/g, '')
+      .trim()
+    const subtitle = requireString(raw.subtitle ?? '', `${label}.subtitle`)
+    const featuredRaw = requireStrings(
+      raw.featured_tweet_ids ?? [],
+      `${label}.featured_tweet_ids`,
+    )
     const overview = requireString(raw.overview, `${label}.overview`)
     const connection = requireString(
       raw.connection ?? '',
@@ -595,6 +628,45 @@ export function assembleWeeklyDigestContent(input: {
       },
     )
 
+    if (rawTitle.length > WEEKLY_TITLE_MAX_CHARS) {
+      errors.push(
+        `${label}.title is ${rawTitle.length} characters; use one line of at most ${WEEKLY_TITLE_MAX_CHARS}, ideally an exact excerpt of one tweet`,
+      )
+    }
+    if (/\s\/\s/.test(rawTitle)) {
+      errors.push(
+        `${label}.title joins several parts with " / "; use one excerpt or one plain headline`,
+      )
+    }
+    if (subtitle.length < 40 || subtitle.length > WEEKLY_SUBTITLE_MAX_CHARS) {
+      errors.push(
+        `${label}.subtitle is ${subtitle.length} characters; write one or two sentences of at most ${WEEKLY_SUBTITLE_MAX_CHARS}`,
+      )
+    }
+    const featuredTweetIds = Array.from(new Set(featuredRaw)).slice(
+      0,
+      WEEKLY_MAX_FEATURED,
+    )
+    if (featuredTweetIds.length === 0) {
+      errors.push(`${label}.featured_tweet_ids must name at least one tweet`)
+    }
+    for (const id of featuredTweetIds) {
+      if (!tweetIds.has(id)) {
+        errors.push(
+          `${label}.featured_tweet_ids contains ${id}, which is not a tweet of the daily stories this weekly story cites`,
+        )
+      }
+    }
+    const corpus: DigestPromptCorpusRow[] = tweets.map((tweet, tweetIndex) => ({
+      index: tweetIndex,
+      kind: 'banger',
+      parentBangerIndex: null,
+      tweetId: tweet.id,
+      tweet,
+    }))
+    const classified = classifyDigestTitle(rawTitle, corpus)
+    const title = classified.title
+
     const continuesFrom: WeeklyContinuityRef[] = []
     for (const ref of continuesFromRefs) {
       const found = weekly.get(ref)
@@ -620,6 +692,9 @@ export function assembleWeeklyDigestContent(input: {
       slug: occurrence === 1 ? baseSlug : `${baseSlug}-${occurrence}`,
       kind,
       title,
+      titleIsQuote: classified.kind === 'quote',
+      titleKind: classified.kind,
+      subtitle,
       overview,
       connection: refs.length > 1 ? connection : '',
       continuityNote: continuesFrom.length > 0 ? continuityNote : '',
@@ -628,6 +703,7 @@ export function assembleWeeklyDigestContent(input: {
       days: Array.from(days).sort(),
       segments,
       tweets,
+      featuredTweetIds: featuredTweetIds.filter((id) => tweetIds.has(id)),
       trendTerms,
     }
   })
@@ -705,9 +781,11 @@ export function weeklyDigestToMarkdown(
   ]
   for (const story of content.stories) {
     lines.push(
-      `## ${story.title}`,
+      `## ${story.titleIsQuote ? `\u201c${story.title}\u201d` : story.title}`,
       '',
-      `*${story.kind === 'ongoing' ? `Ongoing · ${story.days.length} days` : 'Major'}* — ${story.overview}`,
+      `*${story.kind === 'ongoing' ? `Ongoing · ${story.days.length} days` : 'Major'}* — ${story.subtitle}`,
+      '',
+      story.overview,
       '',
     )
     for (const segment of story.segments) {
@@ -816,6 +894,7 @@ export function weeklyPeople(content: WeeklyDigestContent): WeeklyPerson[] {
     ...content.alsoNotable.map(({ line }) => line),
     ...content.stories.flatMap((story) => [
       story.title,
+      story.subtitle,
       story.overview,
       story.connection,
       story.continuityNote,

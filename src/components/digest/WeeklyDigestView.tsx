@@ -3,6 +3,10 @@ import type { ReactNode } from 'react'
 import TweetCard from '@/components/TweetCard'
 import { DigestRefLink } from '@/components/digest/DigestRefLink'
 import { DigestSubscribeButton } from '@/components/digest/DigestSubscribeButton'
+import {
+  TweetCardGrid,
+  tweetCardFrame,
+} from '@/components/digest/TweetCardGrid'
 import { WeeklyTrendChart } from '@/components/digest/WeeklyTrendChart'
 import {
   WeeklyPeopleProvider,
@@ -42,6 +46,9 @@ export const weeklyStoryPath = (weekStart: string, slug: string) =>
   `/digest/week/${weekStart}/${slug}`
 
 const plain = (markdown: string) => markdown.replace(/[*_`]/g, '')
+/** Quote titles get curly marks, like daily story titles. */
+const displayTitle = (story: WeeklyDigestStory) =>
+  story.titleIsQuote ? `\u201c${plain(story.title)}\u201d` : plain(story.title)
 const storyColor = (content: WeeklyDigestContent, slug: string) =>
   WEEKLY_MAP_COLORS[content.stories.findIndex((item) => item.slug === slug)] ??
   WEEKLY_MAP_COLORS[0]
@@ -252,6 +259,16 @@ function Page({
   )
 }
 
+/** The tweets shown with a story on the week page. */
+const featuredTweets = (story: WeeklyDigestStory) => {
+  const byId = new Map(story.tweets.map((tweet) => [tweet.id, tweet]))
+  const chosen = story.featuredTweetIds.flatMap((id) => {
+    const tweet = byId.get(id)
+    return tweet ? [tweet] : []
+  })
+  return chosen.length > 0 ? chosen : story.tweets.slice(0, 2)
+}
+
 /** The week's front page: a subtitle, then straight into the stories. */
 export function WeeklyDigestView({
   edition,
@@ -311,7 +328,7 @@ export function WeeklyDigestView({
                   <li
                     key={story.slug}
                     id={story.slug}
-                    className="grid grid-cols-[2.25rem_1fr] gap-x-3 border-b border-zinc-200 py-6 last:border-b-0 dark:border-zinc-800 sm:grid-cols-[3rem_1fr]"
+                    className="grid grid-cols-[2.25rem_1fr] gap-x-3 border-b border-zinc-200 py-9 last:border-b-0 dark:border-zinc-800 sm:grid-cols-[3rem_1fr]"
                   >
                     <span
                       aria-hidden
@@ -323,20 +340,28 @@ export function WeeklyDigestView({
                     <div className="min-w-0">
                       <KindChips story={story} />
                       <h3
-                        className="mt-3 text-[23px] font-semibold leading-[1.2] [text-wrap:pretty] sm:text-[27px]"
+                        className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[36px]"
                         style={SERIF}
                       >
                         <Link
                           href={weeklyStoryPath(edition.weekStart, story.slug)}
                           className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         >
-                          {plain(story.title)}
+                          {displayTitle(story)}
                         </Link>
                       </h3>
-                      <p className="mt-2 leading-[1.6] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300">
-                        <WeeklyText>{story.overview}</WeeklyText>
+                      <p
+                        className={`mt-3 max-w-[62ch] text-base leading-[1.65] [text-wrap:pretty] sm:text-[17.5px] ${MUTED}`}
+                      >
+                        <WeeklyText>{story.subtitle}</WeeklyText>
                       </p>
-                      <p className={`mt-3 text-[13px] leading-[1.7] ${MUTED}`}>
+                      <div className="mt-6">
+                        <TweetCardGrid
+                          tweets={featuredTweets(story)}
+                          returnTo={`/digest/week/${edition.weekStart}`}
+                        />
+                      </div>
+                      <p className={`mt-5 text-[13px] leading-[1.7] ${MUTED}`}>
                         {story.dailyStories.map((ref, refIndex) => (
                           <span key={`${ref.digestDate}-${ref.slug}`}>
                             {refIndex > 0 ? ' · ' : ''}
@@ -398,9 +423,6 @@ export function WeeklyDigestView({
   )
 }
 
-const tweetFrame =
-  'overflow-hidden rounded-2xl border border-zinc-200 bg-white px-4 [&_.border-t]:border-t-0 [&_.border-t]:py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_14px_-6px_rgba(0,0,0,0.08)] dark:border-zinc-800 dark:bg-zinc-900/70 dark:shadow-none'
-
 /** One weekly story on its own page. */
 export function WeeklyStoryView({
   edition,
@@ -428,7 +450,7 @@ export function WeeklyStoryView({
     const tweet = byId.get(id)
     if (!tweet) return null
     return (
-      <div key={id} className={tweetFrame}>
+      <div key={id} className={tweetCardFrame}>
         <TweetCard
           tweet={tweet}
           variant="editorial"
@@ -489,7 +511,7 @@ export function WeeklyStoryView({
               className="mt-4 text-[32px] font-semibold leading-[1.12] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
               style={SERIF}
             >
-              {plain(story.title)}
+              {displayTitle(story)}
             </h1>
             <p className="mt-5 text-lg leading-[1.6] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200 sm:text-[19px]">
               <WeeklyText>{story.overview}</WeeklyText>

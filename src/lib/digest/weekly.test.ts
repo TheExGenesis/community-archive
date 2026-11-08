@@ -87,6 +87,10 @@ const priorWeek: WeeklyDigestContent = {
       segments: [],
       tweets: [],
       trendTerms: [],
+      titleIsQuote: false,
+      titleKind: 'voice',
+      subtitle: '',
+      featuredTweetIds: [],
     },
   ],
   alsoNotable: [],
@@ -111,6 +115,9 @@ const validOutput = {
     {
       kind: 'ongoing',
       title: 'From a green neuron to a persona-neuron library',
+      subtitle:
+        'A joke find on Monday became a searchable persona library by Wednesday.',
+      featured_tweet_ids: ['1', '3'],
       overview:
         'Researchers built on one another across the week, from a joke find by @user_1 to a searchable library.',
       segments: [
@@ -127,7 +134,10 @@ const validOutput = {
     },
     {
       kind: 'major',
-      title: 'Binance reportedly hacked for $5.6 billion',
+      title: '\u201ctweet 4\u201d',
+      subtitle:
+        'The largest reported theft of the week drew questions about custody.',
+      featured_tweet_ids: ['4'],
       overview:
         'The largest reported theft of the week drew questions about exchange custody.',
       segments: [
@@ -142,6 +152,9 @@ const validOutput = {
     {
       kind: 'major',
       title: 'Only a good guy with a swarm can stop a bad guy with one',
+      subtitle:
+        'A defensive-security argument that agents must defend against agents.',
+      featured_tweet_ids: ['2'],
       overview:
         'A defensive-security argument that agents must defend against agents.',
       segments: [{ commentary: 'The argument went viral.', tweet_ids: ['2'] }],
@@ -245,7 +258,7 @@ describe('assembleWeeklyDigestContent', () => {
         title: 'Neurons are already clean',
       },
     ])
-    expect(major.slug).toBe('binance-reportedly-hacked-for-5-6-billion')
+    expect(major.slug).toBe('tweet-4')
     expect(single.connection).toBe('')
     expect(weeklyDigestToMarkdown(content)).toContain(
       '/digest/2026-10-28/persona-neurons',
@@ -304,6 +317,8 @@ describe('assembleWeeklyDigestContent', () => {
       stories: many.map((item, index) => ({
         kind: 'major',
         title: `AI story number ${index + 1}`,
+        subtitle: 'An AI story that took over the timeline this week, again.',
+        featured_tweet_ids: [`a${index + 1}`],
         overview: 'An AI story that took over the timeline this week, again.',
         connection: '',
         daily_refs: [`${item.digestDate}#1`],
@@ -351,6 +366,34 @@ describe('assembleWeeklyDigestContent', () => {
     const unknown = structuredClone(validOutput)
     unknown.stories[1].continues_from = ['W2026-10-19#1']
     expect(() => assemble(unknown)).toThrow('unknown weekly ref W2026-10-19#1')
+  })
+
+  it('marks exact-excerpt titles as quotes and keeps the featured tweets', () => {
+    const content = assemble(validOutput)
+    expect(content.stories[1]).toMatchObject({
+      title: 'tweet 4',
+      titleIsQuote: true,
+      titleKind: 'quote',
+      featuredTweetIds: ['4'],
+    })
+    expect(content.stories[0]).toMatchObject({
+      titleIsQuote: false,
+      featuredTweetIds: ['1', '3'],
+    })
+  })
+
+  it('rejects composite and overlong titles and foreign featured tweets', () => {
+    const composite = structuredClone(validOutput)
+    composite.stories[0].title = 'tweet 1 / tweet 3'
+    expect(() => assemble(composite)).toThrow('joins several parts')
+    const long = structuredClone(validOutput)
+    long.stories[0].title = 'word '.repeat(20).trim()
+    expect(() => assemble(long)).toThrow('stories[0].title is 99 characters')
+    const foreign = structuredClone(validOutput)
+    foreign.stories[1].featured_tweet_ids = ['1']
+    expect(() => assemble(foreign)).toThrow(
+      'stories[1].featured_tweet_ids contains 1',
+    )
   })
 
   it('requires a short dek', () => {

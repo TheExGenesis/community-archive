@@ -379,7 +379,9 @@ analytics read publishes without trends.
 - Pages: `/digest/week` (latest, also in the "Explore archive" menu) and
   `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (a one-line
   subtitle that gives the flavour of the week, not a list) and then the stories
-  straight away. Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
+  straight away, each like a daily story: a one-line title (preferably an exact
+  tweet excerpt, shown in quotation marks), a short `subtitle`, and one or two
+  `featuredTweetIds` in a card grid. Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
   with each commentary segment on a numbered rail beside its tweet cards, and a
   sidebar of daily coverage and trend charts. Links to daily stories and earlier weeks preview the
   linked section on hover or focus. Profile hover-card facts are resolved with

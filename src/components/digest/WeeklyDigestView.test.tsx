@@ -43,7 +43,7 @@ const content = JSON.parse(
   readFileSync(
     join(
       process.cwd(),
-      'memos/artifacts/20261108-weekly-digest-v3/2026-10-26.json',
+      'memos/artifacts/20261108-weekly-digest-v4/2026-10-26.json',
     ),
     'utf8',
   ),
@@ -69,7 +69,14 @@ describe('WeeklyDigestView', () => {
         (story) => `/digest/week/${content.weekStart}/${story.slug}`,
       ),
     )
-    expect(screen.queryAllByTestId('tweet-card')).toHaveLength(0)
+    expect(
+      screen.queryAllByTestId('tweet-card').map((card) => card.textContent),
+    ).toEqual(content.stories.flatMap((story) => story.featuredTweetIds))
+    expect(
+      screen.getByRole('link', {
+        name: `\u201c${content.stories[0].title}\u201d`,
+      }),
+    ).toBeInTheDocument()
     expect(screen.getByText(content.dek)).toBeInTheDocument()
     expect(screen.queryByText(content.executiveSummary[0])).toBeNull()
     expect(screen.queryByText('Trending words')).toBeNull()

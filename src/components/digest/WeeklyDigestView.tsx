@@ -467,10 +467,9 @@ export function WeeklyDigestView({
                       >
                         <WeeklyText>{story.subtitle}</WeeklyText>
                         {story.continuesFrom.length > 0 ? (
-                          <>
-                            {' '}
-                            <ContinuesFrom story={story} previews={previews} />.
-                          </>
+                          <span className="mt-1.5 block text-[13px] leading-[1.6]">
+                            <ContinuesFrom story={story} previews={previews} />
+                          </span>
                         ) : null}
                       </p>
                       <div className="mt-6">

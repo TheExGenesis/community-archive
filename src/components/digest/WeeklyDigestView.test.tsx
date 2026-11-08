@@ -100,9 +100,9 @@ describe('WeeklyDigestView', () => {
     const story = content.stories[0]
     const ref = story.dailyStories[0]
     render(
-      <WeeklyDigestView
+      <WeeklyStoryView
         edition={edition}
-        weeks={[content.weekStart]}
+        story={story}
         previews={{
           [dailyPreviewKey(ref.digestDate, ref.slug)]: {
             kicker: 'Daily digest · Tuesday 27 October',

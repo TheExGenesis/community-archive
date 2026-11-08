@@ -56,8 +56,6 @@ const storyColor = (content: WeeklyDigestContent, slug: string) =>
 
 const sectionLabel =
   'text-[11.5px] font-bold uppercase tracking-[0.22em] text-zinc-800 dark:text-zinc-200'
-const chip =
-  'rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100'
 const refLink =
   'rounded-sm text-brand underline decoration-dotted decoration-brand/50 underline-offset-[3px] hover:decoration-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand'
 const navLink =
@@ -135,24 +133,6 @@ function ContinuesFrom({
         )
       })}
     </>
-  )
-}
-
-function KindChips({ story }: { story: WeeklyDigestStory }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
-      <span className={chip}>
-        {story.kind === 'ongoing'
-          ? `Ongoing · ${story.days.length} days`
-          : 'Major'}
-      </span>
-      {story.continuesFrom.length > 0 ? (
-        <span className={chip}>Continuing story</span>
-      ) : null}
-      <span>
-        {story.tweets.length} {story.tweets.length === 1 ? 'tweet' : 'tweets'}
-      </span>
-    </div>
   )
 }
 
@@ -471,9 +451,8 @@ export function WeeklyDigestView({
                       {index + 1}
                     </span>
                     <div className="min-w-0">
-                      <KindChips story={story} />
                       <h3
-                        className="mt-3 text-[28px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[36px]"
+                        className="text-[28px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[36px]"
                         style={SERIF}
                       >
                         <Link
@@ -487,6 +466,12 @@ export function WeeklyDigestView({
                         className={`mt-3 max-w-[62ch] text-base leading-[1.65] [text-wrap:pretty] sm:text-[17.5px] ${MUTED}`}
                       >
                         <WeeklyText>{story.subtitle}</WeeklyText>
+                        {story.continuesFrom.length > 0 ? (
+                          <>
+                            {' '}
+                            <ContinuesFrom story={story} previews={previews} />.
+                          </>
+                        ) : null}
                       </p>
                       <div className="mt-6">
                         <TweetCardGrid
@@ -494,29 +479,9 @@ export function WeeklyDigestView({
                           returnTo={`/digest/week/${edition.weekStart}`}
                         />
                       </div>
-                      <p className={`mt-5 text-[13px] leading-[1.7] ${MUTED}`}>
-                        {story.dailyStories.map((ref, refIndex) => (
-                          <span key={`${ref.digestDate}-${ref.slug}`}>
-                            {refIndex > 0 ? ' · ' : ''}
-                            <DailyRef
-                              digestDate={ref.digestDate}
-                              slug={ref.slug}
-                              previews={previews}
-                            >
-                              {shortDay(ref.digestDate)}
-                            </DailyRef>
-                          </span>
-                        ))}
-                        {story.continuesFrom.length > 0 ? (
-                          <>
-                            {' — '}
-                            <ContinuesFrom story={story} previews={previews} />
-                          </>
-                        ) : null}
-                      </p>
                       <Link
                         href={weeklyStoryPath(edition.weekStart, story.slug)}
-                        className={`mt-3 inline-block text-sm font-semibold ${navLink}`}
+                        className={`mt-5 inline-block text-sm font-semibold ${navLink}`}
                       >
                         Read the story →
                       </Link>
@@ -644,9 +609,8 @@ export function WeeklyStoryView({
       <div className="mt-9 grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0 max-w-[860px]">
           <header>
-            <KindChips story={story} />
             <h1
-              className="mt-4 text-[32px] font-semibold leading-[1.12] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
+              className="text-[32px] font-semibold leading-[1.12] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
               style={SERIF}
             >
               {displayTitle(story)}

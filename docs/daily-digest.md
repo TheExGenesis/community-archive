@@ -55,16 +55,32 @@ separate, must occur verbatim in the supplied posts, and link to the existing
 archive search.
 
 Story titles borrow maximally from the supplied tweets rather than behaving
-like generated newsletter headlines. An exact three- to eighteen-word excerpt
-is preferred; a clear paraphrase is retained as an editorial warning instead
-of failing an otherwise grounded generation. The generated
+like generated newsletter headlines. A story about one thing (one claim,
+event, release, or joke, however many posts discuss it) takes an exact three-
+to eighteen-word excerpt from one post. A story that combines distinct
+elements may not take a quote that fits only one of them: the model writes
+one headline under about 100 characters that covers every element, stays as
+close to the posts' own words as possible, and may quote two to six telling
+words from a post inside the sentence. It must still say who did or said
+what, never a bare list of quotes. The receiver classifies
+each title (`titleKind`): `quote` when the whole title occurs in one story
+post, `composed` when every ` / ` part does (re-rendered as
+`“A” / “B”`; kept for robustness, the prompt no longer asks for it), otherwise
+`voice`; quoted spans inside a voice title must be exact excerpts and
+are rendered with curly quotation marks. `titleIsQuote` is true only for `quote`, so
+renderers wrap only single excerpts in quotation marks. A voice title on a
+one-banger story, or a quoted part that is not an exact excerpt, is kept as an editorial warning instead of failing an otherwise
+grounded generation. The generated
 subtitle must supply the people, event, and significance that the source quote
 leaves unstated rather than merely restating it. The story page keeps
 source-grounded `In brief` bullets and a short editor's note for interpretation
 or caveats. The edition abstract is exactly three concrete bullet sentences so
-a reader can scan the day's developments before opening a story. When the
-stories do not reduce cleanly, bullet three briefly catches the remaining
-stories.
+a reader can scan the day's developments before opening a story. Each bullet
+must make sense to someone who has not read the stories: one or two stories
+per bullet, plain words, and no compressed noun piles. Bullet three covers the
+most important remaining story or two; when the rest do not fit clearly, the
+summary names fewer of them rather than cramming an `Also:` catch-all, which
+is flagged as an editorial warning.
 
 ### Editorial presentation
 
@@ -155,9 +171,9 @@ completed date, generates with the newest immutable Opus 5.5 prompt, stages the
 validated output, and publishes it. The unique automated-run index and the
 one-published-edition index make duplicate cron delivery safe.
 
-Every edition keyword must occur verbatim in supplied posts. Exact story-title
-excerpts are preferred and checked, while a paraphrase becomes a non-fatal
-editorial warning. Every story must reference at least one indexed banger, and
+Every edition keyword must occur verbatim in supplied posts. Story titles are
+classified as exact, composed, or voice titles, and a paraphrased title on a
+one-banger story becomes a non-fatal editorial warning. Every story must reference at least one indexed banger, and
 a banger cannot be assigned to multiple stories. These are executable guards
 against generic AI-derived topic labels, newsletter-style headlines, and
 fabricated tweet references. The loose editorial label is generated

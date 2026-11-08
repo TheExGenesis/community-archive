@@ -3,6 +3,13 @@ import Link from 'next/link'
 const TESTIMONIALS = [
   {
     quote:
+      "PSA: I probably wouldn't be using X at all if it wasn't for @exgenesis's work on @comm_archive meaning that my tweets get saved for posterity and can be searched, analyzed, etc by third-party tools. Please opt-in if you can",
+    name: 'ivan',
+    handle: 'IvanVendrov',
+    tweetId: '2119417824192208981',
+  },
+  {
+    quote:
       'I just successfully used Community Archive search to find a tweet that Twitter search could not find 😎',
     name: 'Richard D. Bartlett',
     handle: 'RichDecibels',

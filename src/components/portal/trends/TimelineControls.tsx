@@ -34,12 +34,12 @@ export function TimelineControls({
       >
         {(
           [
-            ['all', 'All time'],
-            ['12m', 'Last 12 months'],
-            ['12w', 'Last 12 weeks'],
-            ['15d', 'Last 15 days'],
+            ['all', 'All time', 'All'],
+            ['12m', 'Last 12 months', '12 mo'],
+            ['12w', 'Last 12 weeks', '12 wk'],
+            ['15d', 'Last 15 days', '15 days'],
           ] as const
-        ).map(([value, label]) => {
+        ).map(([value, label, short]) => {
           const active = value === 'all' ? allTime : preset === value
           return (
             <button
@@ -47,10 +47,12 @@ export function TimelineControls({
               type="button"
               disabled={disabled}
               aria-pressed={active}
+              aria-label={label}
               onClick={() => onPreset(value)}
               className={`whitespace-nowrap rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${active ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : `${MUTED} hover:text-foreground`}`}
             >
-              {label}
+              <span className="sm:hidden">{short}</span>
+              <span className="hidden sm:inline">{label}</span>
             </button>
           )
         })}

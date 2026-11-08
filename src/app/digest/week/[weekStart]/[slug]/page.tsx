@@ -59,7 +59,6 @@ export default async function WeeklyStoryPage({
       edition.content,
       handlesIn([
         story.overview,
-        story.connection,
         story.continuityNote,
         ...story.segments.map(({ commentary }) => commentary),
       ]),

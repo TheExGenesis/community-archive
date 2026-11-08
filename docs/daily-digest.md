@@ -356,7 +356,7 @@ attempts fail. Failures remain private and do not publish an invalid edition.
 Monday–Sunday week into at most 5 weekly stories: "major" ones (most important
 even if covered once) and "ongoing" ones (the same subject on two or more dates).
 At most 3 may be built only from "AI news" daily stories. Daily stories are
-bundled only on a concrete shared subject, with the link stated in `connection`.
+bundled only on a concrete shared subject, with the link explained in the overview when it is not obvious.
 Each weekly story may continue a story from the previous two weekly editions
 (`continues_from` plus a `continuity_note` saying what is new).
 

@@ -139,8 +139,18 @@ quote titles get curly marks. Featured tweets on both the weekly and the daily
 front page now sit in a card grid (`TweetCardGrid`, two across when the column
 fits two ~300px cards).
 
-Samples regenerated into `memos/artifacts/20261108-weekly-digest-v4/`; all four
+Samples regenerated into `memos/artifacts/20261108-weekly-digest-v4/` (since replaced by v5); all four
 weeks passed on the first attempt and 19 of 20 titles are exact quotes, e.g. "The
 Exponential Time Hypothesis is false.", "Democrats are winning EVERYTHING!!!",
 "haha we have a lil neighborhood". The one written title: "Rest in peace BioWare".
+
+## No separate "How these connect" (Nov 8, later)
+
+The `connection` field is gone from the schema, validation and story page. When a
+weekly story bundles several daily stories, the overview must weave in what links
+them unless it is self-evident. Samples regenerated into
+`memos/artifacts/20261108-weekly-digest-v5/` (Oct 26 needed one repair attempt,
+the rest passed first time); the bundled overviews state their links in passing,
+e.g. "Saturday's viral 'CLAUDE FOUND THE SEEDS' post was read explicitly against
+that episode".
 

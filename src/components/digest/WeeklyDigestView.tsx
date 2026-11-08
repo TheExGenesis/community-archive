@@ -516,14 +516,6 @@ export function WeeklyStoryView({
             <p className="mt-5 text-lg leading-[1.6] text-zinc-800 [text-wrap:pretty] dark:text-zinc-200 sm:text-[19px]">
               <WeeklyText>{story.overview}</WeeklyText>
             </p>
-            {story.connection ? (
-              <p className={`mt-5 text-[15px] leading-[1.6] ${MUTED}`}>
-                <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                  How these connect.{' '}
-                </span>
-                <WeeklyText>{story.connection}</WeeklyText>
-              </p>
-            ) : null}
             {story.continuesFrom.length > 0 ? (
               <p className={`mt-3 text-[15px] leading-[1.6] ${MUTED}`}>
                 <span className="font-semibold text-zinc-800 dark:text-zinc-200">

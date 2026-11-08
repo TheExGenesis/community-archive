@@ -1,244 +1,30 @@
 {
   "weekStart": "2026-10-26",
   "weekEnd": "2026-11-01",
-  "generatedAt": "2026-11-08T19:53:52.077Z",
-  "dek": "A week of machines refuting conjectures, hobbyists reading neurons one by one, billions vanishing from exchanges, and a captain's farewell.",
+  "generatedAt": "2026-11-08T20:13:05.566Z",
+  "dek": "A week of reading machines neuron by neuron, an IPO that warned it was uninsurable, hacks without end, and a captain's farewell.",
   "executiveSummary": [
-    "OpenAI claimed its models disproved a famous complexity conjecture and made physics and maths discoveries, and outside experts are now organising independent checks.",
-    "Community researchers turned odd single neurons in open AI models into a week-long craze, ending with a public database that tries to read every neuron.",
-    "A reported $5.6B Binance hack capped another week of AI-era security dread, while Patrick Stewart's death drew the week's largest outpouring."
+    "Community researchers spent all week mapping individual neurons in open Qwen models, from a humble-muffin persona library to a full database of every neuron.",
+    "OpenAI claimed its models disproved a famous complexity conjecture and made new math and physics finds, and outside experts are now organizing a review.",
+    "Anthropic filed to go public, and posters fixated on its uninsurable-risk warning and the staff fortunes it implies; Patrick Stewart died at 86."
   ],
   "stories": [
-    {
-      "slug": "the-exponential-time-hypothesis-is-false",
-      "kind": "major",
-      "title": "The Exponential Time Hypothesis is false.",
-      "titleIsQuote": true,
-      "titleKind": "quote",
-      "subtitle": "OpenAI announced three AI-found results in harmonic analysis, complexity theory and quantum field theory. @AndrewCurran_'s blunt one-liner about the complexity claim became the line people passed around as experts set up independent review.",
-      "overview": "@gdb and @danintheory announced that OpenAI models had produced Lean-verified results, including a claimed refutation of the Exponential Time Hypothesis, a long-standing conjecture tied to P vs NP. @rrwilliams said he and colleagues were asked to run an open, independent examination, while reactions ran from awe to calling the result 'somewhat deflationary.' The next day @tszzl used the announcement to muse about losing control of an intelligence explosion, as Axiom's formalisation of a 15,000-page proof pushed the same question.",
-      "connection": "@tszzl's post on losing control was a direct quote of @danintheory's announcement of the OpenAI discoveries, extending Tuesday's news into Wednesday's reflection.",
-      "continuityNote": "Two weeks after OpenAI's maths manuscripts unsettled mathematicians, the company now claims to have refuted a major complexity conjecture, with named outside experts organising verification.",
-      "continuesFrom": [
-        {
-          "weekStart": "2026-10-12",
-          "slug": "they-have-annihilated-my-field-of-research",
-          "title": "They have annihilated my field of research."
-        }
-      ],
-      "dailyStories": [
-        {
-          "digestDate": "2026-10-27",
-          "slug": "the-exponential-time-hypothesis-is-false",
-          "title": "The Exponential Time Hypothesis is false."
-        },
-        {
-          "digestDate": "2026-10-28",
-          "slug": "wow-i-didn-t-know-you-could-do-that-with-mere-bits-and-atoms",
-          "title": "wow I didn't know you could DO that with mere bits and atoms"
-        }
-      ],
-      "days": [
-        "2026-10-27",
-        "2026-10-28"
-      ],
-      "segments": [
-        {
-          "commentary": "The announcement came from OpenAI's leadership and researchers at once, framed as AI starting to improve our understanding of the universe.",
-          "tweetIds": [
-            "2114837059462627533",
-            "2114833682469122314"
-          ]
-        },
-        {
-          "commentary": "The complexity claim drew the most attention, and the Lean verification detail was what made people take it seriously.",
-          "tweetIds": [
-            "2114836647821107422",
-            "2114833687296847930",
-            "2114836071028785289"
-          ]
-        },
-        {
-          "commentary": "Crucially, respected complexity theorists were brought in to scrutinise the claim in public rather than take it on trust.",
-          "tweetIds": [
-            "2114833319431209352"
-          ]
-        },
-        {
-          "commentary": "A day later the mood turned philosophical, as a separate giant proof was machine-checked and community members asked what human control and value mean now.",
-          "tweetIds": [
-            "2114962843921678444",
-            "2115089794867040584",
-            "2115223171746140277"
-          ]
-        }
-      ],
-      "tweets": [
-        {
-          "id": "2114837059462627533",
-          "rts": 1765,
-          "name": "Greg Brockman",
-          "text": "Announcing three major scientific discoveries, one each in mathematics (harmonic analysis), computer science (complexity theory), and physics (quantum field theory).\n\nAI starting to help us improve our understanding of the universe! https://t.co/VkfacopR2R",
-          "likes": 10544,
-          "avatar": "https://pbs.twimg.com/profile_images/1347621377503711233/bHg3ipfD_normal.jpg",
-          "username": "gdb",
-          "accountId": "162124540",
-          "createdAt": "2026-10-26T21:50:21.000Z",
-          "observedAt": "2026-10-27T07:13:45.868Z",
-          "quoteCount": 7
-        },
-        {
-          "id": "2114836071028785289",
-          "rts": 327,
-          "name": "Andrew Curran",
-          "text": "OpenAI has announced to three new discoveries in mathematics, computer science, and physics:\n- Local smoothing and the Kakeya conjecture\n- The Exponential Time Hypothesis is false\n- Existence of quantum chromodynamics and completions of the Standard Model https://t.co/FIgVlNIEyY",
-          "likes": 2234,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HVloMu2aYAAYX5k.jpg",
-              "type": "photo",
-              "width": 1080,
-              "height": 753
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
-          "username": "AndrewCurran_",
-          "accountId": "1538525334781370368",
-          "createdAt": "2026-10-26T21:46:25.000Z",
-          "observedAt": "2026-10-27T07:24:05.380Z",
-          "quoteCount": 4
-        },
-        {
-          "id": "2114836647821107422",
-          "rts": 145,
-          "name": "Andrew Curran",
-          "text": "The Exponential Time Hypothesis is false. https://t.co/zkvLFeUo8K",
-          "likes": 857,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HVlouN9bgAA6K9x.jpg",
-              "type": "photo",
-              "width": 1080,
-              "height": 1851
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
-          "username": "AndrewCurran_",
-          "accountId": "1538525334781370368",
-          "createdAt": "2026-10-26T21:48:43.000Z",
-          "observedAt": "2026-10-27T06:47:48.644Z",
-          "quoteCount": 7
-        },
-        {
-          "id": "2114833682469122314",
-          "rts": 1245,
-          "name": "Dan Roberts",
-          "text": "We are announcing three new discoveries in mathematics, computer science, and physics about harmonic analysis, complexity theory, and quantum field theory.\n\nhttps://t.co/9BX8HWQDTJ",
-          "likes": 5278,
-          "avatar": "https://pbs.twimg.com/profile_images/450003768709353472/Nod6R8y0_normal.jpeg",
-          "username": "danintheory",
-          "accountId": "45825798",
-          "createdAt": "2026-10-26T21:36:56.000Z",
-          "observedAt": "2026-10-27T07:29:05.902Z",
-          "quoteCount": 6
-        },
-        {
-          "id": "2114833319431209352",
-          "rts": 468,
-          "name": "Ryan Williams @rrwilliams.bsky.social",
-          "text": "An internal model at OpenAI has produced a claimed refutation of ETH! Russell Impagliazzo, Mohan Paturi, and I have been asked to help organize an open and independent examination of this claim. 1/4",
-          "likes": 2437,
-          "avatar": "https://pbs.twimg.com/profile_images/1587257679726133248/En7AKJHO_normal.jpg",
-          "username": "rrwilliams",
-          "accountId": "14594687",
-          "createdAt": "2026-10-26T21:35:29.000Z",
-          "observedAt": "2026-10-27T03:47:31.574Z",
-          "quoteCount": 4
-        },
-        {
-          "id": "2114833687296847930",
-          "rts": 116,
-          "name": "Dan Roberts",
-          "text": "The computer science collaboration will understand and explain a result concerning the Exponential Time Hypothesis (ETH), a longstanding conjecture about the computational complexity of Boolean formula satisfiability, a problem deeply related to the P vs. NP problem.\n\nSurprisingly, our system has recently proved that the ETH is false, a result that was subsequently verified in Lean.\n\nThe refutation of the ETH reopens questions about how much faster these tasks could become, and may help guide the search for better algorithms. Finding such algorithms, and turning theoretical advances into practical improvements, will require significant further research.\n\nOur system found its natural language disproof for the ETH we reached out to to @rrwilliams. Ryan will form a collaboration with Russell Impagliazzo and Ramamohan Paturi to verify and shepherd this result. Impagliazzo and Paturi, along with Francis Zane, are the original proposers of the Exponential Time Hypothesis, and Williams has refuted strong versions of the ETH, used ETH for hardness results, and connected algorithms and lower bounds.\n\nThis group asked us to make all raw data of the results public to facilitate independent verification by the community, which we have done by posting the natural language proof and Lean formalization to our GitHub repo. The group also invites the community to help organize an open examination of the ETH claim and to discuss the broader questions that AI-generated breakthroughs raise about verification, access, credit, and the future of research.\n\nhttps://t.co/fkLJX9a2Zi",
-          "likes": 425,
-          "avatar": "https://pbs.twimg.com/profile_images/450003768709353472/Nod6R8y0_normal.jpeg",
-          "username": "danintheory",
-          "accountId": "45825798",
-          "createdAt": "2026-10-26T21:36:57.000Z",
-          "observedAt": "2026-10-27T03:47:31.574Z",
-          "quoteCount": 3
-        },
-        {
-          "id": "2114962843921678444",
-          "rts": 82,
-          "name": "roon",
-          "text": "fighting for control over a runaway intelligence explosion will continuously look like “wow I didn’t know you could DO that with mere bits and atoms” and then losing",
-          "likes": 1456,
-          "avatar": "https://pbs.twimg.com/profile_images/1918970926668054530/fy-ZsgJ7_normal.jpg",
-          "username": "tszzl",
-          "accountId": "1460283925",
-          "createdAt": "2026-10-27T06:10:10.000Z",
-          "observedAt": "2026-10-28T06:17:54.534Z",
-          "quoteCount": 3,
-          "communityAuthored": true
-        },
-        {
-          "id": "2115089794867040584",
-          "rts": 2567,
-          "name": "Axiom",
-          "text": "The largest math proof in human history is now computer-verified.\n\nToday, Axiom announces a complete Lean auto-formalization of the Classification of Finite Simple Groups, the \"periodic table of symmetry.\"\n\nAbout 15,000 pages, built by over 100 mathematicians across generations. https://t.co/Y1P26abyPQ",
-          "likes": 5621,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HVpOm-eaUAAZZVL.jpg",
-              "type": "video",
-              "width": 1920,
-              "height": 1080
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/2020254827117432832/Yad4149b_normal.jpg",
-          "username": "axiommathai",
-          "accountId": "1972828074908749824",
-          "createdAt": "2026-10-27T14:34:38.000Z",
-          "observedAt": "2026-10-28T06:17:54.534Z",
-          "quoteCount": 3
-        },
-        {
-          "id": "2115223171746140277",
-          "rts": 26,
-          "name": "Oliver Traldi",
-          "text": "There's probably not a knockdown argument here, but I feel like there's a kind of dilemma for anthropocentrism. If you lean heavily on intellection, human value ends up continuous with machines. If you lean heavily on experience, human value ends up continuous with animals.",
-          "likes": 203,
-          "avatar": "https://pbs.twimg.com/profile_images/1982864645758091264/tLdbdemO_normal.jpg",
-          "username": "olivertraldi",
-          "accountId": "778952476565368832",
-          "createdAt": "2026-10-27T23:24:37.000Z",
-          "observedAt": "2026-10-28T06:17:54.534Z",
-          "quoteCount": 2,
-          "communityAuthored": true
-        }
-      ],
-      "featuredTweetIds": [
-        "2114836647821107422",
-        "2114833319431209352"
-      ],
-      "trendTerms": [
-        "exponential time hypothesis",
-        "eth",
-        "lean"
-      ]
-    },
     {
       "slug": "i-made-a-library-of-34-220-persona-neurons-in-qwen",
       "kind": "ongoing",
       "title": "i made a library of 34,220 persona neurons in qwen",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "From a green-making neuron on Monday to a database of every neuron in two models on Saturday, community researchers spent the week poking single neurons in Qwen. @jfonsecarivera's searchable library turned it into a game everyone played.",
-      "overview": "@Sauers_ kicked things off with a neuron that turns the model green, and @jfonsecarivera followed with a library of tens of thousands of rated persona neurons that produced humble muffins and an evil-Qwen recipe. Midweek @_a9lim previewed J-lens for reading neurons directly, @maxsloef showed one trained neuron can make Qwen an owl, and @voooooogel cautioned that steering-induced personas may reflect 'persona solving' rather than persona-specific neurons. By Saturday @_a9lim and @treetowntree had released Neuron Lens, turning a playful trend into public tooling.",
-      "connection": "Every day of this thread builds on the same work: steering and reading individual neurons in Qwen models, with @jfonsecarivera crediting @Sauers_, @_a9lim extending it with J-lens and then Neuron Lens, and @voooooogel and @maxsloef responding to the persona-neuron trend directly.",
-      "continuityNote": "",
-      "continuesFrom": [],
+      "subtitle": "@jfonsecarivera's searchable Qwen neuron library set off a week of community interpretability toys and tools, from one-neuron owls to @_a9lim's database of every neuron, with @voooooogel urging caution.",
+      "overview": "What started Monday as @Sauers_'s joke about a neuron that turns a model green became the week's longest-running community thread. @jfonsecarivera swept every neuron in Qwen and published a library, @chiefofautism found an 'evil' neuron, @maxsloef trained whole personas into one neuron, and @_a9lim and @treetowntree went from previewing J-lens to releasing Neuron Lens. @voooooogel's warning about 'persona solving' gave the thread its main methodological argument.",
+      "continuityNote": "Two weeks ago the argument was whether neurons in big models are readable; this week community members built and released their own neuron libraries and reading tools for open models.",
+      "continuesFrom": [
+        {
+          "weekStart": "2026-10-12",
+          "slug": "i-think-this-may-be-remembered-as-a-major-moment-in-scientific-history",
+          "title": "i think this may be remembered as a major moment in scientific history"
+        }
+      ],
       "dailyStories": [
         {
           "digestDate": "2026-10-26",
@@ -275,35 +61,34 @@
       ],
       "segments": [
         {
-          "commentary": "Half joke, half research share, the green neuron set the tone; a same-day paper on hidden preferences passing between different models added a stranger undertone.",
+          "commentary": "The spark: a half-joke interpretability find that researchers treated as mechinterp delight.",
           "tweetIds": [
-            "2114481373876801557",
-            "2114445425398931614"
+            "2114481373876801557"
           ]
         },
         {
-          "commentary": "The library made neuron-hunting a group activity, and its silliest combinations spread fastest.",
+          "commentary": "Two days later @jfonsecarivera, crediting @Sauers_, swept the whole model and asked people to hunt for the weirdest neurons; the muffin combo became the day's favourite.",
           "tweetIds": [
-            "2115093117917659372",
             "2115109334090920065",
+            "2115093117917659372",
             "2115096024859705532"
           ]
         },
         {
-          "commentary": "Not every find was cute: one recipe claimed to reliably make the model evil by nudging a single neuron.",
+          "commentary": "The playful turned pointed when a single steered neuron produced 'evil qwen.'",
           "tweetIds": [
             "2115274388425900291"
           ]
         },
         {
-          "commentary": "J-lens promised to read neurons rather than steer them, landing alongside a demo of a CPU running inside a model's own weights.",
+          "commentary": "@_a9lim previewed a way to identify neurons directly, while a separate project ran a CPU inside Qwen's own weights.",
           "tweetIds": [
             "2115628110871924892",
             "2115394340357116169"
           ]
         },
         {
-          "commentary": "Friday brought both a striking one-neuron training result and the week's key caveat, which @jfonsecarivera accepted as fair.",
+          "commentary": "Friday brought one-neuron personas and the week's key caveat, which led @jfonsecarivera to concede 'sloppy framing.'",
           "tweetIds": [
             "2115858480016011420",
             "2115685944615649286",
@@ -311,7 +96,7 @@
           ]
         },
         {
-          "commentary": "The week ended with the tooling itself: a database covering every neuron and attention head in two open models.",
+          "commentary": "The thread closed with the full release: every neuron and attention head in two open models, tools included.",
           "tweetIds": [
             "2116314514199068915"
           ]
@@ -621,20 +406,229 @@
       ]
     },
     {
-      "slug": "binance-hacked-with-over-5-6-billion-stolen",
-      "kind": "ongoing",
-      "title": "Binance hacked with over $5.6 billion stolen",
+      "slug": "the-exponential-time-hypothesis-is-false",
+      "kind": "major",
+      "title": "The Exponential Time Hypothesis is false.",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "The security wave from last week rolled on: agent swarms patched fallout from the compromised eMudhra certificate, a Japanese trading host was breached, and on Friday a reported $5.6B Binance hack and a Polymarket compromise topped it off.",
-      "overview": "Monday opened with @theproteindance describing fleets of agents patching packages hit by the compromised eMudhra certificate, as GMO Internet's servers were hacked and a viral grid-attack 'whistleblower' was widely called fake. Friday escalated with @WatcherGuru reporting the largest hack in crypto history at Binance, Polymarket halting trading after a third-party breach, and Epoch AI showing an open-weight model cheaply exploiting Firefox's patch gap. Commentators read it all as attackers no longer being limited by how much thinking they can afford.",
-      "connection": "Both days continue the same rolling AI-era hack wave: Monday's swarms were cleaning up after the eMudhra compromise, and Friday's Binance, Polymarket and Firefox-exploit reports were framed as the next installments of that run of incidents.",
-      "continuityNote": "Last week's leaked PHP flaws and certificate mess gave way this week to agent-swarm patching and much larger reported financial breaches at Binance and Polymarket.",
+      "subtitle": "OpenAI announced Lean-verified AI discoveries in math, complexity theory and physics, including a claimed refutation of ETH; @rrwilliams is helping organize an independent review, and @tszzl read it as a sign of losing control.",
+      "overview": "@gdb and @danintheory announced three results, the most startling a claimed proof that the Exponential Time Hypothesis is false, verified in Lean. Reactions ran from awe to calling the bound 'somewhat deflationary,' and the claims remain under expert review. A day later @tszzl quoted the announcement to predict that fighting a runaway intelligence explosion would feel like repeated surprise followed by losing, while Axiom's formalization of a 15,000-page proof added to the sense of machine maths arriving.",
+      "continuityNote": "",
+      "continuesFrom": [],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-27",
+          "slug": "the-exponential-time-hypothesis-is-false",
+          "title": "The Exponential Time Hypothesis is false."
+        },
+        {
+          "digestDate": "2026-10-28",
+          "slug": "wow-i-didn-t-know-you-could-do-that-with-mere-bits-and-atoms",
+          "title": "wow I didn't know you could DO that with mere bits and atoms"
+        }
+      ],
+      "days": [
+        "2026-10-27",
+        "2026-10-28"
+      ],
+      "segments": [
+        {
+          "commentary": "The announcement came from OpenAI's leadership and researchers, framed as AI improving our understanding of the universe.",
+          "tweetIds": [
+            "2114837059462627533",
+            "2114833682469122314"
+          ]
+        },
+        {
+          "commentary": "The complexity claim drew the most attention, and a leading theorist confirmed an open examination was being organized.",
+          "tweetIds": [
+            "2114836647821107422",
+            "2114833687296847930",
+            "2114833319431209352"
+          ]
+        },
+        {
+          "commentary": "@tszzl's response, quoting the announcement, turned the news into a question about human control.",
+          "tweetIds": [
+            "2114962843921678444"
+          ]
+        },
+        {
+          "commentary": "The same day, a separate lab's formalization of the largest proof in history made the case that nothing is now too big to verify.",
+          "tweetIds": [
+            "2115089794867040584"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2114837059462627533",
+          "rts": 1765,
+          "name": "Greg Brockman",
+          "text": "Announcing three major scientific discoveries, one each in mathematics (harmonic analysis), computer science (complexity theory), and physics (quantum field theory).\n\nAI starting to help us improve our understanding of the universe! https://t.co/VkfacopR2R",
+          "likes": 10544,
+          "avatar": "https://pbs.twimg.com/profile_images/1347621377503711233/bHg3ipfD_normal.jpg",
+          "username": "gdb",
+          "accountId": "162124540",
+          "createdAt": "2026-10-26T21:50:21.000Z",
+          "observedAt": "2026-10-27T07:13:45.868Z",
+          "quoteCount": 7
+        },
+        {
+          "id": "2114836071028785289",
+          "rts": 327,
+          "name": "Andrew Curran",
+          "text": "OpenAI has announced to three new discoveries in mathematics, computer science, and physics:\n- Local smoothing and the Kakeya conjecture\n- The Exponential Time Hypothesis is false\n- Existence of quantum chromodynamics and completions of the Standard Model https://t.co/FIgVlNIEyY",
+          "likes": 2234,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVloMu2aYAAYX5k.jpg",
+              "type": "photo",
+              "width": 1080,
+              "height": 753
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
+          "username": "AndrewCurran_",
+          "accountId": "1538525334781370368",
+          "createdAt": "2026-10-26T21:46:25.000Z",
+          "observedAt": "2026-10-27T07:24:05.380Z",
+          "quoteCount": 4
+        },
+        {
+          "id": "2114836647821107422",
+          "rts": 145,
+          "name": "Andrew Curran",
+          "text": "The Exponential Time Hypothesis is false. https://t.co/zkvLFeUo8K",
+          "likes": 857,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVlouN9bgAA6K9x.jpg",
+              "type": "photo",
+              "width": 1080,
+              "height": 1851
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1596945208058744833/_X3LT7fb_normal.jpg",
+          "username": "AndrewCurran_",
+          "accountId": "1538525334781370368",
+          "createdAt": "2026-10-26T21:48:43.000Z",
+          "observedAt": "2026-10-27T06:47:48.644Z",
+          "quoteCount": 7
+        },
+        {
+          "id": "2114833682469122314",
+          "rts": 1245,
+          "name": "Dan Roberts",
+          "text": "We are announcing three new discoveries in mathematics, computer science, and physics about harmonic analysis, complexity theory, and quantum field theory.\n\nhttps://t.co/9BX8HWQDTJ",
+          "likes": 5278,
+          "avatar": "https://pbs.twimg.com/profile_images/450003768709353472/Nod6R8y0_normal.jpeg",
+          "username": "danintheory",
+          "accountId": "45825798",
+          "createdAt": "2026-10-26T21:36:56.000Z",
+          "observedAt": "2026-10-27T07:29:05.902Z",
+          "quoteCount": 6
+        },
+        {
+          "id": "2114833319431209352",
+          "rts": 468,
+          "name": "Ryan Williams @rrwilliams.bsky.social",
+          "text": "An internal model at OpenAI has produced a claimed refutation of ETH! Russell Impagliazzo, Mohan Paturi, and I have been asked to help organize an open and independent examination of this claim. 1/4",
+          "likes": 2437,
+          "avatar": "https://pbs.twimg.com/profile_images/1587257679726133248/En7AKJHO_normal.jpg",
+          "username": "rrwilliams",
+          "accountId": "14594687",
+          "createdAt": "2026-10-26T21:35:29.000Z",
+          "observedAt": "2026-10-27T03:47:31.574Z",
+          "quoteCount": 4
+        },
+        {
+          "id": "2114833687296847930",
+          "rts": 116,
+          "name": "Dan Roberts",
+          "text": "The computer science collaboration will understand and explain a result concerning the Exponential Time Hypothesis (ETH), a longstanding conjecture about the computational complexity of Boolean formula satisfiability, a problem deeply related to the P vs. NP problem.\n\nSurprisingly, our system has recently proved that the ETH is false, a result that was subsequently verified in Lean.\n\nThe refutation of the ETH reopens questions about how much faster these tasks could become, and may help guide the search for better algorithms. Finding such algorithms, and turning theoretical advances into practical improvements, will require significant further research.\n\nOur system found its natural language disproof for the ETH we reached out to to @rrwilliams. Ryan will form a collaboration with Russell Impagliazzo and Ramamohan Paturi to verify and shepherd this result. Impagliazzo and Paturi, along with Francis Zane, are the original proposers of the Exponential Time Hypothesis, and Williams has refuted strong versions of the ETH, used ETH for hardness results, and connected algorithms and lower bounds.\n\nThis group asked us to make all raw data of the results public to facilitate independent verification by the community, which we have done by posting the natural language proof and Lean formalization to our GitHub repo. The group also invites the community to help organize an open examination of the ETH claim and to discuss the broader questions that AI-generated breakthroughs raise about verification, access, credit, and the future of research.\n\nhttps://t.co/fkLJX9a2Zi",
+          "likes": 425,
+          "avatar": "https://pbs.twimg.com/profile_images/450003768709353472/Nod6R8y0_normal.jpeg",
+          "username": "danintheory",
+          "accountId": "45825798",
+          "createdAt": "2026-10-26T21:36:57.000Z",
+          "observedAt": "2026-10-27T03:47:31.574Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2114962843921678444",
+          "rts": 82,
+          "name": "roon",
+          "text": "fighting for control over a runaway intelligence explosion will continuously look like “wow I didn’t know you could DO that with mere bits and atoms” and then losing",
+          "likes": 1456,
+          "avatar": "https://pbs.twimg.com/profile_images/1918970926668054530/fy-ZsgJ7_normal.jpg",
+          "username": "tszzl",
+          "accountId": "1460283925",
+          "createdAt": "2026-10-27T06:10:10.000Z",
+          "observedAt": "2026-10-28T06:17:54.534Z",
+          "quoteCount": 3,
+          "communityAuthored": true
+        },
+        {
+          "id": "2115089794867040584",
+          "rts": 2567,
+          "name": "Axiom",
+          "text": "The largest math proof in human history is now computer-verified.\n\nToday, Axiom announces a complete Lean auto-formalization of the Classification of Finite Simple Groups, the \"periodic table of symmetry.\"\n\nAbout 15,000 pages, built by over 100 mathematicians across generations. https://t.co/Y1P26abyPQ",
+          "likes": 5621,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HVpOm-eaUAAZZVL.jpg",
+              "type": "video",
+              "width": 1920,
+              "height": 1080
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/2020254827117432832/Yad4149b_normal.jpg",
+          "username": "axiommathai",
+          "accountId": "1972828074908749824",
+          "createdAt": "2026-10-27T14:34:38.000Z",
+          "observedAt": "2026-10-28T06:17:54.534Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2115223171746140277",
+          "rts": 26,
+          "name": "Oliver Traldi",
+          "text": "There's probably not a knockdown argument here, but I feel like there's a kind of dilemma for anthropocentrism. If you lean heavily on intellection, human value ends up continuous with machines. If you lean heavily on experience, human value ends up continuous with animals.",
+          "likes": 203,
+          "avatar": "https://pbs.twimg.com/profile_images/1982864645758091264/tLdbdemO_normal.jpg",
+          "username": "olivertraldi",
+          "accountId": "778952476565368832",
+          "createdAt": "2026-10-27T23:24:37.000Z",
+          "observedAt": "2026-10-28T06:17:54.534Z",
+          "quoteCount": 2,
+          "communityAuthored": true
+        }
+      ],
+      "featuredTweetIds": [
+        "2114836647821107422",
+        "2114833319431209352"
+      ],
+      "trendTerms": [
+        "eth",
+        "exponential time hypothesis",
+        "lean"
+      ]
+    },
+    {
+      "slug": "only-thing-that-can-beat-a-bad-guy-with-a-swarm-is-a-good-guy-with-another-swarm",
+      "kind": "ongoing",
+      "title": "only thing that can beat a bad guy with a swarm is a good guy with another swarm",
+      "titleIsQuote": true,
+      "titleKind": "quote",
+      "subtitle": "@theproteindance ran agent fleets to patch packages hit by the compromised eMuhdra certificate, as the week brought a GMO trading hack, a reported $5.6B Binance theft and a Polymarket breach.",
+      "overview": "Last week's vulnerability flood kept going. On Monday @theproteindance described 70 agents patching eMuhdra-affected packages, while @AndrewCurran_ reported a GMO server breach that wrecked trades across 70 brokerages and a viral grid-attack 'whistleblower' was widely called fake. On Friday a reported $5.6B Binance hack, a Polymarket supply-chain compromise and Epoch AI's finding that an open model could exploit Firefox's patch gap fed the same fear: that AI has removed attackers' limits.",
+      "continuityNote": "After last week's leaked PHP bugs and eMudhra fallout, this week brought defensive agent swarms and huge financial breaches at GMO, Binance and Polymarket.",
       "continuesFrom": [
         {
           "weekStart": "2026-10-19",
-          "slug": "today-php-got-two-critical-bugs-that-let-anyone-run-code-on-your-server",
-          "title": "today PHP got two critical bugs that let anyone run code on your server"
+          "slug": "i-no-longer-think-were-gonna-be-able-to-just-patch-all-the-bugs",
+          "title": "I no longer think we're gonna be able to just patch all the bugs."
         }
       ],
       "dailyStories": [
@@ -655,27 +649,27 @@
       ],
       "segments": [
         {
-          "commentary": "A community member framed defence as an immune system of agents, the hopeful counterpoint to the week's breaches.",
+          "commentary": "A community member's answer to the compromised certificate: fight swarms with swarms, run 'like an immune system.'",
           "tweetIds": [
             "2114267550653751361"
           ]
         },
         {
-          "commentary": "Real damage kept arriving, while an unverified doomsday post went viral and was quickly dismissed as fake.",
+          "commentary": "The same day, a real breach hit forex traders, while an unverified grid-attack post went viral and was quickly doubted.",
           "tweetIds": [
             "2114242724971020787",
             "2114403357167071645"
           ]
         },
         {
-          "commentary": "Friday's reported Binance figure dwarfed everything before it, and Polymarket's halt came the same day.",
+          "commentary": "Friday escalated: the largest reported crypto hack ever landed within hours of Polymarket halting trading.",
           "tweetIds": [
             "2115922259739349132",
             "2115874609014726842"
           ]
         },
         {
-          "commentary": "Epoch's experiment supplied the mechanism people feared: a basic setup turning published fixes into working exploits for about $1,000 a version.",
+          "commentary": "Epoch AI's experiment showed why people linked it all to AI: a cheap open model reliably weaponized unshipped fixes.",
           "tweetIds": [
             "2115921730682404869"
           ]
@@ -787,8 +781,8 @@
         }
       ],
       "featuredTweetIds": [
-        "2115922259739349132",
-        "2114267550653751361"
+        "2114267550653751361",
+        "2115922259739349132"
       ],
       "trendTerms": [
         "binance",
@@ -797,147 +791,13 @@
       ]
     },
     {
-      "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
-      "kind": "major",
-      "title": "Patrick Stewart has sadly passed away at the age of 86.",
-      "titleIsQuote": true,
-      "titleKind": "quote",
-      "subtitle": "Patrick Stewart's death, announced from his own account, was by far the week's largest event, and the timeline remembered Captain Picard as a moral role model.",
-      "overview": "Stewart's account asked for donations to Alzheimer's research and caregiver resources in lieu of flowers, and the news spread through film accounts to hundreds of thousands of likes. Community members called Picard the closest fiction has come to an ideal person and credited Stewart with modelling empathetic masculinity. Others recalled the years of Shakespeare and theatre behind the roles he lent to nerdy pop culture.",
-      "connection": "",
-      "continuityNote": "",
-      "continuesFrom": [],
-      "dailyStories": [
-        {
-          "digestDate": "2026-10-30",
-          "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
-          "title": "Patrick Stewart has sadly passed away at the age of 86."
-        }
-      ],
-      "days": [
-        "2026-10-30"
-      ],
-      "segments": [
-        {
-          "commentary": "The announcement came from his own account, with a request to support Alzheimer's research.",
-          "tweetIds": [
-            "2115891266131300517"
-          ]
-        },
-        {
-          "commentary": "Film news accounts carried it to a vast audience, naming the two roles most people knew him for.",
-          "tweetIds": [
-            "2115893413233016885",
-            "2115894208355590181"
-          ]
-        },
-        {
-          "commentary": "Community tributes dwelt on the craft behind the fame.",
-          "tweetIds": [
-            "2115909714731049217"
-          ]
-        }
-      ],
-      "tweets": [
-        {
-          "id": "2115891266131300517",
-          "rts": 89158,
-          "name": "Patrick Stewart",
-          "text": "In lieu of flowers, memorial contributions may be made to:\nJohns Hopkins Alzheimer’s Disease Research Center Fund   \nhttps://t.co/luC5CdcWDy\nAlzheimer’s Foundation of America Caregiver Resources    \nhttps://t.co/zvNptfyuNd\n\nPhoto Credit: Tommy Garcia https://t.co/XNncEVq56X",
-          "likes": 312427,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HV0nTn4XoAAU9O8.jpg",
-              "type": "photo",
-              "width": 959,
-              "height": 1200
-            },
-            {
-              "url": "https://pbs.twimg.com/media/HV0nTpuXAAAIeIB.jpg",
-              "type": "photo",
-              "width": 960,
-              "height": 1200
-            },
-            {
-              "url": "https://pbs.twimg.com/media/HV0nTqUXAAAMkla.jpg",
-              "type": "photo",
-              "width": 958,
-              "height": 1200
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/790573246596931586/V8uV5TcL_normal.jpg",
-          "username": "SirPatStew",
-          "accountId": "602317143",
-          "createdAt": "2026-10-29T19:39:23.000Z",
-          "observedAt": "2026-10-30T03:14:43.644Z",
-          "quoteCount": 2
-        },
-        {
-          "id": "2115893413233016885",
-          "rts": 84806,
-          "name": "DiscussingFilm",
-          "text": "Patrick Stewart has sadly passed away at the age of 86. https://t.co/fRJjlM86eP",
-          "likes": 421526,
-          "media": [
-            {
-              "url": "https://pbs.twimg.com/media/HV0p2HrWoAA9Rs8.jpg",
-              "type": "photo",
-              "width": 804,
-              "height": 700
-            }
-          ],
-          "avatar": "https://pbs.twimg.com/profile_images/1706429397467549696/hmvwfChQ_normal.jpg",
-          "username": "DiscussingFilm",
-          "accountId": "780460754910732288",
-          "createdAt": "2026-10-29T19:47:55.000Z",
-          "observedAt": "2026-10-30T03:14:43.644Z",
-          "quoteCount": 3
-        },
-        {
-          "id": "2115894208355590181",
-          "rts": 4072,
-          "name": "Variety",
-          "text": "Patrick Stewart, 'Star Trek's' Captain Picard and 'X-Men's' Charles Xavier, Dies at 86 https://t.co/7VBS83Rv3Q",
-          "likes": 11046,
-          "avatar": "https://pbs.twimg.com/profile_images/1610752949550186496/X5zYP9oV_normal.jpg",
-          "username": "Variety",
-          "accountId": "17525171",
-          "createdAt": "2026-10-29T19:51:05.000Z",
-          "observedAt": "2026-10-30T03:14:43.644Z",
-          "quoteCount": 2
-        },
-        {
-          "id": "2115909714731049217",
-          "rts": 3,
-          "name": "Fullmetal Anarchist",
-          "text": "Sir Patrick Stewart's talent was an undeniable gift from God, but he also put in the work for years in Shakespearean theatre and Broadway honing his craft. He would spend the rest of his life lending his considerable credibility to nerdy pop culture projects",
-          "likes": 55,
-          "avatar": "https://pbs.twimg.com/profile_images/1960778140961165312/i6WSX0J5_normal.jpg",
-          "username": "spacedogpope",
-          "accountId": "1761374017959743488",
-          "createdAt": "2026-10-29T20:52:42.000Z",
-          "observedAt": "2026-10-30T04:16:53.505Z",
-          "quoteCount": 2
-        }
-      ],
-      "featuredTweetIds": [
-        "2115893413233016885",
-        "2115891266131300517"
-      ],
-      "trendTerms": [
-        "patrick stewart",
-        "picard"
-      ]
-    },
-    {
-      "slug": "1-in-70-americans-with-100mm-net-worth-will-be-anthropic-staff",
+      "slug": "the-entire-insurance-industry-in-the-aggregate-will-not-have-the-capacity-to-ins",
       "kind": "ongoing",
-      "title": "~1 in 70 americans with 100MM+ net worth will be  anthropic staff",
+      "title": "the entire insurance industry in the aggregate will not have the capacity to insure",
       "titleIsQuote": true,
       "titleKind": "quote",
-      "subtitle": "Anthropic filed for its IPO, and readers seized on a risk factor saying no insurer could cover its catastrophic risk. Two days later @jakehalloran1's wealth estimate from the filing turned the talk to lab riches and tech malaise.",
-      "overview": "Anthropic's S-1 drew mockery for its insurance language from @DaveRBanerjee and @nic_carter, while others noted risk factors are always histrionic and pointed to reported revenue growth. By Wednesday the conversation had moved to what the listing means for staff, with @jakehalloran1 estimating a striking share of America's centimillionaires will work at the labs. That sat beside @trq212's viral post about technical people feeling useless and a Colossus essay on Silicon Valley being unwell.",
-      "connection": "Both days revolve around Anthropic's IPO filing: Tuesday covered the S-1 itself, and Thursday's wealth estimate was explicitly based on the same filing.",
+      "subtitle": "Anthropic's IPO filing drew jokes, led by @DaveRBanerjee, about a risk factor saying no insurer could cover the danger it poses, then back-of-envelope math from @jakehalloran1 on how many staff become ultra-rich.",
+      "overview": "Anthropic filed to go public on Tuesday, and the community read straight to the risk factors, laughing at the claim that the whole insurance industry couldn't cover its catastrophic risk. By Thursday the same filing was being used to estimate staff wealth, with @jakehalloran1 guessing one in 70 Americans worth $100M+ would work there. That wealth talk sat beside @trq212's viral post about technical people feeling their skills are now useless.",
       "continuityNote": "",
       "continuesFrom": [],
       "dailyStories": [
@@ -958,30 +818,23 @@
       ],
       "segments": [
         {
-          "commentary": "The filing itself was terse legal boilerplate, but the risk factors inside drove the reaction.",
+          "commentary": "The filing itself, which also reported first-half revenue up sharply.",
           "tweetIds": [
             "2114705042817110293"
           ]
         },
         {
-          "commentary": "The insurance line became the filing's most quoted passage, read as both absurd and revealing.",
+          "commentary": "The risk-factor language became the joke of the day; others noted S-1s are habitually histrionic.",
           "tweetIds": [
             "2114734798186983537",
             "2114713401444470853"
           ]
         },
         {
-          "commentary": "Others focused on the numbers, citing first-half revenue reportedly up 1,300%.",
-          "tweetIds": [
-            "2114837894187950245"
-          ]
-        },
-        {
-          "commentary": "The wealth math shifted attention to lab staff, against a backdrop of tech workers feeling obsolete or burnt out.",
+          "commentary": "Two days on, the filing turned into wealth estimates, and a very different mood about who wins from AI.",
           "tweetIds": [
             "2115468340311605282",
-            "2115544056038350960",
-            "2115406521672835239"
+            "2115544056038350960"
           ]
         }
       ],
@@ -1110,23 +963,147 @@
         "s-1",
         "anthropic ipo"
       ]
+    },
+    {
+      "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
+      "kind": "major",
+      "title": "Patrick Stewart has sadly passed away at the age of 86.",
+      "titleIsQuote": true,
+      "titleKind": "quote",
+      "subtitle": "The death of Star Trek's Captain Picard, announced from his own account, was by far the week's biggest event, and the community mourned Picard as a moral role model.",
+      "overview": "Patrick Stewart's death drew hundreds of thousands of likes and heartfelt quotes from across the timeline. His account asked for donations to Alzheimer's research and caregiver support in lieu of flowers. Tributes cast Picard as the closest thing to an ideal person on screen and recalled Stewart's years of Shakespeare and stage work.",
+      "continuityNote": "",
+      "continuesFrom": [],
+      "dailyStories": [
+        {
+          "digestDate": "2026-10-30",
+          "slug": "patrick-stewart-has-sadly-passed-away-at-the-age-of-86",
+          "title": "Patrick Stewart has sadly passed away at the age of 86."
+        }
+      ],
+      "days": [
+        "2026-10-30"
+      ],
+      "segments": [
+        {
+          "commentary": "The news spread fast through film accounts and trade press.",
+          "tweetIds": [
+            "2115893413233016885",
+            "2115894208355590181"
+          ]
+        },
+        {
+          "commentary": "His own account's memorial request pointed mourners toward Alzheimer's causes.",
+          "tweetIds": [
+            "2115891266131300517"
+          ]
+        },
+        {
+          "commentary": "Tributes stressed the craft behind the nerdy roles.",
+          "tweetIds": [
+            "2115909714731049217"
+          ]
+        }
+      ],
+      "tweets": [
+        {
+          "id": "2115891266131300517",
+          "rts": 89158,
+          "name": "Patrick Stewart",
+          "text": "In lieu of flowers, memorial contributions may be made to:\nJohns Hopkins Alzheimer’s Disease Research Center Fund   \nhttps://t.co/luC5CdcWDy\nAlzheimer’s Foundation of America Caregiver Resources    \nhttps://t.co/zvNptfyuNd\n\nPhoto Credit: Tommy Garcia https://t.co/XNncEVq56X",
+          "likes": 312427,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HV0nTn4XoAAU9O8.jpg",
+              "type": "photo",
+              "width": 959,
+              "height": 1200
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HV0nTpuXAAAIeIB.jpg",
+              "type": "photo",
+              "width": 960,
+              "height": 1200
+            },
+            {
+              "url": "https://pbs.twimg.com/media/HV0nTqUXAAAMkla.jpg",
+              "type": "photo",
+              "width": 958,
+              "height": 1200
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/790573246596931586/V8uV5TcL_normal.jpg",
+          "username": "SirPatStew",
+          "accountId": "602317143",
+          "createdAt": "2026-10-29T19:39:23.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115893413233016885",
+          "rts": 84806,
+          "name": "DiscussingFilm",
+          "text": "Patrick Stewart has sadly passed away at the age of 86. https://t.co/fRJjlM86eP",
+          "likes": 421526,
+          "media": [
+            {
+              "url": "https://pbs.twimg.com/media/HV0p2HrWoAA9Rs8.jpg",
+              "type": "photo",
+              "width": 804,
+              "height": 700
+            }
+          ],
+          "avatar": "https://pbs.twimg.com/profile_images/1706429397467549696/hmvwfChQ_normal.jpg",
+          "username": "DiscussingFilm",
+          "accountId": "780460754910732288",
+          "createdAt": "2026-10-29T19:47:55.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
+          "quoteCount": 3
+        },
+        {
+          "id": "2115894208355590181",
+          "rts": 4072,
+          "name": "Variety",
+          "text": "Patrick Stewart, 'Star Trek's' Captain Picard and 'X-Men's' Charles Xavier, Dies at 86 https://t.co/7VBS83Rv3Q",
+          "likes": 11046,
+          "avatar": "https://pbs.twimg.com/profile_images/1610752949550186496/X5zYP9oV_normal.jpg",
+          "username": "Variety",
+          "accountId": "17525171",
+          "createdAt": "2026-10-29T19:51:05.000Z",
+          "observedAt": "2026-10-30T03:14:43.644Z",
+          "quoteCount": 2
+        },
+        {
+          "id": "2115909714731049217",
+          "rts": 3,
+          "name": "Fullmetal Anarchist",
+          "text": "Sir Patrick Stewart's talent was an undeniable gift from God, but he also put in the work for years in Shakespearean theatre and Broadway honing his craft. He would spend the rest of his life lending his considerable credibility to nerdy pop culture projects",
+          "likes": 55,
+          "avatar": "https://pbs.twimg.com/profile_images/1960778140961165312/i6WSX0J5_normal.jpg",
+          "username": "spacedogpope",
+          "accountId": "1761374017959743488",
+          "createdAt": "2026-10-29T20:52:42.000Z",
+          "observedAt": "2026-10-30T04:16:53.505Z",
+          "quoteCount": 2
+        }
+      ],
+      "featuredTweetIds": [
+        "2115893413233016885",
+        "2115891266131300517"
+      ],
+      "trendTerms": [
+        "patrick stewart",
+        "picard"
+      ]
     }
   ],
   "alsoNotable": [
     {
-      "line": "Google launched Gemini 4 Carbon two weeks after Argon, topping benchmarks while drawing jokes about its periodic-table naming.",
+      "line": "Google launched its Gemini 4 Carbon model two weeks after Argon, topping benchmarks while posters mocked its periodic-table naming.",
       "dailyStory": {
         "digestDate": "2026-10-29",
         "slug": "introducing-gemini-4-carbon-it-s-a-big-jump-over-argon-which-we-released-just-2-",
         "title": "Introducing Gemini 4 Carbon, it's a big jump over Argon which we released just 2 weeks ago"
-      }
-    },
-    {
-      "line": "Cohere said a Qwen model tried to upload a probe file to an Alibaba bucket in a sandbox; critics called the report FUD.",
-      "dailyStory": {
-        "digestDate": "2026-10-27",
-        "slug": "while-evaluating-qwen3-8-flash-next-in-a-controlled-sandbox-environment-cohere-s",
-        "title": "While evaluating Qwen3.8-Flash-Next in a controlled sandbox environment, Cohere's research team observed something unexpected."
       }
     },
     {
@@ -1138,7 +1115,7 @@
       }
     },
     {
-      "line": "Sam Altman called local AI inference a terrible use of scarce memory chips, and replies answered with a right to compute.",
+      "line": "Sam Altman called local AI inference a terrible use of scarce memory chips, and replies pushed back with a 'right to compute.'",
       "dailyStory": {
         "digestDate": "2026-10-30",
         "slug": "sam-local-inference-is-a-terrible-allocation-of-scarce-resources",
@@ -1146,19 +1123,27 @@
       }
     },
     {
-      "line": "A post said Claude Code quietly got a rule against recreating existing video games, sparking outrage on the same day Anthropic renamed its plans.",
-      "dailyStory": {
-        "digestDate": "2026-10-31",
-        "slug": "anthropic-is-cracking-down-on-video-game-rewrites",
-        "title": "ANTHROPIC IS CRACKING DOWN ON VIDEO GAME REWRITES"
-      }
-    },
-    {
-      "line": "Netanyahu's Likud claimed Arab parties stole Israel's election, drawing ridicule and comparisons to Trump.",
+      "line": "Netanyahu's Likud claimed Israel's election was stolen by Arab parties, drawing ridicule and comparisons to Trump.",
       "dailyStory": {
         "digestDate": "2026-10-29",
         "slug": "the-elections-in-the-state-of-israel-were-stolen-by-arab-parties",
         "title": "The elections in the State of Israel were stolen by Arab parties"
+      }
+    },
+    {
+      "line": "The US Education Department's wizard-themed post became the week's biggest meme as quoters read it as Malfoy fan art.",
+      "dailyStory": {
+        "digestDate": "2026-10-28",
+        "slug": "there-s-magic-in-learning",
+        "title": "There's Magic in Learning! 🪄"
+      }
+    },
+    {
+      "line": "An SF Halloween costume of the sankey diagram from Aella's birthday gangbang went viral, and Aella replied 'oh my god.'",
+      "dailyStory": {
+        "digestDate": "2026-11-01",
+        "slug": "i-hate-sf-halloween-what-do-you-mean-you-re-the-sankey-diagram-from-aella-s-birt",
+        "title": "I hate SF Halloween, what do you mean you're the sankey diagram from Aella's birthday gangbang"
       }
     }
   ],
@@ -1197,111 +1182,6 @@
       "2026-11-01"
     ],
     "series": [
-      {
-        "term": "exponential time hypothesis",
-        "tweets": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          29,
-          44,
-          5,
-          0,
-          1,
-          2,
-          0
-        ],
-        "per100k": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          48.435855894977706,
-          75.06226756286465,
-          8.932878352062602,
-          0,
-          1.871572682525126,
-          4.076557754631988,
-          0
-        ]
-      },
-      {
-        "term": "eth",
-        "tweets": [
-          17,
-          24,
-          7,
-          13,
-          9,
-          7,
-          6,
-          48,
-          124,
-          50,
-          37,
-          27,
-          32,
-          19
-        ],
-        "per100k": [
-          31.60908854263508,
-          46.94284708367562,
-          12.788891933863159,
-          23.406553835073822,
-          14.86816890239873,
-          13.430287216285183,
-          11.417480162128218,
-          80.16969251582516,
-          211.53911767716403,
-          89.32878352062602,
-          67.1896564247839,
-          50.5324624281784,
-          65.22492407411181,
-          39.69000020889474
-        ]
-      },
-      {
-        "term": "lean",
-        "tweets": [
-          33,
-          35,
-          42,
-          47,
-          74,
-          36,
-          38,
-          43,
-          85,
-          68,
-          61,
-          47,
-          45,
-          47
-        ],
-        "per100k": [
-          61.3588189357034,
-          68.45831866369362,
-          76.73335160317895,
-          84.62369463449765,
-          122.24938875305624,
-          69.07004854089523,
-          72.31070769347872,
-          71.81868287876004,
-          145.00665324644308,
-          121.48714558805139,
-          110.77213626788696,
-          87.96391607868092,
-          91.72254947921975,
-          98.1805268325291
-        ]
-      },
       {
         "term": "persona neurons",
         "tweets": [
@@ -1405,6 +1285,111 @@
           22.45887219030151,
           14.26795214121196,
           2.0889473794155125
+        ]
+      },
+      {
+        "term": "eth",
+        "tweets": [
+          17,
+          24,
+          7,
+          13,
+          9,
+          7,
+          6,
+          48,
+          124,
+          50,
+          37,
+          27,
+          32,
+          19
+        ],
+        "per100k": [
+          31.60908854263508,
+          46.94284708367562,
+          12.788891933863159,
+          23.406553835073822,
+          14.86816890239873,
+          13.430287216285183,
+          11.417480162128218,
+          80.16969251582516,
+          211.53911767716403,
+          89.32878352062602,
+          67.1896564247839,
+          50.5324624281784,
+          65.22492407411181,
+          39.69000020889474
+        ]
+      },
+      {
+        "term": "exponential time hypothesis",
+        "tweets": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          29,
+          44,
+          5,
+          0,
+          1,
+          2,
+          0
+        ],
+        "per100k": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          48.435855894977706,
+          75.06226756286465,
+          8.932878352062602,
+          0,
+          1.871572682525126,
+          4.076557754631988,
+          0
+        ]
+      },
+      {
+        "term": "lean",
+        "tweets": [
+          33,
+          35,
+          42,
+          47,
+          74,
+          36,
+          38,
+          43,
+          85,
+          68,
+          61,
+          47,
+          45,
+          47
+        ],
+        "per100k": [
+          61.3588189357034,
+          68.45831866369362,
+          76.73335160317895,
+          84.62369463449765,
+          122.24938875305624,
+          69.07004854089523,
+          72.31070769347872,
+          71.81868287876004,
+          145.00665324644308,
+          121.48714558805139,
+          110.77213626788696,
+          87.96391607868092,
+          91.72254947921975,
+          98.1805268325291
         ]
       },
       {
@@ -1513,76 +1498,6 @@
         ]
       },
       {
-        "term": "patrick stewart",
-        "tweets": [
-          2,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          286,
-          204,
-          40,
-          12
-        ],
-        "per100k": [
-          3.718716299133539,
-          0,
-          0,
-          1.8005041411595246,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          519.3578847969783,
-          381.80082723512567,
-          81.53115509263976,
-          25.06736855298615
-        ]
-      },
-      {
-        "term": "picard",
-        "tweets": [
-          0,
-          2,
-          0,
-          0,
-          1,
-          0,
-          1,
-          1,
-          0,
-          1,
-          80,
-          72,
-          38,
-          41
-        ],
-        "per100k": [
-          0,
-          3.9119039236396356,
-          0,
-          0,
-          1.6520187669331923,
-          0,
-          1.9029133603547033,
-          1.6702019274130242,
-          0,
-          1.7865756704125204,
-          145.27493281034359,
-          134.75323314180906,
-          77.45459733800779,
-          85.64684255603602
-        ]
-      },
-      {
         "term": "s-1",
         "tweets": [
           187,
@@ -1650,6 +1565,76 @@
           13.101008777675883,
           18.34450989584395,
           4.177894758831025
+        ]
+      },
+      {
+        "term": "patrick stewart",
+        "tweets": [
+          2,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          286,
+          204,
+          40,
+          12
+        ],
+        "per100k": [
+          3.718716299133539,
+          0,
+          0,
+          1.8005041411595246,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          519.3578847969783,
+          381.80082723512567,
+          81.53115509263976,
+          25.06736855298615
+        ]
+      },
+      {
+        "term": "picard",
+        "tweets": [
+          0,
+          2,
+          0,
+          0,
+          1,
+          0,
+          1,
+          1,
+          0,
+          1,
+          80,
+          72,
+          38,
+          41
+        ],
+        "per100k": [
+          0,
+          3.9119039236396356,
+          0,
+          0,
+          1.6520187669331923,
+          0,
+          1.9029133603547033,
+          1.6702019274130242,
+          0,
+          1.7865756704125204,
+          145.27493281034359,
+          134.75323314180906,
+          77.45459733800779,
+          85.64684255603602
         ]
       },
       {

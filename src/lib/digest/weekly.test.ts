@@ -79,7 +79,6 @@ const priorWeek: WeeklyDigestContent = {
       kind: 'ongoing',
       title: 'Neurons are already clean',
       overview: 'overview',
-      connection: '',
       continuityNote: '',
       continuesFrom: [],
       dailyStories: [],
@@ -125,8 +124,6 @@ const validOutput = {
         { commentary: 'Two days later it was a library.', tweet_ids: ['3'] },
       ],
       trend_terms: ['Neurons', 'neurons'],
-      connection:
-        'The persona library author credits the green-neuron post as the inspiration.',
       daily_refs: ['2026-10-26#1', '2026-10-28#1'],
       continues_from: ['W2026-10-12#1'],
       continuity_note:
@@ -144,7 +141,6 @@ const validOutput = {
         { commentary: 'The first report came on Friday.', tweet_ids: ['4'] },
       ],
       trend_terms: [] as string[],
-      connection: '',
       daily_refs: ['2026-10-30#1'],
       continues_from: [],
       continuity_note: '',
@@ -159,7 +155,6 @@ const validOutput = {
         'A defensive-security argument that agents must defend against agents.',
       segments: [{ commentary: 'The argument went viral.', tweet_ids: ['2'] }],
       trend_terms: [] as string[],
-      connection: 'ignored for one source',
       daily_refs: ['2026-10-26#2'],
       continues_from: [],
       continuity_note: '',
@@ -259,7 +254,6 @@ describe('assembleWeeklyDigestContent', () => {
       },
     ])
     expect(major.slug).toBe('tweet-4')
-    expect(single.connection).toBe('')
     expect(weeklyDigestToMarkdown(content)).toContain(
       '/digest/2026-10-28/persona-neurons',
     )
@@ -320,7 +314,6 @@ describe('assembleWeeklyDigestContent', () => {
         subtitle: 'An AI story that took over the timeline this week, again.',
         featured_tweet_ids: [`a${index + 1}`],
         overview: 'An AI story that took over the timeline this week, again.',
-        connection: '',
         daily_refs: [`${item.digestDate}#1`],
         continues_from: [],
         continuity_note: '',
@@ -351,12 +344,6 @@ describe('assembleWeeklyDigestContent', () => {
     const singleDay = structuredClone(validOutput)
     singleDay.stories[2].kind = 'ongoing'
     expect(() => assemble(singleDay)).toThrow('only one date')
-  })
-
-  it('requires an explicit connection when bundling daily stories', () => {
-    const output = structuredClone(validOutput)
-    output.stories[0].connection = ''
-    expect(() => assemble(output)).toThrow('must explain concretely')
   })
 
   it('requires a continuity note and a real prior weekly ref', () => {

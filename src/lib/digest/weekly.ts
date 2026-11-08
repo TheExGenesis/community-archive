@@ -83,8 +83,6 @@ export interface WeeklyDigestStory {
   subtitle: string
   /** One paragraph about the story as a whole, for the story page. */
   overview: string
-  /** Why the bundled daily stories belong together; empty for a single source. */
-  connection: string
   /** What this week adds to a story from a previous weekly digest. */
   continuityNote: string
   continuesFrom: WeeklyContinuityRef[]
@@ -150,7 +148,6 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
           'subtitle',
           'featured_tweet_ids',
           'overview',
-          'connection',
           'daily_refs',
           'continues_from',
           'continuity_note',
@@ -168,7 +165,6 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
             items: { type: 'string', minLength: 1, maxLength: 30 },
           },
           overview: { type: 'string', minLength: 80, maxLength: 600 },
-          connection: { type: 'string', maxLength: 400 },
           daily_refs: {
             type: 'array',
             minItems: 1,
@@ -233,7 +229,7 @@ Pick exactly ${WEEKLY_MAX_STORIES} weekly stories (fewer only if the week has fe
 Keep the edition varied. At most ${WEEKLY_MAX_AI_STORIES} stories may be built only from "AI news" daily stories; when the week has strong culture, news, meme, joke, opportunity or community stories, include at least one or two of them even if an AI story had slightly more engagement. Order stories by importance to the reader, not chronologically.
 
 BUNDLING DAILY STORIES
-Only put several daily stories in one weekly story when they share a concrete subject: the same event, the same people or organisation, the same release or paper, the same claim being argued over, or a direct reply/response. A shared broad theme ("AI safety", "elections", "launches", "the community") is NOT enough; such stories stay separate or are left out. When a weekly story cites more than one daily story, "connection" must say in one or two plain sentences exactly what links them (who/what is common and how one led to or answered the other). For a single daily story, leave "connection" empty.
+Only put several daily stories in one weekly story when they share a concrete subject: the same event, the same people or organisation, the same release or paper, the same claim being argued over, or a direct reply/response. A shared broad theme ("AI safety", "elections", "launches", "the community") is NOT enough; such stories stay separate or are left out. When a weekly story cites more than one daily story and the link is not obvious from the events themselves, the overview must say plainly what links them (who/what is common and how one led to or answered the other).
 
 CONTINUITY WITH PREVIOUS WEEKS
 You also get up to two previous weekly digests. If a weekly story genuinely continues one of their stories (same concrete subject, as above), list those stories' refs in "continues_from" and write "continuity_note": one sentence on what is new this week compared with before. Check every selected story against every previous weekly story before deciding; a returning subject from two weeks ago counts even if last week skipped it. Do not link stories that are only thematically similar. A story that merely repeats last week with nothing new should not be selected. Leave both empty when there is no continuation.
@@ -246,7 +242,7 @@ WRITING
 - title: ONE line of at most ${WEEKLY_TITLE_MAX_CHARS} characters that points the reader at the story. Strongly prefer an exact excerpt copied character for character from one of the story's tweets: the line people kept quoting, the claim at the centre, the reaction that captures the mood. The quote is a pointer to the broader story, not a summary of it, so it does not need to cover every part. Do not add quotation marks (the page adds them). Do NOT compose titles from several parts: no " / " joins, no "X, Y and Z" chains, no "A, as B says C". If no single excerpt works, write one short plain headline about the story's core thread. A quote that means nothing without the story ("whew", "Anyway, it's Wednesday.") is not a title.
 - subtitle: about three lines (one or two sentences, at most ${WEEKLY_SUBTITLE_MAX_CHARS} characters) shown under the title on the week page. Say what happened across the week and, if the title is a quote, who said it and why it mattered. Plain words; @handles allowed.
 - featured_tweet_ids: the ${WEEKLY_MAX_FEATURED} tweets (or one, if the story has one) that best show the story on the week page, chosen from the story's tweets. Prefer the tweet the title quotes plus the strongest reaction or development.
-- overview: one paragraph (two to four sentences) about the story as a whole: what happened across the week, who drove it, and why it mattered to the community. No bullet lists.
+- overview: one paragraph (two to four sentences) about the story as a whole: what happened across the week, who drove it, and why it mattered to the community. When the story bundles several daily stories, weave in what connects them unless it is self-evident. No bullet lists.
 - segments: walk the reader through the story's tweets in a sensible order (usually chronological). Each segment is one or two short sentences of commentary (context, what the tweet adds, how people reacted) followed by the ids of the one to four tweets it introduces. Choose tweets only from the "tweets" of the daily stories this weekly story cites, and use each tweet at most once. Do not restate what the tweet says; say why it matters or what it answered. Any tweet you skip is still shown after the segments, so prefer a few strong segments over covering everything.
 - trend_terms: up to ${WEEKLY_MAX_TREND_TERMS} single words or short phrases (lower case, as people would actually type them in tweets) whose daily usage would show this story in the archive, such as a product, person, place or coined phrase central to it. Prefer specific terms ("sora", "polymarket") over generic ones ("ai", "model"). Leave empty when nothing distinctive fits.
 - Dek: one sentence under the week's date that gives the flavour of the week, the way a magazine standfirst does. It sets a mood or names the thread running through the week; it is not a list or a summary, and it should not try to mention every story. At most ${WEEKLY_DEK_MAX_CHARS} characters, no @handles, no colon-separated lists. Good shape: "A week of machines doing maths, a captain's farewell, and everyone reading the same neuron." Bad shape: "OpenAI's ETH claim, Qwen neurons, Picard, Binance, and elections."
@@ -523,10 +519,6 @@ export function assembleWeeklyDigestContent(input: {
       `${label}.featured_tweet_ids`,
     )
     const overview = requireString(raw.overview, `${label}.overview`)
-    const connection = requireString(
-      raw.connection ?? '',
-      `${label}.connection`,
-    )
     const continuityNote = requireString(
       raw.continuity_note ?? '',
       `${label}.continuity_note`,
@@ -583,11 +575,6 @@ export function assembleWeeklyDigestContent(input: {
     if (kind === 'ongoing' && days.size < 2) {
       errors.push(
         `${label} is "ongoing" but cites daily stories from only one date; cite at least two dates or mark it "major"`,
-      )
-    }
-    if (refs.length > 1 && connection.length < 20) {
-      errors.push(
-        `${label} bundles ${refs.length} daily stories, so "connection" must explain concretely what links them`,
       )
     }
 
@@ -696,7 +683,6 @@ export function assembleWeeklyDigestContent(input: {
       titleKind: classified.kind,
       subtitle,
       overview,
-      connection: refs.length > 1 ? connection : '',
       continuityNote: continuesFrom.length > 0 ? continuityNote : '',
       continuesFrom,
       dailyStories,
@@ -799,8 +785,6 @@ export function weeklyDigestToMarkdown(
           )
       }
     }
-    if (story.connection)
-      lines.push(`**How these connect:** ${story.connection}`, '')
     if (story.continuesFrom.length > 0) {
       const links = story.continuesFrom
         .map((ref) => `“${ref.title}” (week of ${ref.weekStart})`)
@@ -896,7 +880,6 @@ export function weeklyPeople(content: WeeklyDigestContent): WeeklyPerson[] {
       story.title,
       story.subtitle,
       story.overview,
-      story.connection,
       story.continuityNote,
       ...story.segments.map(({ commentary }) => commentary),
     ]),

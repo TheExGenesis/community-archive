@@ -56,8 +56,20 @@ export const resolveCommenterIdentity = (user: User) => {
  * Confirms the edition exists and is published. Returns an error response
  * instead when the id is malformed, unknown, or not yet public.
  */
+export type DigestCommentKind = 'daily' | 'weekly'
+
+/** Edition and comment tables for each kind of digest. */
+export const DIGEST_COMMENT_TABLES = {
+  daily: { editions: 'digest_editions', comments: 'digest_edition_comments' },
+  weekly: {
+    editions: 'digest_weekly_editions',
+    comments: 'digest_weekly_edition_comments',
+  },
+} as const
+
 export async function ensurePublishedEdition(
   editionId: string,
+  kind: DigestCommentKind = 'daily',
 ): Promise<{ error: NextResponse } | { ok: true }> {
   const notFound = {
     error: NextResponse.json({ error: 'Edition not found' }, { status: 404 }),
@@ -66,7 +78,7 @@ export async function ensurePublishedEdition(
 
   const admin = createDigestAdminClient()
   const { data: edition, error } = await admin
-    .from('digest_editions')
+    .from(DIGEST_COMMENT_TABLES[kind].editions)
     .select('id,status')
     .eq('id', editionId)
     .maybeSingle()

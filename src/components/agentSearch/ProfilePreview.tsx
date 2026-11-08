@@ -37,9 +37,28 @@ function loadPreview(key: string): Promise<Preview | null> {
   return pending
 }
 
+// Previews a page already resolved on the server, readable synchronously so
+// the card opens complete.
+const known = new Map<string, Preview>()
+
+/** Hand over previews the page loaded with itself. */
+export function primeProfilePreviews(list: readonly Preview[]) {
+  for (const preview of list) {
+    for (const key of [preview.accountId, preview.username.toLowerCase()]) {
+      known.set(key, preview)
+      previews.set(key, Promise.resolve(preview))
+    }
+  }
+}
+
+const knownPreview = (person: Person) =>
+  (person.accountId && known.get(person.accountId)) ||
+  known.get(person.username.toLowerCase())
+
 /** Forgets fetched previews; for tests. */
 export function clearProfilePreviews() {
   previews.clear()
+  known.clear()
 }
 
 const handleOf = (children: ReactNode) => {
@@ -61,8 +80,11 @@ export function ProfileCard({
   href: string
 }) {
   const key = person.accountId ?? person.username
-  const [preview, setPreview] = useState<Preview | null | undefined>(undefined)
+  const [preview, setPreview] = useState<Preview | null | undefined>(() =>
+    knownPreview(person),
+  )
   useEffect(() => {
+    if (knownPreview(person)) return
     let live = true
     void loadPreview(key).then((result) => {
       if (live) setPreview(result)
@@ -70,6 +92,7 @@ export function ProfileCard({
     return () => {
       live = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by person
   }, [key])
 
   const count = person.tweets ?? 0

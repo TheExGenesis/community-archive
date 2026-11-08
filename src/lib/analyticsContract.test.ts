@@ -35,6 +35,12 @@ it('classifies every actual page, including explicit non-product exclusions', ()
     })
   expect(routes.filter((route) => !(route in analyticsRoutes))).toEqual([])
   expect(analyticsRoute('/birdseye/profiles').group).toBe('admin')
+  expect(analyticsRoute('/digest/week/2026-10-26').path).toBe(
+    '/digest/week/[weekStart]',
+  )
+  expect(analyticsRoute('/digest/week/2026-10-26/some-story').path).toBe(
+    '/digest/week/[weekStart]/[slug]',
+  )
 })
 
 it('rejects unregistered literal events anywhere in product source before release', () => {

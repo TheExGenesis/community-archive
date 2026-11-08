@@ -349,3 +349,59 @@ request includes that error and the complete JSON schema and asks the model
 to rewrite complete sentences instead of truncating prose. Each response and
 its cumulative token usage is saved before validation, including when both
 attempts fail. Failures remain private and do not publish an invalid edition.
+
+## Weekly Digest
+
+`src/lib/digest/weekly.ts` weaves the published daily stories of one
+Monday–Sunday week into at most 5 weekly stories: "major" ones (most important
+even if covered once) and "ongoing" ones (the same subject on two or more dates).
+At most 3 may be built only from "AI news" daily stories. Daily stories are
+bundled only on a concrete shared subject, with the link explained in the overview when it is not obvious.
+Each weekly story may continue a story from the previous two weekly editions
+(`continues_from` plus a `continuity_note` saying what is new).
+
+A story is tweet-led: one `overview` paragraph, then `segments` of short
+commentary each followed by the tweets it introduces. It carries every banger of
+its cited daily stories; tweets no segment places are shown after the segments.
+People are named by @handle, which opens a profile card on hover. The model also
+picks up to three `trend_terms` per story; the publisher freezes their daily
+word-trend counts (and the week's daily rising/falling terms) for the week and
+the week before into `content.trends` via `snapshotWeeklyTrends`. A failed
+analytics read publishes without trends.
+
+- Storage: `public.digest_weekly_editions`, one row per generation attempt. Only
+  `published` rows are public, and anonymous readers may select only `id`,
+  `week_start`, `status`, `content` and `published_at`. Prompts, raw responses and
+  errors stay service-role only.
+- Publisher: `services/nightly-digest/publishWeekly.ts` on the
+  `community-archive-weekly-digest.timer` (Mondays 09:00 UTC). Runbook:
+  `ops/nightly-digest/README.md`.
+- Pages: `/digest/week` (latest, also in the "Explore archive" menu) and
+  `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (a one-line
+  subtitle that gives the flavour of the week, not a list) and then the stories
+  straight away, each like a daily story: a one-line title (preferably an exact
+  tweet excerpt, shown in quotation marks), a short `subtitle`, and one or two
+  `featuredTweetIds` in a card grid. The subtitle is written like a daily
+  summary bullet: who did or said what, quoting a few telling words. A sidebar
+  shows cards for earlier-week stories this week continues, the three story
+  words with the most mentions this week, and keyword chips; under the stories
+  come the Bulletin asks and offers posted that week (same ranking as the
+  daily) and the discussion thread (`digest_weekly_edition_comments`, API under
+  `/api/digest/week/<editionId>/comments`, sharing handlers with the daily
+  comments in `src/lib/digest/commentRoutes.ts`). Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
+  with each commentary segment on a numbered rail beside its tweet cards, and a
+  sidebar of daily coverage and trend charts. Links to daily stories and earlier weeks preview the
+  linked section on hover or focus. Profile hover-card facts are resolved with
+  the page (`loadWeeklyProfiles`, 2.5s budget) because the profile preview API
+  requires sign-in. Each daily edition's sidebar links its week, or the latest
+  week.
+- Opt-out: when `tombstone_policy_account` archives a daily edition, a trigger
+  archives every weekly edition built from it and drops the private prompt
+  copies of later weeks that used it as continuity context.
+
+For prompt work, generate locally without touching the database (oldest week
+first, because each week reads the previous outputs):
+
+```bash
+CA_ROOT_ENV=../.env pnpm tsx scripts/generate-weekly-digest.ts 2026-10-19 2026-10-26
+```

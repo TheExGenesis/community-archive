@@ -361,7 +361,9 @@ test('delivery manifest is content-free and historical uploads are not seeded', 
     'await processSingleArchive(',
     queueFirst,
   )
-  const completion = processor.indexOf("SET upload_phase = 'completed'")
+  const completion = processor.indexOf(
+    'const completed = await finishArchiveUpload(',
+  )
   const directSink = processor.indexOf(
     'await attemptClickHouseDelivery(',
     completion,

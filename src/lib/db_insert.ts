@@ -47,23 +47,43 @@ export const retryOperation = async <T>(
 }
 
 
-type UploadPhase = 'uploading' | 'ready_for_commit' | 'committed' | 'failed'
+// The phases a browser client may set, and the phases it may set them from.
+// The database enforces the same rules (enforce_archive_upload_transition);
+// committing and completed belong to the archive worker.
+const CLIENT_PHASE_SOURCES = {
+  ready_for_commit: ['uploading'],
+  failed: ['uploading', 'ready_for_commit'],
+} as const
+
+type ClientUploadPhase = keyof typeof CLIENT_PHASE_SOURCES
+
+// Upload rows the client may reuse for a new attempt.
+const REUSABLE_UPLOAD_PHASES = ['uploading', 'ready_for_commit'] as const
 
 export const setUploadPhase = async (
   supabase: SupabaseClient,
   archiveUploadId: number,
-  phase: UploadPhase,
+  phase: ClientUploadPhase,
   retryOptions?: RetryOptions,
 ): Promise<void> => {
   await retryOperation(async () => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('archive_upload')
       .update({ upload_phase: phase })
       .eq('id', archiveUploadId)
+      .in('upload_phase', [...CLIENT_PHASE_SOURCES[phase]])
+      .select('id')
     // supabase-js does not throw on errors, so surface it explicitly — otherwise a
     // failed phase update is silently dropped and retryOperation never retries,
     // leaving the row stuck (e.g. in 'uploading', which the worker never picks up).
     if (error) throw error
+    // No matching row means the upload already left the phases this step may
+    // change (for example the worker claimed it); do not report success.
+    if (!data?.length) {
+      throw new Error(
+        `archive upload ${archiveUploadId} is no longer in ${CLIENT_PHASE_SOURCES[phase].join(' or ')}`,
+      )
+    }
   }, `Error updating archive upload phase to ${phase}`, retryOptions)
 }
 
@@ -107,19 +127,20 @@ const insertAccountAndUploadRow = async (
     endDate: null,
   }
 
-  const {data: lastUploadedArchive, error: lastUploadedArchiveError} = await supabase.from('archive_upload').
-  select('id,archive_at,storage_path').eq('account_id', accountId).in('upload_phase', ['uploading', 'ready_for_commit'])
+  const {data: lastUploadedArchive} = await supabase.from('archive_upload').
+  select('id,archive_at,storage_path').eq('account_id', accountId).in('upload_phase', [...REUSABLE_UPLOAD_PHASES])
   .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
   // The immutable path uses the verified current identity; an archive may
   // still contain the owner's previous Twitter username.
   const username = storageReference?.storage_path.split('/')[0] ?? archiveData.account[0].account.username;
 
-  let supabaseUpsertQuery;
   if (lastUploadedArchive && !lastUploadedArchive.storage_path && !storageReference) {
-     supabaseUpsertQuery = supabase
+    // Reuse the unfinished row only while it is still unclaimed: the worker
+    // may have moved it to committing since the lookup above.
+    const { data: reused, error: reuseError } = await supabase
       .from('archive_upload')
-      .update({ 
+      .update({
         username: username,
         archive_at: latestTweetDate,
         keep_private: false,
@@ -130,29 +151,32 @@ const insertAccountAndUploadRow = async (
         created_at: new Date().toISOString(),
       })
       .eq('id', lastUploadedArchive.id)
+      .in('upload_phase', [...REUSABLE_UPLOAD_PHASES])
       .select('id')
       .maybeSingle()
-      console.log("has other records, updating")
-  }else{
-    supabaseUpsertQuery = supabase
-        .from('archive_upload')
-        .insert({
-          account_id: accountId,
-          username: username,
-          archive_at: latestTweetDate,
-          keep_private: false,
-          upload_likes: uploadOptions.uploadLikes,
-          start_date: uploadOptions.startDate,
-          end_date: uploadOptions.endDate,
-          upload_phase: 'uploading',
-          ...storageReference,
-        })
-        .select('id')
-        .single()
-        console.log("no other records, inserting")
+    if (reuseError) throw reuseError
+    if (reused?.id) {
+      console.log("has other records, updated")
+      return reused.id
+    }
+    console.log("previous record was claimed meanwhile, inserting")
   }
 
-  const { data: archiveUploadIdData, error: uploadError } = await supabaseUpsertQuery;
+  const { data: archiveUploadIdData, error: uploadError } = await supabase
+    .from('archive_upload')
+    .insert({
+      account_id: accountId,
+      username: username,
+      archive_at: latestTweetDate,
+      keep_private: false,
+      upload_likes: uploadOptions.uploadLikes,
+      start_date: uploadOptions.startDate,
+      end_date: uploadOptions.endDate,
+      upload_phase: 'uploading',
+      ...storageReference,
+    })
+    .select('id')
+    .single()
 
   console.log('archiveUploadIdData', { archiveUploadIdData })
   const archiveUploadId = archiveUploadIdData?.id

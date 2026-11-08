@@ -7,7 +7,8 @@ test('an immutable upload creates its own row and keeps the verified path owner'
   for (const method of ['select', 'eq', 'in', 'order', 'limit']) legacyQuery[method] = jest.fn(() => legacyQuery)
   legacyQuery.maybeSingle = jest.fn().mockResolvedValue({ data: { id: 99, archive_at: '2026-09-01', storage_path: null }, error: null })
   const insert = jest.fn(() => ({ select: () => ({ single: async () => ({ data: { id: 100 }, error: null }) }) }))
-  const phaseId = jest.fn().mockResolvedValue({ error: null })
+  const phaseSource = jest.fn(() => ({ select: async () => ({ data: [{ id: 100 }], error: null }) }))
+  const phaseId = jest.fn(() => ({ in: phaseSource }))
   const update = jest.fn(() => ({ eq: phaseId }))
   const client = { from: (table: string) => table === 'all_account'
     ? { upsert: async () => ({ error: null }) }
@@ -21,4 +22,5 @@ test('an immutable upload creates its own row and keeps the verified path owner'
   expect(update).toHaveBeenCalledTimes(1)
   expect(update).toHaveBeenCalledWith({ upload_phase: 'ready_for_commit' })
   expect(phaseId).toHaveBeenCalledWith('id', 100)
+  expect(phaseSource).toHaveBeenCalledWith('upload_phase', ['uploading'])
 })

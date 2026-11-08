@@ -28,7 +28,7 @@ SELECT throws_ok(
   $$ INSERT INTO public.archive_upload (account_id, username, archive_at, upload_phase)
      VALUES ('990000000000000601', 'OwnerSix', '2021-01-01T00:00:00Z', 'completed') $$,
   '42501',
-  'archive uploads must start in the uploading phase',
+  'archive upload must start in the uploading phase',
   'an owner cannot insert a completed upload'
 );
 
@@ -36,7 +36,7 @@ SELECT throws_ok(
   $$ UPDATE public.archive_upload SET upload_phase = 'completed'
      WHERE account_id = '990000000000000601' AND archive_at = '2020-02-01T00:00:00Z' $$,
   '42501',
-  'archive upload phase can only be set to uploading, ready_for_commit or failed by its owner',
+  'archive upload cannot move from uploading to completed',
   'an owner cannot mark their own upload completed'
 );
 
@@ -44,7 +44,7 @@ SELECT throws_ok(
   $$ UPDATE public.archive_upload SET upload_phase = 'committing'
      WHERE account_id = '990000000000000601' AND archive_at = '2020-02-01T00:00:00Z' $$,
   '42501',
-  'archive upload phase can only be set to uploading, ready_for_commit or failed by its owner',
+  'archive upload cannot move from uploading to committing',
   'an owner cannot mark their own upload committing'
 );
 
@@ -52,7 +52,7 @@ SELECT throws_ok(
   $$ UPDATE public.archive_upload SET upload_phase = 'ready_for_commit'
      WHERE account_id = '990000000000000601' AND archive_at = '2020-01-01T00:00:00Z' $$,
   '42501',
-  'archive upload phase can only be set to uploading, ready_for_commit or failed by its owner',
+  'archive upload cannot move from completed to ready_for_commit',
   'an owner cannot reopen a completed upload for reprocessing'
 );
 

@@ -94,7 +94,7 @@ SELECT lives_ok(
 );
 
 SELECT lives_ok(
-  $$ UPDATE public.archive_upload SET upload_phase = 'failed'
+  $$ UPDATE public.archive_upload SET upload_likes = false
      WHERE account_id = '990000000000000501' AND username = 'OldHandle' $$,
   'an update that keeps a pre-rename username is not re-validated'
 );

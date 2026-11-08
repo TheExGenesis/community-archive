@@ -187,7 +187,11 @@ export default function TrendsExplorer({
                 story={selectedStory}
                 onClear={() => selectStory(null)}
               />
-            ) : null}
+            ) : (
+              <p className={`mb-3 text-xs ${MUTED}`}>
+                Default terms are trending this week in the community.
+              </p>
+            )}
             <div className={`${CARD} mb-4 p-4 sm:p-5`}>
               <form
                 onSubmit={addTerms}

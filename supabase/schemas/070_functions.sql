@@ -3988,7 +3988,7 @@ ALTER FUNCTION private.enforce_archive_upload_owner() OWNER TO postgres;
 -- to the worker (uploading <-> ready_for_commit, either -> failed); trusted
 -- callers own committing and completed. A committing row carries the worker's
 -- lease, set on entry and cleared on exit. See
--- 20261107120000_archive_upload_commit_lease.sql.
+-- 20261108163000_archive_upload_commit_lease.sql.
 CREATE OR REPLACE FUNCTION private.enforce_archive_upload_transition()
 RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
 DECLARE

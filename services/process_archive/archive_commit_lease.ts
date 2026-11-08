@@ -4,7 +4,7 @@ import type postgres from 'postgres'
 type Sql = postgres.Sql
 
 // The worker side of the archive_upload phase machine (see
-// supabase/migrations/20261107120000_archive_upload_commit_lease.sql):
+// supabase/migrations/20261108163000_archive_upload_commit_lease.sql):
 //
 //   ready_for_commit --claim--> committing --finish--> completed | failed
 //                                   |                  | ready_for_commit

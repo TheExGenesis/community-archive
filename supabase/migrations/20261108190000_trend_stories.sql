@@ -3,8 +3,12 @@
 -- "ea" and "effective altruism"), explains each story, and freezes a small
 -- set of evidence tweets so the story page stays stable after the trend moves.
 -- Rows are kept indefinitely so days can be browsed and later stitched together.
+--
+-- First merged as 20261107120000, a version production had already recorded
+-- for archive_upload_commit_lease (#1215); re-dated so `db push` applies it.
+-- Idempotent because staging already applied it under the old version.
 
-create table "public"."trend_stories" (
+create table if not exists "public"."trend_stories" (
   "id" uuid primary key default gen_random_uuid(),
   -- The UTC day the terms were featured on the homepage (the trend window's
   -- exclusive end; the window covers the seven days before it).
@@ -30,7 +34,7 @@ create table "public"."trend_stories" (
   unique ("trend_date", "slug")
 );
 
-create index "trend_stories_date_position_idx"
+create index if not exists "trend_stories_date_position_idx"
   on "public"."trend_stories" ("trend_date" desc, "position");
 
 alter table "public"."trend_stories" enable row level security;
@@ -38,6 +42,9 @@ alter table "public"."trend_stories" enable row level security;
 revoke all privileges on table "public"."trend_stories" from "anon", "authenticated";
 grant all privileges on table "public"."trend_stories" to "service_role";
 grant select on table "public"."trend_stories" to "anon", "authenticated";
+
+drop policy if exists "Trend stories are publicly readable"
+  on "public"."trend_stories";
 
 create policy "Trend stories are publicly readable"
   on "public"."trend_stories"

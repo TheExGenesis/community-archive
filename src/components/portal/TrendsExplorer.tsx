@@ -13,8 +13,12 @@ import { TimelineControls } from './trends/TimelineControls'
 import { TrendChart } from './trends/TrendChart'
 import { MAX_SERIES, SERIES_COLORS } from './trends/config'
 import { bucketLabel } from './trends/model'
-import { TrendStoryStrip } from './trends/TrendStoryStrip'
-import type { TrendStoryDay } from '@/lib/trendStories/core'
+import {
+  SelectedTrendStory,
+  TrendStoryRail,
+  storyKey,
+} from './trends/TrendStoryRail'
+import type { TrendStoryCard, TrendStoryDay } from '@/lib/trendStories/core'
 
 type FeedFilter = 'include' | 'off'
 
@@ -77,6 +81,47 @@ export default function TrendsExplorer({
   } = useTrendExplorer({ initialTrends, initialLoadFailed, initialSearch })
   const [isSelectingRange, setIsSelectingRange] = useState(false)
   const chartRef = useRef<HTMLDivElement>(null)
+  const [selectedStory, setSelectedStory] = useState<TrendStoryCard | null>(
+    null,
+  )
+  const initialFeedFilters = useRef(feedFilters)
+
+  // Focus the chart and tweet feed on one story's terms, or (null) go back
+  // to every configured term.
+  const selectStory = (story: TrendStoryCard | null) => {
+    setSelectedStory(story)
+    if (!story) {
+      setChartEnabled(
+        Object.fromEntries(configuredTerms.map((term) => [term, true])),
+      )
+      setFeedFilters(
+        Object.fromEntries(
+          configuredTerms.map((term) => [
+            term,
+            initialFeedFilters.current[term] ?? 'include',
+          ]),
+        ),
+      )
+      return
+    }
+    captureProductAction('trend_stories', 'view_changed')
+    if (story.terms.every((term) => configuredTerms.includes(term))) {
+      const only = new Set(story.terms)
+      setChartEnabled(
+        Object.fromEntries(
+          configuredTerms.map((term) => [term, only.has(term)]),
+        ),
+      )
+      setFeedFilters(
+        Object.fromEntries(
+          configuredTerms.map((term) => [
+            term,
+            only.has(term) ? 'include' : 'off',
+          ]),
+        ),
+      )
+    } else void chartTerms(story.terms)
+  }
   const {
     evidence,
     evidenceSort,
@@ -122,42 +167,31 @@ export default function TrendsExplorer({
 
         <ExtensionInstallPrompt surface="trends" className="mb-5" />
 
-        <TrendStoryStrip
-          days={storyDays}
-          charting={isAdding || isLoadingSeries}
-          onChart={(terms) => {
-            captureProductAction('trend_stories', 'view_changed')
-            chartRef.current?.scrollIntoView({ behavior: 'smooth' })
-            // Already charted (today's terms are the defaults): focus the
-            // chart and the tweet feed on just this story's terms.
-            if (terms.every((term) => configuredTerms.includes(term))) {
-              const only = new Set(terms)
-              setChartEnabled(
-                Object.fromEntries(
-                  configuredTerms.map((term) => [term, only.has(term)]),
-                ),
-              )
-              setFeedFilters(
-                Object.fromEntries(
-                  configuredTerms.map((term) => [
-                    term,
-                    only.has(term) ? 'include' : 'off',
-                  ]),
-                ),
-              )
-            } else void chartTerms(terms)
-          }}
-        />
-
-        <p className={`mb-4 text-xs ${MUTED}`}>
-          Default terms are trending this week in the community.
-        </p>
-
         <div
           ref={chartRef}
-          className="grid scroll-mt-20 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]"
+          className="grid scroll-mt-20 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)] xl:grid-cols-[250px_minmax(0,1fr)_minmax(340px,0.72fr)]"
         >
+          {storyDays.length ? (
+            <div className="min-w-0 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1">
+              <TrendStoryRail
+                days={storyDays}
+                selected={selectedStory ? storyKey(selectedStory) : null}
+                onSelect={selectStory}
+                disabled={isAdding || isLoadingSeries}
+              />
+            </div>
+          ) : null}
           <section className="min-w-0">
+            {selectedStory ? (
+              <SelectedTrendStory
+                story={selectedStory}
+                onClear={() => selectStory(null)}
+              />
+            ) : (
+              <p className={`mb-3 text-xs ${MUTED}`}>
+                Default terms are trending this week in the community.
+              </p>
+            )}
             <div className={`${CARD} mb-4 p-4 sm:p-5`}>
               <form
                 onSubmit={addTerms}

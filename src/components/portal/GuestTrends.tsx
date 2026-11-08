@@ -3,7 +3,7 @@ import type { TermWeek } from '@/lib/portal/types'
 import GuestTrendsSignIn from './GuestTrendsSignIn'
 import { CARD, MUTED, SERIF } from './styles'
 import { WeeklyKeywordRows } from './WeeklyKeywordRows'
-import { TrendStoryStrip } from './trends/TrendStoryStrip'
+import { TrendStoryRail } from './trends/TrendStoryRail'
 import type { TrendStoryDay } from '@/lib/trendStories/core'
 
 /**
@@ -38,9 +38,12 @@ export default function GuestTrends({
           </p>
         </div>
 
-        <TrendStoryStrip days={storyDays} />
-
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)] xl:grid-cols-[250px_minmax(0,1fr)_minmax(340px,0.72fr)]">
+          {storyDays.length ? (
+            <div className="min-w-0 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1">
+              <TrendStoryRail days={storyDays} />
+            </div>
+          ) : null}
           <div className={`${CARD} flex flex-col`}>
             <div className="border-b border-zinc-200 px-4 py-3 text-[13px] font-bold dark:border-[#26262a]">
               {weekly.some((row) => !row.lane)

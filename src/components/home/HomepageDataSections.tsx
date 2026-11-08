@@ -9,6 +9,7 @@ import {
   HomeTrendsPanel,
 } from '@/components/portal/Portal'
 import { getLatestDigestPreview } from '@/lib/digest/data'
+import HomepageTools from './HomepageTools'
 import { formatNumber } from '@/lib/formatNumber'
 import type { HomepageData } from '@/lib/portal/data'
 import { measureServerRead } from '@/lib/performance/server'
@@ -187,6 +188,7 @@ export function HomepagePortal({
           </Suspense>
         </>
       }
+      tools={<HomepageTools />}
       trends={
         <Suspense fallback={<SectionLoading label="trending terms" />}>
           <HomepageTrends data={data.trends} isMember={isMember} />

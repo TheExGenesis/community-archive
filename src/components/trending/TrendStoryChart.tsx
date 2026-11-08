@@ -51,7 +51,7 @@ export default function TrendStoryChart({
   const hoverDay = hover === null ? null : days[hover]
 
   return (
-    <figure className="mt-8">
+    <figure className="mt-10">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <figcaption className="text-[13px] font-semibold text-foreground">
           {series.length === 1 ? `“${series[0].term}”` : 'Terms'} per 100k

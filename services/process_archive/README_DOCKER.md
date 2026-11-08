@@ -333,6 +333,21 @@ deploy:
 ## Performance Optimization
 
 ### Memory Management
+- **Streamed input:** The worker streams the archive from Storage, verifies
+  its pinned checksum incrementally, and parses one array element at a time
+  (`archive_stream_input.ts`). It keeps only the fields it writes, so a tweet
+  keeps its text, counts, reply/retweet IDs, mentions, URLs and media, and a
+  like keeps only its tweet ID. When the worker starts reading another archive
+  field, add it to that projection; `archive_stream_input.test.ts` fails if a
+  projected archive changes any ClickHouse or canonical output.
+- **Bounded batches:** Canonical publishing and ClickHouse delivery build rows
+  for at most 5,000 tweets or 50,000 likes at a time instead of the whole
+  archive.
+- **Heap:** `npm start` runs Node with `--max-old-space-size=1536` inside the
+  2 GB container. `npm run memcheck:large-archive` writes a synthetic archive
+  shaped like the largest production upload (about 310k tweets and 607k likes,
+  roughly 500 MB) and runs every in-memory stage under a 1 GB heap; it peaked
+  at about 860 MB heap and 1 GB RSS when added.
 - **Garbage Collection:** Enabled by default with `--expose-gc`
 - **Memory Limit:** Set via `MAX_MEMORY_MB` environment variable
 - **Batch Sizes:** Defaults are `PG_BATCH_SIZE=1000` and

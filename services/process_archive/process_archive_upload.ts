@@ -14,7 +14,7 @@ import {
   reclaimExpiredCommitLeases,
   startCommitHeartbeat,
 } from './archive_commit_lease'
-import { parseArchiveInput } from './archive_storage_input'
+import { readArchiveStream } from './archive_stream_input'
 import winston from 'winston'
 import type { Logform } from 'winston'
 dotenv.config({ path: '.env' })
@@ -28,13 +28,14 @@ import { getArchiveTweetMedia } from './archive_media'
 import {
   ArchiveClickHouseError,
   ArchiveClickHouseSink,
+  type ArchiveClickHouseBatch,
   type ArchiveClickHouseDelivery,
   type ArchiveGraphPurgeRequest,
   type ArchivePolicyCandidate,
   type ArchivePolicyDecisions,
   attemptArchiveClickHouseDelivery,
   attemptArchiveGraphPurge,
-  buildArchiveClickHouseBatch,
+  buildArchiveClickHouseBatches,
   buildArchiveTombstoneBatch,
   collectArchivePolicyCandidates,
   createArchiveClickHouseManifest,
@@ -96,8 +97,7 @@ const CONFIG = {
   ),
 } as const
 
-export async function createServerScriptClient() {
-  const getSupabaseConfig = (includeServiceRole: boolean = false) => {
+function getSupabaseConfig(includeServiceRole: boolean = false) {
     const isDevelopment = process.env.NODE_ENV === 'development'
     const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
   
@@ -123,7 +123,9 @@ export async function createServerScriptClient() {
     }
   
     return config
-  }
+}
+
+export async function createServerScriptClient() {
   const { url, serviceRole } = getSupabaseConfig(true)
   return createClient(url!, serviceRole!)
 }
@@ -250,6 +252,10 @@ function removeProblematicCharacters(value: string | null | undefined): string |
 function getMemoryUsageMB(): number {
   const usage = process.memoryUsage()
   return Math.round(usage.heapUsed / 1024 / 1024)
+}
+
+function formatMB(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1)
 }
 
 function checkMemoryLimit(): void {
@@ -909,35 +915,49 @@ async function loadArchiveData(
   if (CONFIG.DEV_ARCHIVE_PATH) {
     const archivePath = path.join(CONFIG.DEV_ARCHIVE_PATH, objectPath)
     logger.debug(`Reading archive from filesystem: ${archivePath}`)
-
-    // For very large files, consider streaming JSON parsing
-    const fileSize = fs.statSync(archivePath).size
-    const fileSizeMB = fileSize / (1024 * 1024)
-
-    logger.info(`Archive file size: ${fileSizeMB.toFixed(1)}MB`)
-
-    const archiveData = fs.readFileSync(archivePath, 'utf8')
-    return parseArchiveInput(archiveData, reference)
+    const { archive, bytes } = await readArchiveStream(
+      fs.createReadStream(archivePath),
+      reference,
+    )
+    logger.info(`Read archive of ${username} with size: ${formatMB(bytes)}MB`)
+    return archive
   }
 
+  // Stream the object instead of supabase-js download(), which buffers the
+  // whole archive as a Blob before it can be read.
   logger.debug(`Downloading pinned archive for ${username} from Supabase`)
-  const supabase = await createServerScriptClient()
-  const { data, error } = await supabase.storage
-    .from('archives')
-    .download(objectPath)
-  
-  if (error) {
-    throw new Error(`Failed to download archive for ${username}: ${error.message}`)
+  // supabase-js trims these; the production env file carries whitespace.
+  const config = getSupabaseConfig(true)
+  const url = (config.url ?? '').trim().replace(/\/+$/, '')
+  const serviceRole = (config.serviceRole ?? '').trim()
+  if (!/^https?:\/\//.test(url) || !serviceRole) {
+    throw new Error('Supabase storage configuration is missing')
   }
-  
-  const text = await data.text()
-  logger.info(`Downloaded archive of ${username} with size: ${(text.length / (1024 * 1024)).toFixed(1)}MB`)
-  
-  return parseArchiveInput(text, reference)
+  const objectUrl = `${url}/storage/v1/object/archives/${objectPath
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')}`
+  const response = await fetch(objectUrl, {
+    headers: { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` },
+  })
+  if (!response.ok || !response.body) {
+    await response.body?.cancel()
+    throw new Error(
+      `Failed to download archive for ${username}: HTTP ${response.status}`,
+    )
+  }
+  const { archive, bytes } = await readArchiveStream(
+    response.body as unknown as AsyncIterable<Uint8Array>,
+    reference,
+  )
+  logger.info(
+    `Downloaded archive of ${username} with size: ${formatMB(bytes)}MB (memory: ${getMemoryUsageMB()}MB)`,
+  )
+  return archive
 }
 
 
-function patchArchive(archive: any): any {
+export function patchArchive(archive: any): any {
   try{
     // `tweets` and `like` are optional files in third-party / scripted uploads;
     // default to [] so a missing section doesn't throw and fail the whole archive.
@@ -1096,9 +1116,9 @@ async function buildPolicySafeCanonicalArchiveBatch(
     `
     const ownerBlocked = policy?.blocked === true
     let decisions: ArchivePolicyDecisions = new Map()
-    let batch
+    let batches: Iterable<ArchiveClickHouseBatch>
     if (ownerBlocked) {
-      batch = buildArchiveTombstoneBatch(manifest, observedAt)
+      batches = [buildArchiveTombstoneBatch(manifest, observedAt)]
     } else {
       const source =
         archive ??
@@ -1124,10 +1144,17 @@ async function buildPolicySafeCanonicalArchiveBatch(
         trx,
         collectArchivePolicyCandidates(source),
       )
-      batch = buildArchiveClickHouseBatch(source, manifest, decisions, observedAt)
+      // Built lazily by the publisher, one bounded batch at a time; the
+      // policy decisions above were resolved under the owner lock.
+      batches = buildArchiveClickHouseBatches(
+        source,
+        manifest,
+        decisions,
+        observedAt,
+      )
     }
     return {
-      batch,
+      batches,
       manifest,
       policyVersion: canonicalArchivePolicyVersion(
         manifest,

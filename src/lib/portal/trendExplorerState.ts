@@ -58,8 +58,8 @@ export function defaultTrendExplorerState(
     shown: terms.slice(0, 6),
     included: terms.slice(0, 1),
     scale: 'normalized',
-    granularity: 'day',
-    timeline: '15d',
+    granularity: 'week',
+    timeline: '12w',
     range: null,
   }
 }

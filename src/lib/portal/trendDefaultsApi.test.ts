@@ -8,9 +8,24 @@ jest.mock('./analytics', () => ({
   fetchPortalWeeklyTrends: jest.fn(),
   portalTrendTokens: (term: string) => [term],
 }))
-jest.mock('./data', () => ({ enrichPortalTweets: jest.fn() }))
+// The route reads through the Data Cache wrappers in ./data; pass straight
+// through to the gateway mocks so these tests pin the route's contract.
+jest.mock('./data', () => {
+  const analytics = jest.requireMock('./analytics')
+  return {
+    enrichPortalTweets: jest.fn(),
+    getPortalWeeklyTrends: () => analytics.fetchPortalWeeklyTrends(),
+    getPortalTrendSeries: (terms: string[], granularity: string) =>
+      analytics.fetchPortalTrendSeries(
+        terms,
+        new Date(),
+        undefined,
+        granularity,
+      ),
+  }
+})
 beforeEach(() => jest.resetAllMocks())
-test('dynamic defaults are member-only and never cached independently of the gateway', async () => {
+test('dynamic defaults are member-only and never browser-cached', async () => {
   jest.mocked(getIsMember).mockResolvedValue(false)
   expect(
     (
@@ -63,14 +78,12 @@ test.each(['day', 'week'])(
   'accepts authenticated %s series requests',
   async (granularity) => {
     jest.mocked(getIsMember).mockResolvedValue(true)
-    jest
-      .mocked(fetchPortalTrendSeries)
-      .mockResolvedValue({
-        granularity: granularity as 'day' | 'week',
-        buckets: [],
-        series: [],
-        computedAt: '',
-      })
+    jest.mocked(fetchPortalTrendSeries).mockResolvedValue({
+      granularity: granularity as 'day' | 'week',
+      buckets: [],
+      series: [],
+      computedAt: '',
+    })
     const response = await GET(
       new NextRequest(
         `http://localhost/api/portal/trends?view=series&q=astra&granularity=${granularity}`,

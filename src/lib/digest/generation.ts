@@ -160,15 +160,42 @@ export interface ClassifiedDigestTitle {
   /** Display title; composed titles carry their own curly quotation marks. */
   title: string
   kind: DigestTitleKind
-  /** Composed-title parts that do not occur in any story post. */
+  /**
+   * Composed-title parts, or quoted spans inside a voice title, that do not
+   * occur in any story post.
+   */
   unmatchedParts: string[]
+}
+
+const INLINE_QUOTE = /"([^"]+)"|\u201c([^\u201c\u201d]+)\u201d/g
+
+/** Check quoted spans in a written title and render them with curly marks. */
+const classifyVoiceTitle = (
+  title: string,
+  storyPosts: DigestPromptCorpusRow[],
+): ClassifiedDigestTitle => {
+  const unmatchedParts: string[] = []
+  const rendered = title.replace(
+    INLINE_QUOTE,
+    (_match, straight?: string, curly?: string) => {
+      const span = (straight ?? curly ?? '').trim()
+      // US style puts trailing punctuation inside the marks: “twins,”.
+      const excerpt = span.replace(/[,.;:!?]+$/, '')
+      if (!titleOccursInOnePost(excerpt, storyPosts)) {
+        unmatchedParts.push(excerpt)
+      }
+      return `\u201c${span}\u201d`
+    },
+  )
+  return { title: rendered, kind: 'voice', unmatchedParts }
 }
 
 /**
  * Classify a model title against the story's posts:
  * - quote: the whole title is an exact excerpt of one post;
  * - composed: " / "-joined exact excerpts, re-rendered as “A” / “B”;
- * - voice: anything else, a title written in the posts' voice.
+ * - voice: anything else, a headline in the posts' words; quoted spans inside
+ *   it must be exact excerpts and are rendered with curly quotation marks.
  */
 export function classifyDigestTitle(
   title: string,
@@ -181,7 +208,7 @@ export function classifyDigestTitle(
     .split(COMPOSED_TITLE_SEPARATOR)
     .map((part) => part.trim().replace(QUOTE_MARKS, '').trim())
   if (parts.length < 2 || parts.some((part) => !part)) {
-    return { title, kind: 'voice', unmatchedParts: [] }
+    return classifyVoiceTitle(title, storyPosts)
   }
   const unmatchedParts = parts.filter(
     (part) => !titleOccursInOnePost(part, storyPosts),
@@ -193,12 +220,11 @@ export function classifyDigestTitle(
       unmatchedParts,
     }
   }
-  return {
-    title,
-    kind: 'voice',
-    // Only an attempted composition (some parts matched) is worth flagging.
-    unmatchedParts: unmatchedParts.length < parts.length ? unmatchedParts : [],
+  // Only an attempted composition (some parts matched) is worth flagging.
+  if (unmatchedParts.length < parts.length) {
+    return { title, kind: 'voice', unmatchedParts }
   }
+  return classifyVoiceTitle(title, storyPosts)
 }
 
 export function summaryBulletWarnings(bullets: string[]): string[] {
@@ -314,7 +340,7 @@ function parseModelDigest(
     const classifiedTitle = classifyDigestTitle(title, indexedTweets)
     if (classifiedTitle.unmatchedParts.length) {
       editorialWarnings.push(
-        `Story ${index + 1} composed title has parts that are not exact tweet excerpts: ${classifiedTitle.unmatchedParts.join(' / ')}.`,
+        `Story ${index + 1} title quotes words that are not exact tweet excerpts: ${classifiedTitle.unmatchedParts.join(' / ')}.`,
       )
     } else if (classifiedTitle.kind === 'voice' && bangerRows.length === 1) {
       // A one-banger story is one element, so its title should be a quote.

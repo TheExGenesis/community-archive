@@ -59,16 +59,17 @@ like generated newsletter headlines. A story about one thing (one claim,
 event, release, or joke, however many posts discuss it) takes an exact three-
 to eighteen-word excerpt from one post. A story that combines distinct
 elements may not take a quote that fits only one of them: the model writes
-one short, plain headline (about twelve words) in the posts' voice that
-covers every element and makes sense on its own, never stitched-together
-quotes. The receiver classifies
+one headline under about 100 characters that covers every element, stays as
+close to the posts' own words as possible, and may quote two to six telling
+words from a post inside the sentence. It must still say who did or said
+what, never a bare list of quotes. The receiver classifies
 each title (`titleKind`): `quote` when the whole title occurs in one story
 post, `composed` when every ` / ` part does (re-rendered as
 `“A” / “B”`; kept for robustness, the prompt no longer asks for it), otherwise
-`voice`. `titleIsQuote` is true only for `quote`, so
+`voice`; quoted spans inside a voice title must be exact excerpts and
+are rendered with curly quotation marks. `titleIsQuote` is true only for `quote`, so
 renderers wrap only single excerpts in quotation marks. A voice title on a
-one-banger story, or a composed title with a part that is not an exact
-excerpt, is kept as an editorial warning instead of failing an otherwise
+one-banger story, or a quoted part that is not an exact excerpt, is kept as an editorial warning instead of failing an otherwise
 grounded generation. The generated
 subtitle must supply the people, event, and significance that the source quote
 leaves unstated rather than merely restating it. The story page keeps

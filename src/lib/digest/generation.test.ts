@@ -565,6 +565,28 @@ describe('daily digest generation contract', () => {
     })
   })
 
+  test('checks and curls exact quotes inside a written headline', () => {
+    const posts = buildDigestPromptCorpus(candidates)
+
+    expect(
+      classifyDigestTitle(
+        'One poster says "taste benchmarks are becoming public rituals" as parquet gains reply graphs',
+        posts,
+      ),
+    ).toEqual({
+      title:
+        'One poster says \u201ctaste benchmarks are becoming public rituals\u201d as parquet gains reply graphs',
+      kind: 'voice',
+      unmatchedParts: [],
+    })
+    expect(
+      classifyDigestTitle(
+        'One poster says \u201ctaste is dead,\u201d as \u201creply graphs.\u201d arrive',
+        posts,
+      ),
+    ).toMatchObject({ kind: 'voice', unmatchedParts: ['taste is dead'] })
+  })
+
   test('renders a composed multi-element title in per-excerpt quotation marks', () => {
     const edition = assembleDigestEditionContent({
       runId: 'run-1',

@@ -11,7 +11,7 @@ import { useTrendExplorer } from './trends/useTrendExplorer'
 import { useTrendEvidence } from './trends/useTrendEvidence'
 import { TimelineControls, timelineNote } from './trends/TimelineControls'
 import { TrendChart } from './trends/TrendChart'
-import { MAX_SERIES, SERIES_COLORS } from './trends/config'
+import { SERIES_COLORS } from './trends/config'
 import { bucketLabel } from './trends/model'
 import {
   SelectedTrendStory,
@@ -216,17 +216,11 @@ export default function TrendsExplorer({
                   {isAdding ? 'Adding…' : 'Add trends'}
                 </button>
               </form>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span
-                  className={`text-[11.5px] ${addError ? 'text-red-600 dark:text-red-400' : MUTED}`}
-                >
-                  {addError ||
-                    'Multi-word trends match all words; up to four distinct words are counted.'}
-                </span>
-                <span className={`text-[11.5px] tabular-nums ${MUTED}`}>
-                  {configuredTerms.length}/{MAX_SERIES} trends
-                </span>
-              </div>
+              {addError && (
+                <p className="mt-2 text-[11.5px] text-red-600 dark:text-red-400">
+                  {addError}
+                </p>
+              )}
             </div>
 
             <div className={`${CARD} overflow-hidden`}>

@@ -12,7 +12,6 @@ import type {
   TrendRange,
   TrendExplorerUrlState,
 } from '@/lib/portal/trendExplorerState'
-import { bucketDate, bucketKey } from '@/lib/portal/trendTimeline'
 import { bucketLabel } from './model'
 import type { CaptureExplorerAction } from './config'
 import { MUTED } from '../styles'
@@ -194,11 +193,10 @@ export function TrendChart({
 
   const finishRangeSelection = (event: ReactPointerEvent<SVGRectElement>) => {
     if (dragStartBucket === null) return
-    const bucket = bucketForPointer(event.clientX)
-    if (bucket !== null && bucket !== dragStartBucket) {
-      updateDraggedRange(bucket)
-      captureExplorerAction('year_filter_applied', { hasYearFilter: true })
-    }
+    // A drag selects the span; a plain click selects the bucket under it.
+    const bucket = bucketForPointer(event.clientX) ?? dragStartBucket
+    updateDraggedRange(bucket)
+    captureExplorerAction('year_filter_applied', { hasYearFilter: true })
     setDragStartBucket(null)
     onSelectingRangeChange(false)
   }
@@ -353,171 +351,22 @@ export function TrendChart({
         <span className={`mr-auto text-[11.5px] ${MUTED}`}>
           {selectedRange
             ? `Tweets filtered to ${bucketLabel(selectedRange.start, granularity)} – ${bucketLabel(selectedRange.end, granularity)}.`
-            : `Drag across the chart to filter tweets by ${granularity}.`}
+            : `Click or drag across the chart to filter tweets by ${granularity}.`}
         </span>
-        <div className="flex flex-wrap items-center gap-2">
-          {granularity === 'year' ? (
-            <>
-              <label
-                className={`inline-flex items-center whitespace-nowrap text-[11px] font-semibold ${MUTED}`}
-              >
-                From
-                <select
-                  aria-label="Tweets from year"
-                  value={selectedRange?.start ?? ''}
-                  onChange={(event) => {
-                    if (!event.target.value) {
-                      captureExplorerAction('year_filter_cleared', {
-                        hasYearFilter: false,
-                      })
-                      setSelectedRange(null)
-                      return
-                    }
-                    const start = event.target.value
-                    captureExplorerAction('year_filter_applied', {
-                      hasYearFilter: true,
-                    })
-                    setSelectedRange((current) => ({
-                      start,
-                      end:
-                        current && current.end >= start ? current.end : start,
-                    }))
-                  }}
-                  className="ml-1.5 h-7 rounded-[4px] border border-zinc-300 bg-white px-2 text-[12px] font-normal text-foreground dark:border-[#34343a] dark:bg-[#121214]"
-                >
-                  <option value="">Any</option>
-                  {allBuckets.map((bucket) => (
-                    <option key={bucket} value={bucket}>
-                      {bucket}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label
-                className={`inline-flex items-center whitespace-nowrap text-[11px] font-semibold ${MUTED}`}
-              >
-                To
-                <select
-                  aria-label="Tweets through year"
-                  value={selectedRange?.end ?? ''}
-                  onChange={(event) => {
-                    if (!event.target.value) {
-                      captureExplorerAction('year_filter_cleared', {
-                        hasYearFilter: false,
-                      })
-                      setSelectedRange(null)
-                      return
-                    }
-                    const end = event.target.value
-                    captureExplorerAction('year_filter_applied', {
-                      hasYearFilter: true,
-                    })
-                    setSelectedRange((current) => ({
-                      start:
-                        current && current.start <= end ? current.start : end,
-                      end,
-                    }))
-                  }}
-                  className="ml-1.5 h-7 rounded-[4px] border border-zinc-300 bg-white px-2 text-[12px] font-normal text-foreground dark:border-[#34343a] dark:bg-[#121214]"
-                >
-                  <option value="">Any</option>
-                  {allBuckets.map((bucket) => (
-                    <option key={bucket} value={bucket}>
-                      {bucket}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          ) : (
-            <>
-              <label
-                className={`inline-flex items-center whitespace-nowrap text-[11px] font-semibold ${MUTED}`}
-              >
-                From
-                <input
-                  type={granularity === 'month' ? 'month' : 'date'}
-                  aria-label={`Tweets from ${granularity}`}
-                  min={allBuckets[0]}
-                  max={allBuckets.at(-1)}
-                  value={selectedRange?.start ?? ''}
-                  onChange={(event) => {
-                    const start =
-                      event.target.value &&
-                      (granularity === 'week'
-                        ? bucketKey(bucketDate(event.target.value), 'week')
-                        : event.target.value)
-                    if (!start) {
-                      captureExplorerAction('year_filter_cleared', {
-                        hasYearFilter: false,
-                      })
-                      setSelectedRange(null)
-                      return
-                    }
-                    captureExplorerAction('year_filter_applied', {
-                      hasYearFilter: true,
-                    })
-                    setSelectedRange((current) => ({
-                      start,
-                      end:
-                        current && current.end >= start ? current.end : start,
-                    }))
-                  }}
-                  className="ml-1.5 h-7 rounded-[4px] border border-zinc-300 bg-white px-2 text-[12px] font-normal text-foreground dark:border-[#34343a] dark:bg-[#121214]"
-                />
-              </label>
-              <label
-                className={`inline-flex items-center whitespace-nowrap text-[11px] font-semibold ${MUTED}`}
-              >
-                To
-                <input
-                  type={granularity === 'month' ? 'month' : 'date'}
-                  aria-label={`Tweets through ${granularity}`}
-                  min={allBuckets[0]}
-                  max={allBuckets.at(-1)}
-                  value={selectedRange?.end ?? ''}
-                  onChange={(event) => {
-                    const end =
-                      event.target.value &&
-                      (granularity === 'week'
-                        ? bucketKey(bucketDate(event.target.value), 'week')
-                        : event.target.value)
-                    if (!end) {
-                      captureExplorerAction('year_filter_cleared', {
-                        hasYearFilter: false,
-                      })
-                      setSelectedRange(null)
-                      return
-                    }
-                    captureExplorerAction('year_filter_applied', {
-                      hasYearFilter: true,
-                    })
-                    setSelectedRange((current) => ({
-                      start:
-                        current && current.start <= end ? current.start : end,
-                      end,
-                    }))
-                  }}
-                  className="ml-1.5 h-7 rounded-[4px] border border-zinc-300 bg-white px-2 text-[12px] font-normal text-foreground dark:border-[#34343a] dark:bg-[#121214]"
-                />
-              </label>
-            </>
-          )}
-          {selectedRange && (
-            <button
-              type="button"
-              onClick={() => {
-                captureExplorerAction('year_filter_cleared', {
-                  hasYearFilter: false,
-                })
-                setSelectedRange(null)
-              }}
-              className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${MUTED} hover:text-foreground`}
-            >
-              Clear range
-            </button>
-          )}
-        </div>
+        {selectedRange && (
+          <button
+            type="button"
+            onClick={() => {
+              captureExplorerAction('year_filter_cleared', {
+                hasYearFilter: false,
+              })
+              setSelectedRange(null)
+            }}
+            className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${MUTED} hover:text-foreground`}
+          >
+            Clear range
+          </button>
+        )}
       </div>
     </>
   )

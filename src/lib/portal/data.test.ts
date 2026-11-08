@@ -1009,6 +1009,10 @@ describe('daily banger selection', () => {
 })
 
 test('live keyword seeds avoid the old corpus-wide default chart queries', async () => {
+  process.env.PORTAL_READ_SUPABASE_URL ??= 'https://prod-project.supabase.co/'
+  process.env.PORTAL_READ_SUPABASE_ANON_KEY ??= 'prod-public-anon'
+  process.env.CLICKHOUSE_ANALYTICS_API_URL ??=
+    'https://analytics.community-archive.org/analytics'
   jest.mocked(fetchPortalWeeklyTrends).mockResolvedValue([])
   jest.mocked(fetchPortalTrends).mockClear()
   const data = await getPortalTrendSnapshot()

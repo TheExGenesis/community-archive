@@ -64,6 +64,35 @@ const defaultTrends: PortalTrends = {
   })),
 }
 
+// Clicks (or drags across) the yearly chart. X0 = 62 is 2025, X1 = 732 is 2026.
+function chartPointer(name = 'year') {
+  const chart = screen.getByRole('img', { name: /term trends shown as/ })
+  Object.defineProperty(chart, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({ left: 0, width: 760 }),
+  })
+  const dragTarget = screen.getByLabelText(
+    `Drag horizontally to filter tweets by ${name}`,
+  ) as unknown as SVGRectElement & { setPointerCapture: jest.Mock }
+  dragTarget.setPointerCapture = jest.fn()
+  return (type: string, clientX: number) => {
+    const event = new Event(type, { bubbles: true })
+    Object.defineProperties(event, {
+      clientX: { value: clientX },
+      pointerId: { value: 1 },
+    })
+    act(() => {
+      fireEvent(dragTarget, event)
+    })
+  }
+}
+
+function clickChart(clientX: number) {
+  const dispatch = chartPointer()
+  dispatch('pointerdown', clientX)
+  dispatch('pointerup', clientX)
+}
+
 function feedTweet(id: string, year: number) {
   const createdAt = `${year}-06-01T00:00:00.000Z`
   return {
@@ -189,7 +218,9 @@ describe('TrendsExplorer request isolation', () => {
         screen.queryByText('Chart data unavailable.'),
       ).not.toBeInTheDocument(),
     )
-    expect(screen.getByText('7/12 trends')).toBeVisible()
+    expect(
+      screen.getAllByRole('button', { name: /^Remove .+ trend$/ }),
+    ).toHaveLength(7)
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
@@ -242,7 +273,9 @@ describe('TrendsExplorer request isolation', () => {
     expect(
       screen.queryByRole('button', { name: 'Remove tpot trend' }),
     ).not.toBeInTheDocument()
-    expect(screen.getByText('0/12 trends')).toBeVisible()
+    expect(
+      screen.queryAllByRole('button', { name: /^Remove .+ trend$/ }),
+    ).toHaveLength(0)
   })
 
   test('replaces defaults with the first custom trend, then preserves later additions', async () => {
@@ -292,7 +325,9 @@ describe('TrendsExplorer request isolation', () => {
     expect(
       screen.queryByRole('button', { name: 'Remove tpot trend' }),
     ).not.toBeInTheDocument()
-    expect(screen.getByText('1/12 trends')).toBeVisible()
+    expect(
+      screen.getAllByRole('button', { name: /^Remove .+ trend$/ }),
+    ).toHaveLength(1)
 
     await user.type(input, 'second idea')
     await user.click(screen.getByRole('button', { name: 'Add trends' }))
@@ -304,7 +339,9 @@ describe('TrendsExplorer request isolation', () => {
     expect(
       screen.getByRole('button', { name: 'Remove custom idea trend' }),
     ).toBeVisible()
-    expect(screen.getByText('2/12 trends')).toBeVisible()
+    expect(
+      screen.getAllByRole('button', { name: /^Remove .+ trend$/ }),
+    ).toHaveLength(2)
     expect(
       screen.getByLabelText('custom idea · 2026 · 20 per 100k'),
     ).toBeInTheDocument()
@@ -343,7 +380,6 @@ describe('TrendsExplorer request isolation', () => {
 
   test('filters cached evidence immediately and debounces the range query', async () => {
     jest.useFakeTimers()
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
     const fetchMock = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce({
@@ -366,7 +402,7 @@ describe('TrendsExplorer request isolation', () => {
 
     expect(await screen.findByText('tweet-2025-old')).toBeVisible()
     expect(screen.getByText('tweet-2026-new')).toBeVisible()
-    await user.selectOptions(screen.getByLabelText('Tweets from year'), '2025')
+    clickChart(62)
 
     expect(screen.getByText('tweet-2025-old')).toBeVisible()
     expect(screen.queryByText('tweet-2026-new')).not.toBeInTheDocument()
@@ -388,7 +424,6 @@ describe('TrendsExplorer request isolation', () => {
 
   test('loads an exact range page even when broader cached evidence is visible', async () => {
     jest.useFakeTimers()
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
     const tweets = Array.from({ length: 30 }, (_, index) =>
       feedTweet(String(index), 2026),
     )
@@ -406,7 +441,7 @@ describe('TrendsExplorer request isolation', () => {
 
     expect(await screen.findByText('tweet-2026-0')).toBeVisible()
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    await user.selectOptions(screen.getByLabelText('Tweets from year'), '2026')
+    clickChart(732)
 
     expect(screen.getByText('tweet-2026-0')).toBeVisible()
     expect(
@@ -507,30 +542,12 @@ describe('TrendsExplorer request isolation', () => {
     )
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
 
-    const chart = screen.getByRole('img', {
-      name: /Yearly term trends shown as/,
-    })
-    Object.defineProperty(chart, 'getBoundingClientRect', {
-      value: () => ({ left: 0, width: 760 }),
-    })
-    const dragTarget = screen.getByLabelText(
-      'Drag horizontally to filter tweets by year',
-    ) as unknown as SVGRectElement & { setPointerCapture: jest.Mock }
-    dragTarget.setPointerCapture = jest.fn()
-    const dispatchPointer = (type: string, clientX: number) => {
-      const event = new Event(type, { bubbles: true })
-      Object.defineProperties(event, {
-        clientX: { value: clientX },
-        pointerId: { value: 1 },
-      })
-      fireEvent(dragTarget, event)
-    }
-
+    const dispatchPointer = chartPointer()
     dispatchPointer('pointerdown', 62)
-    expect(screen.getByLabelText('Tweets from year')).toHaveValue('')
+    expect(screen.queryByText(/Tweets filtered to/)).not.toBeInTheDocument()
     dispatchPointer('pointermove', 732)
     await waitFor(() =>
-      expect(screen.getByLabelText('Tweets through year')).toHaveValue('2026'),
+      expect(screen.getByText('Tweets filtered to 2025 – 2026.')).toBeVisible(),
     )
     act(() => jest.advanceTimersByTime(5_000))
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -552,8 +569,7 @@ describe('TrendsExplorer request isolation', () => {
     ).toBeVisible()
   })
 
-  test('keeps an existing range when the chart is clicked without dragging', async () => {
-    const user = userEvent.setup()
+  test('clicking the chart filters tweets to that one period', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ tweets: [] }),
@@ -565,32 +581,12 @@ describe('TrendsExplorer request isolation', () => {
         initialTrends={successfulTrends}
       />,
     )
-    await user.selectOptions(screen.getByLabelText('Tweets from year'), '2025')
-
-    const chart = screen.getByRole('img', {
-      name: /Yearly term trends shown as/,
-    })
-    Object.defineProperty(chart, 'getBoundingClientRect', {
-      value: () => ({ left: 0, width: 760 }),
-    })
-    const dragTarget = screen.getByLabelText(
-      'Drag horizontally to filter tweets by year',
-    ) as unknown as SVGRectElement & { setPointerCapture: jest.Mock }
-    dragTarget.setPointerCapture = jest.fn()
-    const dispatchPointer = (type: string, clientX: number) => {
-      const event = new Event(type, { bubbles: true })
-      Object.defineProperties(event, {
-        clientX: { value: clientX },
-        pointerId: { value: 1 },
-      })
-      fireEvent(dragTarget, event)
-    }
-
-    dispatchPointer('pointerdown', 732)
-    dispatchPointer('pointerup', 732)
-
-    expect(screen.getByLabelText('Tweets from year')).toHaveValue('2025')
-    expect(screen.getByLabelText('Tweets through year')).toHaveValue('2025')
+    clickChart(62)
+    expect(screen.getByText('Tweets filtered to 2025 – 2025.')).toBeVisible()
+    clickChart(732)
+    expect(screen.getByText('Tweets filtered to 2026 – 2026.')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear range' }))
+    expect(screen.queryByText(/Tweets filtered to/)).not.toBeInTheDocument()
   })
 
   test('restores shareable month state and uses exact month evidence bounds', async () => {
@@ -633,8 +629,9 @@ describe('TrendsExplorer request isolation', () => {
       'aria-pressed',
       'true',
     )
-    expect(screen.getByLabelText('Tweets from month')).toHaveValue('2026-07')
-    expect(screen.getByLabelText('Tweets through month')).toHaveValue('2026-08')
+    expect(
+      screen.getByText('Tweets filtered to Jul 2026 – Aug 2026.'),
+    ).toBeVisible()
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.some(([url]) =>
@@ -714,7 +711,9 @@ test('charts six live monthly defaults with a brief note and independent log tog
   expect(
     screen.getByText('Default terms are trending this week in the community.'),
   ).toBeVisible()
-  expect(screen.getByText('6/12 trends')).toBeVisible()
+  expect(
+    screen.getAllByRole('button', { name: /^Remove .+ trend$/ }),
+  ).toHaveLength(6)
   expect(
     calls
       .find((url) => url.searchParams.get('view') === 'series')
@@ -810,7 +809,7 @@ test('zooms monthly data locally and loads real weekly/daily detail for short pr
     expect(points()).toHaveLength(count)
     expect(calls.at(-1)?.searchParams.get('granularity')).toBe(granularity)
     expect(preset('Log')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText(`Tweets from ${granularity}`)).toHaveValue('')
+    expect(screen.queryByText(/Tweets filtered to/)).not.toBeInTheDocument()
   }
   expect(new URLSearchParams(window.location.search).get('timeline')).toBe(
     '15d',

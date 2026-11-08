@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   fetchPortalTrendEvidence,
-  fetchPortalTrendSeries,
-  fetchPortalWeeklyTrends,
   portalTrendTokens,
 } from '@/lib/portal/analytics'
 import { getIsMember } from '@/lib/portal/auth'
-import { enrichPortalTweets } from '@/lib/portal/data'
+import {
+  enrichPortalTweets,
+  getPortalTrendSeries,
+  getPortalWeeklyTrends,
+} from '@/lib/portal/data'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
     const view = params.get('view')
 
     if (view === 'defaults')
-      return privateJson({ weekly: await fetchPortalWeeklyTrends() })
+      return privateJson({ weekly: await getPortalWeeklyTrends() })
 
     if (view === 'series') {
       const terms = normalizedTerms(params.getAll('q'))
@@ -87,12 +89,7 @@ export async function GET(request: NextRequest) {
         throw new Error('Choose year, month, week, or day granularity')
       }
       return privateJson(
-        await fetchPortalTrendSeries(
-          terms,
-          new Date(),
-          undefined,
-          requestedGranularity,
-        ),
+        await getPortalTrendSeries(terms, requestedGranularity),
       )
     }
 

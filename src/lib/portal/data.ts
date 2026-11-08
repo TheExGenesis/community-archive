@@ -10,9 +10,11 @@ import {
   fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
   fetchPortalRecentBangers,
+  fetchPortalTrendSeries,
   fetchPortalTrends,
   fetchPortalWeeklyTrends,
 } from './analytics'
+import type { TrendGranularity } from './types'
 import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
 import type {
@@ -822,6 +824,36 @@ const getCachedTrendsSnapshot = unstable_cache(
   ['portal-trends-snapshot-v1'],
   { revalidate: 86_400 },
 )
+// The weekly-keywords gateway route can take 20s+ under load, so the trends
+// page never waits on it: Next serves the last value and refreshes it in the
+// background. Keyed by UTC day like the gateway's own cache, so a new day's
+// terms never wait on an old entry expiring.
+const getCachedWeeklyKeywords = unstable_cache(
+  async (_sourceKey: string, _utcDay: string) => fetchPortalWeeklyTrends(),
+  ['portal-weekly-keywords-v1'],
+  { revalidate: 900 },
+)
+// Every member opens the explorer on the same default terms, so cache series
+// per term list and granularity; five minutes of staleness is invisible on a
+// chart whose newest bucket is already partial.
+const getCachedTrendSeries = unstable_cache(
+  async (_sourceKey: string, terms: string[], granularity: TrendGranularity) =>
+    fetchPortalTrendSeries(terms, new Date(), undefined, granularity),
+  ['portal-trend-series-v1'],
+  { revalidate: 300 },
+)
+export async function getPortalWeeklyTrends() {
+  return getCachedWeeklyKeywords(
+    portalDataSourceKey(),
+    new Date().toISOString().slice(0, 10),
+  )
+}
+export async function getPortalTrendSeries(
+  terms: string[],
+  granularity: TrendGranularity,
+) {
+  return getCachedTrendSeries(portalDataSourceKey(), terms, granularity)
+}
 const getCachedCorpusRange = unstable_cache(
   async (_sourceKey: string) => fetchCorpusRange(),
   ['portal-corpus-range-v1'],
@@ -1037,7 +1069,7 @@ export async function getCachedWeeklyTrends(): Promise<PortalTrends['weekly']> {
 }
 
 export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
-  return { ...emptyPortalTrends(), weekly: await fetchPortalWeeklyTrends() }
+  return { ...emptyPortalTrends(), weekly: await getPortalWeeklyTrends() }
 }
 
 export async function getPortalData(

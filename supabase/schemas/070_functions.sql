@@ -4553,3 +4553,70 @@ BEGIN
     'expires_at', found_key.expires_at));
 END
 $$;
+
+-- Owner-write guards (20261106210000_guard_owner_writes).
+CREATE OR REPLACE FUNCTION private.guard_archive_upload_phase()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+BEGIN
+  IF v_role = 'service_role'
+     OR (v_role IS NULL AND session_user <> 'authenticator') THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.upload_phase IS DISTINCT FROM 'uploading'::public.upload_phase_enum THEN
+      RAISE EXCEPTION 'archive uploads must start in the uploading phase'
+        USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.upload_phase IS DISTINCT FROM OLD.upload_phase THEN
+    IF OLD.upload_phase IN ('committing', 'completed')
+       OR NEW.upload_phase NOT IN ('uploading', 'ready_for_commit', 'failed') THEN
+      RAISE EXCEPTION 'archive upload phase can only be set to uploading, ready_for_commit or failed by its owner'
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.guard_archive_upload_phase() OWNER TO postgres;
+
+-- SECURITY DEFINER so the policy check runs regardless of the caller's grants.
+CREATE OR REPLACE FUNCTION private.guard_all_account_owner_write()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+  v_user_name text := NULLIF(BTRIM(auth.jwt()->'app_metadata'->>'user_name'), '');
+BEGIN
+  IF v_role = 'service_role'
+     OR (v_role IS NULL AND session_user <> 'authenticator') THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_user_name IS NULL THEN
+    RAISE EXCEPTION 'account rows can only be written with a trusted handle'
+      USING ERRCODE = '42501';
+  END IF;
+  NEW.username := v_user_name;
+
+  -- A policy tombstone stays while the stable account ID is blocked; once
+  -- the block is lifted the owner's upload may hydrate the placeholder.
+  IF TG_OP = 'INSERT' THEN
+    NEW.is_tombstone := false;
+  ELSIF OLD.is_tombstone THEN
+    NEW.is_tombstone := public.policy_account_is_blocked(NEW.account_id, NULL);
+  ELSE
+    NEW.is_tombstone := false;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.guard_all_account_owner_write() OWNER TO postgres;

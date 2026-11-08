@@ -11,6 +11,9 @@ Type=oneshot
 User=root
 WorkingDirectory=/opt/community-archive-nightly-digest
 EnvironmentFile=/etc/community-archive-nightly-digest.env
+# Trend stories first: "-" keeps its failure from blocking the digest, and it
+# skips a day that is already stored, so a digest retry never repeats the call.
+ExecStart=-/root/.bun/bin/bun /opt/community-archive-nightly-digest/services/nightly-digest/trend-stories.ts
 ExecStart=/root/.bun/bin/bun /opt/community-archive-nightly-digest/services/nightly-digest/publish.ts
 TimeoutStartSec=20min
 # A retry never repeats a model call: published dates skip, completed runs only

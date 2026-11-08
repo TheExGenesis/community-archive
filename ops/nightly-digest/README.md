@@ -18,6 +18,34 @@ starts, so a brief gateway or database outage does not strand a finished
 edition as a draft. A failed model or validation attempt remains a failed run
 and those restarts stop at it without another model call.
 
+## Trend stories step
+
+Before the digest, the same oneshot unit runs
+`services/nightly-digest/trend-stories.ts`. It reads the day's homepage
+trending terms from the gateway's `weekly-keywords` route, fetches up to 50
+evidence tweets per term from `trend-evidence` for the same seven-day window,
+and asks one OpenRouter model (`TREND_STORIES_MODEL`, default
+`moonshotai/kimi-k3`) to merge terms that tell the same story and explain each
+one. Validation requires every term in exactly one story and only supplied
+tweets; a rejected answer is retried with the error, up to three calls. Rows
+land in `public.trend_stories` keyed by the homepage day (the window's
+exclusive end) and back `/trending/[date]/[slug]` and the homepage trending
+panel's tooltips.
+
+The step is `ExecStart=-`, so its failure never blocks the digest, and it skips
+a day that already has rows, so a digest restart never repeats the model call.
+Stories persist indefinitely; an opt-out deletes any story citing the account
+(`tombstone_policy_account`). The gateway only serves the current day, so a
+missed day cannot be backfilled later. Run it alone with `--dry-run` (no
+writes) or `--force` (regenerate today):
+
+```sh
+ssh prod-firehose 'systemd-run --wait --collect --pipe \
+  --property=EnvironmentFile=/etc/community-archive-nightly-digest.env \
+  --property=WorkingDirectory=/opt/community-archive-nightly-digest \
+  /root/.bun/bin/bun services/nightly-digest/trend-stories.ts --dry-run'
+```
+
 ## Runtime configuration
 
 Create `/etc/community-archive-nightly-digest.env` as root with mode `0600`:
@@ -28,6 +56,8 @@ SUPABASE_SERVICE_ROLE=...
 OPENROUTER_API_KEY=...
 CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
 CLICKHOUSE_ANALYTICS_API_TOKEN=...
+# Optional: model for the trend stories step.
+TREND_STORIES_MODEL=moonshotai/kimi-k3
 ```
 
 The ClickHouse token's source of truth on `prod-firehose` is the running

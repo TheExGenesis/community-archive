@@ -3984,6 +3984,63 @@ $$;
 
 ALTER FUNCTION private.enforce_archive_upload_owner() OWNER TO postgres;
 
+-- archive_upload phases: browser clients may only create an upload and hand it
+-- to the worker (uploading <-> ready_for_commit, either -> failed); trusted
+-- callers own committing and completed. A committing row carries the worker's
+-- lease, set on entry and cleared on exit. See
+-- 20261108163000_archive_upload_commit_lease.sql.
+CREATE OR REPLACE FUNCTION private.enforce_archive_upload_transition()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+  v_trusted boolean := COALESCE(v_role = 'service_role', false)
+    OR (v_role IS NULL AND session_user <> 'authenticator');
+BEGIN
+  IF NOT v_trusted THEN
+    IF TG_OP = 'INSERT' THEN
+      IF NEW.upload_phase IS DISTINCT FROM 'uploading'
+         OR NEW.commit_claim_id IS NOT NULL
+         OR NEW.commit_heartbeat_at IS NOT NULL
+         OR NEW.commit_attempts <> 0 THEN
+        RAISE EXCEPTION 'archive upload must start in the uploading phase'
+          USING ERRCODE = '42501';
+      END IF;
+    ELSE
+      IF NEW.commit_claim_id IS DISTINCT FROM OLD.commit_claim_id
+         OR NEW.commit_heartbeat_at IS DISTINCT FROM OLD.commit_heartbeat_at
+         OR NEW.commit_attempts IS DISTINCT FROM OLD.commit_attempts THEN
+        RAISE EXCEPTION 'archive upload commit lease is managed by the archive worker'
+          USING ERRCODE = '42501';
+      END IF;
+      IF NEW.upload_phase IS DISTINCT FROM OLD.upload_phase AND NOT (
+        (OLD.upload_phase = 'uploading'
+          AND NEW.upload_phase IN ('ready_for_commit', 'failed'))
+        OR (OLD.upload_phase = 'ready_for_commit'
+          AND NEW.upload_phase IN ('uploading', 'failed'))
+      ) THEN
+        RAISE EXCEPTION 'archive upload cannot move from % to %',
+          OLD.upload_phase, NEW.upload_phase
+          USING ERRCODE = '42501';
+      END IF;
+    END IF;
+  END IF;
+
+  IF NEW.upload_phase = 'committing' THEN
+    IF TG_OP = 'INSERT' OR OLD.upload_phase IS DISTINCT FROM 'committing' THEN
+      NEW.commit_claim_id := COALESCE(NEW.commit_claim_id, pg_catalog.gen_random_uuid());
+      NEW.commit_heartbeat_at := COALESCE(NEW.commit_heartbeat_at, pg_catalog.now());
+    END IF;
+  ELSE
+    NEW.commit_claim_id := NULL;
+    NEW.commit_heartbeat_at := NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.enforce_archive_upload_transition() OWNER TO postgres;
+
 -- Private dashboard read. No consent or archive data is changed by this function.
 CREATE OR REPLACE FUNCTION public.admin_activity_page(
   p_before_at timestamptz DEFAULT NULL,
@@ -4553,3 +4610,38 @@ BEGIN
     'expires_at', found_key.expires_at));
 END
 $$;
+
+-- Owner-write guard for all_account (20261106210000_guard_owner_writes).
+-- SECURITY DEFINER so the policy check runs regardless of the caller's grants.
+CREATE OR REPLACE FUNCTION private.guard_all_account_owner_write()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+  v_user_name text := NULLIF(BTRIM(auth.jwt()->'app_metadata'->>'user_name'), '');
+BEGIN
+  IF v_role = 'service_role'
+     OR (v_role IS NULL AND session_user <> 'authenticator') THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_user_name IS NULL THEN
+    RAISE EXCEPTION 'account rows can only be written with a trusted handle'
+      USING ERRCODE = '42501';
+  END IF;
+  NEW.username := v_user_name;
+
+  -- A policy tombstone stays while the stable account ID is blocked; once
+  -- the block is lifted the owner's upload may hydrate the placeholder.
+  IF TG_OP = 'INSERT' THEN
+    NEW.is_tombstone := false;
+  ELSIF OLD.is_tombstone THEN
+    NEW.is_tombstone := public.policy_account_is_blocked(NEW.account_id, NULL);
+  ELSE
+    NEW.is_tombstone := false;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.guard_all_account_owner_write() OWNER TO postgres;

@@ -7,6 +7,13 @@ import {
   trustedArchiveStoragePath,
 } from './archive_storage_reference'
 import { lookupTrustedArchiveOwner } from './archive_owner'
+import {
+  claimArchiveUpload,
+  commitLeaseConfigFromEnv,
+  finishArchiveUpload,
+  reclaimExpiredCommitLeases,
+  startCommitHeartbeat,
+} from './archive_commit_lease'
 import { parseArchiveInput } from './archive_storage_input'
 import winston from 'winston'
 import type { Logform } from 'winston'
@@ -1531,6 +1538,14 @@ async function main() {
 
     await retryPendingCanonicalArchiveShadows(sql)
 
+    // A run that crashed or was killed mid-commit leaves an expired lease.
+    const commitLease = commitLeaseConfigFromEnv()
+    for (const reclaimed of await reclaimExpiredCommitLeases(sql, commitLease)) {
+      logger.warn(
+        `Reclaimed expired commit lease (archive_upload_id=${reclaimed.id}, attempts=${reclaimed.commit_attempts}, phase=${reclaimed.upload_phase})`,
+      )
+    }
+
     logger.info('Fetching archive_upload records ready for processing...')
 
     const ready = await sql`
@@ -1555,20 +1570,20 @@ async function main() {
       logger.info(`Processing account ${account_id} with optimized batches (archive_upload_id=${archiveUploadId})`)
 
       let queueFirstPending = false
+      const claimId = await claimArchiveUpload(sql, archiveUploadId)
+      if (!claimId) {
+        logger.warn(`Upload is no longer ready_for_commit; skipping (archive_upload_id=${archiveUploadId})`)
+        continue
+      }
+      const heartbeat = startCommitHeartbeat(
+        sql,
+        archiveUploadId,
+        claimId,
+        commitLease,
+        (error) =>
+          logger.warn(`Commit heartbeat failed (archive_upload_id=${archiveUploadId}): ${error}`),
+      )
       try {
-        // Mark as committing
-        const updateResult = await sql`
-          UPDATE public.archive_upload
-          SET upload_phase = 'committing'
-          WHERE id = ${archiveUploadId} AND upload_phase IN ('ready_for_commit')
-          RETURNING id
-        `
-
-        if (!updateResult.length) {
-          logger.error(`Failed to mark as committing for id=${archiveUploadId}`)
-          continue
-        }
-
         const archive = await loadArchiveData(sql, row, archiveUploadId)
         // The archive file is client-written too: it may only write the
         // account that owns the upload row (RLS binds account_id to the JWT).
@@ -1608,18 +1623,22 @@ async function main() {
         // Process archive with optimized compatibility inserts.
         await processSingleArchive(sql, archive, archiveUploadId)
 
-        // Mark as completed
-        const completeResult = await sql`
-          UPDATE public.archive_upload
-          SET upload_phase = 'completed'
-          WHERE id = ${archiveUploadId}
-          RETURNING id
-        `
+        // Mark as completed, only while this run still holds the claim.
+        if (heartbeat.lost) {
+          throw new Error('Commit lease was reclaimed by another run')
+        }
+        const completed = await finishArchiveUpload(
+          sql,
+          archiveUploadId,
+          claimId,
+          'completed',
+        )
         archives_processed++
 
-        if (!completeResult.length) {
-          throw new Error('Failed to mark as completed')
+        if (!completed) {
+          throw new Error('Commit lease was lost before the upload was marked completed')
         }
+        heartbeat.stop()
 
         logger.info(`✅ Successfully completed account ${account_id} with optimized batches (archive_upload_id=${archiveUploadId})`)
 
@@ -1646,14 +1665,23 @@ async function main() {
         logger.error(`❌ Failed processing account ${account_id} (archive_upload_id=${archiveUploadId}): ${error.message}`)
         
         try {
-          await sql`
-            UPDATE public.archive_upload
-            SET upload_phase = ${queueFirstPending ? 'ready_for_commit' : 'failed'}
-            WHERE id = ${archiveUploadId}
-          `
+          const nextPhase = queueFirstPending ? 'ready_for_commit' : 'failed'
+          const recorded = await finishArchiveUpload(
+            sql,
+            archiveUploadId,
+            claimId,
+            nextPhase,
+          )
+          if (!recorded) {
+            logger.warn(
+              `Commit lease no longer held; leaving the upload to its current owner (archive_upload_id=${archiveUploadId})`,
+            )
+          }
         } catch (statusError) {
           logger.error(`Failed to update status to failed for id=${archiveUploadId}: ${statusError}`)
         }
+      } finally {
+        heartbeat.stop()
       }
     }
 

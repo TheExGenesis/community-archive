@@ -136,14 +136,14 @@ isOneToOne: false
                   ]
                 },"archive_upload": {
                   Row: {
-                    "account_id": string,"archive_at": string,"created_at": string | null,"end_date": string | null,"id": number,"keep_private": boolean | null,"start_date": string | null,"storage_path": string | null,"storage_sha256": string | null,"upload_likes": boolean | null,"upload_phase": Database["public"]['Enums']["upload_phase_enum"] | null,"username": string | null
+                    "account_id": string,"archive_at": string,"commit_attempts": number,"commit_claim_id": string | null,"commit_heartbeat_at": string | null,"created_at": string | null,"end_date": string | null,"id": number,"keep_private": boolean | null,"start_date": string | null,"storage_path": string | null,"storage_sha256": string | null,"upload_likes": boolean | null,"upload_phase": Database["public"]['Enums']["upload_phase_enum"] | null,"username": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "account_id": string,"archive_at": string,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
+                    "account_id": string,"archive_at": string,"commit_attempts"?: number,"commit_claim_id"?: string | null,"commit_heartbeat_at"?: string | null,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
                   }
                   Update: {
-                    "account_id"?: string,"archive_at"?: string,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
+                    "account_id"?: string,"archive_at"?: string,"commit_attempts"?: number,"commit_claim_id"?: string | null,"commit_heartbeat_at"?: string | null,"created_at"?: string | null,"end_date"?: string | null,"id"?: never,"keep_private"?: boolean | null,"start_date"?: string | null,"storage_path"?: string | null,"storage_sha256"?: string | null,"upload_likes"?: boolean | null,"upload_phase"?: Database["public"]['Enums']["upload_phase_enum"] | null,"username"?: string | null
                   }
                   Relationships: [
                     {
@@ -744,6 +744,20 @@ isOneToOne: true
                   }
                   Update: {
                     "created_at"?: string,"id"?: string,"strand_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"trend_stories": {
+                  Row: {
+                    "bullets": NonNullable<Json>,"generated_at": string,"id": string,"label": string,"lane": string,"model": string | null,"position": number,"slug": string,"stats": NonNullable<Json>,"summary": string,"terms": (string)[],"title": string,"tooltip": string,"trend_date": string,"tweets": NonNullable<Json>,"window_since": string,"window_until": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bullets"?: NonNullable<Json>,"generated_at"?: string,"id"?: string,"label": string,"lane": string,"model"?: string | null,"position": number,"slug": string,"stats"?: NonNullable<Json>,"summary": string,"terms": (string)[],"title": string,"tooltip": string,"trend_date": string,"tweets"?: NonNullable<Json>,"window_since": string,"window_until": string
+                  }
+                  Update: {
+                    "bullets"?: NonNullable<Json>,"generated_at"?: string,"id"?: string,"label"?: string,"lane"?: string,"model"?: string | null,"position"?: number,"slug"?: string,"stats"?: NonNullable<Json>,"summary"?: string,"terms"?: (string)[],"title"?: string,"tooltip"?: string,"trend_date"?: string,"tweets"?: NonNullable<Json>,"window_since"?: string,"window_until"?: string
                   }
                   Relationships: [
                     

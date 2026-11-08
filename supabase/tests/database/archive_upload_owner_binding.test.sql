@@ -35,7 +35,7 @@ SELECT setval(
 -- A row written before the owner renamed their handle. Existing data is never
 -- re-validated.
 INSERT INTO public.archive_upload (account_id, username, archive_at, upload_phase)
-VALUES ('990000000000000501', 'OldHandle', '2020-01-01T00:00:00Z', 'completed');
+VALUES ('990000000000000501', 'OldHandle', '2020-01-01T00:00:00Z', 'uploading');
 
 SET LOCAL request.jwt.claims TO '{"sub":"00000000-0000-4000-8000-000000000501","role":"authenticated","app_metadata":{"provider":"twitter","provider_id":"990000000000000501","user_name":"OwnerTw"}}';
 SET LOCAL ROLE authenticated;
@@ -94,7 +94,7 @@ SELECT lives_ok(
 );
 
 SELECT lives_ok(
-  $$ UPDATE public.archive_upload SET upload_phase = 'failed'
+  $$ UPDATE public.archive_upload SET upload_likes = false
      WHERE account_id = '990000000000000501' AND username = 'OldHandle' $$,
   'an update that keeps a pre-rename username is not re-validated'
 );

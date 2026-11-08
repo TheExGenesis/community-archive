@@ -123,6 +123,10 @@ No ClickHouse access is needed.
 - Each automated attempt is one row with workflow ID `systemd:weekly:<monday>`.
   A failed or interrupted attempt stays as a `failed`/`running` row and stops
   later retries, so no model call repeats implicitly.
+- A model call that runs past its 240-second limit (the limit covers the whole
+  response body) is retried once in the same run with `low` reasoning and a
+  480-second limit, logged as `weekly model call timed out; retrying…`. The
+  unit allows 30 minutes for this.
 - Health: `public.community_archive_monitoring_weekly_digest()` (aggregate only)
   feeds `community_archive_weekly_digest_healthy`; the edition is due by Monday
   12:00 UTC.

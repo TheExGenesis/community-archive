@@ -3,6 +3,7 @@ import { POST as subscribe } from '@/app/api/digest/email/subscribe/route'
 import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
 import {
   getSubscriptionForAccount,
+  setListEnabled,
   unsubscribe,
   upsertSubscription,
 } from './emailSubscriptions'
@@ -13,6 +14,7 @@ jest.mock('@/lib/authenticatedAccount', () => ({
 jest.mock('./emailSubscriptions', () => ({
   ...jest.requireActual('./emailSubscriptions'),
   getSubscriptionForAccount: jest.fn(),
+  setListEnabled: jest.fn(),
   unsubscribe: jest.fn(),
   upsertSubscription: jest.fn(),
 }))
@@ -24,6 +26,8 @@ const subscription = {
   accountId: '123',
   confirmedAt: '2026-09-15T10:00:00Z',
   unsubscribedAt: null,
+  daily: true,
+  weekly: false,
 }
 const request = (body: unknown) =>
   new Request('http://localhost/api/digest/email/settings', {
@@ -47,7 +51,45 @@ test('returns private, uncached status with a masked email and no unsubscribe to
     id: subscription.id,
     status: 'subscribed',
     email: 're••••@example.com',
+    daily: true,
+    weekly: false,
   })
+})
+
+test('turns one list on for the account subscription and reports both lists', async () => {
+  jest
+    .mocked(setListEnabled)
+    .mockResolvedValueOnce({ ...subscription, weekly: true })
+  const body = await (
+    await POST(request({ action: 'set', list: 'weekly', enabled: true }))
+  ).json()
+  expect(setListEnabled).toHaveBeenCalledWith(subscription, 'weekly', true)
+  expect(body).toMatchObject({
+    status: 'subscribed',
+    daily: true,
+    weekly: true,
+  })
+  expect(unsubscribe).not.toHaveBeenCalled()
+})
+
+test.each([
+  { action: 'set', list: 'monthly', enabled: true },
+  { action: 'set', list: 'weekly' },
+])('rejects a malformed list change %p', async (body) => {
+  expect((await POST(request(body))).status).toBe(400)
+  expect(setListEnabled).not.toHaveBeenCalled()
+})
+
+test('subscribes to the weekly list when asked', async () => {
+  await subscribe(request({ email: subscription.email, list: 'weekly' }))
+  expect(upsertSubscription).toHaveBeenCalledWith(
+    subscription.email,
+    '123',
+    'weekly',
+  )
+  expect(
+    (await subscribe(request({ email: subscription.email, list: 'x' }))).status,
+  ).toBe(400)
 })
 
 test.each([
@@ -116,6 +158,7 @@ test.each([null, '456', '123'])(
     expect(upsertSubscription).toHaveBeenCalledWith(
       subscription.email,
       accountId,
+      'daily',
     )
     expect(body.subscriptionId).toBe(
       accountId === '123' ? subscription.id : null,

@@ -354,14 +354,14 @@ isOneToOne: false
                   ]
                 },"digest_email_subscriptions": {
                   Row: {
-                    "account_id": string | null,"confirmed_at": string | null,"created_at": string,"email": string,"id": string,"token": string,"unsubscribed_at": string | null,"updated_at": string
+                    "account_id": string | null,"confirmed_at": string | null,"created_at": string,"daily_enabled": boolean,"email": string,"id": string,"token": string,"unsubscribed_at": string | null,"updated_at": string,"weekly_enabled": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "account_id"?: string | null,"confirmed_at"?: string | null,"created_at"?: string,"email": string,"id"?: string,"token"?: string,"unsubscribed_at"?: string | null,"updated_at"?: string
+                    "account_id"?: string | null,"confirmed_at"?: string | null,"created_at"?: string,"daily_enabled"?: boolean,"email": string,"id"?: string,"token"?: string,"unsubscribed_at"?: string | null,"updated_at"?: string,"weekly_enabled"?: boolean
                   }
                   Update: {
-                    "account_id"?: string | null,"confirmed_at"?: string | null,"created_at"?: string,"email"?: string,"id"?: string,"token"?: string,"unsubscribed_at"?: string | null,"updated_at"?: string
+                    "account_id"?: string | null,"confirmed_at"?: string | null,"created_at"?: string,"daily_enabled"?: boolean,"email"?: string,"id"?: string,"token"?: string,"unsubscribed_at"?: string | null,"updated_at"?: string,"weekly_enabled"?: boolean
                   }
                   Relationships: [
                     
@@ -439,6 +439,32 @@ isOneToOne: false
                   }
                   Relationships: [
                     
+                  ]
+                },"digest_weekly_email_sends": {
+                  Row: {
+                    "edition_id": string,"message_id": string | null,"sent_at": string,"subscription_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "edition_id": string,"message_id"?: string | null,"sent_at"?: string,"subscription_id": string
+                  }
+                  Update: {
+                    "edition_id"?: string,"message_id"?: string | null,"sent_at"?: string,"subscription_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "digest_weekly_email_sends_edition_id_fkey"
+      columns: ["edition_id"]
+isOneToOne: false
+      referencedRelation: "digest_weekly_editions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "digest_weekly_email_sends_subscription_id_fkey"
+      columns: ["subscription_id"]
+isOneToOne: false
+      referencedRelation: "digest_email_subscriptions"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"directory_hidden_users": {
                   Row: {

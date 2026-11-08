@@ -12,7 +12,8 @@ User=root
 WorkingDirectory=/opt/community-archive-nightly-digest
 EnvironmentFile=/etc/community-archive-nightly-digest.env
 ExecStart=/root/.bun/bin/bun /opt/community-archive-nightly-digest/services/nightly-digest/publishWeekly.ts
-TimeoutStartSec=15min
+# Two model calls, each of which may retry once with a longer limit.
+TimeoutStartSec=30min
 # A retry never repeats a model call: a published week skips, and an existing
 # automated attempt (failed or interrupted) stops the job for operator recovery.
 Restart=on-failure

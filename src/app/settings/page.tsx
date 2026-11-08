@@ -77,19 +77,19 @@ export default async function SettingsPage() {
               profile:all_profile(avatar_media_url)
             )
           `,
-            )
-            .eq('account_id', twitterAccountId)
-            .order('created_at', { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
-      twitterAccountId
-        ? getPublicProfileSettings(twitterAccountId, { readSource: 'app' })
-        : Promise.resolve({ downloadArchiveVisible: true }),
-      twitterAccountId
-        ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
-        : Promise.resolve(null),
-      // Only members who may ask see Ask the archive's setting.
-      ownKeysEnabled() ? getAgentSearchAccess() : Promise.resolve(null),
-    ])
+          )
+          .eq('account_id', twitterAccountId)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    twitterAccountId
+      ? getPublicProfileSettings(twitterAccountId, { readSource: 'app' })
+      : Promise.resolve({ downloadArchiveVisible: true }),
+    twitterAccountId
+      ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
+      : Promise.resolve(null),
+    // Only members who may ask see Ask the archive's setting.
+    ownKeysEnabled() ? getAgentSearchAccess() : Promise.resolve(null),
+  ])
   const askLimits = askAccess?.ok ? agentSearchDailyLimits() : null
 
   const digestEmailStatus: DigestEmailStatus = !digestSubscription
@@ -107,6 +107,12 @@ export default async function SettingsPage() {
             digestSubscription
               ? maskSubscriptionEmail(digestSubscription.email)
               : null
+          }
+          initialDaily={
+            digestEmailStatus === 'subscribed' && digestSubscription!.daily
+          }
+          initialWeekly={
+            digestEmailStatus === 'subscribed' && digestSubscription!.weekly
           }
         />
         {askLimits && (

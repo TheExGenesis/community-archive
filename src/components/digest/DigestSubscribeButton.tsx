@@ -13,6 +13,27 @@ type Phase =
   | 'unsubscribing'
 type ManagedSubscription = { id: string; email: string }
 type Placement = 'compact' | 'home' | 'digest'
+type List = 'daily' | 'weekly'
+
+const LIST_COPY: Record<
+  List,
+  { name: string; label: string; heading: string; body: string; hint: string }
+> = {
+  daily: {
+    name: 'Daily Digest',
+    label: 'daily digest',
+    heading: 'Get the daily digest in your inbox',
+    body: 'The stories worth catching up on, delivered each day.',
+    hint: 'Daily digest in your inbox. Unsubscribe anytime.',
+  },
+  weekly: {
+    name: 'Week in Review',
+    label: 'Week in Review',
+    heading: 'Get the Week in Review in your inbox',
+    body: "The week's top stories, every Monday.",
+    hint: 'One email each Monday. Unsubscribe anytime.',
+  },
+}
 
 // Unsubscribe redirects land on /digest?email=<status>.
 const REDIRECT_MESSAGES: Record<string, string> = {
@@ -24,7 +45,14 @@ const REDIRECT_MESSAGES: Record<string, string> = {
 const pillClasses =
   'rounded-full bg-brand px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:text-brand-foreground dark:focus-visible:ring-offset-[#111114]'
 
-function SubscribeControl({ placement }: { placement: Placement }) {
+function SubscribeControl({
+  placement,
+  list,
+}: {
+  placement: Placement
+  list: List
+}) {
+  const copy = LIST_COPY[list]
   // Nullable outside the app router (e.g. bare jsdom renders).
   const searchParams = useSearchParams()
   const redirectMessage = REDIRECT_MESSAGES[searchParams?.get('email') ?? '']
@@ -51,8 +79,12 @@ function SubscribeControl({ placement }: { placement: Placement }) {
         })
         const body = response.ok ? await response.json() : null
         if (!active) return
+        // Older responses have no per-list flags; they describe the daily list.
+        const onList =
+          list === 'weekly' ? body?.weekly === true : body?.daily !== false
         if (
           body?.status === 'subscribed' &&
+          onList &&
           typeof body.id === 'string' &&
           typeof body.email === 'string'
         ) {
@@ -68,7 +100,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
     return () => {
       active = false
     }
-  }, [startsWithEmailField])
+  }, [startsWithEmailField, list])
 
   useEffect(() => {
     if (phase === 'open' && focusOnOpen.current) {
@@ -85,7 +117,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
       const response = await fetch('/api/digest/email/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, list }),
       })
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
@@ -114,7 +146,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
     if (!subscription || phase === 'unsubscribing') return
     if (
       !window.confirm(
-        `Are you sure you want to unsubscribe ${subscription.email} from the Daily Digest?`,
+        `Are you sure you want to unsubscribe ${subscription.email} from the ${copy.name}?`,
       )
     )
       return
@@ -124,13 +156,25 @@ function SubscribeControl({ placement }: { placement: Placement }) {
       const response = await fetch('/api/digest/email/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'unsubscribe',
-          subscriptionId: subscription.id,
-        }),
+        // Leaving one list keeps the other; the daily control keeps its
+        // original whole-subscription unsubscribe.
+        body: JSON.stringify(
+          list === 'weekly'
+            ? {
+                action: 'set',
+                list: 'weekly',
+                enabled: false,
+                subscriptionId: subscription.id,
+              }
+            : { action: 'unsubscribe', subscriptionId: subscription.id },
+        ),
       })
       const body = await response.json().catch(() => null)
-      if (!response.ok || body?.status !== 'unsubscribed') {
+      const left =
+        list === 'weekly'
+          ? body?.weekly === false || body?.status === 'unsubscribed'
+          : body?.status === 'unsubscribed'
+      if (!response.ok || !left) {
         throw new Error(
           response.status === 401
             ? 'Please sign in again to unsubscribe.'
@@ -188,10 +232,10 @@ function SubscribeControl({ placement }: { placement: Placement }) {
   const ctaCopy = isDigestCta ? (
     <div>
       <p className="text-xl font-semibold text-zinc-950 dark:text-white sm:text-2xl">
-        Get the daily digest in your inbox
+        {copy.heading}
       </p>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-        The stories worth catching up on, delivered each day.
+        {copy.body}
       </p>
     </div>
   ) : null
@@ -227,7 +271,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
     )
     return isDigestCta ? (
       <section
-        aria-label="Subscribe to the daily digest"
+        aria-label={`Subscribe to the ${copy.label}`}
         className={ctaClasses}
       >
         {ctaCopy}
@@ -262,7 +306,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
               setPhase('idle')
           }}
           placeholder="you@example.com"
-          aria-label="Email address for the daily digest"
+          aria-label={`Email address for the ${copy.label}`}
           className={`min-w-0 flex-1 bg-transparent text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-100 ${
             isHome || isDigestCta
               ? 'w-32 text-sm sm:w-44'
@@ -285,12 +329,15 @@ function SubscribeControl({ placement }: { placement: Placement }) {
       <span
         className={`${isHome || isDigestCta ? 'mt-1 block' : 'absolute right-0 top-full mt-1 whitespace-nowrap pr-2'} text-[11px] text-zinc-500 dark:text-zinc-400`}
       >
-        {error ?? 'Daily digest in your inbox. Unsubscribe anytime.'}
+        {error ?? copy.hint}
       </span>
     </div>
   )
   return isDigestCta ? (
-    <section aria-label="Subscribe to the daily digest" className={ctaClasses}>
+    <section
+      aria-label={`Subscribe to the ${copy.label}`}
+      className={ctaClasses}
+    >
       {ctaCopy}
       {form}
     </section>
@@ -301,8 +348,11 @@ function SubscribeControl({ placement }: { placement: Placement }) {
 
 export function DigestSubscribeButton({
   placement = 'compact',
+  list = 'daily',
 }: {
   placement?: Placement
+  /** Which email list this control subscribes to. */
+  list?: List
 }) {
   return (
     // useSearchParams needs a Suspense boundary on statically rendered pages.
@@ -313,7 +363,7 @@ export function DigestSubscribeButton({
         )
       }
     >
-      <SubscribeControl placement={placement} />
+      <SubscribeControl placement={placement} list={list} />
     </Suspense>
   )
 }

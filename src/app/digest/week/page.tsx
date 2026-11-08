@@ -5,12 +5,11 @@ import {
   WeeklyBulletin,
   WeeklyDiscussion,
 } from '@/components/digest/WeeklyEngagement'
+import { WeeklyProfiles } from '@/components/digest/WeeklyProfiles'
 import {
   getPublishedWeeklyDigest,
   listPublishedWeeks,
-  loadWeeklyProfiles,
-  loadWeeklyRefPreviews,
-  weekPageHandles,
+  getCachedWeeklyRefPreviews,
 } from '@/lib/digest/weeklyData'
 
 export const revalidate = 300
@@ -27,16 +26,13 @@ export default async function LatestWeeklyDigestPage() {
     listPublishedWeeks(),
   ])
   if (!edition) notFound()
-  const [previews, profiles] = await Promise.all([
-    loadWeeklyRefPreviews(edition.content),
-    loadWeeklyProfiles(edition.content, weekPageHandles(edition.content)),
-  ])
+  const previews = await getCachedWeeklyRefPreviews(edition.weekStart)
   return (
     <WeeklyDigestView
       edition={edition}
       weeks={weeks}
       previews={previews}
-      profiles={profiles}
+      profiles={<WeeklyProfiles weekStart={edition.weekStart} />}
       bulletin={<WeeklyBulletin edition={edition} />}
       comments={<WeeklyDiscussion edition={edition} />}
     />

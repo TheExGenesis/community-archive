@@ -8,7 +8,8 @@ jest.mock('@/utils/supabase', () => ({
 const query = {
   select: jest.fn().mockReturnThis(),
   not: jest.fn().mockReturnThis(),
-  is: jest.fn(),
+  is: jest.fn().mockReturnThis(),
+  eq: jest.fn(),
 }
 
 beforeEach(() => {
@@ -21,7 +22,7 @@ beforeEach(() => {
 })
 
 test('returns an exact active count beyond the row cap without retrieving private rows', async () => {
-  query.is.mockResolvedValueOnce({ data: null, count: 1234, error: null })
+  query.eq.mockResolvedValueOnce({ data: null, count: 1234, error: null })
   expect(await getActiveDigestSubscriberCount()).toBe(1234)
   expect(query.select).toHaveBeenCalledWith('id', {
     count: 'exact',
@@ -29,10 +30,17 @@ test('returns an exact active count beyond the row cap without retrieving privat
   })
   expect(query.not).toHaveBeenCalledWith('confirmed_at', 'is', null)
   expect(query.is).toHaveBeenCalledWith('unsubscribed_at', null)
+  expect(query.eq).toHaveBeenCalledWith('daily_enabled', true)
+})
+
+test('counts the weekly list separately', async () => {
+  query.eq.mockResolvedValueOnce({ count: 7, error: null })
+  expect(await getActiveDigestSubscriberCount('weekly')).toBe(7)
+  expect(query.eq).toHaveBeenCalledWith('weekly_enabled', true)
 })
 
 test('keeps a genuine zero count', async () => {
-  query.is.mockResolvedValueOnce({ count: 0, error: null })
+  query.eq.mockResolvedValueOnce({ count: 0, error: null })
   expect(await getActiveDigestSubscriberCount()).toBe(0)
 })
 
@@ -40,6 +48,6 @@ test.each([
   { count: null, error: null },
   { count: null, error: new Error('Unavailable') },
 ])('rejects unavailable counts rather than returning zero', async (result) => {
-  query.is.mockResolvedValueOnce(result)
+  query.eq.mockResolvedValueOnce(result)
   await expect(getActiveDigestSubscriberCount()).rejects.toThrow()
 })

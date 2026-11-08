@@ -247,7 +247,7 @@ WRITING
 - overview: one paragraph (two to four sentences) about the story as a whole: what happened across the week, who drove it, and why it mattered to the community. When the story bundles several daily stories, weave in what connects them unless it is self-evident. No bullet lists.
 - segments: walk the reader through the story's tweets in a sensible order (usually chronological). Each segment is one or two short sentences of commentary (context, what the tweet adds, how people reacted) followed by the ids of the one to four tweets it introduces. Choose tweets only from the "tweets" of the daily stories this weekly story cites, and use each tweet at most once. Do not restate what the tweet says; say why it matters or what it answered. Any tweet you skip is still shown after the segments, so prefer a few strong segments over covering everything.
 - trend_terms: up to ${WEEKLY_MAX_TREND_TERMS} single words or short phrases (lower case, as people would actually type them in tweets) whose daily usage would show this story in the archive, such as a product, person, place or coined phrase central to it. Prefer specific terms ("sora", "polymarket") over generic ones ("ai", "model"). Leave empty when nothing distinctive fits.
-- Dek: one sentence under the week's date that gives the flavour of the week, the way a magazine standfirst does. It sets a mood or names the thread running through the week; it is not a list or a summary, and it should not try to mention every story. At most ${WEEKLY_DEK_MAX_CHARS} characters, no @handles, no colon-separated lists. Good shape: "A week of machines doing maths, a captain's farewell, and everyone reading the same neuron." Bad shape: "OpenAI's ETH claim, Qwen neurons, Picard, Binance, and elections."
+- Dek: one sentence under the week's date, roughly 120 to ${WEEKLY_DEK_MAX_CHARS} characters,, that goes straight into the week's biggest moments. Build it from the tweets' own words: quote short phrases exactly, in quotation marks, and say plainly whose they are or what they were about. Do not open with "A week", "This week", "The week" or any framing about the week itself; start with the first thing that happened or was said. No metaphors, wordplay, mood-setting or invented imagery ("sprang leaks", "the captain's final bow"); no @handles; no colon-separated lists. Good shape (invented example): "A lab said its model 'solved the conjecture outright'; the city council voted to 'pause every new data center'; a bakery's sourdough post 'broke the timeline.'" Bad shape: "A week of machines solving puzzles and bread taking over."
 - Executive summary: exactly three bullet sentences a reader can understand without opening anything. Aim for about 150 characters each and never exceed 200. Lead each bullet with one story; add a second only if it fits in a short clause. Prefer naming fewer stories clearly over cramming. No compressed noun piles, no unexplained jargon or product names without saying what they are.
 - "also_notable": up to 6 one-line mentions of daily stories that did not make the weekly cut but are worth a click. Each line must be understandable on its own.
 - Each daily ref may appear in at most one weekly story, and not also in also_notable.
@@ -471,7 +471,12 @@ export function assembleWeeklyDigestContent(input: {
   if (!dek) throw new Error('dek must be one sentence')
   if (dek.length > WEEKLY_DEK_MAX_CHARS) {
     throw new Error(
-      `dek is ${dek.length} characters; rewrite it as one evocative sentence of at most ${WEEKLY_DEK_MAX_CHARS} characters that does not list the stories`,
+      `dek is ${dek.length} characters; rewrite it as one sentence of at most ${WEEKLY_DEK_MAX_CHARS} characters built from short quoted phrases`,
+    )
+  }
+  if (/^(a|this|the|one)\s+week\b/i.test(dek)) {
+    throw new Error(
+      'dek opens with framing about the week; start with the first thing that happened or was said, quoting the tweets',
     )
   }
   const executiveSummary = requireStrings(

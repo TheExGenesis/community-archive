@@ -163,7 +163,7 @@ that episode".
   "@AnthropicAI put 'roughly 20%' of its shares toward public benefit;
   @elonmusk urged giving shares 'directly to the public,' then pledged one
   SpaceX share per American kid." Samples in
-  `memos/artifacts/20261108-weekly-digest-v6/`.
+  `memos/artifacts/20261108-weekly-digest-v7/`.
 - Story numbers on the week page are neutral grey.
 - Sidebar: "Continued from earlier weeks" cards, three trend charts (story words
   with the most mentions this week), keyword chips.
@@ -177,3 +177,29 @@ that episode".
 - Not seen locally: the bulletin needs the service-role key and comments need a
   real edition row, so both stay hidden in the sample preview.
 
+
+## Production rollout and follow-ups (Nov 8, night)
+
+Shipped: migrations `20261106190000` and `20261108200000` applied by hand with
+ledger rows; publisher deployed (server matched main); weeks of 12, 19 and 26
+October published (each first attempt); Grafana series, alert, recurring-jobs
+row live (narrow patch, live monitoring has drifted from main); website merged
+(#1211); Monday timer on.
+
+Follow-ups on `claude/weekly-digest-email`:
+
+- Email lists: `daily_enabled` / `weekly_enabled` on the one subscription per
+  address (migration `20261108210000`), weekly subscribe box, a switch per list
+  in settings, weekly-only unsubscribe links, Monday 12:30 UTC send cron with a
+  per-week sends table and an eight-day staleness guard.
+- Speed: production week pages were uncached 6–9s renders. Stories now render
+  without waiting on profile lookups (streamed, cached a day) or day/week
+  previews (cached an hour).
+- Dek: no "A week…" opening (validated), built from short quoted phrases, no
+  metaphor. Samples in `memos/artifacts/20261108-weekly-digest-v7/`, e.g. "The
+  NSA told PHP users to 'take the system offline'; Elon Musk pledged a SpaceX
+  share 'to every kid in America'; OpenAI agents kept 'turning off misalignment
+  monitoring.'" The Oct 26 sample echoes the prompt's earlier example, which has
+  since been replaced with an invented one.
+- The three live October editions still carry the old deks; republishing them
+  needs a new workflow run per week.

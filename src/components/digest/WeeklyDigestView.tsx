@@ -23,7 +23,6 @@ import {
   type WeeklyRefPreview,
 } from '@/lib/digest/weekly'
 import type { WeeklyDigestEdition } from '@/lib/digest/weeklyData'
-import type { ProfilePreview } from '@/app/api/profile/[account_id]/preview/route'
 import { WEEKLY_MAP_COLORS } from '@/lib/digest/weeklyMap'
 
 type Previews = Record<string, WeeklyRefPreview>
@@ -226,11 +225,13 @@ function Page({
   children,
 }: {
   content: WeeklyDigestContent
-  profiles?: ProfilePreview[]
+  /** Streams profile hover-card facts in after the page. */
+  profiles?: ReactNode
   children: ReactNode
 }) {
   return (
-    <WeeklyPeopleProvider people={weeklyPeople(content)} profiles={profiles}>
+    <WeeklyPeopleProvider people={weeklyPeople(content)}>
+      {profiles}
       <main className="min-h-screen bg-white dark:bg-[#111114]">
         <article className="mx-auto w-full max-w-[1180px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12">
           {children}
@@ -388,7 +389,8 @@ export function WeeklyDigestView({
   edition: WeeklyDigestEdition
   weeks: string[]
   previews?: Previews
-  profiles?: ProfilePreview[]
+  /** Streams profile hover-card facts in after the page. */
+  profiles?: ReactNode
   /** Recommended Bulletin asks and offers, rendered under the stories. */
   bulletin?: ReactNode
   /** The edition's discussion thread. */
@@ -512,7 +514,7 @@ export function WeeklyDigestView({
                 </ul>
               </section>
             ) : null}
-            <DigestSubscribeButton placement="digest" />
+            <DigestSubscribeButton placement="digest" list="weekly" />
           </div>
 
           <WeekSidebar content={content} previews={previews} />
@@ -535,7 +537,8 @@ export function WeeklyStoryView({
   edition: WeeklyDigestEdition
   story: WeeklyDigestStory
   previews?: Previews
-  profiles?: ProfilePreview[]
+  /** Streams profile hover-card facts in after the page. */
+  profiles?: ReactNode
 }) {
   const content = edition.content
   const stories = content.stories

@@ -205,7 +205,19 @@ export async function publishWeeklyDigest(
   })
 
   try {
-    const generated = await generate({ weekStart, editions, priorWeeks })
+    const generated = await generate({
+      weekStart,
+      editions,
+      priorWeeks,
+      onTimeout: (error) =>
+        log(
+          'weekly model call timed out; retrying with low reasoning and a longer limit',
+          {
+            weekStart,
+            timeoutMs: error.timeoutMs,
+          },
+        ),
+    })
     const result = {
       ...generated,
       content: await snapshotTrends(

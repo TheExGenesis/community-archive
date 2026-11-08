@@ -48,7 +48,7 @@ export function TimelineControls({
               disabled={disabled}
               aria-pressed={active}
               onClick={() => onPreset(value)}
-              className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${active ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : `${MUTED} hover:text-foreground`}`}
+              className={`whitespace-nowrap rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${active ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : `${MUTED} hover:text-foreground`}`}
             >
               {label}
             </button>

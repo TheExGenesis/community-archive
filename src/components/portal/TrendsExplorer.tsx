@@ -169,7 +169,7 @@ export default function TrendsExplorer({
 
         <div
           ref={chartRef}
-          className="grid scroll-mt-20 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)] xl:grid-cols-[250px_minmax(0,1fr)_minmax(340px,0.72fr)]"
+          className={`grid scroll-mt-20 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)] ${storyDays.length ? 'xl:grid-cols-[250px_minmax(0,1fr)_minmax(340px,0.72fr)]' : ''}`}
         >
           {storyDays.length ? (
             <div className="min-w-0 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1">

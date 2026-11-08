@@ -17,6 +17,12 @@ import {
 
 export const revalidate = 300
 
+// No weeks are built ahead of time; each is rendered on its first visit and
+// then served from the cache, refreshed every five minutes.
+export async function generateStaticParams() {
+  return []
+}
+
 export async function generateMetadata({
   params,
 }: {

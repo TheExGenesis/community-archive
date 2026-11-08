@@ -13,6 +13,12 @@ import { WeeklyProfiles } from '@/components/digest/WeeklyProfiles'
 
 export const revalidate = 300
 
+// No weeks are built ahead of time; each is rendered on its first visit and
+// then served from the cache, refreshed every five minutes.
+export async function generateStaticParams() {
+  return []
+}
+
 const plain = (text: string) => text.replace(/[*_`[\]]/g, '')
 
 async function load(weekStart: string, slug: string) {

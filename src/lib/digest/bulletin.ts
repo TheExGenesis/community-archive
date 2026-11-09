@@ -163,16 +163,22 @@ export async function loadDigestBulletinItemsForViewer(edition: DigestEdition) {
   return bulletinItemsForViewer(prepareDigestBulletinItems(edition))
 }
 
-/** Bulletin picks for a weekly edition: notices posted during that week. */
-export async function loadWeeklyBulletinItemsForViewer(
+/**
+ * The shared (unpersonalized) picks for a week, so the week page can be
+ * cached for everyone.
+ */
+export async function loadWeeklyBulletinItems(
   weekStart: string,
   weekEnd: string,
-) {
+): Promise<DigestBulletinItem[]> {
   const end = new Date(`${weekEnd}T00:00:00Z`)
   end.setUTCDate(end.getUTCDate() + 1)
-  return bulletinItemsForViewer(
-    prepareBulletinItemsForWindow(`${weekStart}T00:00:00Z`, end.toISOString()),
-  )
+  return (
+    await prepareBulletinItemsForWindow(
+      `${weekStart}T00:00:00Z`,
+      end.toISOString(),
+    )
+  ).itemsForAccount()
 }
 
 async function bulletinItemsForViewer(

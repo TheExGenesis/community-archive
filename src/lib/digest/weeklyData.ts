@@ -132,6 +132,31 @@ export const listPublishedWeeks = (limit = 26): Promise<string[]> =>
     { revalidate: SHARED_READ_SECONDS },
   )()
 
+/**
+ * How many of the newest published weeks each deploy renders ahead of time, so
+ * no reader waits for a cold render after a release. Older weeks still render
+ * on their first visit.
+ */
+export const PREBUILT_WEEKS = 4
+
+/** Route params for the newest published weeks and their stories. */
+export async function prebuiltWeeklyParams(): Promise<
+  { weekStart: string; slugs: string[] }[]
+> {
+  const weeks = await listPublishedWeeks(PREBUILT_WEEKS)
+  const editions = await Promise.all(weeks.map(getPublishedWeeklyDigest))
+  return editions.flatMap((edition) =>
+    edition
+      ? [
+          {
+            weekStart: edition.weekStart,
+            slugs: edition.content.stories.map((story) => story.slug),
+          },
+        ]
+      : [],
+  )
+}
+
 async function readPublishedWeeks(limit: number): Promise<string[]> {
   const { data, error } = await weeklyTable()
     .select('week_start')

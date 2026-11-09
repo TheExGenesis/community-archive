@@ -13,14 +13,16 @@ import {
   getPublishedWeeklyDigest,
   listPublishedWeeks,
   getCachedWeeklyRefPreviews,
+  prebuiltWeeklyParams,
 } from '@/lib/digest/weeklyData'
 
 export const revalidate = 300
 
-// No weeks are built ahead of time; each is rendered on its first visit and
-// then served from the cache, refreshed every five minutes.
+// The newest weeks are rendered during the build; older ones on their first
+// visit. Either way they are then served from the cache, refreshed every five
+// minutes.
 export async function generateStaticParams() {
-  return []
+  return (await prebuiltWeeklyParams()).map(({ weekStart }) => ({ weekStart }))
 }
 
 export async function generateMetadata({

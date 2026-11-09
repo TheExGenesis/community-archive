@@ -8,15 +8,19 @@ import {
 import {
   getPublishedWeeklyDigest,
   getCachedWeeklyRefPreviews,
+  prebuiltWeeklyParams,
 } from '@/lib/digest/weeklyData'
 import { WeeklyProfiles } from '@/components/digest/WeeklyProfiles'
 
 export const revalidate = 300
 
-// No weeks are built ahead of time; each is rendered on its first visit and
-// then served from the cache, refreshed every five minutes.
+// Stories of the newest weeks are rendered during the build; the rest on their
+// first visit. Either way they are then served from the cache, refreshed every
+// five minutes.
 export async function generateStaticParams() {
-  return []
+  return (await prebuiltWeeklyParams()).flatMap(({ weekStart, slugs }) =>
+    slugs.map((slug) => ({ weekStart, slug })),
+  )
 }
 
 const plain = (text: string) => text.replace(/[*_`[\]]/g, '')

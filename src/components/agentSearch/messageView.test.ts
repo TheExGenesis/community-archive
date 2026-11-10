@@ -23,6 +23,7 @@ import {
   logSummary,
   messageOutcome,
   namedBeforeChip,
+  commandKind,
   describeCommand,
   progressLine,
   progressLines,
@@ -963,6 +964,29 @@ describe('workspace steps and the folded log line', () => {
     ).toBe('Looking through the results')
   })
 
+  test('names timeline, expand and par steps, with the icon of what par runs', () => {
+    expect(describeCommand('timeline @maskys_ --limit 1000 > m.jsonl')).toBe(
+      "Reading @maskys_'s tweets",
+    )
+    expect(commandKind('timeline maskys_')).toBe('people')
+    expect(describeCommand('expand c1.jsonl > e1.jsonl')).toBe(
+      'Reading the conversations around the best matches',
+    )
+    expect(commandKind('expand c1.jsonl')).toBe('thread')
+    expect(
+      describeCommand(
+        `par 'semantic "{} about notion" > m_{}.jsonl' complaints warnings jokes`,
+      ),
+    ).toBe('Searching by meaning “complaints about notion”, and 2 more at once')
+    expect(
+      describeCommand(`par 'timeline @a > a.jsonl' 'search notion > s.jsonl'`),
+    ).toBe("Reading @a's tweets, and 1 more at once")
+    expect(commandKind(`par 'search {} > s_{}.jsonl' rust zig`)).toBe('search')
+    expect(describeCommand(`par 'echo one' 'echo two'`)).toBe(
+      'Looking through the results',
+    )
+  })
+
   test('sums up steps, what the answer rests on, and what else was found', () => {
     const search = toolPart(
       'search_tweets',
@@ -1125,7 +1149,7 @@ describe('opening a step in archive search', () => {
   test('author, reply, date and sort options become search page filters', () => {
     expect(
       bashSearchHref(
-        'search "great movie" --from @patio11 --reply-to visakanv --since 2023-01-01 --until=2023-12-31 --sort likes',
+        'search "great movie" --phrase --from @patio11 --reply-to visakanv --since 2023-01-01 --until=2023-12-31 --sort likes',
       ),
     ).toBe(
       '/search?q=great+movie&fromUser=patio11&replyToUser=visakanv&sinceDate=2023-01-01&untilDate=2023-12-31&sort=likes',
@@ -1151,6 +1175,17 @@ describe('opening a step in archive search', () => {
       bashSearchHref('score s1.jsonl "Is this about Singapore?" > c1.jsonl'),
     ).toBeNull()
     expect(bashSearchHref('people visakanv')).toBeNull()
+  })
+
+  test('several words link only as a phrase, which is what the search page runs', () => {
+    expect(bashSearchHref('search "community archive" > s1.jsonl')).toBeNull()
+    expect(bashSearchHref('search community archive --all')).toBeNull()
+    expect(bashSearchHref('search "community archive" --phrase')).toBe(
+      '/search?q=community+archive',
+    )
+    expect(bashSearchHref('search archive --phrase')).toBe('/search?q=archive')
+    expect(bashSearchHref('search notion --or @NotionHQ')).toBeNull()
+    expect(bashSearchHref('search notion --with slow,offline')).toBeNull()
   })
 
   test('a malformed date gives no link rather than a wrong one', () => {

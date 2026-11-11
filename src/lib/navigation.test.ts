@@ -65,6 +65,7 @@ describe('site navigation', () => {
         ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
         ['Social Graph', '/social-graph'],
+        ['Spread Explorer', '/admin/spread-explorer'],
       ],
     })
     expect(nav.slice(0, 2)).toEqual([
@@ -181,4 +182,18 @@ test('Ask the archive is listed only while visible to the viewer', () => {
     )
   expect(hrefs(false)).not.toContain('/search/ask')
   expect(hrefs(true)).toContain('/search/ask')
+})
+
+test('the Spread Explorer is listed only for admins and the local admin preview', () => {
+  const tools = getPrimaryNav()
+    .filter(isNavGroup)
+    .find((group) => group.label === 'Tools')!
+  const shows = (audience: Parameters<typeof visibleNavItems>[1]) =>
+    visibleNavItems(tools, audience).some(
+      (item) => item.href === '/admin/spread-explorer',
+    )
+  expect(shows({ askVisible: true })).toBe(false)
+  expect(shows({ askVisible: true, localPreview: 'signed-out' })).toBe(false)
+  expect(shows({ askVisible: false, isAdmin: true })).toBe(true)
+  expect(shows({ askVisible: false, localPreview: 'admin' })).toBe(true)
 })

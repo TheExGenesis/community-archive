@@ -8,6 +8,30 @@
   scripts, and CI workflows as authoritative. Dated notes and audits are not
   current configuration.
 
+## Product Goals
+
+- Optimize for four outcomes, in this order when they conflict: members
+  control their data; the website is fast and gentle on our machines;
+  legitimate AI agents get the export and the keyed API; page-by-page
+  scraping costs us nothing.
+- The website is a cached showcase; the daily export and API v1 are the data
+  access paths. A signed-out request must be answerable from a cached route
+  (`/guest/...` or static). Do not add a signed-out page, API route or image
+  path that renders per request or queries ClickHouse or Supabase per request.
+- Set a guest cache window from how long an opted-out account may stay
+  visible, not from cost alone, and say so in a comment beside it.
+- Prefer making automated traffic cheap over identifying it. Do not add
+  per-IP or in-memory rate limiting in middleware; it does not hold across
+  instances or against rotating addresses.
+- Keep `public/llms.txt`, `robots.ts`, `/docs` and the OpenAPI document in
+  agreement in the same change. When a public page has an export or API
+  equivalent, say where it is.
+- Agents have standing permission from the operator (2026-11-10) to simplify
+  and redesign toward these goals while keeping existing functionality; state
+  the trade-off in the pull request. The safety, migration and validation
+  rules in this file still apply. The cross-repository wish list is in the
+  control-panel repository, `memos/20261110-1923-stewardship-roadmap.md`.
+
 ## Data Authority And Privacy
 
 - Supabase/PostgreSQL is authoritative for authentication, membership, consent,

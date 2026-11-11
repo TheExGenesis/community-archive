@@ -8,6 +8,8 @@ import { startHomepageData } from '@/lib/portal/data'
 // ClickHouse snapshot; subsequent homepage requests reuse the shared Data Cache.
 // Force request-time rendering so the portal's component fallbacks do not catch
 // Next's static-render probe and freeze build-time fallback data into this route.
+// Visitors without a session cookie never reach this route: the middleware
+// serves them the cached `/guest/home` render of the same component.
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 

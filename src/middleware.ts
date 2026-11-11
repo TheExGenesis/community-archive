@@ -780,6 +780,20 @@ export async function middleware(request: NextRequest) {
     response = rewriteToGuestView(request, '/guest/trends', response)
   }
 
+  // The signed-out homepage is the same for everyone and is the most
+  // requested page, so visitors without a session cookie share the cached
+  // guest render. A session cookie, even a stale one, gets the per-viewer
+  // page, which decides the hero actions from the live session.
+  if (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    !hasAuthCookies &&
+    !request.cookies.has('dev_as_member') &&
+    !request.nextUrl.searchParams.has('as') &&
+    pathname === '/'
+  ) {
+    response = rewriteToGuestView(request, '/guest/home', response)
+  }
+
   // ── Stage 6: Security Headers (all responses) ──────────────────────────
   addSecurityHeaders(response)
   if (

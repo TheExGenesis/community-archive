@@ -48,7 +48,15 @@ describe.each([
       for (const method of ['GET', 'HEAD']) {
         const response = await request(path, userAgent, method)
         expect(response.status).toBe(200)
-        expect(response.headers.get('x-middleware-next')).toBe('1')
+        // The homepage is served from the shared guest render; the other
+        // entry points pass straight through.
+        if (path === '/') {
+          expect(response.headers.get('x-middleware-rewrite')).toBe(
+            'https://www.community-archive.org/guest/home',
+          )
+        } else {
+          expect(response.headers.get('x-middleware-next')).toBe('1')
+        }
         expect(response.headers.get('x-content-type-options')).toBe('nosniff')
         expect(response.headers.get('x-robots-tag')).toBeNull()
       }

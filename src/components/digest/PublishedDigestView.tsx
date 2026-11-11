@@ -18,7 +18,8 @@ import { DigestViewCount } from './DigestViewCount'
 import { DigestTopTerms } from './DigestTopTerms'
 import { DigestBulletinCards } from './DigestBulletinCards'
 import { getPublishedWeeklyDigest } from '@/lib/digest/weeklyData'
-import { weekStartFor } from '@/lib/digest/weekly'
+import { CURRENT_WEEK_PATH, weekStartFor } from '@/lib/digest/weekly'
+import { inProgressWeekStart } from '@/lib/digest/currentWeek'
 import {
   loadDigestBulletinItemsForViewer,
   type DigestBulletinItem,
@@ -169,18 +170,27 @@ async function Calendar({
   )
 }
 
-/** Links the week this edition belongs to, or else the latest weekly edition. */
+const weeklyLink =
+  'mt-6 block border-t border-zinc-200 pt-4 text-sm font-semibold text-brand hover:underline dark:border-zinc-800'
+
+/**
+ * Links the week this edition belongs to: its weekly edition, the week so far
+ * while that is still being gathered, or else the latest weekly edition.
+ */
 async function WeeklyLink({ date }: { date: string }) {
-  const weekly =
-    (await getPublishedWeeklyDigest(weekStartFor(date))) ??
-    (await getPublishedWeeklyDigest())
+  const ownWeek = await getPublishedWeeklyDigest(weekStartFor(date))
+  if (!ownWeek && (await inProgressWeekStart()) === weekStartFor(date)) {
+    return (
+      <Link href={CURRENT_WEEK_PATH} className={weeklyLink}>
+        This week so far →
+      </Link>
+    )
+  }
+  const weekly = ownWeek ?? (await getPublishedWeeklyDigest())
   if (!weekly) return null
   const isThisWeek = weekly.weekStart === weekStartFor(date)
   return (
-    <Link
-      href={`/digest/week/${weekly.weekStart}`}
-      className="mt-6 block border-t border-zinc-200 pt-4 text-sm font-semibold text-brand hover:underline dark:border-zinc-800"
-    >
+    <Link href={`/digest/week/${weekly.weekStart}`} className={weeklyLink}>
       {isThisWeek ? 'This week in review →' : 'Latest week in review →'}
     </Link>
   )

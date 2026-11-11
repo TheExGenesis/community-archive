@@ -226,6 +226,33 @@ async function readPublishedEditions(
   )
 }
 
+/**
+ * Published editions dated `from` to `to` inclusive, oldest first. Like every
+ * published read, the pointers are fresh and only the bodies are shared.
+ */
+export async function getPublishedDigestsBetween(
+  from: string,
+  to: string,
+): Promise<DigestEdition[]> {
+  const { data, error } = await createDigestReadClient()
+    .from('digest_editions')
+    .select('id,updated_at')
+    .eq('status', 'published')
+    .gte('digest_date', from)
+    .lte('digest_date', to)
+    .order('digest_date', { ascending: true })
+  if (error) throw new Error('Published digest is temporarily unavailable')
+  const source = publicDataConfig().sourceId
+  const editions = await Promise.all(
+    (data ?? []).map((row) =>
+      cachedPublishedDigest(row.id, row.updated_at, source),
+    ),
+  )
+  return editions.filter(
+    (edition): edition is DigestEdition => edition !== null,
+  )
+}
+
 export async function getPublishedDigestEditions(offset: number, limit = 2) {
   return measureServerRead('digest.editions', () =>
     readPublishedEditions(undefined, offset, limit),

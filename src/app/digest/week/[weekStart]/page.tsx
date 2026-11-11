@@ -8,6 +8,7 @@ import {
   WeeklyBulletin,
   WeeklyDiscussion,
 } from '@/components/digest/WeeklyEngagement'
+import { inProgressWeekStart } from '@/lib/digest/currentWeek'
 import { WeeklyProfiles } from '@/components/digest/WeeklyProfiles'
 import {
   getPublishedWeeklyDigest,
@@ -55,9 +56,10 @@ export default async function WeeklyDigestPage({
   params: Promise<{ weekStart: string }>
 }) {
   const { weekStart } = await params
-  const [edition, weeks] = await Promise.all([
+  const [edition, weeks, inProgress] = await Promise.all([
     getPublishedWeeklyDigest(weekStart),
     listPublishedWeeks(),
+    inProgressWeekStart(),
   ])
   if (!edition) notFound()
   const previews = await getCachedWeeklyRefPreviews(edition.weekStart)
@@ -65,6 +67,7 @@ export default async function WeeklyDigestPage({
     <WeeklyDigestView
       edition={edition}
       weeks={weeks}
+      weekInProgress={inProgress !== null}
       previews={previews}
       profiles={<WeeklyProfiles weekStart={edition.weekStart} />}
       bulletin={<WeeklyBulletin edition={edition} />}

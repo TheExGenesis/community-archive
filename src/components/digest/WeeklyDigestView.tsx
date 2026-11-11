@@ -15,6 +15,7 @@ import {
 import { MUTED, SERIF } from '@/components/portal/styles'
 import { buildSearchHref } from '@/lib/searchParams'
 import {
+  CURRENT_WEEK_PATH,
   dailyPreviewKey,
   weeklyPeople,
   weeklyPreviewKey,
@@ -135,7 +136,15 @@ function ContinuesFrom({
   )
 }
 
-function WeekNav({ weekStart, weeks }: { weekStart: string; weeks: string[] }) {
+function WeekNav({
+  weekStart,
+  weeks,
+  weekInProgress,
+}: {
+  weekStart: string
+  weeks: string[]
+  weekInProgress: boolean
+}) {
   const index = weeks.indexOf(weekStart)
   const newer = index > 0 ? weeks[index - 1] : null
   const older = index >= 0 && index < weeks.length - 1 ? weeks[index + 1] : null
@@ -152,6 +161,10 @@ function WeekNav({ weekStart, weeks }: { weekStart: string; weeks: string[] }) {
       {newer ? (
         <Link href={`/digest/week/${newer}`} className={navLink}>
           Next week →
+        </Link>
+      ) : weekInProgress && index === 0 ? (
+        <Link href={CURRENT_WEEK_PATH} className={navLink}>
+          This week so far →
         </Link>
       ) : null}
       <Link href="/digest" className={navLink}>
@@ -381,6 +394,7 @@ const featuredTweets = (story: WeeklyDigestStory) => {
 export function WeeklyDigestView({
   edition,
   weeks,
+  weekInProgress = false,
   previews = {},
   profiles,
   bulletin,
@@ -388,6 +402,8 @@ export function WeeklyDigestView({
 }: {
   edition: WeeklyDigestEdition
   weeks: string[]
+  /** A newer week has daily editions but no weekly edition yet. */
+  weekInProgress?: boolean
   previews?: Previews
   /** Streams profile hover-card facts in after the page. */
   profiles?: ReactNode
@@ -405,7 +421,11 @@ export function WeeklyDigestView({
         <header className="max-w-[880px]">
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
             <div className={sectionLabel}>The Week in Review</div>
-            <WeekNav weekStart={edition.weekStart} weeks={weeks} />
+            <WeekNav
+              weekStart={edition.weekStart}
+              weeks={weeks}
+              weekInProgress={weekInProgress}
+            />
           </div>
           <h1
             className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.01em] sm:text-[52px]"

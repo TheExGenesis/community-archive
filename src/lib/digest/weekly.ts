@@ -281,6 +281,9 @@ const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const weekday = (date: string) =>
   WEEKDAY[new Date(`${date}T00:00:00Z`).getUTCDay()]
 
+/** The in-progress week: its daily editions so far, before the weekly one. */
+export const CURRENT_WEEK_PATH = '/digest/week/current'
+
 export const dailyRef = (digestDate: string, storyIndex: number) =>
   `${digestDate}#${storyIndex + 1}`
 

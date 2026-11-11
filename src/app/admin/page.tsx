@@ -164,6 +164,16 @@ export default async function AdminPage({
         </Link>
 
         <Link
+          href="/admin/spread-explorer"
+          className="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
+        >
+          <h2 className="font-semibold">Spread explorer →</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            How any word spreads across the TPOT hex map, month by month.
+          </p>
+        </Link>
+
+        <Link
           href="/admin/digest"
           className="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
         >

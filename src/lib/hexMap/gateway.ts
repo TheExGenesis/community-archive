@@ -27,7 +27,12 @@ export type MapHeat = {
 // the gateway membership projection; private self lookup requires fresh website
 // consent first. Production routes also recheck current website policy.
 export async function mapGateway<T>(
-  endpoint: 'hex-self' | 'hex-lookup' | 'hex-posts' | 'hex-word-heat',
+  endpoint:
+    | 'hex-self'
+    | 'hex-estimate'
+    | 'hex-lookup'
+    | 'hex-posts'
+    | 'hex-word-heat',
   params: Record<string, string> = {},
 ): Promise<T> {
   const base = clickHouseAnalyticsGatewayBaseUrl(),
@@ -42,7 +47,11 @@ export async function mapGateway<T>(
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
     signal: AbortSignal.timeout(
-      endpoint === 'hex-lookup' || endpoint === 'hex-self' ? 3000 : 20_000,
+      endpoint === 'hex-lookup' || endpoint === 'hex-self'
+        ? 3000
+        : endpoint === 'hex-estimate'
+          ? 8000
+          : 20_000,
     ),
   })
   if (!result.ok) throw new Error('Map backend unavailable')

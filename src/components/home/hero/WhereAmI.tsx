@@ -16,6 +16,7 @@ type Result = {
   username?: string
   error?: string
   isSelf?: boolean
+  estimated?: boolean
   person?: SelfLocation
   people?: SelfLocation[]
   missing?: string[]
@@ -246,11 +247,20 @@ export default function WhereAmI({
                   ? `${result.people.map((p) => `@${p.username}`).join(', ')} ${result.people.length === 1 ? 'is' : 'are'} here.`
                   : result.isSelf === false
                     ? `@${result.person?.username} is here.`
-                    : `You are here, @${result.person?.username}.`
+                    : result.estimated
+                      ? `You're probably around here, @${result.person?.username}.`
+                      : `You are here, @${result.person?.username}.`
                 : result?.status === 'sign_in' || result?.status === 'opt_in'
                   ? 'Opt in to the Community Archive to find yourself on the map!'
                   : result?.error}
           </div>
+          {!busy && result?.status === 'located' && result.estimated && (
+            <p>
+              Estimated from the people you reply to and quote, using the
+              limited data we have so far. We&apos;ll pull in more of your
+              tweets overnight, so your spot may move.
+            </p>
+          )}
           {!!result?.missing?.length && (
             <p>
               Not found on the map:{' '}

@@ -283,3 +283,19 @@ it('plots immediately after the signed-in visitor saves consent', async () => {
     '/api/hex-map/me',
   ])
 })
+it('labels an estimated self location with the limited-data caveat', async () => {
+  fetchMock.mockResolvedValue(
+    response(200, {
+      status: 'located',
+      isSelf: true,
+      estimated: true,
+      person: { username: 'newbie', cell: 7 },
+    }),
+  )
+  const onLocated = jest.fn()
+  render(<WhereAmI onLocated={onLocated} />)
+  submit()
+  await screen.findByText("You're probably around here, @newbie.")
+  expect(screen.getByText(/limited data we have so far/)).toBeVisible()
+  expect(onLocated).toHaveBeenLastCalledWith([{ username: 'newbie', cell: 7 }])
+})

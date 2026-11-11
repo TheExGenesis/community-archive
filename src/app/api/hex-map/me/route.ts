@@ -9,6 +9,7 @@ import { readMapLookup } from '@/lib/hexMap/lookup'
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import snapshot from '@/lib/hexMap/snapshot.json'
 import { parseMapUsernames } from '@/lib/hexMap/usernames'
+import { estimateCell, type EstimateCell } from '@/lib/hexMap/estimate'
 
 export const dynamic = 'force-dynamic'
 type ConsentRow = Pick<
@@ -115,8 +116,32 @@ export async function GET(request: NextRequest) {
         person?.account_id !== accountId ||
         !Number.isInteger(person.cell) ||
         !snapshot.cells[person.cell]
-      )
-        return unavailable()
+      ) {
+        if (person) return unavailable()
+        // No saved cell yet (for example a fresh opt-in): estimate one from
+        // the mapped accounts this person replies to and quotes. A slow or
+        // failed estimate degrades to the existing not-mapped answer.
+        const estimate = await mapGateway<{
+          version: string
+          accountId: string
+          cells: EstimateCell[]
+        }>('hex-estimate', { account_id: accountId })
+          .then((result) =>
+            result.version === MAP_VERSION &&
+            result.accountId === accountId &&
+            Array.isArray(result.cells)
+              ? estimateCell(snapshot, result.cells)
+              : null,
+          )
+          .catch(() => null)
+        if (!estimate) return unavailable()
+        return reply(200, {
+          status: 'located',
+          person: { username, cell: estimate.cell },
+          isSelf: true,
+          estimated: true,
+        })
+      }
       return reply(200, {
         status: 'located',
         person: { username, cell: person.cell },

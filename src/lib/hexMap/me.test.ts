@@ -300,3 +300,67 @@ it('fails closed when the private self location backend is unavailable', async (
   jest.mocked(mapGateway).mockRejectedValueOnce(new Error('offline'))
   expect((await GET(request())).status).toBe(503)
 })
+describe('estimated self placement', () => {
+  const selfMissing = (estimate: unknown) =>
+    jest.mocked(mapGateway).mockImplementation(async (endpoint) => {
+      if (endpoint === 'hex-self') return { version: MAP_VERSION, person: null }
+      if (endpoint === 'hex-estimate') {
+        if (estimate instanceof Error) throw estimate
+        return estimate
+      }
+      throw new Error(`unexpected ${endpoint}`)
+    })
+  it('estimates an unmapped self from mapped interaction cells', async () => {
+    selfMissing({
+      version: MAP_VERSION,
+      accountId: '123',
+      cells: [{ cell: 4, interactions: 3, partners: 2 }],
+    })
+    const res = await GET(request())
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(await res.json()).toEqual({
+      status: 'located',
+      isSelf: true,
+      estimated: true,
+      person: { username: 'me_one', cell: 4 },
+    })
+    expect(mapGateway).toHaveBeenCalledWith('hex-estimate', {
+      account_id: '123',
+    })
+  })
+  it('falls back to not mapped without interactions, on mismatch or on failure', async () => {
+    for (const estimate of [
+      { version: MAP_VERSION, accountId: '123', cells: [] },
+      {
+        version: MAP_VERSION,
+        accountId: '999',
+        cells: [{ cell: 4, interactions: 1, partners: 1 }],
+      },
+      {
+        version: 'old',
+        accountId: '123',
+        cells: [{ cell: 4, interactions: 1, partners: 1 }],
+      },
+      new Error('timeout'),
+    ]) {
+      selfMissing(estimate)
+      const res = await GET(request())
+      expect(res.status).toBe(404)
+      expect((await res.json()).status).toBe('not_mapped')
+    }
+  })
+  it('never estimates for another username or without consent', async () => {
+    selfMissing({
+      version: MAP_VERSION,
+      accountId: '123',
+      cells: [{ cell: 4, interactions: 1, partners: 1 }],
+    })
+    range.mockResolvedValue({ data: [], error: null })
+    expect((await GET(request())).status).toBe(403)
+    expect(mapGateway).not.toHaveBeenCalledWith(
+      'hex-estimate',
+      expect.anything(),
+    )
+  })
+})

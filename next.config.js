@@ -57,6 +57,16 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    // Research pieces are self-contained static files in /public/research.
+    // This gives them an address without the .html suffix; no function renders.
+    return [
+      {
+        source: '/research/you-can-just-do-things',
+        destination: '/research/you-can-just-do-things.html',
+      },
+    ]
+  },
   async redirects() {
     // The member Bulletin launched as /opportunities. Query strings carry over;
     // browsers keep the hash on their own.

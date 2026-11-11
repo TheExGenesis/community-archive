@@ -10,6 +10,7 @@ export const analyticsRoutes = {
   '/digest/[date]/[slug]': ['digest_story', 'product'],
   '/stream': ['live_stream', 'product'],
   '/research': ['research', 'product'],
+  '/research/you-can-just-do-things': ['research_article', 'product'],
   '/search': ['search', 'product'],
   '/search/ask': ['ask_archive', 'product'],
   '/settings': ['settings', 'product'],

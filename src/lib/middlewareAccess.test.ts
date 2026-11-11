@@ -197,6 +197,31 @@ test.each(['sb-test-auth-token=session', 'dev_as_member=1'])(
   },
 )
 
+test.each([
+  ['/', '/guest/home'],
+  ['/?action=optin', '/guest/home?action=optin'],
+])(
+  'serves the cookie-less homepage %s from the cached %s',
+  async (path, guestPath) => {
+    const response = await request(path)
+    expect(response.headers.get('x-middleware-rewrite')).toBe(
+      `https://archive.test${guestPath}`,
+    )
+    expect(response.headers.get('cache-control')).toBeNull()
+    expect(response.headers.get('x-robots-tag')).toBeNull()
+    expect(createMiddlewareClient).not.toHaveBeenCalled()
+  },
+)
+
+test.each(['sb-test-auth-token=session', 'dev_as_member=1'])(
+  'sends homepage visitors with %s to the per-viewer page',
+  async (cookie) => {
+    const response = await request('/', { cookie })
+    expect(response.headers.get('x-middleware-rewrite')).toBeNull()
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+  },
+)
+
 test('sends visitors with a session to the consent-checked tweet page', async () => {
   const response = await request('/tweets/123', {
     cookie: 'sb-test-auth-token=session',
@@ -346,7 +371,6 @@ test.each([true, false])(
 )
 
 test.each([
-  '/',
   '/about',
   '/login',
   '/api/auth/callback',

@@ -1197,10 +1197,11 @@ export async function getPortalData(
  * digest and cards have separate Suspense boundaries and failure states.
  */
 export function startHomepageData() {
-  const sourceKey = portalDataSourceKey()
+  // Resolve the source inside the loader so a missing gateway setting is a
+  // section failure, not a throw that fails the cached guest homepage build.
   const globalStats = loadPortalComponentData(
     'global-stats',
-    () => getCachedGlobalStats(sourceKey),
+    async () => getCachedGlobalStats(portalDataSourceKey()),
     {
       totalTweets: 0,
       memberCount: 0,

@@ -2,7 +2,7 @@
  * Upload the spread explorer export to the private Supabase Storage bucket the
  * admin page reads from (src/lib/spreadExplorer/data.ts).
  *
- *   pnpm tsx --env-file=.env scripts/upload-spread-explorer-data.ts /path/to/export --yes
+ *   pnpm tsx --env-file=.env scripts/upload-spread-explorer-data.ts /path/to/export --yes [--resume]
  *
  * Uses NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE from the environment
  * (the service role is needed to write to a private bucket). The bucket is
@@ -15,7 +15,29 @@ import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
 const BUCKET = process.env.SPREAD_EXPLORER_BUCKET || 'spread-explorer'
-const CONCURRENCY = 8
+// Each Storage upload holds a database connection on the project; keep this low
+// so the upload never crowds out the site (8 hit "Too many connections").
+const CONCURRENCY = Number(process.env.SPREAD_EXPLORER_UPLOAD_CONCURRENCY || 2)
+const RETRIES = 6
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// Names already in the bucket, so a rerun resumes instead of re-uploading.
+async function existing(
+  supabase: ReturnType<typeof createClient>,
+  folder: string,
+): Promise<Set<string>> {
+  const names = new Set<string>()
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .list(folder, { limit: 1000, offset })
+    if (error) throw error
+    for (const o of data)
+      if (o.id) names.add(folder ? `${folder}/${o.name}` : o.name)
+    if (data.length < 1000) return names
+  }
+}
 
 async function walk(dir: string, prefix = ''): Promise<string[]> {
   const out: string[] = []
@@ -29,7 +51,7 @@ async function walk(dir: string, prefix = ''): Promise<string[]> {
 }
 
 async function main() {
-  const [dir, flag] = process.argv.slice(2)
+  const [dir, flag, mode] = process.argv.slice(2)
   if (!dir)
     throw new Error('usage: upload-spread-explorer-data.ts <export dir> --yes')
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -66,8 +88,19 @@ async function main() {
       `bucket ${BUCKET} is public; make it private before uploading`,
     )
   }
+  // --resume skips objects already present (use after an interrupted upload;
+  // a fresh export should be uploaded without it so every file is replaced).
+  const skip =
+    mode === '--resume'
+      ? new Set([
+          ...(await existing(supabase, '')),
+          ...(await existing(supabase, 'words')),
+        ])
+      : new Set<string>()
+  const queue = files.filter((f) => !skip.has(f))
+  console.log(`${skip.size} already uploaded, ${queue.length} to go`)
+  const total = queue.length
   let done = 0
-  const queue = files.slice()
   await Promise.all(
     Array.from({ length: CONCURRENCY }, async () => {
       for (let file = queue.shift(); file; file = queue.shift()) {
@@ -75,11 +108,16 @@ async function main() {
         const contentType = file.endsWith('.gz')
           ? 'application/gzip'
           : 'application/json'
-        const { error } = await supabase.storage
-          .from(BUCKET)
-          .upload(file, body, { contentType, upsert: true })
-        if (error) throw new Error(`${file}: ${error.message}`)
-        if (++done % 500 === 0) console.log(`${done}/${files.length}`)
+        for (let attempt = 0; ; attempt++) {
+          const { error } = await supabase.storage
+            .from(BUCKET)
+            .upload(file, body, { contentType, upsert: true })
+          if (!error) break
+          if (attempt >= RETRIES) throw new Error(`${file}: ${error.message}`)
+          console.warn(`${file}: ${error.message}; retrying`)
+          await sleep(2000 * 2 ** attempt)
+        }
+        if (++done % 250 === 0) console.log(`${done}/${total}`)
       }
     }),
   )

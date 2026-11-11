@@ -29,7 +29,7 @@ const YOU_CAN_JUST_DO_THINGS: ResearchPost = {
   date: '2026-11-11T12:00:00.000Z',
   excerpt:
     'How one phrase spread from TPOT to tech to politics, traced through 17,657 tweets.',
-  image: null,
+  image: '/images/research/you-can-just-do-things.png',
   author: 'Community Archive',
 }
 

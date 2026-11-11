@@ -417,3 +417,161 @@ export async function getTweetDetails(
   }
   return tweets
 }
+
+/** Distinct tweets of each kind one account sent another (a tweet counts once in tweets). */
+export interface InteractionCounts {
+  tweets: number
+  replies: number
+  mentions: number
+  quotes: number
+}
+
+export interface InteractionAccount {
+  id: string
+  username: string | null
+  name: string | null
+  isMember: boolean
+}
+
+export interface InteractionPeer extends InteractionAccount {
+  mutual: boolean
+  /** From the focus account to this peer, and back. */
+  out: InteractionCounts
+  in: InteractionCounts
+  firstMonth: string
+  lastMonth: string
+}
+
+export interface InteractionProjection {
+  buildId: string
+  builtAt: string
+  coveredUntil: string
+}
+
+export interface InteractionPeers {
+  a: InteractionAccount
+  since: string | null
+  until: string | null
+  peerCount: number
+  mutualCount: number
+  mutualMemberCount: number
+  truncated: boolean
+  peers: InteractionPeer[]
+  projection: InteractionProjection
+}
+
+export interface InteractionPair {
+  a: InteractionAccount
+  b: InteractionAccount
+  since: string | null
+  until: string | null
+  months: Array<{
+    month: string
+    aToB: InteractionCounts
+    bToA: InteractionCounts
+  }>
+  totals: { aToB: InteractionCounts; bToA: InteractionCounts }
+  firstMonth: string | null
+  /** The month by which both directions had happened. */
+  firstMutualMonth: string | null
+  projection: InteractionProjection
+}
+
+export interface InteractionTie {
+  input: string
+  account: InteractionAccount | null
+  error?: 'not_found'
+  peers?: number
+  mutualPeers?: number
+  mutualMembers?: number
+  tweetsToMembers?: number
+  tweetsFromMembers?: number
+  topMutual?: Array<
+    Omit<InteractionAccount, 'isMember'> & {
+      isMember: boolean
+      outTweets: number
+      inTweets: number
+      firstMonth: string
+    }
+  >
+}
+
+export interface InteractionTies {
+  before: string
+  months: number
+  window: { from: string; until: string }
+  accounts: InteractionTie[]
+  projection: InteractionProjection
+}
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
+const account = (value: string) => value.trim().replace(/^@/, '')
+
+/**
+ * Who an account talked to, and when: its peers (both directions), or with
+ * `b` the monthly a<->b timeline. Months are YYYY-MM, inclusive.
+ */
+export async function getInteractions(
+  input: {
+    a: string
+    b?: string
+    since?: string
+    until?: string
+    limit?: number
+  },
+  limits: RunLimits = {},
+): Promise<InteractionPeers | InteractionPair | null> {
+  const params = new URLSearchParams({ a: account(input.a) })
+  if (input.b) params.set('b', account(input.b))
+  for (const key of ['since', 'until'] as const) {
+    const value = input[key]
+    if (value === undefined) continue
+    if (!MONTH.test(value)) throw new Error(`${key} must be YYYY-MM`)
+    params.set(key, value)
+  }
+  if (input.limit !== undefined) {
+    params.set('limit', String(Math.min(Math.max(input.limit, 1), 100)))
+  }
+  return retryWhileBusy(limits, () =>
+    fetchAnalyticsGatewayJson<InteractionPeers | InteractionPair>(
+      ['interactions'],
+      params,
+      { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
+    ),
+  ).catch((error: { status?: number }) => {
+    if (error?.status === 404) return null
+    throw error
+  })
+}
+
+/**
+ * For each account, its back-and-forth ties in the `months` before `before`
+ * (YYYY-MM, exclusive), with how many were CA members.
+ */
+export async function getInteractionTies(
+  input: {
+    accounts: string[]
+    before: string
+    months?: number
+    peers?: number
+  },
+  limits: RunLimits = {},
+): Promise<InteractionTies> {
+  if (!MONTH.test(input.before)) throw new Error('before must be YYYY-MM')
+  const accounts = Array.from(new Set(input.accounts.map(account))).slice(0, 25)
+  const params = new URLSearchParams({
+    accounts: accounts.join(','),
+    before: input.before,
+  })
+  if (input.months !== undefined) {
+    params.set('months', String(Math.min(Math.max(input.months, 1), 240)))
+  }
+  if (input.peers !== undefined) {
+    params.set('peers', String(Math.min(Math.max(input.peers, 0), 10)))
+  }
+  return retryWhileBusy(limits, () =>
+    fetchAnalyticsGatewayJson<InteractionTies>(['interaction-ties'], params, {
+      timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
+    }),
+  )
+}

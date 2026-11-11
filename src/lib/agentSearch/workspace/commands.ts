@@ -10,6 +10,8 @@ import {
   findPeopleImpl,
   getQuotePostsImpl,
   getThreadImpl,
+  interactionTiesImpl,
+  interactionsImpl,
   scoreWithParents,
 } from '../toolImpl'
 import {
@@ -218,6 +220,9 @@ export const USAGE: Record<string, string> = {
   quotes: 'usage: quotes <tweet id> [--limit N]',
   tweets: 'usage: tweets <tweet id>... (or ids on stdin)',
   show: 'usage: show <tweet id>',
+  interactions:
+    'usage: interactions @handle [@other] [--since YYYY-MM] [--until YYYY-MM] [--limit N]',
+  ties: 'usage: ties @handle... --before YYYY-MM [--months N] [--peers N]  (or "@handle YYYY-MM" lines on stdin)',
 }
 
 async function search(
@@ -568,6 +573,255 @@ async function show(
   return { stdout: `${lines.join('\n')}\n`, stderr: '', exitCode: 0 }
 }
 
+const MONTH_ARG = /^(\d{4}-(?:0[1-9]|1[0-2]))(?:-\d{2})?$/
+const INTERACTIONS_DEFAULT = 25
+const TIES_MAX_ACCOUNTS = 60
+const TIES_PER_CALL = 25
+
+/** YYYY-MM, also accepting a full date (its month). */
+function monthFlag(value: string | true | undefined, name: string) {
+  if (value === undefined) return undefined
+  const match = typeof value === 'string' ? MONTH_ARG.exec(value) : null
+  if (!match) throw new UsageError(`--${name} must be YYYY-MM`)
+  return match[1]
+}
+
+const handleArg = (value: string) => {
+  const handle = value.trim().replace(/^@/, '')
+  if (!/^(?:[A-Za-z0-9_]{1,15}|\d{1,20})$/.test(handle)) {
+    throw new UsageError(`not a handle: ${value}`)
+  }
+  return handle
+}
+
+const at = (account: { username: string | null; id: string }) =>
+  account.username ? `@${account.username}` : account.id
+
+const counts = (c: {
+  tweets: number
+  replies: number
+  mentions: number
+  quotes: number
+}) => ({
+  tweets: c.tweets,
+  replies: c.replies,
+  mentions: c.mentions,
+  quotes: c.quotes,
+})
+
+function windowText(since?: string | null, until?: string | null) {
+  if (since && until) return `${since} to ${until}`
+  if (since) return `since ${since}`
+  if (until) return `until ${until}`
+  return 'all time'
+}
+
+async function interactions(
+  state: CommandState,
+  args: string[],
+): Promise<CommandResult> {
+  const { positional, flags } = parseCommandArgs(args, [
+    'since',
+    'until',
+    'limit',
+  ])
+  if (positional.length < 1 || positional.length > 2) {
+    throw new UsageError(
+      'give one handle, or two for the timeline between them',
+    )
+  }
+  const [account, other] = positional.map(handleArg)
+  const since = monthFlag(flags.since, 'since')
+  const until = monthFlag(flags.until, 'until')
+  if (since && until && since > until)
+    throw new UsageError('--since is after --until')
+  const limit = intFlag(flags.limit, 'limit', INTERACTIONS_DEFAULT, 100)
+  state.calls += 1
+  const result = await interactionsImpl(
+    { account, other, since, until, limit },
+    state.limits,
+  )
+  const who = other ? `@${account} and @${other}` : `@${account}`
+  if ('notFound' in result) {
+    state.summaries.push(`Looked up interactions of ${who} · not found`)
+    return {
+      stdout: '',
+      stderr: `interactions ${who}: not found\n`,
+      exitCode: 1,
+    }
+  }
+  const window = windowText(since, until)
+  if ('b' in result) {
+    const rows = result.months.map((row) =>
+      JSON.stringify({
+        month: row.month,
+        out: counts(row.aToB),
+        in: counts(row.bToA),
+      }),
+    )
+    const a = at(result.a)
+    const b = at(result.b)
+    const parts = [
+      plural(rows.length, 'active month'),
+      result.firstMonth ? `first ${result.firstMonth}` : null,
+      result.firstMutualMonth
+        ? `both ways by ${result.firstMutualMonth}`
+        : 'never both ways',
+      `${a}→${b} ${plural(result.totals.aToB.tweets, 'tweet')}`,
+      `${b}→${a} ${plural(result.totals.bToA.tweets, 'tweet')}`,
+    ].filter(Boolean)
+    state.summaries.push(
+      `Interactions between ${a} and ${b} · ${plural(rows.length, 'month')}`,
+    )
+    return {
+      stdout: rows.length ? `${rows.join('\n')}\n` : '',
+      stderr: `interactions ${a} ${b} (${window}, out = ${a}→${b}): ${parts.join(' · ')}\n`,
+      exitCode: 0,
+    }
+  }
+  const rows = result.peers.map((peer) =>
+    JSON.stringify({
+      handle: at(peer),
+      name: peer.name,
+      member: peer.isMember,
+      mutual: peer.mutual,
+      out: counts(peer.out),
+      in: counts(peer.in),
+      first: peer.firstMonth,
+      last: peer.lastMonth,
+    }),
+  )
+  const focus = at(result.a)
+  const more = result.truncated || result.omitted ? `${rows.length} of ` : ''
+  state.summaries.push(
+    `Interactions of ${focus} · ${plural(result.peerCount, 'account')}`,
+  )
+  return {
+    stdout: rows.length ? `${rows.join('\n')}\n` : '',
+    stderr: `interactions ${focus} (${window}, out = from ${focus}): ${more}${plural(result.peerCount, 'account')} · ${result.mutualCount.toLocaleString('en-US')} both ways, ${result.mutualMemberCount.toLocaleString('en-US')} of them members · data through ${result.projection.coveredUntil}\n`,
+    exitCode: 0,
+  }
+}
+
+/** `@handle YYYY-MM` lines: each account with its own cutoff month. */
+function tiesFromStdin(stdin: Uint8Array | string) {
+  const text =
+    typeof stdin === 'string' ? stdin : decodeBytesToUtf8(stdin as never)
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [handle, month] = line.split(/[\s,]+/)
+      const before = month ? MONTH_ARG.exec(month)?.[1] : undefined
+      if (!before)
+        throw new UsageError(`stdin lines must be "@handle YYYY-MM": ${line}`)
+      return { handle: handleArg(handle), before }
+    })
+}
+
+async function ties(
+  state: CommandState,
+  args: string[],
+  stdin: Uint8Array | string,
+): Promise<CommandResult> {
+  const { positional, flags } = parseCommandArgs(args, [
+    'before',
+    'months',
+    'peers',
+  ])
+  const before = monthFlag(flags.before, 'before')
+  const months = intFlag(flags.months, 'months', 12, 240)
+  const peers = flags.peers === '0' ? 0 : intFlag(flags.peers, 'peers', 5, 10)
+  let wanted: { handle: string; before: string }[]
+  if (positional.length) {
+    if (!before) throw new UsageError('give --before YYYY-MM')
+    wanted = positional.map((value) => ({ handle: handleArg(value), before }))
+  } else {
+    wanted = tiesFromStdin(stdin)
+    if (before) wanted = wanted.map((entry) => ({ ...entry, before }))
+  }
+  if (!wanted.length)
+    throw new UsageError('give handles, or "@handle YYYY-MM" lines on stdin')
+  const unique = Array.from(
+    new Map(
+      wanted.map((entry) => [
+        `${entry.handle.toLowerCase()} ${entry.before}`,
+        entry,
+      ]),
+    ).values(),
+  )
+  if (unique.length > TIES_MAX_ACCOUNTS) {
+    throw new UsageError(`at most ${TIES_MAX_ACCOUNTS} accounts per command`)
+  }
+  const byMonth = new Map<string, string[]>()
+  for (const entry of unique) {
+    byMonth.set(entry.before, [
+      ...(byMonth.get(entry.before) ?? []),
+      entry.handle,
+    ])
+  }
+  const rows: string[] = []
+  const notes: string[] = []
+  for (const [month, handles] of Array.from(byMonth)) {
+    for (let i = 0; i < handles.length; i += TIES_PER_CALL) {
+      state.calls += 1
+      const result = await interactionTiesImpl(
+        {
+          accounts: handles.slice(i, i + TIES_PER_CALL),
+          before: month,
+          months,
+          peers,
+        },
+        state.limits,
+      )
+      for (const entry of result.accounts) {
+        if (!entry.account) {
+          rows.push(
+            JSON.stringify({
+              handle: `@${entry.input}`,
+              before: month,
+              error: 'not found',
+            }),
+          )
+          notes.push(`@${entry.input} not found`)
+          continue
+        }
+        rows.push(
+          JSON.stringify({
+            handle: at(entry.account),
+            member: entry.account.isMember,
+            before: month,
+            mutual_members: entry.mutualMembers ?? 0,
+            mutual: entry.mutualPeers ?? 0,
+            peers: entry.peers ?? 0,
+            to_members: entry.tweetsToMembers ?? 0,
+            from_members: entry.tweetsFromMembers ?? 0,
+            top: (entry.topMutual ?? []).map((peer) => ({
+              handle: at(peer),
+              member: peer.isMember,
+              out: peer.outTweets,
+              in: peer.inTweets,
+              first: peer.firstMonth,
+            })),
+          }),
+        )
+        notes.push(
+          `${at(entry.account)} ${plural(entry.mutualMembers ?? 0, 'member tie')}`,
+        )
+      }
+    }
+  }
+  const shown =
+    notes.length > 6 ? `${notes.slice(0, 6).join(', ')}, …` : notes.join(', ')
+  state.summaries.push(`Checked ties of ${plural(unique.length, 'account')}`)
+  return {
+    stdout: `${rows.join('\n')}\n`,
+    stderr: `ties (${months} months before ${byMonth.size === 1 ? Array.from(byMonth.keys())[0] : 'each month'}; a tie = replied, mentioned or quoted each way): ${shown}\n`,
+    exitCode: 0,
+  }
+}
+
 /** The archive commands for one shell execution. */
 export function archiveCommands(state: CommandState) {
   return [
@@ -583,5 +837,7 @@ export function archiveCommands(state: CommandState) {
       tweetsById(state, args, ctx.stdin),
     ),
     archiveCommand(state, 'show', (args) => show(state, args)),
+    archiveCommand(state, 'interactions', (args) => interactions(state, args)),
+    archiveCommand(state, 'ties', (args, ctx) => ties(state, args, ctx.stdin)),
   ]
 }

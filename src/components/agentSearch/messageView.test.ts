@@ -16,6 +16,7 @@ import {
   createTurnViewBuilder,
   citesSomeoneElse,
   collectToolTweets,
+  commandKind,
   describeChatError,
   formatElapsed,
   latestThought,
@@ -961,6 +962,44 @@ describe('workspace steps and the folded log line', () => {
     expect(
       describeCommand('mkdir -p lists && jq -c . c1.jsonl > lists/a.jsonl'),
     ).toBe('Looking through the results')
+  })
+
+  test('describes interaction lookups and shows them as people steps', () => {
+    expect(
+      describeCommand('interactions @visakanv --since 2023-01 > p.jsonl'),
+    ).toBe('Checking who @visakanv talked with')
+    expect(describeCommand('interactions @a @b')).toBe(
+      'Checking how @a and @b talked',
+    )
+    expect(
+      describeCommand('jq -r .author s.jsonl | sort | ties --before 2024-06'),
+    ).toBe('Checking who they were talking to')
+    expect(commandKind('ties @a --before 2024-06 > t.jsonl')).toBe('people')
+    expect(commandKind('interactions @a')).toBe('people')
+    const done = (
+      name: string,
+      input: Record<string, unknown>,
+      output: unknown,
+    ) =>
+      progressLine({
+        id: '1',
+        name,
+        input,
+        output,
+        state: 'output-available',
+      } as never)
+    expect(
+      done('get_interactions', { account: 'a' }, { peerCount: 12 }),
+    ).toMatchObject({
+      text: 'Checked who @a talked with · 12 accounts',
+      kind: 'people',
+    })
+    expect(
+      done('get_interaction_ties', { accounts: ['a', 'b'] }, {}),
+    ).toMatchObject({
+      text: 'Checked ties of 2 accounts',
+      kind: 'people',
+    })
   })
 
   test('sums up steps, what the answer rests on, and what else was found', () => {

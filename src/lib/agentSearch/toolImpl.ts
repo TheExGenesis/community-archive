@@ -2,6 +2,8 @@ import { scoreTweets } from './classifier'
 import type { RunLimits } from './deadline'
 import {
   findMembers,
+  getInteractionTies,
+  getInteractions,
   getQuotePosts,
   getTweetDetails,
   getTweetThread,
@@ -408,6 +410,127 @@ export async function semanticSearchImpl(
   return semanticSearch(input, limits)
 }
 
+const POLICY_CHECK_CONCURRENCY = 8
+
+/**
+ * Account IDs PostgreSQL policy withholds (opt-out or scrape block), as for
+ * find_people. A failed check withholds the account too. Accounts without a
+ * known handle are not checked; callers drop them, since the agent cannot
+ * name them anyway.
+ */
+export async function withheldAccountIds(
+  accounts: Array<{ id: string; username: string | null }>,
+): Promise<Set<string>> {
+  const unique = Array.from(
+    new Map(
+      accounts
+        .filter((entry) => entry.username)
+        .map((entry) => [entry.id, entry.username as string]),
+    ),
+  )
+  if (!unique.length) return new Set()
+  const { isPolicyBlockedAccount } = await import('./policy')
+  const withheld = new Set<string>()
+  for (let i = 0; i < unique.length; i += POLICY_CHECK_CONCURRENCY) {
+    await Promise.all(
+      unique
+        .slice(i, i + POLICY_CHECK_CONCURRENCY)
+        .map(async ([id, username]) => {
+          const blocked = await isPolicyBlockedAccount(id, username).catch(
+            () => true,
+          )
+          if (blocked) withheld.add(id)
+        }),
+    )
+  }
+  return withheld
+}
+
+export interface InteractionsToolInput {
+  account: string
+  other?: string
+  since?: string
+  until?: string
+  limit?: number
+}
+
+/**
+ * Who an account was in conversation with, and when (replies, mentions and
+ * quotes, by month, both directions), or with `other` the monthly timeline
+ * between two accounts. Withheld and unnamed accounts are left out.
+ */
+export async function interactionsImpl(
+  raw: InteractionsToolInput,
+  limits: RunLimits = {},
+) {
+  const input = present(raw)
+  const notFound = {
+    notFound: true as const,
+    account: input.account,
+    other: input.other ?? null,
+  }
+  const result = await getInteractions(
+    {
+      a: input.account,
+      b: input.other,
+      since: input.since,
+      until: input.until,
+      limit: input.limit,
+    },
+    limits,
+  )
+  if (!result) return notFound
+  if ('b' in result) {
+    const withheld = await withheldAccountIds([result.a, result.b])
+    if (withheld.has(result.a.id) || withheld.has(result.b.id)) return notFound
+    return result
+  }
+  const withheld = await withheldAccountIds([result.a, ...result.peers])
+  if (withheld.has(result.a.id)) return notFound
+  const peers = result.peers.filter(
+    (peer) => peer.username && !withheld.has(peer.id),
+  )
+  return { ...result, peers, omitted: result.peers.length - peers.length }
+}
+
+export interface InteractionTiesToolInput {
+  accounts: string[]
+  before: string
+  months?: number
+  peers?: number
+}
+
+/**
+ * For each account, its back-and-forth ties (a reply, mention or quote each
+ * way) in the months before `before`, and how many were with CA members.
+ */
+export async function interactionTiesImpl(
+  raw: InteractionTiesToolInput,
+  limits: RunLimits = {},
+) {
+  const input = present(raw)
+  const result = await getInteractionTies(input, limits)
+  const withheld = await withheldAccountIds(
+    result.accounts.flatMap((entry) => [
+      ...(entry.account ? [entry.account] : []),
+      ...(entry.topMutual ?? []),
+    ]),
+  )
+  return {
+    ...result,
+    accounts: result.accounts.map((entry) =>
+      !entry.account || withheld.has(entry.account.id)
+        ? { input: entry.input, account: null, error: 'not_found' as const }
+        : {
+            ...entry,
+            topMutual: (entry.topMutual ?? []).filter(
+              (peer) => peer.username && !withheld.has(peer.id),
+            ),
+          },
+    ),
+  }
+}
+
 /** What the typed tool returns once a question has used its semantic searches. */
 export const semanticLimitReached = (query: string) => ({
   query,
@@ -425,6 +548,8 @@ export const AGENT_SEARCH_TOOL_EXECUTORS = {
   get_quote_posts: getQuotePostsImpl,
   get_tweets: getTweetsImpl,
   semantic_search: semanticSearchImpl,
+  get_interactions: interactionsImpl,
+  get_interaction_ties: interactionTiesImpl,
 }
 
 export type AgentSearchToolExecutors = typeof AGENT_SEARCH_TOOL_EXECUTORS

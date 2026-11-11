@@ -542,7 +542,15 @@ const ARCHIVE_COMMANDS = new Set([
   'quotes',
   'show',
   'tweets',
+  'interactions',
+  'ties',
 ])
+
+/** Archive commands that share another command's icon. */
+const COMMAND_KINDS: Record<string, StepKind> = {
+  interactions: 'people',
+  ties: 'people',
+}
 
 /** The first archive command in a shell command line, with its words. */
 function firstArchiveCommand(
@@ -557,7 +565,9 @@ function firstArchiveCommand(
 
 /** What a shell command did, for its icon: its first archive command. */
 export function commandKind(command: string): StepKind {
-  return (firstArchiveCommand(command)?.name as StepKind | undefined) ?? 'files'
+  const name = firstArchiveCommand(command)?.name
+  if (!name) return 'files'
+  return COMMAND_KINDS[name] ?? (name as StepKind)
 }
 
 /**
@@ -590,6 +600,13 @@ export function describeCommand(command: string): string {
         return 'Reading a tweet in full'
       case 'tweets':
         return 'Collecting tweets'
+      case 'interactions':
+        if (!rest[0]) return 'Checking who talked with whom'
+        return rest[1]
+          ? `Checking how ${rest[0]} and ${rest[1]} talked`
+          : `Checking who ${rest[0]} talked with`
+      case 'ties':
+        return 'Checking who they were talking to'
     }
   }
   return 'Looking through the results'
@@ -604,6 +621,8 @@ const TOOL_KINDS: Record<string, StepKind> = {
   get_thread: 'thread',
   get_quote_posts: 'quotes',
   get_tweets: 'tweets',
+  get_interactions: 'people',
+  get_interaction_ties: 'people',
 }
 
 const SEARCH_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -794,6 +813,28 @@ export function progressLine(call: ToolCallView): ProgressLine {
       running = 'Reading quotes'
       finished = `Read quotes · ${plural(asArray(out.tweets).length, 'tweet')}`
       failure = 'Could not read quotes'
+      break
+    }
+    case 'get_interactions': {
+      const who = [asString(input.account), asString(input.other)]
+        .filter(Boolean)
+        .map((value) => `@${String(value).replace(/^@/, '')}`)
+      running =
+        who.length === 2
+          ? `Checking how ${who[0]} and ${who[1]} talked`
+          : `Checking who ${who[0] ?? 'they'} talked with`
+      finished =
+        who.length === 2
+          ? `Checked how ${who[0]} and ${who[1]} talked · ${plural(asArray(out.months).length, 'month')}`
+          : `Checked who ${who[0] ?? 'they'} talked with · ${plural(asNumber(out.peerCount) ?? 0, 'account')}`
+      failure = 'Could not check who they talked with'
+      break
+    }
+    case 'get_interaction_ties': {
+      const accounts = asArray(input.accounts).length
+      running = 'Checking who they were talking to'
+      finished = `Checked ties of ${plural(accounts, 'account')}`
+      failure = 'Could not check who they were talking to'
       break
     }
     case 'get_tweets': {

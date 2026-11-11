@@ -35,12 +35,16 @@ import {
   getQuotePostsImpl,
   getThreadImpl,
   getTweetsImpl,
+  interactionTiesImpl,
+  interactionsImpl,
   scoreTweetsImpl,
   searchTweetsImpl,
   semanticLimitReached,
   semanticSearchImpl,
   type CollectAndScoreInput,
   type FindPeopleInput,
+  type InteractionTiesToolInput,
+  type InteractionsToolInput,
   type ScoreTweetsInput,
   type SearchTweetsToolInput,
 } from '@/lib/agentSearch/toolImpl'
@@ -116,6 +120,24 @@ async function getQuotePostsStep(
   return getQuotePostsImpl(input, { deadlineAt })
 }
 getQuotePostsStep.maxRetries = 1
+
+async function interactionsStep(
+  input: InteractionsToolInput,
+  deadlineAt: number,
+) {
+  'use step'
+  return interactionsImpl(input, { deadlineAt })
+}
+interactionsStep.maxRetries = 1
+
+async function interactionTiesStep(
+  input: InteractionTiesToolInput,
+  deadlineAt: number,
+) {
+  'use step'
+  return interactionTiesImpl(input, { deadlineAt })
+}
+interactionTiesStep.maxRetries = 1
 
 async function getTweetsStep(
   input: { tweetIds: string[] },
@@ -316,6 +338,8 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
           get_thread: (args) => getThreadStep(args, deadlineAt),
           get_quote_posts: (args) => getQuotePostsStep(args, deadlineAt),
           get_tweets: (args) => getTweetsStep(args, deadlineAt),
+          get_interactions: (args) => interactionsStep(args, deadlineAt),
+          get_interaction_ties: (args) => interactionTiesStep(args, deadlineAt),
           semantic_search: async (args) => {
             if (semanticUsed >= MAX_SEMANTIC_CALLS_PER_RUN) {
               return semanticLimitReached(args.query)

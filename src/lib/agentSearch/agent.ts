@@ -45,6 +45,8 @@ Archive commands (rows on stdout, a one-line summary on stderr, so you see the s
 - people <name or handle>: matching members, to get the right handle.
 - score <file> "<yes/no question about one tweet>": asks the question of every tweet in the file (a reply is read with its parent) and prints the rows with p, the probability of yes, highest first. p ≥ 0.5 means yes. Use it when a search returns more tweets than you can read.
 - thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), show <id> (one tweet in full, with what it quotes).
+- interactions @handle [@other] [--since YYYY-MM] [--until YYYY-MM] [--limit N]: who an account was in conversation with, and when: replies, mentions and quotes in both directions, counted by month (out = from @handle, in = back to it), members marked, accounts with a back-and-forth first. With @other, the month-by-month timeline between the two. Use it to see whether someone was talking with an account or with members, for example before they used a phrase.
+- ties @handle... --before YYYY-MM [--months 12] [--peers 5]: for each account, how many people and how many members it had a back-and-forth with (each replied to, mentioned or quoted the other) in the months before that month, and the strongest of those ties. To give each account its own month, such as the month it first used a phrase, pipe "@handle YYYY-MM" lines instead: jq -r '[.author, .date[:7]] | @tsv' s1.jsonl | sort | awk '!seen[$1]++' | ties
 - Also: jq, grep, sort, uniq, head, tail, wc, cut, awk, sed, mkdir.
 
 How to work:
@@ -109,6 +111,7 @@ How to work:
 3. Use collect_and_score only when the answer is a set of posts spread across the archive (who criticised something, what people think about a topic) and searches show more matching posts than you can read, many of them off-topic. Give 2 to 8 terms that signal the answer and a precise yes/no criterion. It checks up to 300 posts by default; raise maxTweets (up to 1000) only when the question needs the long tail. If the result says capped, posts past the limit were not checked: narrow the terms or dates, or say so in the answer. Do not use it to find one remembered tweet or when a few searches already answer the question.
 4. Use semantic_search for ideas people express in their own words (survey and investigative questions), at most ${MAX_SEMANTIC_CALLS_PER_RUN} times per question; keep search_tweets for names, handles, exact phrases and dates. Score semantic results with score_tweets when precision matters.
 5. Follow conversations when they matter: get_thread for replies and context, get_quote_posts for reactions. Use score_tweets to score posts you found this way.
+   For who talked with whom and when (replies, mentions and quotes by month, both directions), use get_interactions; to check whether accounts had a back-and-forth with members in the months before some month, such as before they first used a phrase, use get_interaction_ties.
 6. Stop searching once more searches stop turning up new relevant posts. Do not repeat the same search.
 
 How to answer:
@@ -518,6 +521,8 @@ const date = z
   .regex(/^(\d{4}-\d{2}-\d{2})?$/)
   .optional()
 const tweetId = z.string().regex(/^\d{1,20}$/)
+const handle = z.string().regex(/^@?(?:[A-Za-z0-9_]{1,15}|\d{1,20})$/)
+const month = z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/)
 
 function json(value: unknown) {
   return { type: 'json' as const, value: value as never }
@@ -652,6 +657,29 @@ export function createAgentSearchTools(
       execute: run.get_quote_posts,
       toModelOutput: ({ output }) =>
         json({ total: output.total, tweets: compactList(output.tweets) }),
+    }),
+    get_interactions: tool({
+      description:
+        'Who an account was in conversation with, and when: replies, mentions and quotes in both directions, counted by UTC month (out = from account, in = back to it). Without other, its peers with members marked and back-and-forth (mutual) ties first; with other, the month-by-month timeline between the two. Months are YYYY-MM, inclusive.',
+      inputSchema: z.object({
+        account: handle,
+        other: handle.optional(),
+        since: month.optional(),
+        until: month.optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+      execute: run.get_interactions,
+    }),
+    get_interaction_ties: tool({
+      description:
+        'For each account, how many people and CA members it had a back-and-forth with (each replied to, mentioned or quoted the other) in the months before a YYYY-MM month, with its strongest mutual ties (members first).',
+      inputSchema: z.object({
+        accounts: z.array(handle).min(1).max(25),
+        before: month,
+        months: z.number().int().min(1).max(240).optional(),
+        peers: z.number().int().min(0).max(10).optional(),
+      }),
+      execute: run.get_interaction_ties,
     }),
     get_tweets: tool({
       description: 'Fetch specific tweets by id.',

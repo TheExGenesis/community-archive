@@ -3,6 +3,47 @@ import Link from 'next/link'
 const TESTIMONIALS = [
   {
     quote:
+      "PSA: I probably wouldn't be using X at all if it wasn't for @exgenesis's work on @comm_archive meaning that my tweets get saved for posterity and can be searched, analyzed, etc by third-party tools. Please opt-in if you can",
+    name: 'ivan',
+    handle: 'IvanVendrov',
+    tweetId: '2119417824192208981',
+  },
+  {
+    quote:
+      'proud to support the Community Archive — valuable project that’s already been of great service to me',
+    name: 'Visakan Veerasamy',
+    handle: 'visakanv',
+    tweetId: '1875045709835325442',
+  },
+  {
+    quote:
+      'I’ve uploaded my X data… I recommend doing so to nudge models towards improved mental health, self-modeling and situational awareness — all which promote voluntary alignment.',
+    name: 'j⧉nus',
+    handle: 'repligate',
+    tweetId: '1993170617127125031',
+  },
+  {
+    quote: 'building exoskeletons for online communities',
+    name: 'Alexandre Variengien',
+    handle: 'A_Variengien',
+    tweetId: '1990743753188126764',
+  },
+  {
+    quote:
+      "opt in to community archive so claude will know who i'm talking to please",
+    name: 'thebes',
+    handle: 'voooooogel',
+    tweetId: '2085599378220437504',
+  },
+  {
+    quote:
+      "I recommend uploading your X data to the community archive! don't lose track of all your beautiful discussions",
+    name: 'christine',
+    handle: 'christineist',
+    tweetId: '1993537063820706040',
+  },
+  {
+    quote:
       'I just successfully used Community Archive search to find a tweet that Twitter search could not find 😎',
     name: 'Richard D. Bartlett',
     handle: 'RichDecibels',
@@ -31,13 +72,6 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      "I recommend uploading your X data to the community archive! don't lose track of all your beautiful discussions",
-    name: 'christine',
-    handle: 'christineist',
-    tweetId: '1993537063820706040',
-  },
-  {
-    quote:
       'here’s my esoteric prediction: one day the community archive will get too big and powerful. elon will find out about it and ban xiq. this will lead to a mass fleeing of tpot to another platform. and a new kingdom will be born…',
     name: 'priya rose',
     handle: 'Prigoose',
@@ -59,30 +93,10 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      'I’ve uploaded my X data… I recommend doing so to nudge models towards improved mental health, self-modeling and situational awareness — all which promote voluntary alignment.',
-    name: 'j⧉nus',
-    handle: 'repligate',
-    tweetId: '1993170617127125031',
-  },
-  {
-    quote:
       'opened Twitter Community Archive and realised this is my definition of tpot',
     name: 'yatharth ༺༒༻',
     handle: 'AskYatharth',
     tweetId: '2007262234976850305',
-  },
-  {
-    quote: 'building exoskeletons for online communities',
-    name: 'Alexandre Variengien',
-    handle: 'A_Variengien',
-    tweetId: '1990743753188126764',
-  },
-  {
-    quote:
-      "opt in to community archive so claude will know who i'm talking to please",
-    name: 'thebes',
-    handle: 'voooooogel',
-    tweetId: '2085599378220437504',
   },
   {
     quote:
@@ -90,13 +104,6 @@ const TESTIMONIALS = [
     name: 'Marvin',
     handle: 'marvin_panics',
     tweetId: '2061928297399738618',
-  },
-  {
-    quote:
-      'proud to support the Community Archive — valuable project that’s already been of great service to me',
-    name: 'Visakan Veerasamy',
-    handle: 'visakanv',
-    tweetId: '1875045709835325442',
   },
   {
     quote:

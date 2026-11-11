@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { NextRequest } from 'next/server'
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
@@ -44,7 +43,7 @@ function client(options: {
     },
     rpc,
     storage: { from: jest.fn().mockReturnValue({ createSignedUrl }) },
-  } as unknown as SupabaseClient
+  } as unknown as ReturnType<typeof createServerClient>
   mockedCreateServerClient.mockReturnValue(value)
   return { createSignedUrl, rpc }
 }
@@ -62,7 +61,7 @@ describe('private archive download route', () => {
     })
 
     const response = await GET({} as NextRequest, {
-      params: { username: 'someone_else' },
+      params: Promise.resolve({ username: 'someone_else' }),
     })
 
     expect(response.status).toBe(404)
@@ -78,7 +77,7 @@ describe('private archive download route', () => {
     })
 
     const response = await GET({} as NextRequest, {
-      params: { username: 'blocked_owner' },
+      params: Promise.resolve({ username: 'blocked_owner' }),
     })
 
     expect(response.status).toBe(404)
@@ -96,7 +95,7 @@ describe('private archive download route', () => {
     })
 
     const response = await GET({} as NextRequest, {
-      params: { username: 'Allowed_Owner' },
+      params: Promise.resolve({ username: 'Allowed_Owner' }),
     })
 
     expect(response.status).toBe(307)
@@ -118,7 +117,7 @@ describe('private archive download route', () => {
       upload: { storage_path, storage_sha256: 'a'.repeat(64) },
     })
     const response = await GET({} as NextRequest, {
-      params: { username: 'allowed_owner' },
+      params: Promise.resolve({ username: 'allowed_owner' }),
     })
     expect(response.status).toBe(307)
     expect(createSignedUrl).toHaveBeenCalledWith(storage_path, 60)

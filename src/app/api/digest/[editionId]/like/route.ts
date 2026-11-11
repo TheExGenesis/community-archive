@@ -9,7 +9,7 @@ import {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-type Params = { params: { editionId: string } }
+type RouteParams = { editionId: string }
 
 async function likeCount(editionId: string) {
   const admin = createDigestAdminClient()
@@ -36,7 +36,7 @@ async function authorize(editionId: string): Promise<
     }
   }
 
-  const supabase = createDigestPublicClient(cookies())
+  const supabase = createDigestPublicClient(await cookies())
   const {
     data: { user },
     error: authError,
@@ -73,12 +73,16 @@ async function authorize(editionId: string): Promise<
  * Viewer-specific like state. The digest pages are ISR-cached and shared
  * between sessions, so the button hydrates its signed-in state from here.
  */
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   if (!UUID_PATTERN.test(params.editionId)) {
     return NextResponse.json({ error: 'Edition not found' }, { status: 404 })
   }
 
-  const supabase = createDigestPublicClient(cookies())
+  const supabase = createDigestPublicClient(await cookies())
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -102,7 +106,11 @@ export async function GET(_request: Request, { params }: Params) {
   })
 }
 
-export async function POST(_request: Request, { params }: Params) {
+export async function POST(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const result = await authorize(params.editionId)
   if ('error' in result) return result.error
 
@@ -125,7 +133,11 @@ export async function POST(_request: Request, { params }: Params) {
   })
 }
 
-export async function DELETE(_request: Request, { params }: Params) {
+export async function DELETE(
+  _request: Request,
+  { params: paramsPromise }: { params: Promise<RouteParams> },
+) {
+  const params = await paramsPromise
   const result = await authorize(params.editionId)
   if ('error' in result) return result.error
 

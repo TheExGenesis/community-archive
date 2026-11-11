@@ -150,11 +150,16 @@ export type NavIcon =
   | 'trends'
   | 'graph'
   | 'bulletin'
-  | 'apps'
+  | 'map'
+  | 'tube'
+  | 'ask'
+  | 'week'
 
 export interface NavMenuItem extends NavItem {
   description: string
   icon: NavIcon
+  /** Shown only while Ask the archive is visible to the viewer. */
+  requiresAsk?: true
 }
 
 export interface NavGroup {
@@ -168,32 +173,24 @@ export const isNavGroup = (entry: NavEntry): entry is NavGroup =>
   'items' in entry
 
 /**
- * Single source of truth for site navigation: Home, Today's Digest, three
- * grouped menus, then Research — the same for every audience.
+ * Single source of truth for site navigation: Home, Today's Digest, the
+ * archive menu, Community, the Tools menu of first-party products, then
+ * Research — the same for every audience.
  */
 export const getPrimaryNav = (): NavEntry[] => [
   { href: '/', label: 'Home' },
   { href: '/digest', label: "Today's Digest" },
   {
-    label: 'Ideas',
-    items: [
-      {
-        href: BANGERS_WEEK_HREF,
-        label: 'Bangers',
-        description: 'The best tweets of all time.',
-        icon: 'bangers',
-      },
-      {
-        href: '/strands',
-        label: 'Strands',
-        description: 'Follow ideas and narratives as they evolve over time.',
-        icon: 'strands',
-      },
-    ],
-  },
-  {
     label: 'Explore archive',
     items: [
+      {
+        href: '/search/ask',
+        label: 'Ask the archive',
+        description:
+          'Ask a question; an agent searches members’ tweets and cites them.',
+        icon: 'ask',
+        requiresAsk: true,
+      },
       {
         href: '/user-dir',
         label: 'Explore by user',
@@ -208,6 +205,48 @@ export const getPrimaryNav = (): NavEntry[] => [
         icon: 'stream',
       },
       {
+        href: '/digest/week',
+        label: 'The Week in Review',
+        description: "The week's top stories, woven from the daily digests.",
+        icon: 'week',
+      },
+    ],
+  },
+  { href: '/community', label: 'Community' },
+  {
+    label: 'Tools',
+    items: [
+      {
+        href: BANGERS_WEEK_HREF,
+        label: 'Bangers',
+        description: 'The best tweets of all time.',
+        icon: 'bangers',
+      },
+      {
+        href: '/strands',
+        label: 'Strands',
+        description: 'Follow ideas and narratives as they evolve over time.',
+        icon: 'strands',
+      },
+      {
+        href: '/conversation-map',
+        label: 'Conversation Map',
+        description: 'A zoomable map of each year’s most-quoted posts.',
+        icon: 'map',
+      },
+      {
+        href: '/tube',
+        label: 'CA Tube',
+        description: 'YouTube videos the community keeps sharing.',
+        icon: 'tube',
+      },
+      {
+        href: '/bulletin',
+        label: 'Bulletin Board',
+        description: 'Asks, offers, and opportunities across the community.',
+        icon: 'bulletin',
+      },
+      {
         href: '/trends',
         label: 'Trends',
         description: 'Discover what the community is talking about.',
@@ -218,23 +257,6 @@ export const getPrimaryNav = (): NavEntry[] => [
         label: 'Social Graph',
         description: 'Explore connections between people and ideas.',
         icon: 'graph',
-      },
-    ],
-  },
-  {
-    label: 'Community',
-    items: [
-      {
-        href: '/bulletin',
-        label: 'Bulletin Board',
-        description: 'Asks, offers, and opportunities across the community.',
-        icon: 'bulletin',
-      },
-      {
-        href: '/community',
-        label: 'Community Apps',
-        description: 'Explore tools and apps built on the Community Archive.',
-        icon: 'apps',
       },
     ],
   },
@@ -263,6 +285,13 @@ export function isNavItemActive(pathname: string, href: string): boolean {
     (itemPathname !== '/' && pathname.startsWith(`${itemPathname}/`))
   )
 }
+
+/** A group's items the viewer may see: Ask the archive only while visible. */
+export const visibleNavItems = (
+  group: NavGroup,
+  { askVisible }: { askVisible: boolean },
+): NavMenuItem[] =>
+  group.items.filter((item) => !item.requiresAsk || askVisible)
 
 export const isNavGroupActive = (pathname: string, group: NavGroup): boolean =>
   group.items.some((item) => isNavItemActive(pathname, item.href))

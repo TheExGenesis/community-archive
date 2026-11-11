@@ -9,8 +9,9 @@ const UUID_PATTERN =
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params: paramsPromise }: { params: Promise<{ id: string }> },
 ) {
+  const params = await paramsPromise
   if (!UUID_PATTERN.test(params.id)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

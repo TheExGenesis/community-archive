@@ -1,6 +1,13 @@
+import DigestStoryPage from '@/app/digest/[date]/[slug]/page'
+import { DigestStoryView } from '@/components/digest/DigestStoryView'
+import { loadDigestQuotePosts } from '@/lib/digest/quotePosts'
+jest.mock('@/lib/digest/quotePosts', () => ({
+  loadDigestQuotePosts: jest.fn(),
+}))
 import {
   Children,
   isValidElement,
+  type ComponentProps,
   type ReactElement,
   type ReactNode,
 } from 'react'
@@ -22,7 +29,13 @@ import {
   loadCommunityProjectLikeCounts,
   loadPublishedCommunityProjects,
 } from '@/lib/communityProjectDatabase'
-import { getPortalTrendSnapshot, startStreamData } from '@/lib/portal/data'
+import {
+  getCachedWeeklyTrends,
+  getPortalTrendSnapshot,
+  loadPortalComponentData,
+  startStreamData,
+} from '@/lib/portal/data'
+import GuestTrends from '@/components/portal/GuestTrends'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
 
 jest.mock('@/components/bulletin/BulletinBoard.module.css', () => ({}))
@@ -44,6 +57,7 @@ jest.mock('@/lib/communityProjectDatabase', () => ({
 }))
 jest.mock('@/lib/portal/data', () => ({
   startStreamData: jest.fn(),
+  getCachedWeeklyTrends: jest.fn(),
   getPortalTrendSnapshot: jest.fn(),
   loadPortalComponentData: jest.fn(),
 }))
@@ -58,14 +72,17 @@ jest.mock('@/components/digest/DigestMarkdown', () => ({
 }))
 
 const pending = new Promise<never>(() => {})
-function find(
+function find<Props>(
   node: ReactNode,
-  predicate: (element: ReactElement) => boolean,
-): ReactElement | undefined {
-  if (!isValidElement<{ children?: ReactNode }>(node)) return undefined
-  if (predicate(node)) return node
+  predicate: (
+    element: ReactElement<{ children?: ReactNode; result?: unknown }>,
+  ) => boolean,
+): ReactElement<Props> | undefined {
+  if (!isValidElement<{ children?: ReactNode; result?: unknown }>(node))
+    return undefined
+  if (predicate(node)) return node as ReactElement<Props>
   for (const child of Children.toArray(node.props.children)) {
-    const result = find(child, predicate)
+    const result = find<Props>(child, predicate)
     if (result) return result
   }
 }
@@ -78,7 +95,10 @@ test('published article is available while calendar and viewer reads remain pend
   const page = await DigestPage()
   expect(page.type).toBe(PublishedDigestView)
   const view = PublishedDigestView(page.props)
-  const article = find(view, (node) => node.type === DigestEditionView)!
+  const article = find<ComponentProps<typeof DigestEditionView>>(
+    view,
+    (node) => node.type === DigestEditionView,
+  )!
   expect(article.props.edition.content).toBe(AUGUST_11_MOCK_DIGEST.content)
   expect(getDigestLikeState).not.toHaveBeenCalled()
   expect(getCurrentUser).not.toHaveBeenCalled()
@@ -99,19 +119,46 @@ test('live tweets resolve while optional corpus totals remain pending', async ()
     stats: pending,
   })
   const page = StreamPage()
-  const feed = find(
+  const feed = find<{ result: ReturnType<typeof startStreamData>['tweets'] }>(
     page,
     (node) =>
       node.props.result ===
       jest.mocked(startStreamData).mock.results[0].value.tweets,
   )!
-  const result = await (feed.type as Function)(feed.props)
+  const result = await (
+    feed.type as (
+      props: typeof feed.props,
+    ) => Promise<ReactElement<ComponentProps<typeof StreamFeed>>>
+  )(feed.props)
   expect(result.type).toBe(StreamFeed)
   expect(result.props.failed).toBe(false)
 })
 
-test('signed-out Trends still redirects before requesting analytical data', async () => {
+test('signed-out Trends previews cached terms without explorer reads', async () => {
   jest.mocked(getIsMember).mockResolvedValue(false)
-  await expect(TrendsPage({})).rejects.toThrow('redirect')
+  jest
+    .mocked(loadPortalComponentData)
+    .mockResolvedValue({ data: [], failed: false })
+  const page = await TrendsPage({})
+  expect(page.type).toBe(GuestTrends)
+  expect(jest.mocked(loadPortalComponentData).mock.calls[0][1]).toBe(
+    getCachedWeeklyTrends,
+  )
   expect(getPortalTrendSnapshot).not.toHaveBeenCalled()
+})
+
+test('story article resolves without waiting for archived quote posts', async () => {
+  jest.mocked(getPublishedDigest).mockResolvedValue(AUGUST_11_MOCK_DIGEST)
+  jest.mocked(loadDigestQuotePosts).mockReturnValue(pending)
+  const story = AUGUST_11_MOCK_DIGEST.content.stories[0]
+  const page = await DigestStoryPage({
+    params: Promise.resolve({
+      date: AUGUST_11_MOCK_DIGEST.digestDate,
+      slug: story.slug,
+    }),
+  })
+  expect(page.type).toBe(DigestStoryView)
+  expect(page.props.story.title).toBe(story.title)
+  expect(page.props.archivedQuotes.props.fallback.props.role).toBe('status')
+  expect(loadDigestQuotePosts).not.toHaveBeenCalled()
 })

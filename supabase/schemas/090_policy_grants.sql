@@ -2,6 +2,13 @@
 -- it and narrows privileges, so schema rebuilds cannot re-expose write access
 -- or policy-sensitive snapshots.
 
+-- prod.sql retains legacy GRANT ALL statements for this public counter.
+-- Public roles may read it, while only trusted service code may mutate it.
+REVOKE ALL PRIVILEGES ON TABLE "public"."scraper_count"
+  FROM PUBLIC, "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."scraper_count" TO "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."scraper_count" TO "service_role";
+
 -- These tables are populated only by trusted service-role routes and workers.
 -- Public/authenticated clients retain read access but no direct write grants.
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE
@@ -259,3 +266,6 @@ GRANT EXECUTE ON FUNCTION public.create_public_api_key(uuid,text,text,text,text)
 GRANT EXECUTE ON FUNCTION public.list_public_api_keys(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.revoke_public_api_key(uuid,text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.verify_public_api_key(text,text) TO service_role;
+
+REVOKE ALL ON TABLE public.directory_hidden_users FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.directory_hidden_users TO service_role;

@@ -1,13 +1,14 @@
-import { redirect } from 'next/navigation'
 import PortalComponentErrorBoundary from '@/components/portal/PortalComponentErrorBoundary'
+import GuestTrends from '@/components/portal/GuestTrends'
 import TrendsExplorer from '@/components/portal/TrendsExplorer'
 import { getIsMember } from '@/lib/portal/auth'
-import { loginHref } from '@/lib/authRedirect'
 import {
+  getCachedWeeklyTrends,
   getPortalTrendSnapshot,
   loadPortalComponentData,
 } from '@/lib/portal/data'
 import { emptyPortalTrends } from '@/lib/portal/trendConfig'
+import { getRecentTrendStoryDaysSafe } from '@/lib/trendStories/data'
 
 export const metadata = { title: 'Trends · Community Archive' }
 export const maxDuration = 60
@@ -27,19 +28,34 @@ function serializedSearchParams(
 }
 
 export default async function TrendsPage({
-  searchParams = {},
+  searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const initialSearch = serializedSearchParams(searchParams)
+  const initialSearch = serializedSearchParams((await searchParams) ?? {})
+  // Cookie-less visitors get the cached /guest/trends render from the
+  // middleware; this covers expired sessions with the same cached data.
   if (!(await getIsMember())) {
-    redirect(loginHref(`/trends${initialSearch ? `?${initialSearch}` : ''}`))
+    const [weekly, storyDays] = await Promise.all([
+      loadPortalComponentData('guest-trends', getCachedWeeklyTrends, []),
+      getRecentTrendStoryDaysSafe(),
+    ])
+    return (
+      <GuestTrends
+        weekly={weekly.data}
+        failed={weekly.failed}
+        storyDays={storyDays}
+      />
+    )
   }
-  const initial = await loadPortalComponentData(
-    'trends-explorer',
-    getPortalTrendSnapshot,
-    emptyPortalTrends(),
-  )
+  const [initial, storyDays] = await Promise.all([
+    loadPortalComponentData(
+      'trends-explorer',
+      getPortalTrendSnapshot,
+      emptyPortalTrends(),
+    ),
+    getRecentTrendStoryDaysSafe(),
+  ])
 
   return (
     <PortalComponentErrorBoundary componentName="Trends explorer">
@@ -47,6 +63,7 @@ export default async function TrendsPage({
         initialTrends={initial.data}
         initialLoadFailed={initial.failed}
         initialSearch={initialSearch}
+        storyDays={storyDays}
       />
     </PortalComponentErrorBoundary>
   )

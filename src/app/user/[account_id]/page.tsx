@@ -1,3 +1,5 @@
+import { getBrowsingUser } from '@/lib/browsingAuth'
+import GuestProfile from '@/components/metaTwitter/GuestProfile'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
@@ -29,6 +31,7 @@ import {
   resolveProfileCore,
   withBackfilledMedia,
 } from '@/lib/metaTwitter/profile'
+import { profileMetadata } from '@/lib/metaTwitter/profileMetadata'
 import { getCachedProfileLinks } from '@/lib/profileLinks'
 import { measureServerRead } from '@/lib/performance/server'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
@@ -39,45 +42,24 @@ import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
 // A cold profile waits on several gateway reads; Vercel's 15s default cut
 // streamed renders off mid-way (504).
+export const dynamic = 'force-dynamic'
+
 export const maxDuration = 60
 
 interface PageProps {
-  params: { account_id: string }
-  searchParams: { chapter?: string; section?: string; username?: string }
+  params: Promise<{ account_id: string }>
+  searchParams: Promise<{
+    chapter?: string
+    section?: string
+    username?: string
+  }>
 }
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const resolved = await resolveProfileCore(params.account_id)
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { account_id } = await params
+  const resolved = await resolveProfileCore(account_id)
   if (!resolved) return { title: 'User not found' }
-  const { accountId, isMember, profile } = resolved
-  const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
-  const normalizedBio = profile.bio?.replace(/\s+/g, ' ').trim()
-  const description = normalizedBio
-    ? normalizedBio.length > 200
-      ? `${normalizedBio.slice(0, 199).trimEnd()}…`
-      : normalizedBio
-    : `Explore @${profile.username}'s archived posts on Community Archive.`
-  const canonicalPath = userProfileHref(profile.username, accountId)
-  return {
-    title,
-    description,
-    alternates: { canonical: canonicalPath },
-    // Only people who joined the archive are offered to search engines.
-    ...(isMember ? {} : { robots: { index: false } }),
-    openGraph: {
-      type: 'website',
-      url: canonicalPath,
-      title,
-      description,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-    },
-  }
+  return profileMetadata(resolved)
 }
 
 async function ProfileArchiveContent({
@@ -150,12 +132,19 @@ async function ProfileArchivedAt({ accountId }: { accountId: string }) {
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
-  const resolved = await resolveProfileCore(params.account_id)
+  const [{ account_id }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ])
+  const [viewer, resolved] = await Promise.all([
+    getBrowsingUser(),
+    resolveProfileCore(account_id),
+  ])
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
-  const requestedYear = searchParams.chapter
-    ? Number.parseInt(searchParams.chapter, 10)
+  const requestedYear = resolvedSearchParams.chapter
+    ? Number.parseInt(resolvedSearchParams.chapter, 10)
     : null
   const candidateYear =
     requestedYear &&
@@ -167,12 +156,12 @@ export default async function UserPage({ params, searchParams }: PageProps) {
   // the archive content; here it only has to be shaped like a slug.
   const candidateSection =
     candidateYear &&
-    searchParams.section &&
-    /^[a-z0-9-]{1,64}$/.test(searchParams.section)
-      ? searchParams.section
+    resolvedSearchParams.section &&
+    /^[a-z0-9-]{1,64}$/.test(resolvedSearchParams.section)
+      ? resolvedSearchParams.section
       : null
 
-  const requestedProfilePath = `/user/${encodeURIComponent(params.account_id)}`
+  const requestedProfilePath = `/user/${encodeURIComponent(account_id)}`
   const canonicalProfilePath = userProfileHref(profile.username, accountId)
   if (canonicalProfilePath !== requestedProfilePath) {
     const canonicalParams = new URLSearchParams()
@@ -181,6 +170,20 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     const canonicalQuery = canonicalParams.toString()
     redirect(
       `${canonicalProfilePath}${canonicalQuery ? `?${canonicalQuery}` : ''}`,
+    )
+  }
+
+  // Guest document requests are rewritten to the cached /guest route by the
+  // middleware; this covers anything that still reaches the dynamic page.
+  if (!viewer) {
+    return (
+      <GuestProfile
+        displayName={profile.account_display_name}
+        username={profile.username}
+        bio={profile.bio}
+        avatarUrl={profile.avatar_media_url}
+        basePath={canonicalProfilePath}
+      />
     )
   }
 
@@ -272,6 +275,7 @@ async function OptionalProfileBanner({
       src={`${url.replace(/\/$/, '')}/1500x500`}
       alt=""
       fill
+      unoptimized
       sizes="(max-width: 1220px) 100vw, 1220px"
       className="object-cover"
     />

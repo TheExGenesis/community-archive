@@ -36,7 +36,7 @@ const detail = {
 } as TweetData
 const call = () =>
   GET(new Request('http://localhost/api/bulletin/tweet/123'), {
-    params: { id: '123' },
+    params: Promise.resolve({ id: '123' }),
   })
 beforeEach(() => {
   jest.resetAllMocks()
@@ -57,13 +57,18 @@ beforeEach(() => {
 })
 test('starts independent reads together but does not publish until consent state resolves', async () => {
   let release!: (state: { notices: StoredNotice[] }) => void
-  jest.mocked(loadBulletinBoardState).mockReturnValue(
-    new Promise((resolve) => {
+  let markReadStarted!: () => void
+  const readStarted = new Promise<void>((resolve) => {
+    markReadStarted = resolve
+  })
+  jest.mocked(loadBulletinBoardState).mockImplementation(() => {
+    markReadStarted()
+    return new Promise((resolve) => {
       release = resolve
-    }),
-  )
+    })
+  })
   const response = call()
-  await Promise.resolve()
+  await readStarted
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(1)
   expect(fetchClickHouseTweetThreadPageData).toHaveBeenCalledTimes(1)
   release({ notices: [notice] })

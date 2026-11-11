@@ -6,14 +6,13 @@ import {
 import { Petrona, Manrope } from 'next/font/google'
 import ThemeProvider from '@/providers/ThemeProvider'
 import NextTopLoader from 'nextjs-toploader'
-import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
 import PostHogProvider from '@/providers/PostHogProvider'
 import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
-import dynamic from 'next/dynamic'
+import DynamicSignIn from '@/components/DynamicSignIn'
 import HeaderSearch from '@/components/HeaderSearch'
 import { ArchiveSearchProvider } from '@/components/ArchiveSearchProvider'
 import MobileMenu from '@/components/MobileMenu'
@@ -29,10 +28,6 @@ import {
 import HeaderNavigation from '@/components/HeaderNavigation'
 import MobileNavigation from '@/components/MobileNavigation'
 import { getMobileNav, getPrimaryNav, getUtilityNav } from '@/lib/navigation'
-
-const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
-  ssr: false,
-})
 
 // Headings use Petrona (serif); body uses Manrope (sans).
 const petrona = Petrona({
@@ -152,7 +147,6 @@ export default function RootLayout({
                     </NavigationAudienceProvider>
                     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
                       {children}
-                      <Analytics />
                       <Footer />
                     </div>
                     <div className="hidden min-[980px]:block">

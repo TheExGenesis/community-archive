@@ -8,10 +8,15 @@ export const revalidate = 300
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
-export default async function Image({ params }: { params: { date: string } }) {
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ date: string }>
+}) {
+  const { date } = await params
   return digestEditionCard(
-    DATE_PATTERN.test(params.date)
-      ? await getPublishedDigest(params.date)
+    DATE_PATTERN.test(date)
+      ? await getPublishedDigest(date)
       : null,
   )
 }

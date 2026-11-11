@@ -1,3 +1,4 @@
+jest.mock('@/lib/browsingAuth', () => ({ browsingAuthError: async () => null }))
 import { NextRequest } from 'next/server'
 import { GET as getBangers } from '@/app/api/profile/[account_id]/bangers/route'
 import { GET as getInteractions } from '@/app/api/profile/[account_id]/interactions/route'
@@ -53,7 +54,7 @@ test('serves a bounded profile banger page', async () => {
     new NextRequest(
       'https://community-archive.org/api/profile/42/bangers?year=2025&offset=2&limit=2&sort=likes',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(200)
@@ -71,7 +72,7 @@ test('rejects invalid profile pagination without calling ClickHouse', async () =
     new NextRequest(
       'https://community-archive.org/api/profile/42/bangers?offset=-1',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(400)
@@ -83,7 +84,7 @@ test('rejects unknown profile sort modes instead of changing their meaning', asy
     new NextRequest(
       'https://community-archive.org/api/profile/42/bangers?sort=popular',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(400)
@@ -91,7 +92,7 @@ test('rejects unknown profile sort modes instead of changing their meaning', asy
   expect(getProfileBangersPageMock).not.toHaveBeenCalled()
 })
 
-test('serves the cached year-scoped profile sidebar', async () => {
+test('serves the year-scoped profile sidebar without shared HTTP caching', async () => {
   getClickHouseProfileSidebarOrThrowMock.mockResolvedValue({
     media: [],
     mediaCount: 0,
@@ -102,18 +103,18 @@ test('serves the cached year-scoped profile sidebar', async () => {
     new NextRequest(
       'https://community-archive.org/api/profile/42/sidebar?year=2024',
     ),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(200)
-  expect(response.headers.get('cache-control')).toContain('s-maxage=86400')
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
   expect(getClickHouseProfileSidebarOrThrowMock).toHaveBeenCalledWith(
     '42',
     2024,
   )
 })
 
-test('serves independently cached profile media and interactions', async () => {
+test('serves profile media and interactions without shared HTTP caching', async () => {
   getClickHouseProfileMediaOrThrowMock.mockResolvedValue({
     media: [],
     mediaCount: 0,
@@ -125,19 +126,19 @@ test('serves independently cached profile media and interactions', async () => {
       new NextRequest(
         'https://community-archive.org/api/profile/42/media?year=2024',
       ),
-      { params: { account_id: '42' } },
+      { params: Promise.resolve({ account_id: '42' }) },
     ),
     getInteractions(
       new NextRequest(
         'https://community-archive.org/api/profile/42/interactions?year=2024',
       ),
-      { params: { account_id: '42' } },
+      { params: Promise.resolve({ account_id: '42' }) },
     ),
   ])
 
   expect(media.status).toBe(200)
   expect(interactions.status).toBe(200)
-  expect(media.headers.get('cache-control')).toContain('s-maxage=86400')
+  expect(media.headers.get('cache-control')).toBe('private, no-store')
   expect(interactions.headers.get('cache-control')).toBe('private, no-store')
   expect(getClickHouseProfileMediaOrThrowMock).toHaveBeenCalledWith('42', 2024)
   expect(getClickHouseProfileInteractionsOrThrowMock).toHaveBeenCalledWith(
@@ -154,7 +155,7 @@ test('does not cache a transient profile sidebar failure as empty data', async (
 
   const response = await getSidebar(
     new NextRequest('https://community-archive.org/api/profile/42/sidebar'),
-    { params: { account_id: '42' } },
+    { params: Promise.resolve({ account_id: '42' }) },
   )
 
   expect(response.status).toBe(502)

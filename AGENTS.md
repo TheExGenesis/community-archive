@@ -14,7 +14,12 @@
   uploads, opt-outs, and transactional policy state. ClickHouse is a rebuildable
   analytical projection, never the write authority for those decisions.
 - A member has uploaded an archive or explicitly opted in. Explicit opt-out
-  takes precedence in every public, ingestion, and analytical serving path.
+  takes precedence over membership.
+- Opt-outs are enforced at ingestion and removal time: opted-out content is
+  never written, and is removed or tombstoned when an opt-out lands. Serving
+  paths therefore read stored data as-is. Do not add per-request opt-out
+  rechecks to read or API paths; they duplicate ingestion enforcement and cost
+  seconds on hot pages. Existing serving-time rechecks are legacy.
 - Preserve the archive privacy boundary: process archive data locally where
   designed and never add private messages or unrelated sensitive data to
   uploaded or public datasets.
@@ -68,6 +73,11 @@
 - Treat new gateway routes as gateway-first dependencies: verify and release the
   gateway before a frontend that requires them. The gateway contract and
   production procedure live in the control-panel repository.
+- Every new page, feature, or tool ships with product analytics in the same
+  change: register each new page route in `src/lib/analyticsRoutes.ts`, and
+  capture its main interactions with `captureProductAction` (add the feature
+  and actions to `src/lib/productActionSchema.ts`). Events carry no content,
+  IDs, search strings, or labels, and PostHog records signed-in users only.
 - Use `src/components/TweetCard.tsx` for full-fidelity tweet rendering and
   `src/lib/tweetText.ts` for archive text normalization. Preserve complete text,
   media, and quoted-tweet payloads in adapters.

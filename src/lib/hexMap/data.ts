@@ -1,37 +1,27 @@
 import 'server-only'
-import { cookies } from 'next/headers'
-import { createServerServiceRoleClient } from '@/utils/supabase'
-import { createDigestPublicClient } from '@/lib/digest/database'
-import { getPublishedDigest, mapDigestEdition } from '@/lib/digest/data'
+import {
+  getPublishedDigest,
+  getPublishedDigestEditions,
+} from '@/lib/digest/data'
 import { getPreviewDigestEdition } from '@/lib/digest/mock'
-import { getAppPolicy, getStrands } from '@/lib/community-apps/data'
+import { getStrands } from '@/lib/community-apps/data'
+import { readMembers } from '@/lib/directoryMembers'
 import { filterStrands } from '@/lib/community-apps/strand-list'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import type { PortalTweet } from '@/lib/portal/types'
-import { locate } from './gateway'
+import { locate, type MapLookup } from './gateway'
+import { measureServerRead } from '@/lib/performance/server'
 import snapshot from './snapshot.json'
 import { selectStories } from './selectStories'
 import type { MapStory, StoryPage, StoryDetail } from './stories'
 
-// Recheck current membership as well as opt-outs even for published snapshots.
-// Top-level posts must be members; quoted context follows the permalink opt-out policy.
+// Top-level posts must come from current members. Opt-outs are enforced at
+// ingestion, so stored quoted context is served as-is.
 export async function memberTweets(
   tweets: PortalTweet[],
 ): Promise<PortalTweet[]> {
-  const policy = await getAppPolicy(tweets.map((t) => t.username))
-  const allowed = (t: { username: string; accountId?: string }) =>
-    policy.members.has(t.username.toLowerCase()) &&
-    !policy.blocked.has(t.username.toLowerCase()) &&
-    !policy.blockedIds.has(t.accountId ?? '')
-  return tweets.filter(allowed).map((t) => ({
-    ...t,
-    quotedTweet:
-      t.quotedTweet &&
-      !policy.blocked.has(t.quotedTweet.username.toLowerCase()) &&
-      !policy.blockedIds.has(t.quotedTweet.accountId ?? '')
-        ? t.quotedTweet
-        : undefined,
-  }))
+  const { members } = await readMembers(tweets.map((t) => t.username))
+  return tweets.filter((t) => members.has(t.username.toLowerCase()))
 }
 
 function people(tweets: PortalTweet[]) {
@@ -45,10 +35,21 @@ function people(tweets: PortalTweet[]) {
   )
 }
 
+// Location candidates are private server-side input. Only freshly checked
+// members contribute people or cells to the response. Location failures remain
+// optional for browse, but community-filtered requests fail closed.
+async function storyLocations(names: string[]): Promise<MapLookup | null> {
+  try {
+    return await measureServerRead('map.stories.locations', () => locate(names))
+  } catch {
+    return null
+  }
+}
+
 async function unlocatedStoryPage(
   kind: 'digest' | 'strand',
   offset: number,
-): Promise<StoryPage> {
+): Promise<{ page: StoryPage; lookup: MapLookup | null }> {
   if (kind === 'strand') {
     const { strands } = await getStrands()
     const sorted = filterStrands(strands, '')
@@ -62,27 +63,7 @@ async function unlocatedStoryPage(
           .map((name) => name.toLowerCase()),
       ),
     ).filter((name) => /^[a-z0-9_]{1,15}$/.test(name))
-    const policy = await getAppPolicy(names)
-    const avatars = new Map<string, string | null>()
-    const admin = createServerServiceRoleClient()
-    const members = names.filter(
-      (name) => policy.members.has(name) && !policy.blocked.has(name),
-    )
-    for (let start = 0; start < members.length; start += 40) {
-      const { data, error } = await admin
-        .from('user_directory')
-        .select('username,avatar_media_url')
-        .or(
-          members
-            .slice(start, start + 40)
-            .map((name) => `username.ilike.${name}`)
-            .join(','),
-        )
-      if (error) throw new Error('Member avatars unavailable')
-      for (const row of data ?? [])
-        if (row.username)
-          avatars.set(row.username.toLowerCase(), row.avatar_media_url)
-    }
+    const policy = await readMembers(names)
     const stories: MapStory[] = page.map((s) => ({
       id: s.id,
       kind,
@@ -99,43 +80,44 @@ async function unlocatedStoryPage(
           ),
         ),
       )
-        .filter((name) => policy.members.has(name) && !policy.blocked.has(name))
+        .filter((name) => policy.members.has(name))
         .map((username) => ({
           username,
-          avatar: avatars.get(username) ?? null,
+          avatar: policy.avatars.get(username) ?? null,
         })),
       cells: [],
     }))
     return {
-      stories,
-      editions: [],
-      nextOffset:
-        offset + page.length < sorted.length ? offset + page.length : null,
-      located: false,
+      page: {
+        stories,
+        editions: [],
+        nextOffset:
+          offset + page.length < sorted.length ? offset + page.length : null,
+        located: false,
+      },
+      lookup: await storyLocations(
+        stories.flatMap((s) => s.people.map((p) => p.username)),
+      ),
     }
   }
   const preview = getPreviewDigestEdition()
   let editions
   if (preview) editions = offset === 0 ? [preview] : []
-  else {
-    const { data, error } = await createDigestPublicClient(cookies())
-      .from('digest_editions')
-      .select('*')
-      .eq('status', 'published')
-      .order('digest_date', { ascending: false })
-      .range(offset, offset + 1)
-    if (error) throw new Error('Digest unavailable')
-    editions = (data ?? [])
-      .map(mapDigestEdition)
-      .filter((d): d is NonNullable<typeof d> => d !== null)
-  }
-  const allowed = await memberTweets(
-    editions.flatMap((e) =>
-      e.content.stories.flatMap((s) => [...s.bangers, ...s.commentary]),
-    ),
+  else editions = await getPublishedDigestEditions(offset)
+  const tweets = editions.flatMap((e) =>
+    e.content.stories.flatMap((s) => [...s.bangers, ...s.commentary]),
   )
+  const names = Array.from(new Set(tweets.map((t) => t.username.toLowerCase())))
+  // Overlap independent reads. If candidates exceed the gateway limit, locate
+  // the filtered members afterward as before.
+  const pendingLookup = names.length <= 300 ? storyLocations(names) : undefined
+  const allowed = await measureServerRead('map.stories.members', () =>
+    memberTweets(tweets),
+  )
+  const lookup = await (pendingLookup ??
+    storyLocations(allowed.map((t) => t.username)))
   const byId = new Map(allowed.map((t) => [t.id, t]))
-  return {
+  const page: StoryPage = {
     stories: [],
     editions: editions.map((e) => ({
       date: e.digestDate,
@@ -160,6 +142,7 @@ async function unlocatedStoryPage(
     nextOffset: !preview && editions.length === 2 ? offset + 2 : null,
     located: false,
   }
+  return { page, lookup }
 }
 
 export async function storyDetail(
@@ -214,12 +197,9 @@ export async function storyPage(
   offset: number,
   cells: number[] = [],
 ): Promise<StoryPage> {
-  const page = await unlocatedStoryPage(kind, offset)
+  const { page, lookup } = await unlocatedStoryPage(kind, offset)
   const stories = [...page.stories, ...page.editions.flatMap((e) => e.stories)]
-  try {
-    const lookup = await locate(
-      stories.flatMap((s) => s.people.map((p) => p.username)),
-    )
+  if (lookup) {
     const byName = new Map(
       lookup.people.map((p) => [p.username.toLowerCase(), p.cell]),
     )
@@ -246,8 +226,8 @@ export async function storyPage(
             )?.short
     }
     page.located = true
-  } catch {
-    if (cells.length) throw new Error('Story locations unavailable')
+  } else if (cells.length) {
+    throw new Error('Story locations unavailable')
   }
   return selectStories(page, cells, snapshot)
 }

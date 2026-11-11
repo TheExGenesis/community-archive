@@ -404,7 +404,9 @@ async function postBatch(
 }
 
 export async function publishCanonicalArchiveBatch(options: {
-  batch: ArchiveClickHouseBatch
+  /** One batch, or the bounded batches of a large archive (built lazily). */
+  batch?: ArchiveClickHouseBatch
+  batches?: Iterable<ArchiveClickHouseBatch>
   manifest: ArchiveClickHouseManifest
   policyVersion: string
   reportDir: string
@@ -412,35 +414,37 @@ export async function publishCanonicalArchiveBatch(options: {
 }): Promise<CanonicalPublishReport | { status: 'disabled' }> {
   if (!canonicalArchivePublishingEnabled()) return { status: 'disabled' }
   const config = publisherConfig()
-  const events = buildCanonicalArchiveMutations(options.batch)
+  const batches = options.batches ?? (options.batch ? [options.batch] : [])
   const reportPath = canonicalArchiveReportPath(
     options.reportDir,
     options.manifest.archiveUploadId,
   )
-  const report = newReport(
-    options.manifest,
-    events.length,
-    options.policyVersion,
-  )
+  // event_count grows as each archive batch is converted and published.
+  const report = newReport(options.manifest, 0, options.policyVersion)
   writeReport(reportPath, report)
 
   try {
-    for (const [index, eventBatch] of chunks(events, config.batchSize).entries()) {
-      const hash = `batch-${index}`
-      const duplicateCount = await postBatch(
-        config,
-        { source: SOURCE, source_run_id: `archive:${options.manifest.archiveUploadId}`,
-          source_batch_id: hash, observed_at: new Date(Number(eventBatch[0].version)).toISOString(),
-          mutations: eventBatch },
-        options.fetchImpl ?? fetch,
-      )
-      report.completed_batches[hash] = {
-        event_count: eventBatch.length,
-        duplicate_count: duplicateCount,
-        completed_at: new Date().toISOString(),
+    let index = 0
+    for (const archiveBatch of batches) {
+      const events = buildCanonicalArchiveMutations(archiveBatch)
+      report.event_count += events.length
+      for (const eventBatch of chunks(events, config.batchSize)) {
+        const hash = `batch-${index++}`
+        const duplicateCount = await postBatch(
+          config,
+          { source: SOURCE, source_run_id: `archive:${options.manifest.archiveUploadId}`,
+            source_batch_id: hash, observed_at: new Date(Number(eventBatch[0].version)).toISOString(),
+            mutations: eventBatch },
+          options.fetchImpl ?? fetch,
+        )
+        report.completed_batches[hash] = {
+          event_count: eventBatch.length,
+          duplicate_count: duplicateCount,
+          completed_at: new Date().toISOString(),
+        }
+        report.updated_at = new Date().toISOString()
+        writeReport(reportPath, report)
       }
-      report.updated_at = new Date().toISOString()
-      writeReport(reportPath, report)
     }
     report.status = 'complete'
     delete report.last_error_code

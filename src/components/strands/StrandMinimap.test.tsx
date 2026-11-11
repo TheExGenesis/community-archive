@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { fireEvent, render, screen } from '@testing-library/react'
 import StrandMinimap from './StrandMinimap'
 import { StrandFocusProvider, StrandCardFocus } from './StrandFocus'
@@ -28,7 +29,7 @@ function setup() {
   return render(
     <StrandFocusProvider>
       <StrandCardFocus id="1">
-        <a href="/strands/1">Strand card</a>
+        <Link href="/strands/1">Strand card</Link>
       </StrandCardFocus>
       <StrandMinimap strands={strands} />
     </StrandFocusProvider>,

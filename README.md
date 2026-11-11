@@ -17,7 +17,7 @@ and resolve the latest pointer each time; older download links expire. See the
 
 ## How to use the API (from your own app)
 
-See [API docs](docs/api-doc.md) for how to access the archive's supabase DB.
+See [API docs](docs/api-doc.md) for the keyed API v1, the bulk Parquet export, the open [semantic search API](docs/api-doc.md#semantic-search-api), and the legacy Supabase REST API.
 
 See also this [Google colab notebook](https://colab.research.google.com/drive/109XOgTWj-sajpAYhDCNPfts5zvdkpi_s) for an example you can run in your browser that fetches tweets from the archive for a specific user and runs some basic analysis.
 

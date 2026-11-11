@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
+  Sparkles,
   SlidersHorizontal,
   X,
 } from 'lucide-react'
@@ -22,8 +23,18 @@ import {
   parseSearchExpression,
   SearchFilterKey,
 } from '@/lib/searchParams'
+import { buildAskHref, isAskShortcut } from '@/lib/askFromSearch'
+import {
+  AskSignInPopover,
+  useAskFromSearch,
+} from '@/components/AskSignInPopover'
+import { useAskShortcutLabel } from '@/lib/useAskShortcutLabel'
 
-export default function AdvancedSearchForm() {
+export default function AdvancedSearchForm({
+  allowUserSuggestions = true,
+}: {
+  allowUserSuggestions?: boolean
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -85,6 +96,26 @@ export default function AdvancedSearchForm() {
     router.push(params.size > 0 ? `/search?${params.toString()}` : '/search')
   }
 
+  // Hands the same query and filters to Ask the archive, which prefills its
+  // box; nothing is asked until the member presses Ask there.
+  const goAsk = () => {
+    if (!query.trim()) return
+    capturePostHogEvent('search_interface_action', {
+      action: 'ask_from_search',
+      has_query: Boolean(parseSearchExpression(query).words.length),
+      active_filter_count: activeFilters.length,
+    })
+    router.push(buildAskHref(query))
+  }
+  // Signed out, asking explains and offers sign-in instead.
+  const {
+    ask: askInstead,
+    explaining,
+    setExplaining,
+    available: canAsk,
+  } = useAskFromSearch(goAsk)
+  const shortcut = useAskShortcutLabel()
+
   const activeFilters = [
     { key: 'from' as const, label: 'From', value: from },
     { key: 'to' as const, label: 'To', value: to },
@@ -113,22 +144,71 @@ export default function AdvancedSearchForm() {
       <div className="flex flex-col gap-2.5 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <UserSearchInput
-            id="main-search"
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Search words, phrases, or from:username"
-            className="h-10 rounded-lg bg-background pl-10 pr-4 text-sm"
-            autoComplete="off"
-          />
+          {allowUserSuggestions ? (
+            <UserSearchInput
+              id="main-search"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search words, phrases, or from:username"
+              className="h-10 rounded-lg bg-background pl-10 pr-4 text-sm"
+              autoComplete="off"
+              onKeyDownCapture={(event) => {
+                if (!isAskShortcut(event)) return
+                event.preventDefault()
+                askInstead()
+              }}
+            />
+          ) : (
+            <Input
+              id="main-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search words, phrases, or from:username"
+              className="h-10 rounded-lg bg-background pl-10 pr-4 text-sm"
+              autoComplete="off"
+              onKeyDownCapture={(event) => {
+                if (!isAskShortcut(event)) return
+                event.preventDefault()
+                askInstead()
+              }}
+            />
+          )}
         </div>
-        <Button
-          type="submit"
-          className="h-10 bg-brand px-6 text-brand-foreground hover:bg-brand/90"
-        >
-          <Search className="mr-2 h-4 w-4" />
-          Search
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="submit"
+            className="h-10 flex-1 bg-brand px-6 text-brand-foreground hover:bg-brand/90 sm:flex-none"
+          >
+            <Search className="mr-2 h-4 w-4" />
+            Search
+          </Button>
+          {canAsk && (
+            <AskSignInPopover
+              open={explaining}
+              onOpenChange={setExplaining}
+              question={query}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                onClick={askInstead}
+                disabled={!query.trim()}
+                title="Ask the archive: reads the tweets and writes a cited answer"
+                className="h-10 gap-2 bg-background px-4 text-muted-foreground hover:text-foreground"
+              >
+                <Sparkles aria-hidden="true" className="h-4 w-4" />
+                Ask AI
+                <kbd
+                  aria-hidden="true"
+                  className="hidden rounded border border-border px-1 font-sans text-[11px] leading-4 text-muted-foreground sm:inline"
+                >
+                  {shortcut}↵
+                </kbd>
+              </Button>
+            </AskSignInPopover>
+          )}
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">

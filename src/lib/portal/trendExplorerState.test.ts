@@ -56,13 +56,13 @@ describe('trend explorer URL state', () => {
   })
 })
 
-test('starts with the last 15 days and honors explicit shared chart resolution', () => {
-  expect(
-    parseTrendExplorerState('', ['astra', 'navier stokes']),
-  ).toMatchObject({ granularity: 'day', timeline: '15d' })
+test('starts with the last 12 weeks and honors explicit shared chart resolution', () => {
+  expect(parseTrendExplorerState('', ['astra', 'navier stokes'])).toMatchObject(
+    { granularity: 'week', timeline: '12w' },
+  )
   expect(
     parseTrendExplorerState('q=blender&axis=log', ['astra']),
-  ).toMatchObject({ terms: ['blender'], granularity: 'day', timeline: '15d' })
+  ).toMatchObject({ terms: ['blender'], granularity: 'week', timeline: '12w' })
   expect(
     parseTrendExplorerState('q=blender&granularity=year', ['astra']),
   ).toMatchObject({ terms: ['blender'], granularity: 'year' })

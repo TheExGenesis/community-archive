@@ -10,5 +10,9 @@ export const digestEmailSiteUrl = () =>
       ? `https://${process.env.VERCEL_URL}`
       : `http://localhost:${process.env.PORT ?? 3000}`
 
-export const digestUnsubscribeUrl = (token: string) =>
-  `${digestEmailSiteUrl()}/api/digest/email/unsubscribe?token=${encodeURIComponent(token)}`
+/**
+ * Daily emails keep the original whole-subscription link; weekly emails turn
+ * off only the weekly list.
+ */
+export const digestUnsubscribeUrl = (token: string, list?: 'weekly') =>
+  `${digestEmailSiteUrl()}/api/digest/email/unsubscribe?token=${encodeURIComponent(token)}${list ? `&list=${list}` : ''}`

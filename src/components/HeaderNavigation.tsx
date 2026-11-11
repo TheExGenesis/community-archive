@@ -14,9 +14,11 @@ import {
   navAnalyticsDestination,
   NavEntry,
   NavGroup,
+  visibleNavItems,
   NavItem,
 } from '@/lib/navigation'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { useNavigationAudience } from '@/components/NavigationAudience'
 
 const topLevelStyle =
   'inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-foreground/80 transition-colors hover:bg-brand/5 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 xl:px-2'
@@ -64,6 +66,7 @@ function GroupMenu({
   openedAt: React.MutableRefObject<number>
 }) {
   const isActive = isNavGroupActive(pathname, group)
+  const items = visibleNavItems(group, useNavigationAudience())
   return (
     <NavigationMenu.Item value={group.label} className="relative">
       <NavigationMenu.Trigger
@@ -92,7 +95,7 @@ function GroupMenu({
             {group.label}
           </p>
           <ul className="space-y-0.5">
-            {group.items.map((item) => {
+            {items.map((item) => {
               const itemActive = isNavItemActive(pathname, item.href)
               return (
                 <li key={item.href}>

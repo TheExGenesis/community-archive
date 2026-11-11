@@ -180,6 +180,20 @@ CREATE INDEX IF NOT EXISTS "tweet_page_summaries_tweet_ids_idx"
 CREATE INDEX IF NOT EXISTS "tweet_page_summaries_search_idx"
   ON "public"."tweet_page_summaries" USING gin ("search_vector");
 
+-- Per-member daily counts and history, and the global daily cost total.
+CREATE INDEX IF NOT EXISTS "agent_search_runs_account_started_idx"
+  ON "public"."agent_search_runs" ("account_id", "started_at" DESC);
+CREATE INDEX IF NOT EXISTS "agent_search_runs_started_idx"
+  ON "public"."agent_search_runs" ("started_at");
+CREATE INDEX IF NOT EXISTS "agent_search_runs_conversation_idx"
+  ON "public"."agent_search_runs" ("conversation_id", "started_at");
+CREATE INDEX IF NOT EXISTS "agent_search_runs_account_live_idx"
+  ON "public"."agent_search_runs" ("account_id", "started_at" DESC)
+  WHERE "deleted_at" IS NULL;
+-- Deleting all of a member's history removes their shares.
+CREATE INDEX IF NOT EXISTS "agent_search_shared_conversations_account_idx"
+  ON "public"."agent_search_shared_conversations" ("account_id");
+
 CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
   ON "public"."digest_edition_comments" ("edition_id", "created_at");
 
@@ -207,3 +221,6 @@ CREATE INDEX IF NOT EXISTS "community_project_likes_project_id_idx"
   ON "public"."community_project_likes" ("project_id");
 CREATE INDEX IF NOT EXISTS "community_project_comments_project_id_created_at_idx"
   ON "public"."community_project_comments" ("project_id", "created_at");
+
+CREATE INDEX IF NOT EXISTS "trend_stories_date_position_idx"
+  on "public"."trend_stories" ("trend_date" desc, "position");

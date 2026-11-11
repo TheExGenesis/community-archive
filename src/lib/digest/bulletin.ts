@@ -34,11 +34,21 @@ export type DigestBulletinSelection = {
 export async function prepareDigestBulletinItems(
   edition: DigestEdition,
 ): Promise<DigestBulletinSelection> {
-  const empty: DigestBulletinSelection = { itemsForAccount: async () => [] }
-  if (edition.isPreview) return empty
+  if (edition.isPreview) return { itemsForAccount: async () => [] }
+  return prepareBulletinItemsForWindow(
+    edition.content.windowStart,
+    edition.content.windowEnd,
+  )
+}
 
-  const start = Date.parse(edition.content.windowStart)
-  const end = Date.parse(edition.content.windowEnd)
+/** Verify notices posted in [windowStart, windowEnd), then rank per reader. */
+export async function prepareBulletinItemsForWindow(
+  windowStart: string,
+  windowEnd: string,
+): Promise<DigestBulletinSelection> {
+  const empty: DigestBulletinSelection = { itemsForAccount: async () => [] }
+  const start = Date.parse(windowStart)
+  const end = Date.parse(windowEnd)
   if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end)
     return empty
 
@@ -150,10 +160,31 @@ export async function loadDigestBulletinItems(
 
 /** Use the signed-in account's trusted X identity for the website picks. */
 export async function loadDigestBulletinItemsForViewer(edition: DigestEdition) {
-  const [selection, user] = await Promise.all([
-    prepareDigestBulletinItems(edition),
-    getCurrentUser(),
-  ])
+  return bulletinItemsForViewer(prepareDigestBulletinItems(edition))
+}
+
+/**
+ * The shared (unpersonalized) picks for a week, so the week page can be
+ * cached for everyone.
+ */
+export async function loadWeeklyBulletinItems(
+  weekStart: string,
+  weekEnd: string,
+): Promise<DigestBulletinItem[]> {
+  const end = new Date(`${weekEnd}T00:00:00Z`)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return (
+    await prepareBulletinItemsForWindow(
+      `${weekStart}T00:00:00Z`,
+      end.toISOString(),
+    )
+  ).itemsForAccount()
+}
+
+async function bulletinItemsForViewer(
+  preparing: Promise<DigestBulletinSelection>,
+) {
+  const [selection, user] = await Promise.all([preparing, getCurrentUser()])
   const providerId = user?.app_metadata?.provider_id
   const accountId =
     typeof providerId === 'string' && /^\d{1,20}$/.test(providerId)

@@ -146,6 +146,33 @@ retry without writing corpus rows. The upload state itself remains
 authoritative in PostgreSQL. Queue-first suppresses the redundant post-write
 shadow copy; compatibility writes remain enabled during migration.
 
+## Upload Phases And The Commit Lease
+
+`archive_upload.upload_phase` is enforced by the
+`enforce_archive_upload_transition` trigger. Browser clients may only create an
+upload (`uploading`), hand it to the worker (`ready_for_commit`), reuse an
+unclaimed row, or mark their own unfinished upload `failed`. Only trusted
+callers (this worker's direct database login, `service_role`) may enter
+`committing` or `completed`.
+
+Each run claims a `ready_for_commit` row with a random `commit_claim_id` and
+refreshes `commit_heartbeat_at` while it processes; every transition out of
+`committing` names that claim. At start, a run returns rows whose heartbeat is
+older than the lease to `ready_for_commit` and counts the reclaim in
+`commit_attempts`; a row reclaimed `ARCHIVE_COMMIT_MAX_ATTEMPTS` times is set to
+`failed` instead, so an archive that keeps crashing the worker stops retrying.
+Look for `Reclaimed expired commit lease` in the log.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `ARCHIVE_COMMIT_LEASE_SECONDS` | `900` | Heartbeat age after which a `committing` row is reclaimed |
+| `ARCHIVE_COMMIT_HEARTBEAT_MS` | lease/3, at most 60000 | Heartbeat interval; must be at most half the lease |
+| `ARCHIVE_COMMIT_MAX_ATTEMPTS` | `3` | Reclaims before the upload is marked `failed` |
+
+The container lock still allows one run per host, so a reclaim only happens
+after a run died. A `failed` upload is requeued by an operator setting it back
+to `ready_for_commit`.
+
 ## Execution Options
 
 ### Option 1: Docker Compose Run (Recommended)
@@ -306,6 +333,21 @@ deploy:
 ## Performance Optimization
 
 ### Memory Management
+- **Streamed input:** The worker streams the archive from Storage, verifies
+  its pinned checksum incrementally, and parses one array element at a time
+  (`archive_stream_input.ts`). It keeps only the fields it writes, so a tweet
+  keeps its text, counts, reply/retweet IDs, mentions, URLs and media, and a
+  like keeps only its tweet ID. When the worker starts reading another archive
+  field, add it to that projection; `archive_stream_input.test.ts` fails if a
+  projected archive changes any ClickHouse or canonical output.
+- **Bounded batches:** Canonical publishing and ClickHouse delivery build rows
+  for at most 5,000 tweets or 50,000 likes at a time instead of the whole
+  archive.
+- **Heap:** `npm start` runs Node with `--max-old-space-size=1536` inside the
+  2 GB container. `npm run memcheck:large-archive` writes a synthetic archive
+  shaped like the largest production upload (about 310k tweets and 607k likes,
+  roughly 500 MB) and runs every in-memory stage under a 1 GB heap; it peaked
+  at about 860 MB heap and 1 GB RSS when added.
 - **Garbage Collection:** Enabled by default with `--expose-gc`
 - **Memory Limit:** Set via `MAX_MEMORY_MB` environment variable
 - **Batch Sizes:** Defaults are `PG_BATCH_SIZE=1000` and

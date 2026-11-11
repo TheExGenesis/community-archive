@@ -9,6 +9,7 @@ import {
 } from './analyticsRoutes'
 import { allowedEventProperties, sanitizePostHogEvent } from './posthog'
 import type { CaptureResult } from 'posthog-js/dist/module.slim'
+import { homepageMapActions } from './productActionSchema'
 
 function files(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -34,6 +35,12 @@ it('classifies every actual page, including explicit non-product exclusions', ()
     })
   expect(routes.filter((route) => !(route in analyticsRoutes))).toEqual([])
   expect(analyticsRoute('/birdseye/profiles').group).toBe('admin')
+  expect(analyticsRoute('/digest/week/2026-10-26').path).toBe(
+    '/digest/week/[weekStart]',
+  )
+  expect(analyticsRoute('/digest/week/2026-10-26/some-story').path).toBe(
+    '/digest/week/[weekStart]/[slug]',
+  )
 })
 
 it('rejects unregistered literal events anywhere in product source before release', () => {
@@ -73,6 +80,15 @@ it('rejects unregistered literal events anywhere in product source before releas
 })
 
 it.each([
+  [
+    'website_section_ready',
+    {
+      page: 'home',
+      section: 'homepage_hex_map',
+      navigation_type: 'document',
+      elapsed_ms: 200,
+    },
+  ],
   [
     'website_section_ready',
     { page: 'graph', section: 'navigation_shell', navigation_type: 'unknown' },
@@ -203,3 +219,44 @@ it.each(['https://private.example', 'private words', 'x'.repeat(121)])(
     expect(result).toBeNull()
   },
 )
+
+it.each(homepageMapActions)(
+  'accepts the map action %s without map content',
+  (action) => {
+    const result = sanitizePostHogEvent({
+      event: 'homepage_map_action',
+      uuid: 'test-map-event',
+      properties: {
+        action,
+        tab: 'Latest',
+        enabled: false,
+        username: 'private_person',
+        query: 'private words',
+        community: 'private community',
+        cells: [123],
+        story_id: 'private story',
+        $current_url: 'https://www.community-archive.org/?q=private',
+      },
+    } as CaptureResult)
+    expect(result?.properties).toMatchObject({
+      action,
+      tab: 'Latest',
+      enabled: false,
+    })
+    expect(JSON.stringify(result)).not.toMatch(/private|123/)
+  },
+)
+
+it.each([
+  { action: 'hovered' },
+  { action: 'community_selected', tab: 'private words' },
+  { action: 'archive_overlay_toggled', enabled: 'true' },
+])('rejects unexpected map action values', (properties) => {
+  expect(
+    sanitizePostHogEvent({
+      event: 'homepage_map_action',
+      uuid: 'test-map-event',
+      properties,
+    } as CaptureResult),
+  ).toBeNull()
+})

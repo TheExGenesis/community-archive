@@ -2,21 +2,23 @@ import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { getAuthErrorCopy } from '@/lib/authCallback'
 
-export default function AuthCodeErrorPage({
+export default async function AuthCodeErrorPage({
   searchParams,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     error?: string
     error_code?: string
     error_description?: string
-  }
+  }>
 }) {
+  const resolvedSearchParams = await searchParams
   const copy = getAuthErrorCopy({
-    error: searchParams.error,
-    errorCode: searchParams.error_code,
-    errorDescription: searchParams.error_description,
+    error: resolvedSearchParams.error,
+    errorCode: resolvedSearchParams.error_code,
+    errorDescription: resolvedSearchParams.error_description,
   })
-  const supportCode = searchParams.error_code || searchParams.error
+  const supportCode =
+    resolvedSearchParams.error_code || resolvedSearchParams.error
 
   return (
     <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-16">

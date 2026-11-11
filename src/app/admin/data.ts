@@ -214,7 +214,7 @@ export const normalizeUsername = (value: string | undefined | null) =>
 export const sanitizeAdminSearch = (value: string | undefined | null) =>
   normalizeUsername(value).replace(/[^a-z0-9_]/g, '')
 
-type AdminClient = Awaited<ReturnType<typeof getAdminClient>>
+export type AdminClient = ReturnType<typeof createServerServiceRoleClient>
 
 async function fetchScrapeBlocklist(
   admin: AdminClient,

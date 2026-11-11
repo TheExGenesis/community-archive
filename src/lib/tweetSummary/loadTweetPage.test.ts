@@ -1,6 +1,6 @@
-import { createServerClient } from '@/utils/supabase'
+import { canReadTweetConversation } from '@/lib/tweetConversationAccess'
 import { getTweetPageData } from '@/lib/getTweetPageData'
-import { loadTweetPage } from './loadTweetPage'
+import { loadGuestTweetPage, loadTweetPage } from './loadTweetPage'
 import { getStoredTweetPageSummary } from './store'
 
 jest.mock('server-only', () => ({}))
@@ -9,8 +9,14 @@ jest.mock('react', () => ({
   ...jest.requireActual('react'),
   cache: (fn: unknown) => fn,
 }))
-jest.mock('next/headers', () => ({ cookies: jest.fn(async () => ({})) }))
-jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
+jest.mock('next/headers', () => ({
+  cookies: jest.fn(() => {
+    throw new Error('the cached guest view must not read the request')
+  }),
+}))
+jest.mock('@/lib/tweetConversationAccess', () => ({
+  canReadTweetConversation: jest.fn(),
+}))
 jest.mock('@/lib/getTweetPageData', () => ({ getTweetPageData: jest.fn() }))
 jest.mock('./store', () => ({ getStoredTweetPageSummary: jest.fn() }))
 
@@ -31,10 +37,16 @@ const tweet = {
   urls: [],
 }
 
-function signIn(user: object | null) {
-  ;(createServerClient as jest.Mock).mockReturnValue({
-    auth: { getUser: async () => ({ data: { user } }) },
-  })
+const guestView = {
+  tweet,
+  threadTree: null,
+  quotingTweets: [],
+  quotingTweetCount: 0,
+  quotePosts: undefined,
+  subject: { kind: 'tweet', context: [] },
+  summary: null,
+  summaryPending: false,
+  canReadConversation: false,
 }
 
 beforeEach(() => {
@@ -45,29 +57,58 @@ beforeEach(() => {
   })
 })
 
-test('a missing summary is generated only for a signed-in visitor', async () => {
-  ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue('missing')
-
-  signIn(null)
-  expect(await loadTweetPage('123')).toMatchObject({
-    summary: null,
-    summaryPending: false,
+test('guests receive only the main tweet, even when real context and a stored summary exist', async () => {
+  ;(canReadTweetConversation as jest.Mock).mockResolvedValue(false)
+  ;(getTweetPageData as jest.Mock).mockResolvedValue({
+    tweet,
+    threadTree: { tweets: { private: { full_text: 'Hidden reply' } } },
+    quotingTweets: [{ full_text: 'Hidden quote' }],
+    quotingTweetCount: 1,
+    quotePosts: Promise.resolve({
+      tweets: [{ full_text: 'Deferred hidden quote' }],
+    }),
   })
-
-  signIn({ id: 'user-1' })
-  expect(await loadTweetPage('124')).toMatchObject({
-    summary: null,
-    summaryPending: true,
-  })
+  expect(await loadTweetPage('123')).toMatchObject(guestView)
+  expect(getStoredTweetPageSummary).not.toHaveBeenCalled()
+  expect(getTweetPageData).toHaveBeenCalledWith(
+    '123',
+    expect.objectContaining({ skipQuotePosts: true }),
+  )
 })
 
-test('a stored summary is shown to everyone without checking auth', async () => {
+test('the cached guest view never checks consent or reads the request', async () => {
+  expect(await loadGuestTweetPage('123')).toMatchObject(guestView)
+  expect(canReadTweetConversation).not.toHaveBeenCalled()
+  expect(getStoredTweetPageSummary).not.toHaveBeenCalled()
+  expect(getTweetPageData).toHaveBeenCalledWith(
+    '123',
+    expect.objectContaining({ skipQuotePosts: true }),
+  )
+})
+
+test('an unknown tweet is null in both views', async () => {
+  ;(getTweetPageData as jest.Mock).mockResolvedValue({ tweet: null })
+  ;(canReadTweetConversation as jest.Mock).mockResolvedValue(true)
+  expect(await loadGuestTweetPage('404')).toBeNull()
+  expect(await loadTweetPage('404')).toBeNull()
+})
+
+test('opted-in visitors can load stored summaries and generate missing ones', async () => {
+  ;(canReadTweetConversation as jest.Mock).mockResolvedValue(true)
+  ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue('missing')
+  expect(await loadTweetPage('123')).toMatchObject({
+    summary: null,
+    summaryPending: true,
+    canReadConversation: true,
+  })
+  expect(getTweetPageData).toHaveBeenCalledWith(
+    '123',
+    expect.objectContaining({ skipQuotePosts: false }),
+  )
   const summary = { title: 'A title', description: 'A description' }
   ;(getStoredTweetPageSummary as jest.Mock).mockResolvedValue(summary)
-
-  expect(await loadTweetPage('125')).toMatchObject({
+  expect(await loadTweetPage('123')).toMatchObject({
     summary,
     summaryPending: false,
   })
-  expect(createServerClient).not.toHaveBeenCalled()
 })

@@ -8,6 +8,7 @@ import { OptInDisclosure, useCommunityOptIn } from '@/components/CommunityOptIn'
 import { mapUrl } from '@/lib/hexMap/version'
 import styles from './hero.module.css'
 import { parseMapUsernames } from '@/lib/hexMap/usernames'
+import { captureHomepageMapAction } from '@/lib/posthog'
 
 export type SelfLocation = { username: string; cell: number }
 type Result = {
@@ -187,7 +188,10 @@ export default function WhereAmI({
         className={styles.finderForm}
         onSubmit={(event) => {
           event.preventDefault()
-          if (!busy) void locate(name)
+          if (!busy) {
+            captureHomepageMapAction('find_submitted')
+            void locate(name)
+          }
         }}
       >
         <input

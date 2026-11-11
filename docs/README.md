@@ -4,12 +4,13 @@
 
 - [Agent entry point](https://www.community-archive.org/llms.txt) machine-readable index of the docs and API usage.
 - [Website docs](https://www.community-archive.org/docs) quickstart for agents, developers, and researchers.
-- [API docs](./api-doc.md) download the daily Parquet export, query the public API, or access your own private raw archive.
+- [API docs](./api-doc.md) download the daily Parquet export, query the public API, search tweets by meaning with the semantic search API, or access your own private raw archive.
 - [Declarative schemas](./supabase-declarative-schemas.md) how to evolve the database using ordered schema files and migrations.
 - [Daily Digest](./daily-digest.md) explains the editorial lab, reproducible generation runs, publication boundary, and rollout gates.
 - [Website architecture](./website-architecture.md) feature ownership, tweet contracts, and client state boundaries.
 - [Companion API](./companion-api.md) shared feature services, extension authentication, and versioned client contracts.
 - [Website performance](./website-performance.md) loading boundaries, selective prefetch, and measurement semantics.
+- [Hyperobservability](./hyperobservability.md) server exception capture, the replayable API error log line, and the `signal` issue inbox that PostHog, Grafana, Vercel and the autorefresh host feed.
 - [Archive insertion performance plan](./archive-insertion-performance-plan.md) testable staged/COPY and membership design that preserves the Supabase contract.
 - [Quickstart Jupyter notebook](https://colab.research.google.com/drive/109XOgTWj-sajpAYhDCNPfts5zvdkpi_s) that you can run in your browser. Shows how to fetch all tweets for a given user in Python, and do some basic analysis like find the most common used phrases, and plot the amount of likes over time.
 

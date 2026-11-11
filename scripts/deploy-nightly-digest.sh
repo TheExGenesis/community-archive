@@ -11,6 +11,7 @@ ssh "$host" "rm -rf '$stage' && mkdir -p '$stage/src/lib' '$stage/services'"
 rsync -a --delete "$repo_root/services/nightly-digest/" "$host:$stage/services/nightly-digest/"
 rsync -a --delete "$repo_root/src/lib/digest/" "$host:$stage/src/lib/digest/"
 rsync -a --delete "$repo_root/src/lib/portal/" "$host:$stage/src/lib/portal/"
+rsync -a --delete "$repo_root/src/lib/trendStories/" "$host:$stage/src/lib/trendStories/"
 rsync -a "$repo_root/src/lib/clickhouseGateway.ts" "$host:$stage/src/lib/clickhouseGateway.ts"
 rsync -a "$repo_root/src/lib/clickhouseQuotePosts.ts" "$host:$stage/src/lib/clickhouseQuotePosts.ts"
 rsync -a "$repo_root/src/lib/clickhouseTweetPage.ts" "$host:$stage/src/lib/clickhouseTweetPage.ts"
@@ -20,6 +21,10 @@ rsync -a "$repo_root/ops/nightly-digest/community-archive-nightly-digest.service
   "$host:/etc/systemd/system/community-archive-nightly-digest.service"
 rsync -a "$repo_root/ops/nightly-digest/community-archive-nightly-digest.timer" \
   "$host:/etc/systemd/system/community-archive-nightly-digest.timer"
+rsync -a "$repo_root/ops/nightly-digest/community-archive-weekly-digest.service" \
+  "$host:/etc/systemd/system/community-archive-weekly-digest.service"
+rsync -a "$repo_root/ops/nightly-digest/community-archive-weekly-digest.timer" \
+  "$host:/etc/systemd/system/community-archive-weekly-digest.timer"
 
 ssh "$host" bash -s -- "$stage" "$release" "$previous" <<'REMOTE'
 set -euo pipefail
@@ -32,7 +37,9 @@ test -s /etc/community-archive-nightly-digest.env
 chmod 0600 /etc/community-archive-nightly-digest.env
 systemd-analyze verify \
   /etc/systemd/system/community-archive-nightly-digest.service \
-  /etc/systemd/system/community-archive-nightly-digest.timer
+  /etc/systemd/system/community-archive-nightly-digest.timer \
+  /etc/systemd/system/community-archive-weekly-digest.service \
+  /etc/systemd/system/community-archive-weekly-digest.timer
 rm -rf "$previous"
 if test -d "$release"; then mv "$release" "$previous"; fi
 mv "$stage" "$release"
@@ -41,6 +48,10 @@ systemctl disable --now community-archive-nightly-digest.timer >/dev/null 2>&1 |
 systemctl reset-failed community-archive-nightly-digest.service >/dev/null 2>&1 || true
 systemctl cat community-archive-nightly-digest.service >/dev/null
 systemctl cat community-archive-nightly-digest.timer >/dev/null
+systemctl disable --now community-archive-weekly-digest.timer >/dev/null 2>&1 || true
+systemctl reset-failed community-archive-weekly-digest.service >/dev/null 2>&1 || true
+systemctl cat community-archive-weekly-digest.service >/dev/null
+systemctl cat community-archive-weekly-digest.timer >/dev/null
 REMOTE
 
-echo "Nightly digest installed on $host with the timer disabled."
+echo "Nightly and weekly digest installed on $host with both timers disabled."

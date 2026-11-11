@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Recognize existing manual consent as well as OAuth-linked records. The
     // stable provider ID prevents a recycled handle from granting consent.
-    const admin = createServerServiceRoleClient()
+    const admin = createServerServiceRoleClient({ readSource: 'app' })
     let optedIn = false
     let optedOut = false
     for (let offset = 0; ; offset += 1000) {

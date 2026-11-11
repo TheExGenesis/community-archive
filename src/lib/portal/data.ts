@@ -10,9 +10,11 @@ import {
   fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
   fetchPortalRecentBangers,
+  fetchPortalTrendSeries,
   fetchPortalTrends,
   fetchPortalWeeklyTrends,
 } from './analytics'
+import type { TrendGranularity } from './types'
 import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
 import type {
@@ -52,6 +54,9 @@ interface PortalCorpusRange {
 interface PortalGlobalStats {
   totalTweets: number
   memberCount: number
+  membersAddedLastHour?: number | null
+  membersAddedLast24Hours?: number | null
+  membershipSnapshotAt?: string | null
   addedLast24Hours: number | null
   generatedAt: string
 }
@@ -63,6 +68,8 @@ interface ClickHouseSummaryResponse {
     sourceUpdatedAt: unknown
     collectedAt: unknown
     membershipSnapshotAt: unknown
+    membersAddedLastHour?: unknown
+    membersAddedLast24Hours?: unknown
     addedLast24Hours?: unknown
     source: string
     countMode: string
@@ -268,6 +275,28 @@ export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
       response.data.memberAccounts,
       'ClickHouse member count',
     ),
+    // Optional during the gateway-first rollout; never invent a zero.
+    membersAddedLastHour:
+      response.data.membersAddedLastHour == null
+        ? null
+        : portalClickHouseCount(
+            response.data.membersAddedLastHour,
+            'members added in the last hour',
+          ),
+    membersAddedLast24Hours:
+      response.data.membersAddedLast24Hours == null
+        ? null
+        : portalClickHouseCount(
+            response.data.membersAddedLast24Hours,
+            'members added in the last 24 hours',
+          ),
+    membershipSnapshotAt:
+      response.data.membershipSnapshotAt == null
+        ? null
+        : portalClickHouseTimestamp(
+            String(response.data.membershipSnapshotAt),
+            'membership snapshot timestamp',
+          ),
     // Older gateway releases omit the field; null hides the 24h note.
     addedLast24Hours:
       response.data.addedLast24Hours == null
@@ -795,6 +824,36 @@ const getCachedTrendsSnapshot = unstable_cache(
   ['portal-trends-snapshot-v1'],
   { revalidate: 86_400 },
 )
+// The weekly-keywords gateway route can take 20s+ under load, so the trends
+// page never waits on it: Next serves the last value and refreshes it in the
+// background. Keyed by UTC day like the gateway's own cache, so a new day's
+// terms never wait on an old entry expiring.
+const getCachedWeeklyKeywords = unstable_cache(
+  async (_sourceKey: string, _utcDay: string) => fetchPortalWeeklyTrends(),
+  ['portal-weekly-keywords-v1'],
+  { revalidate: 900 },
+)
+// Every member opens the explorer on the same default terms, so cache series
+// per term list and granularity; five minutes of staleness is invisible on a
+// chart whose newest bucket is already partial.
+const getCachedTrendSeries = unstable_cache(
+  async (_sourceKey: string, terms: string[], granularity: TrendGranularity) =>
+    fetchPortalTrendSeries(terms, new Date(), undefined, granularity),
+  ['portal-trend-series-v1'],
+  { revalidate: 300 },
+)
+export async function getPortalWeeklyTrends() {
+  return getCachedWeeklyKeywords(
+    portalDataSourceKey(),
+    new Date().toISOString().slice(0, 10),
+  )
+}
+export async function getPortalTrendSeries(
+  terms: string[],
+  granularity: TrendGranularity,
+) {
+  return getCachedTrendSeries(portalDataSourceKey(), terms, granularity)
+}
 const getCachedCorpusRange = unstable_cache(
   async (_sourceKey: string) => fetchCorpusRange(),
   ['portal-corpus-range-v1'],
@@ -802,7 +861,7 @@ const getCachedCorpusRange = unstable_cache(
 )
 const getCachedGlobalStats = unstable_cache(
   async (_sourceKey: string) => fetchPortalGlobalStats(),
-  ['portal-global-stats-v2'],
+  ['portal-global-stats-v3'],
   { revalidate: 60 },
 )
 const getCachedJoinedThisWeek = unstable_cache(
@@ -1004,8 +1063,13 @@ export async function getInitialPortalBangersPage(
 }
 
 /** Discover current terms first; the browser requests only its selected chart resolution. */
+/** The homepage's daily-cached trending terms, shared by the guest preview. */
+export async function getCachedWeeklyTrends(): Promise<PortalTrends['weekly']> {
+  return (await getCachedTrendsSnapshot(portalDataSourceKey())).weekly
+}
+
 export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
-  return { ...emptyPortalTrends(), weekly: await fetchPortalWeeklyTrends() }
+  return { ...emptyPortalTrends(), weekly: await getPortalWeeklyTrends() }
 }
 
 export async function getPortalData(

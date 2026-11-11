@@ -23,6 +23,12 @@ GRANT SELECT ON TABLE "public"."monthly_tweet_counts_mv" TO "readclient";
 GRANT SELECT ON TABLE "public"."optin" TO "readclient";
 GRANT SELECT ON TABLE "public"."profile" TO "readclient";
 GRANT SELECT ON TABLE "public"."scraper_count" TO "readclient";
+
+-- The counter is public-readable; only trusted server code may maintain it.
+REVOKE ALL PRIVILEGES ON TABLE "public"."scraper_count"
+  FROM PUBLIC, "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."scraper_count" TO "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."scraper_count" TO "service_role";
 GRANT SELECT ON TABLE "public"."tweet_media" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweet_replies_view" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweet_urls" TO "readclient";
@@ -106,6 +112,12 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" FROM "anon", "aut
 GRANT ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" TO "service_role";
 GRANT SELECT ON TABLE "public"."tweet_page_summaries" TO "anon", "authenticated";
 
+-- Agentic search runs are private to the asker and read only by server code.
+REVOKE ALL PRIVILEGES ON TABLE "public"."agent_search_runs" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."agent_search_runs" TO "service_role";
+REVOKE ALL PRIVILEGES ON TABLE "public"."agent_search_shared_conversations" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."agent_search_shared_conversations" TO "service_role";
+
 REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";
@@ -131,3 +143,6 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_comments" FROM "anon"
 GRANT ALL PRIVILEGES ON TABLE "public"."community_project_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."community_project_comments" TO "anon", "authenticated";
 
+REVOKE ALL PRIVILEGES ON TABLE "public"."trend_stories" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."trend_stories" TO "service_role";
+GRANT SELECT ON TABLE "public"."trend_stories" TO "anon", "authenticated";

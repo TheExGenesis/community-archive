@@ -15,7 +15,7 @@ export default function ResizableHero({
   children: [ReactNode, ReactNode]
 }) {
   const row = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ x: number; width: number }>()
+  const drag = useRef<{ x: number; width: number } | undefined>(undefined)
   const [rowWidth, setRowWidth] = useState(0)
   const [width, setWidth] = useState<number>()
   const minimum = 300

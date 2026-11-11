@@ -4,12 +4,20 @@
   "functions": {
     "src/app/**/*": {
       "maxDuration": 15
+    },
+    "src/app/api/agent-search/*/stream/route.ts": {
+      "maxDuration": 300,
+      "supportsCancellation": true
     }
   },
   "crons": [
     {
       "path": "/api/cron/digest-email",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-digest-email",
+      "schedule": "30 12 * * 1"
     }
   ]
 }

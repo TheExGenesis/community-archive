@@ -4,6 +4,7 @@ import type {
   DigestEditionContent,
   DigestStory,
   DigestStoryCategory,
+  DigestTitleKind,
 } from './types'
 import { DIGEST_STORY_CATEGORIES, isRecord } from './types'
 
@@ -145,9 +146,102 @@ const titleOccursInOnePost = (
   corpus: DigestPromptCorpusRow[],
 ) => {
   const excerpt = normalizedExcerpt(title)
-  return corpus.some(({ tweet }) =>
-    normalizedExcerpt(tweet.text).includes(excerpt),
+  return (
+    excerpt.length > 0 &&
+    corpus.some(({ tweet }) => normalizedExcerpt(tweet.text).includes(excerpt))
   )
+}
+
+const QUOTE_MARKS =
+  /^["'\u201c\u201d\u2018\u2019]+|["'\u201c\u201d\u2018\u2019]+$/g
+const COMPOSED_TITLE_SEPARATOR = /\s+\/\s+/
+
+export interface ClassifiedDigestTitle {
+  /** Display title; composed titles carry their own curly quotation marks. */
+  title: string
+  kind: DigestTitleKind
+  /**
+   * Composed-title parts, or quoted spans inside a voice title, that do not
+   * occur in any story post.
+   */
+  unmatchedParts: string[]
+}
+
+const INLINE_QUOTE = /"([^"]+)"|\u201c([^\u201c\u201d]+)\u201d/g
+
+/** Check quoted spans in a written title and render them with curly marks. */
+const classifyVoiceTitle = (
+  title: string,
+  storyPosts: DigestPromptCorpusRow[],
+): ClassifiedDigestTitle => {
+  const unmatchedParts: string[] = []
+  const rendered = title.replace(
+    INLINE_QUOTE,
+    (_match, straight?: string, curly?: string) => {
+      const span = (straight ?? curly ?? '').trim()
+      // US style puts trailing punctuation inside the marks: “twins,”.
+      const excerpt = span.replace(/[,.;:!?]+$/, '')
+      if (!titleOccursInOnePost(excerpt, storyPosts)) {
+        unmatchedParts.push(excerpt)
+      }
+      return `\u201c${span}\u201d`
+    },
+  )
+  return { title: rendered, kind: 'voice', unmatchedParts }
+}
+
+/**
+ * Classify a model title against the story's posts:
+ * - quote: the whole title is an exact excerpt of one post;
+ * - composed: " / "-joined exact excerpts, re-rendered as “A” / “B”;
+ * - voice: anything else, a headline in the posts' words; quoted spans inside
+ *   it must be exact excerpts and are rendered with curly quotation marks.
+ */
+export function classifyDigestTitle(
+  title: string,
+  storyPosts: DigestPromptCorpusRow[],
+): ClassifiedDigestTitle {
+  if (titleOccursInOnePost(title, storyPosts)) {
+    return { title, kind: 'quote', unmatchedParts: [] }
+  }
+  const parts = title
+    .split(COMPOSED_TITLE_SEPARATOR)
+    .map((part) => part.trim().replace(QUOTE_MARKS, '').trim())
+  if (parts.length < 2 || parts.some((part) => !part)) {
+    return classifyVoiceTitle(title, storyPosts)
+  }
+  const unmatchedParts = parts.filter(
+    (part) => !titleOccursInOnePost(part, storyPosts),
+  )
+  if (unmatchedParts.length === 0) {
+    return {
+      title: parts.map((part) => `\u201c${part}\u201d`).join(' / '),
+      kind: 'composed',
+      unmatchedParts,
+    }
+  }
+  // Only an attempted composition (some parts matched) is worth flagging.
+  if (unmatchedParts.length < parts.length) {
+    return { title, kind: 'voice', unmatchedParts }
+  }
+  return classifyVoiceTitle(title, storyPosts)
+}
+
+export function summaryBulletWarnings(bullets: string[]): string[] {
+  return bullets.flatMap((bullet, index) => {
+    const warnings: string[] = []
+    if (bullet.length < 35 || bullet.length > 140) {
+      warnings.push(
+        `Summary bullet ${index + 1} is outside the 35–140 character target.`,
+      )
+    }
+    if (/^\s*also\s*:/i.test(bullet)) {
+      warnings.push(
+        `Summary bullet ${index + 1} is an "Also:" catch-all; name fewer remaining stories clearly instead.`,
+      )
+    }
+    return warnings
+  })
 }
 
 const cleanCategory = (value: unknown): DigestStoryCategory | null =>
@@ -187,12 +281,14 @@ function parseModelDigest(
   }
 
   const usedBangers = new Set<string>()
-  const normalizedAllPosts = normalizedCorpus(corpus)
-  const editorialWarnings = executiveSummary.flatMap((bullet, index) =>
-    bullet.length < 35 || bullet.length > 140
-      ? [`Summary bullet ${index + 1} is outside the 35–140 character target.`]
-      : [],
+  const commentaryIdsByBanger = new Map(
+    candidates.map(({ candidate, commentary }) => [
+      candidate.tweet.id,
+      new Set(commentary.map(({ id }) => id)),
+    ]),
   )
+  const normalizedAllPosts = normalizedCorpus(corpus)
+  const editorialWarnings = summaryBulletWarnings(executiveSummary)
 
   const stories = value.stories.map((story, index): ModelStory => {
     if (!isRecord(story)) throw new Error(`Story ${index + 1} is invalid`)
@@ -241,13 +337,40 @@ function parseModelDigest(
         `Story ${index + 1} must include at least one banger index`,
       )
     }
+    // A reply, quote, or thread row belongs only with a banger whose context
+    // it is. Borrowed context is a loose bundle, so drop it rather than fail.
+    const orphanContext = indexedTweets.filter(
+      ({ kind, tweetId }) =>
+        kind !== 'banger' &&
+        !bangerRows.some(({ tweetId: bangerId }) =>
+          commentaryIdsByBanger.get(bangerId)?.has(tweetId),
+        ),
+    )
+    if (orphanContext.length) {
+      editorialWarnings.push(
+        `Story ${index + 1} dropped ${orphanContext.length} context ${orphanContext.length === 1 ? 'post' : 'posts'} whose banger is in no part of the story (indices ${orphanContext.map((row) => row.index).join(', ')}).`,
+      )
+    }
+    const keptIndices = orphanContext.length
+      ? tweetIndices.filter(
+          (tweetIndex) =>
+            !orphanContext.some((row) => row.index === tweetIndex),
+        )
+      : tweetIndices
     const titleWordCount = title.split(/\s+/).length
     if (titleWordCount < 3 || titleWordCount > 18 || title.length > 110) {
       editorialWarnings.push(
         `Story ${index + 1} title is outside the 3–18 word / 110 character target.`,
       )
     }
-    if (!titleOccursInOnePost(title, indexedTweets)) {
+    const classifiedTitle = classifyDigestTitle(title, indexedTweets)
+    if (classifiedTitle.unmatchedParts.length) {
+      editorialWarnings.push(
+        `Story ${index + 1} title quotes words that are not exact tweet excerpts: ${classifiedTitle.unmatchedParts.join(' / ')}.`,
+      )
+    } else if (classifiedTitle.kind === 'voice' && bangerRows.length === 1) {
+      // A one-banger story is one element, so its title should be a quote.
+      // Multi-banger stories may legitimately carry a title in the posts' voice.
       editorialWarnings.push(
         `Story ${index + 1} title is a paraphrase rather than an exact tweet excerpt.`,
       )
@@ -269,7 +392,7 @@ function parseModelDigest(
       subtitle,
       bullets,
       editorialNote,
-      tweetIndices,
+      tweetIndices: keptIndices,
     }
   })
 
@@ -491,6 +614,7 @@ export function assembleDigestEditionContent(input: {
 
   const stories: DigestStory[] = parsed.stories.map((story) => {
     const indexedTweets = story.tweetIndices.map((index) => corpus[index])
+    const classifiedTitle = classifyDigestTitle(story.title, indexedTweets)
     const storyBangers = indexedTweets
       .filter(({ kind }) => kind === 'banger')
       .map(markCommunityAuthorship)
@@ -503,7 +627,7 @@ export function assembleDigestEditionContent(input: {
           normalizedExcerpt(tweet.text).includes(normalizedExcerpt(item)),
         ),
       ) ?? story.title.slice(0, 60)
-    const baseSlug = slugify(story.title)
+    const baseSlug = slugify(classifiedTitle.title)
     const occurrence = (slugCounts.get(baseSlug) ?? 0) + 1
     slugCounts.set(baseSlug, occurrence)
     const related = storyBangers
@@ -524,8 +648,9 @@ export function assembleDigestEditionContent(input: {
       slug: occurrence === 1 ? baseSlug : `${baseSlug}-${occurrence}`,
       category: story.category,
       keyword,
-      title: story.title,
-      titleIsQuote: titleOccursInOnePost(story.title, indexedTweets),
+      title: classifiedTitle.title,
+      titleIsQuote: classifiedTitle.kind === 'quote',
+      titleKind: classifiedTitle.kind,
       subtitle: story.subtitle,
       bullets: story.bullets,
       editorialNote: story.editorialNote,

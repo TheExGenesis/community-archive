@@ -53,6 +53,8 @@ test('renders each email with its subscriber account recommendations', async () 
       accountId: '42',
       confirmedAt: 'now',
       unsubscribedAt: null,
+      daily: true,
+      weekly: false,
     },
     {
       id: 'guest',
@@ -61,6 +63,8 @@ test('renders each email with its subscriber account recommendations', async () 
       accountId: null,
       confirmedAt: 'now',
       unsubscribedAt: null,
+      daily: true,
+      weekly: false,
     },
   ])
   const itemsForAccount = jest.fn(async (accountId?: string | null) => [

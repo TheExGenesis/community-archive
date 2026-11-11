@@ -1,3 +1,4 @@
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
@@ -18,7 +19,7 @@ import {
 } from './generation'
 import type { TweetPageKind, TweetPageSubject } from './subject'
 
-export interface TweetPageSummaryRow {
+export type TweetPageSummaryRow = {
   subject_key: string
   kind: TweetPageKind
   tweet_ids: string[]
@@ -193,7 +194,12 @@ const cachedOutcome = (subject: TweetPageSubject, allowGeneration: boolean) =>
       if (stored) return stored
       throw new GenerationSkipped()
     },
-    ['tweet-page-summary', `v${SUMMARY_PROMPT_VERSION}`, subject.key],
+    [
+      'tweet-page-summary',
+      `v${SUMMARY_PROMPT_VERSION}`,
+      subject.key,
+      productionReadCacheKey(),
+    ],
     { revalidate: false, tags: [`tweet-page-summary:${subject.key}`] },
   )()
 

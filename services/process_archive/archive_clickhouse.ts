@@ -472,15 +472,69 @@ export function buildArchiveClickHouseBatch(
   decisions: ArchivePolicyDecisions,
   observedAt = new Date().toISOString(),
 ): ArchiveClickHouseBatch {
+  return buildArchiveClickHouseBatchSlice(
+    archive,
+    manifest,
+    decisions,
+    observedAt,
+    archive?.tweets ?? [],
+    true,
+    new Set(manifest.tweetIds),
+  )
+}
+
+/** Tweets per ClickHouse/canonical batch; bounds memory for large archives. */
+export const ARCHIVE_BATCH_TWEETS = 5_000
+
+/**
+ * The same rows as buildArchiveClickHouseBatch, split into batches of at most
+ * `tweetsPerBatch` tweets so a large archive never materializes every row at
+ * once. The account observation is in the first batch. Rows that several
+ * tweets share (a blocked target's tombstone, say) can appear in more than one
+ * batch with the same event_id; ClickHouse and the canonical ingest already
+ * tolerate that, as every delivery retry rewrites the whole upload.
+ */
+export function* buildArchiveClickHouseBatches(
+  archive: any,
+  manifest: ArchiveClickHouseManifest,
+  decisions: ArchivePolicyDecisions,
+  observedAt = new Date().toISOString(),
+  tweetsPerBatch = ARCHIVE_BATCH_TWEETS,
+): Generator<ArchiveClickHouseBatch> {
+  const tweets: any[] = archive?.tweets ?? []
+  const manifestTweetIds = new Set(manifest.tweetIds)
+  let start = 0
+  do {
+    yield buildArchiveClickHouseBatchSlice(
+      archive,
+      manifest,
+      decisions,
+      observedAt,
+      tweets.slice(start, start + tweetsPerBatch),
+      start === 0,
+      manifestTweetIds,
+    )
+    start += tweetsPerBatch
+  } while (start < tweets.length)
+}
+
+function buildArchiveClickHouseBatchSlice(
+  archive: any,
+  manifest: ArchiveClickHouseManifest,
+  decisions: ArchivePolicyDecisions,
+  observedAt: string,
+  tweets: any[],
+  includeAccount: boolean,
+  manifestTweetIds: Set<string>,
+): ArchiveClickHouseBatch {
   const account = archive?.account?.[0]?.account
   if (asUInt64(account?.accountId) !== manifest.accountId) {
     throw new ArchiveClickHouseError('archive_owner_mismatch')
   }
 
   const batch = emptyBatch()
-  const manifestTweetIds = new Set(manifest.tweetIds)
   const profile = archive?.profile?.[0]?.profile
-  batch.account_observations.push({
+  if (includeAccount) batch.account_observations.push({
     account_id: manifest.accountId,
     is_tombstone: 0,
     username: asUsername(account?.username) ?? '',
@@ -500,7 +554,7 @@ export function buildArchiveClickHouseBatch(
     observed_at: observedAt,
   })
 
-  for (const record of archive?.tweets ?? []) {
+  for (const record of tweets) {
     const tweet = record?.tweet
     const tweetId = asUInt64(tweet?.id_str ?? tweet?.id)
     if (!tweetId || !manifestTweetIds.has(tweetId)) continue
@@ -700,6 +754,36 @@ function deduplicateBatch<T extends object>(batch: T): T {
  * public.liked_tweets, so a new upload never re-publishes third-party text.
  * Targets keep their stable IDs; the owner policy check happens before this.
  */
+/** Likes per graph batch; follows go in one final batch. */
+export const ARCHIVE_GRAPH_BATCH_LIKES = 50_000
+
+/**
+ * buildArchiveGraphBatch in bounded pieces: likes in slices, then the follow
+ * edges. Duplicate likes split across slices repeat the same event_id, which
+ * the graph tables already tolerate on delivery retries.
+ */
+export function* buildArchiveGraphBatches(
+  archive: any,
+  manifest: ArchiveClickHouseManifest,
+  observedAt = new Date().toISOString(),
+  likesPerBatch = ARCHIVE_GRAPH_BATCH_LIKES,
+): Generator<ArchiveClickHouseGraphBatch> {
+  const likes: any[] = archive?.like ?? []
+  const view = { account: archive?.account, like: [], follower: [], following: [] }
+  for (let start = 0; start < likes.length; start += likesPerBatch) {
+    yield buildArchiveGraphBatch(
+      { ...view, like: likes.slice(start, start + likesPerBatch) },
+      manifest,
+      observedAt,
+    )
+  }
+  yield buildArchiveGraphBatch(
+    { ...view, follower: archive?.follower ?? [], following: archive?.following ?? [] },
+    manifest,
+    observedAt,
+  )
+}
+
 export function buildArchiveGraphBatch(
   archive: any,
   manifest: ArchiveClickHouseManifest,
@@ -873,12 +957,12 @@ export async function attemptArchiveClickHouseDelivery(
   try {
     await options.withOwnerPolicyLock(manifest.accountId, async (context) => {
       const observedAt = (options.now ?? (() => new Date()))().toISOString()
-      let batch: ArchiveClickHouseBatch
-      let graphBatch: ArchiveClickHouseGraphBatch | null = null
+      let batches: Iterable<ArchiveClickHouseBatch>
+      let graphBatches: Iterable<ArchiveClickHouseGraphBatch> | null = null
       if (context.ownerBlocked) {
         // An opted-out owner contributes no likes or follow edges; the
         // policy purge removes anything delivered before the opt-out.
-        batch = buildArchiveTombstoneBatch(manifest, observedAt)
+        batches = [buildArchiveTombstoneBatch(manifest, observedAt)]
       } else {
         const archive =
           options.archive ??
@@ -900,23 +984,27 @@ export async function attemptArchiveClickHouseDelivery(
         }
         const candidates = collectArchivePolicyCandidates(archive)
         const decisions = await context.resolvePolicies(candidates)
-        batch = buildArchiveClickHouseBatch(
+        batches = buildArchiveClickHouseBatches(
           archive,
           manifest,
           decisions,
           observedAt,
         )
         if (context.graphEligible) {
-          graphBatch = buildArchiveGraphBatch(archive, manifest, observedAt)
+          graphBatches = buildArchiveGraphBatches(archive, manifest, observedAt)
         }
       }
 
-      await options.sink.writeBatch(batch)
-      if (graphBatch) {
-        if (!options.sink.writeGraphBatch) {
-          throw new ArchiveClickHouseError('clickhouse_graph_sink_missing')
+      if (graphBatches && !options.sink.writeGraphBatch) {
+        throw new ArchiveClickHouseError('clickhouse_graph_sink_missing')
+      }
+      // Batches are built lazily, one at a time, so a large archive never
+      // holds every row in memory.
+      for (const batch of batches) await options.sink.writeBatch(batch)
+      if (graphBatches) {
+        for (const graphBatch of graphBatches) {
+          await options.sink.writeGraphBatch!(graphBatch)
         }
-        await options.sink.writeGraphBatch(graphBatch)
       }
       await context.markDelivered()
     })

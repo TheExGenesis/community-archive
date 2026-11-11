@@ -17,8 +17,9 @@ const ARCHIVE_UPLOAD_ID = /^[1-9][0-9]{0,14}$/
 // from their own session; the folder comes only from the verified identity.
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params: paramsPromise }: { params: Promise<{ id: string }> },
 ) {
+  const params = await paramsPromise
   if (!ARCHIVE_UPLOAD_ID.test(params.id)) {
     return NextResponse.json({ error: 'Invalid archive id' }, { status: 400 })
   }
@@ -42,7 +43,7 @@ export async function DELETE(
     )
   }
 
-  const serviceRole = createServerServiceRoleClient()
+  const serviceRole = createServerServiceRoleClient({ readSource: 'app' })
   const { data: upload, error: uploadError } = await serviceRole
     .from('archive_upload')
     .select('account_id,storage_path,storage_sha256')

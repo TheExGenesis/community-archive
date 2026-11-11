@@ -55,16 +55,32 @@ separate, must occur verbatim in the supplied posts, and link to the existing
 archive search.
 
 Story titles borrow maximally from the supplied tweets rather than behaving
-like generated newsletter headlines. An exact three- to eighteen-word excerpt
-is preferred; a clear paraphrase is retained as an editorial warning instead
-of failing an otherwise grounded generation. The generated
+like generated newsletter headlines. A story about one thing (one claim,
+event, release, or joke, however many posts discuss it) takes an exact three-
+to eighteen-word excerpt from one post. A story that combines distinct
+elements may not take a quote that fits only one of them: the model writes
+one headline under about 100 characters that covers every element, stays as
+close to the posts' own words as possible, and may quote two to six telling
+words from a post inside the sentence. It must still say who did or said
+what, never a bare list of quotes. The receiver classifies
+each title (`titleKind`): `quote` when the whole title occurs in one story
+post, `composed` when every ` / ` part does (re-rendered as
+`“A” / “B”`; kept for robustness, the prompt no longer asks for it), otherwise
+`voice`; quoted spans inside a voice title must be exact excerpts and
+are rendered with curly quotation marks. `titleIsQuote` is true only for `quote`, so
+renderers wrap only single excerpts in quotation marks. A voice title on a
+one-banger story, or a quoted part that is not an exact excerpt, is kept as an editorial warning instead of failing an otherwise
+grounded generation. The generated
 subtitle must supply the people, event, and significance that the source quote
 leaves unstated rather than merely restating it. The story page keeps
 source-grounded `In brief` bullets and a short editor's note for interpretation
 or caveats. The edition abstract is exactly three concrete bullet sentences so
-a reader can scan the day's developments before opening a story. When the
-stories do not reduce cleanly, bullet three briefly catches the remaining
-stories.
+a reader can scan the day's developments before opening a story. Each bullet
+must make sense to someone who has not read the stories: one or two stories
+per bullet, plain words, and no compressed noun piles. Bullet three covers the
+most important remaining story or two; when the rest do not fit clearly, the
+summary names fewer of them rather than cramming an `Also:` catch-all, which
+is flagged as an editorial warning.
 
 ### Editorial presentation
 
@@ -155,9 +171,9 @@ completed date, generates with the newest immutable Opus 5.5 prompt, stages the
 validated output, and publishes it. The unique automated-run index and the
 one-published-edition index make duplicate cron delivery safe.
 
-Every edition keyword must occur verbatim in supplied posts. Exact story-title
-excerpts are preferred and checked, while a paraphrase becomes a non-fatal
-editorial warning. Every story must reference at least one indexed banger, and
+Every edition keyword must occur verbatim in supplied posts. Story titles are
+classified as exact, composed, or voice titles, and a paraphrased title on a
+one-banger story becomes a non-fatal editorial warning. Every story must reference at least one indexed banger, and
 a banger cannot be assigned to multiple stories. These are executable guards
 against generic AI-derived topic labels, newsletter-style headlines, and
 fabricated tweet references. The loose editorial label is generated
@@ -230,6 +246,15 @@ provider-supported budget preserves high reasoning while leaving ample room for
 the structured edition; generation still stops naturally when the concise
 response is done.
 
+Stories follow a strict bundling rule (prompt version "strict story
+bundling", migration `20261106180000_strict_digest_story_bundling.sql`):
+bangers share a story only through the same event, claim, thread, or direct
+exchange, never a shared broad topic alone, and a real but lateral link must be
+stated in the subtitle or an `In brief` bullet. Weakly linked bangers become
+their own story or are left out. The receiver enforces the deterministic half:
+a reply, quote, or thread row whose banger is not in the same story is dropped
+with an editorial warning, because borrowed context is a loose bundle.
+
 The candidate corpus spans all authors and marks every banger with
 `authored_by_community_member`. The prompt treats that marker as a strong
 editorial preference: it favors coherent and relevant community-authored
@@ -251,9 +276,11 @@ publishes the validated edition through Supabase.
 The publisher is date-idempotent. It exits before generation when a date is
 already published, records the stable run identifier `systemd:YYYY-MM-DD`, does
 not replace an edition an editor published during generation, and publishes a
-completed automated run if an earlier database publication attempt failed.
-Generation or validation failure leaves the run failed and does not change the
-public edition.
+completed automated run if an earlier publication attempt failed. systemd
+restarts a failed job every 20 minutes, up to five starts, so a transient
+gateway or database failure recovers without an operator. Generation or
+validation failure leaves the run failed and does not change the public edition;
+those restarts exit at the failed run without another model call.
 
 For a supervised no-write replay, run the publisher with
 `--date YYYY-MM-DD --dry-run`. To pause new nightly writes without affecting
@@ -310,7 +337,7 @@ terms cannot fill either directional slot. Web and email render the same saved
 snapshot, ending on the UTC day before the edition date. Retries preserve it.
 
 If current-day trend retrieval or persistence fails, publication fails visibly;
-the completed generation can be retried without another model call. Older
+the completed generation is retried by systemd without another model call. Older
 editions without snapshots remain unchanged: the live weekly endpoint cannot
 reconstruct historical trends. This code also requires deploying the standalone
 nightly service; a website deployment alone does not update that publisher.
@@ -322,3 +349,72 @@ request includes that error and the complete JSON schema and asks the model
 to rewrite complete sentences instead of truncating prose. Each response and
 its cumulative token usage is saved before validation, including when both
 attempts fail. Failures remain private and do not publish an invalid edition.
+
+## Weekly Digest
+
+`src/lib/digest/weekly.ts` weaves the published daily stories of one
+Monday–Sunday week into at most 5 weekly stories: "major" ones (most important
+even if covered once) and "ongoing" ones (the same subject on two or more dates).
+At most 3 may be built only from "AI news" daily stories. Daily stories are
+bundled only on a concrete shared subject, with the link explained in the overview when it is not obvious.
+Each weekly story may continue a story from the previous two weekly editions
+(`continues_from` plus a `continuity_note` saying what is new).
+
+A story is tweet-led: one `overview` paragraph, then `segments` of short
+commentary each followed by the tweets it introduces. It carries every banger of
+its cited daily stories; tweets no segment places are shown after the segments.
+People are named by @handle, which opens a profile card on hover. The model also
+picks up to three `trend_terms` per story; the publisher freezes their daily
+word-trend counts (and the week's daily rising/falling terms) for the week and
+the week before into `content.trends` via `snapshotWeeklyTrends`. A failed
+analytics read publishes without trends.
+
+- Storage: `public.digest_weekly_editions`, one row per generation attempt. Only
+  `published` rows are public, and anonymous readers may select only `id`,
+  `week_start`, `status`, `content` and `published_at`. Prompts, raw responses and
+  errors stay service-role only.
+- Publisher: `services/nightly-digest/publishWeekly.ts` on the
+  `community-archive-weekly-digest.timer` (Mondays 09:00 UTC). Runbook:
+  `ops/nightly-digest/README.md`.
+- Pages: `/digest/week` (latest, also in the "Explore archive" menu) and
+  `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (one sentence built
+  from short quoted phrases of the week's tweets; it may not open with "A week",
+  "This week" or "The week", and avoids metaphor) and then the stories
+  straight away, each like a daily story: a one-line title (preferably an exact
+  tweet excerpt, shown in quotation marks), a short `subtitle`, and one or two
+  `featuredTweetIds` in a card grid. The subtitle is written like a daily
+  summary bullet: who did or said what, quoting a few telling words. A sidebar
+  shows cards for earlier-week stories this week continues, the three story
+  words with the most mentions this week, and keyword chips; under the stories
+  come the Bulletin asks and offers posted that week (same ranking as the
+  daily) and the discussion thread (`digest_weekly_edition_comments`, API under
+  `/api/digest/week/<editionId>/comments`, sharing handlers with the daily
+  comments in `src/lib/digest/commentRoutes.ts`). Each story has its own page at `/digest/week/YYYY-MM-DD/<slug>`
+  with each commentary segment on a numbered rail beside its tweet cards, and a
+  sidebar of daily coverage and trend charts. Links to daily stories and earlier weeks preview the
+  linked section on hover or focus. Profile hover-card facts are resolved on
+  the server because the profile preview API requires sign-in; they stream in
+  after the stories (`WeeklyProfiles`) and are cached for a day, and the day and
+  week previews are cached for an hour, so the stories never wait on either. Each daily edition's sidebar links its week, or the latest
+  week.
+- Email: one `digest_email_subscriptions` row per address carries
+  `daily_enabled` (on for existing subscribers) and `weekly_enabled` (off until
+  chosen). The week page's subscribe box turns the weekly list on; settings
+  shows a switch per list. `unsubscribed_at` still stops every email, and
+  turning both lists off sets it. `/api/cron/weekly-digest-email` (Vercel cron,
+  Mondays 12:30 UTC) mails the latest published week to weekly subscribers,
+  records each delivery in `digest_weekly_email_sends` so a re-run never repeats
+  one, and skips a week that ended more than eight days ago. Weekly emails link
+  `…/unsubscribe?token=…&list=weekly`, which turns off only the weekly list;
+  daily links keep ending the whole subscription. Operators can POST
+  `{"weekStart": "YYYY-MM-DD"}` with the cron secret to send a specific week.
+- Opt-out: when `tombstone_policy_account` archives a daily edition, a trigger
+  archives every weekly edition built from it and drops the private prompt
+  copies of later weeks that used it as continuity context.
+
+For prompt work, generate locally without touching the database (oldest week
+first, because each week reads the previous outputs):
+
+```bash
+CA_ROOT_ENV=../.env pnpm tsx scripts/generate-weekly-digest.ts 2026-10-19 2026-10-26
+```

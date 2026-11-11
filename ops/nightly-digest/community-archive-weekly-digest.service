@@ -1,0 +1,32 @@
+[Unit]
+Description=Publish the Community Archive weekly digest
+After=network-online.target
+Wants=network-online.target
+# Waits out a late Sunday daily: up to five starts 30 minutes apart.
+StartLimitIntervalSec=3h
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/community-archive-nightly-digest
+EnvironmentFile=/etc/community-archive-nightly-digest.env
+ExecStart=/root/.bun/bin/bun /opt/community-archive-nightly-digest/services/nightly-digest/publishWeekly.ts
+# Two model calls, each of which may retry once with a longer limit.
+TimeoutStartSec=30min
+# A retry never repeats a model call: a published week skips, and an existing
+# automated attempt (failed or interrupted) stops the job for operator recovery.
+Restart=on-failure
+RestartSec=30min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

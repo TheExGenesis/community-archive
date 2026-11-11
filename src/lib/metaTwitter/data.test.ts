@@ -102,7 +102,7 @@ test('does not turn a membership read failure into cached non-membership', async
 })
 
 describe('resolvePublicProfileIdentity', () => {
-  test('resolves a handle through the directory RPC', async () => {
+  test('resolves a handle through the bounded live membership RPC', async () => {
     rpcMock.mockResolvedValue({
       data: [{ account_id: '42', username: 'alice' }],
       error: null,
@@ -112,9 +112,43 @@ describe('resolvePublicProfileIdentity', () => {
       accountId: '42',
       username: 'alice',
     })
-    expect(rpcMock).toHaveBeenCalledWith('resolve_directory_identity', {
-      identifier: 'Alice',
+    expect(rpcMock).toHaveBeenCalledWith(
+      'directory_members_by_username',
+      {
+        p_usernames: ['alice'],
+      },
+      { get: true },
+    )
+    expect(fromMock).not.toHaveBeenCalled()
+  })
+
+  test('does not retry an ineligible handle through the slower directory view', async () => {
+    rpcMock.mockResolvedValue({ data: [], error: null })
+
+    await expect(resolvePublicProfileIdentity('Alice')).resolves.toBeNull()
+    expect(rpcMock).toHaveBeenCalledTimes(1)
+    expect(fromMock).not.toHaveBeenCalled()
+  })
+
+  test('checks membership again on the next request and preserves literal underscores', async () => {
+    rpcMock
+      .mockResolvedValueOnce({
+        data: [{ account_id: '42', username: 'alice_dev' }],
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: [], error: null })
+
+    await expect(resolvePublicProfileIdentity('Alice_dev')).resolves.toEqual({
+      accountId: '42',
+      username: 'alice_dev',
     })
+    await expect(resolvePublicProfileIdentity('Alice_dev')).resolves.toBeNull()
+    expect(rpcMock).toHaveBeenCalledTimes(2)
+    expect(rpcMock).toHaveBeenLastCalledWith(
+      'directory_members_by_username',
+      { p_usernames: ['alice_dev'] },
+      { get: true },
+    )
     expect(fromMock).not.toHaveBeenCalled()
   })
 
@@ -122,9 +156,13 @@ describe('resolvePublicProfileIdentity', () => {
     rpcMock.mockResolvedValue({ data: [], error: null })
 
     await expect(resolvePublicProfileIdentity('42')).resolves.toBeNull()
-    expect(rpcMock).toHaveBeenCalledWith('resolve_directory_identity', {
-      identifier: '42',
-    })
+    expect(rpcMock).toHaveBeenCalledWith(
+      'resolve_directory_identity',
+      {
+        identifier: '42',
+      },
+      { get: true },
+    )
     expect(fromMock).not.toHaveBeenCalled()
   })
 

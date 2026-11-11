@@ -34,9 +34,13 @@ beforeEach(() => {
 const request = (id = '456') =>
   new NextRequest(`https://ca.test/api/strands/123/context?tweet_id=${id}`)
 test('only this eligible strand’s seed/key posts can load context', async () => {
-  expect((await GET(request('999'), { params: { seed: '123' } })).status).toBe(
-    404,
-  )
+  expect(
+    (
+      await GET(request('999'), {
+        params: Promise.resolve({ seed: '123' }),
+      })
+    ).status,
+  ).toBe(404)
   expect(fetchClickHouseTweetThreadPageData).not.toHaveBeenCalled()
 })
 test('withdrawn authors break ancestry and reply traversal before any content hydration', async () => {
@@ -65,7 +69,9 @@ test('withdrawn authors break ancestry and reply traversal before any content hy
         },
       },
     } as never)
-  const response = await GET(request(), { params: { seed: '123' } })
+  const response = await GET(request(), {
+    params: Promise.resolve({ seed: '123' }),
+  })
   expect(response.status).toBe(200)
   expect(getStrandTweets).toHaveBeenCalledWith(['4'])
   expect(response.headers.get('cache-control')).toContain('no-store')
@@ -74,7 +80,9 @@ test('upstream failures stay non-successful and cannot be cached', async () => {
   jest
     .mocked(fetchClickHouseTweetThreadPageData)
     .mockRejectedValue(new Error('upstream failed'))
-  const response = await GET(request(), { params: { seed: '123' } })
+  const response = await GET(request(), {
+    params: Promise.resolve({ seed: '123' }),
+  })
   expect(response.status).toBe(503)
   expect(response.headers.get('cache-control')).toContain('no-store')
   expect(getStrandTweets).not.toHaveBeenCalled()

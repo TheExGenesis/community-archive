@@ -35,7 +35,7 @@ export async function GET() {
       { status: 401 },
     )
   const { accountId } = owner
-  const admin = createServerServiceRoleClient()
+  const admin = createServerServiceRoleClient({ readSource: 'app' })
   const [preference, archives, optIn] = await Promise.all([
     admin
       .from('account_collection_preferences')
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     )
   }
-  const { error } = await createServerServiceRoleClient()
+  const { error } = await createServerServiceRoleClient({ readSource: 'app' })
     .from('account_collection_preferences')
     .upsert({
       account_id: accountId,

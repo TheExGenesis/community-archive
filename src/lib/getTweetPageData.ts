@@ -1,5 +1,4 @@
-import { createServerClient } from '@/utils/supabase'
-import { cookies } from 'next/headers'
+import { createServerAnonClient } from '@/utils/supabase'
 import {
   ConversationTree,
   ThreadTweet,
@@ -111,12 +110,17 @@ interface TweetPageResult {
  */
 export async function getTweetPageData(
   tweetId: string,
-  options: { clickhouseOnly?: boolean; deferQuotePosts?: boolean } = {},
+  options: {
+    clickhouseOnly?: boolean
+    deferQuotePosts?: boolean
+    skipQuotePosts?: boolean
+  } = {},
 ): Promise<TweetPageResult> {
   const clickHousePage = await fetchClickHousePage(
     tweetId,
     options.clickhouseOnly,
     options.deferQuotePosts,
+    options.skipQuotePosts,
   )
   if (clickHousePage) return clickHousePage
   if (options.clickhouseOnly)
@@ -127,8 +131,9 @@ export async function getTweetPageData(
       quotingTweetCount: 0,
     }
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  // Permalinks are public and identical for every visitor. A cookie-bound
+  // client would read the request, which opts the page out of the route cache.
+  const supabase = createServerAnonClient()
 
   const { data, error } = await supabase.rpc('get_tweet_page_data' as any, {
     p_tweet_id: tweetId,
@@ -225,20 +230,29 @@ async function fetchClickHousePage(
   tweetId: string,
   strict = false,
   deferQuotePosts = false,
+  skipQuotePosts = false,
 ): Promise<TweetPageResult | null> {
   if (!strict && !isClickHouseReadsEnabled()) return null
 
   try {
     // Start both reads together, but keep optional quotes off the permalink's
     // critical path. Handle rejection immediately even if the thread is missing.
-    const quotePosts = fetchClickHouseQuotePosts(tweetId).catch((error) => {
-      if (strict && !deferQuotePosts) throw error
-      console.error('ClickHouse quote posts failed:', {
-        tweetId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-      return { tweets: [], totalCount: 0 } satisfies ClickHouseQuotePostsData
-    })
+    const quotePosts = skipQuotePosts
+      ? Promise.resolve({
+          tweets: [],
+          totalCount: 0,
+        } satisfies ClickHouseQuotePostsData)
+      : fetchClickHouseQuotePosts(tweetId).catch((error) => {
+          if (strict && !deferQuotePosts) throw error
+          console.error('ClickHouse quote posts failed:', {
+            tweetId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          return {
+            tweets: [],
+            totalCount: 0,
+          } satisfies ClickHouseQuotePostsData
+        })
     const [page, initialQuotes] = await Promise.all([
       fetchClickHouseTweetThreadPageData(tweetId),
       deferQuotePosts ? null : quotePosts,

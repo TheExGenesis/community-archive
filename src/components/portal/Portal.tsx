@@ -2,6 +2,7 @@
 
 import { usePortalStream } from './usePortalStream'
 import { WeeklyKeywordRows } from './WeeklyKeywordRows'
+import type { TrendStoryLink } from '@/lib/trendStories/core'
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -129,7 +130,7 @@ function PanelUnavailable({ message }: { message: string }) {
   return (
     <div
       role="status"
-      className={`min-h-24 flex items-center justify-center px-4 py-8 text-center text-[13px] ${MUTED}`}
+      className={`flex min-h-24 items-center justify-center px-4 py-8 text-center text-[13px] ${MUTED}`}
     >
       {message}
     </div>
@@ -895,10 +896,12 @@ export function HomeTrendsPanel({
   weekly,
   failed,
   isMember,
+  stories,
 }: {
   weekly: TermWeek[]
   failed: boolean
   isMember: boolean
+  stories?: TrendStoryLink[]
 }) {
   return (
     <div className={`${CARD} flex flex-col`}>
@@ -914,7 +917,7 @@ export function HomeTrendsPanel({
           analyticsDestination: 'trends',
         }}
       />
-      <WeeklyKeywordRows weekly={weekly} failed={failed} />
+      <WeeklyKeywordRows weekly={weekly} failed={failed} stories={stories} />
     </div>
   )
 }

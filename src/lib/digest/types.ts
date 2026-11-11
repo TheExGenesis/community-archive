@@ -55,14 +55,27 @@ export interface DigestPromptVersion {
   createdAt: string
 }
 
+/**
+ * quote: one exact excerpt (single-element stories).
+ * composed: exact excerpts from several posts, joined by " / ".
+ * voice: written in the posts' voice to cover a multi-element story.
+ */
+export type DigestTitleKind = 'quote' | 'composed' | 'voice'
+
 export interface DigestStory {
   slug: string
   /** Loose editorial label; older saved editions may predate categories. */
   category?: DigestStoryCategory
   keyword: string
   title: string
-  /** True when the title is an exact excerpt from one selected tweet. */
+  /**
+   * True only when the whole title is one exact excerpt from a selected tweet,
+   * so renderers wrap it in quotation marks. Composed titles ("“A” / “B”")
+   * already carry their own marks and voice titles carry none; both are false.
+   */
   titleIsQuote?: boolean
+  /** How the title relates to the story's posts; absent on older editions. */
+  titleKind?: DigestTitleKind
   subtitle: string
   bullets: string[]
   editorialNote?: string

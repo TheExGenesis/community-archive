@@ -16,8 +16,8 @@ test.each([
   [{ period: 'all' }, { year: undefined }],
   [{ period: 'all', year: '2024' }, { year: undefined }],
   [{ period: 'today', year: '2024' }, { period: 'today' }],
-])('resolves the page time selection %j', (searchParams, expected) => {
-  BangersPage({ searchParams })
+])('resolves the page time selection %j', async (searchParams, expected) => {
+  await BangersPage({ searchParams: Promise.resolve(searchParams) })
   expect(load).toHaveBeenCalledWith({
     scope: 'all',
     sort: 'quotes',

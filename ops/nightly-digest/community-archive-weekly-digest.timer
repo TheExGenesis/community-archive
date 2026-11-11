@@ -1,0 +1,15 @@
+[Unit]
+Description=Weave the previous Monday-Sunday week into the Community Archive weekly digest
+
+[Timer]
+# Sunday's daily edition publishes around 07:30-08:00 UTC on Sunday; Monday
+# 09:00 UTC leaves a day of margin and lands before the US workday starts.
+# The edition is due by Monday 12:00 UTC (see community_archive_monitoring_weekly_digest).
+OnCalendar=Mon *-*-* 09:00:00 UTC
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=0
+Unit=community-archive-weekly-digest.service
+
+[Install]
+WantedBy=timers.target

@@ -249,6 +249,15 @@ CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
     "username" "text",
     "storage_path" "text",
     "storage_sha256" "text",
+    "commit_claim_id" uuid,
+    "commit_heartbeat_at" timestamp with time zone,
+    "commit_attempts" integer DEFAULT 0 NOT NULL,
+    CONSTRAINT archive_upload_commit_lease CHECK (
+      commit_attempts >= 0 AND (
+        upload_phase IS DISTINCT FROM 'committing'
+        OR (commit_claim_id IS NOT NULL AND commit_heartbeat_at IS NOT NULL)
+      )
+    ),
     CONSTRAINT archive_upload_storage_reference CHECK (
       (storage_path IS NULL AND storage_sha256 IS NULL) OR
       (storage_path IS NOT NULL AND storage_sha256 IS NOT NULL AND username IS NOT NULL
@@ -259,6 +268,9 @@ CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
 );
 ALTER TABLE "public"."archive_upload" OWNER TO "postgres";
 COMMENT ON COLUMN "public"."archive_upload"."username" IS 'Username/handle at the time of archive upload - used to locate archive files in storage';
+COMMENT ON COLUMN "public"."archive_upload"."commit_claim_id" IS 'Archive-worker claim for a row in the committing phase; NULL in every other phase.';
+COMMENT ON COLUMN "public"."archive_upload"."commit_heartbeat_at" IS 'Last archive-worker heartbeat for the committing claim; an expired heartbeat lets the next run reclaim the row.';
+COMMENT ON COLUMN "public"."archive_upload"."commit_attempts" IS 'Number of times an expired committing claim was reclaimed; the worker fails the upload once it reaches its limit.';
 
 -- public.likes
 CREATE TABLE IF NOT EXISTS "public"."likes" (
@@ -630,6 +642,53 @@ CREATE TABLE IF NOT EXISTS "public"."tweet_page_summaries" (
     )
 );
 ALTER TABLE "public"."tweet_page_summaries" OWNER TO "postgres";
+
+-- One row per agentic search question, keyed by a search run id the server
+-- picks before the workflow starts (older rows use their workflow run id).
+-- Private to the asker: only the server's service-role client reads or writes
+-- it, and route code checks ownership. Also backs the per-member and global
+-- budgets.
+CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
+    "id" text PRIMARY KEY,
+    "account_id" text NOT NULL,
+    "conversation_id" text CHECK (length("conversation_id") <= 100),
+    "question" text NOT NULL CHECK (length("question") <= 1000),
+    "status" text NOT NULL CHECK ("status" IN ('running', 'completed', 'failed')),
+    "model" text NOT NULL,
+    "started_at" timestamptz NOT NULL DEFAULT now(),
+    "completed_at" timestamptz,
+    "answer" text,
+    "cited_tweet_ids" text[] NOT NULL DEFAULT '{}',
+    "invalid_citation_ids" text[] NOT NULL DEFAULT '{}',
+    "tool_calls" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "input_tokens" integer NOT NULL DEFAULT 0,
+    "output_tokens" integer NOT NULL DEFAULT 0,
+    "cost_usd" numeric NOT NULL DEFAULT 0,
+    "error" text,
+    -- The answer's message parts with tweets reduced to ids; tweets are
+    -- fetched again through the gateway when a past answer is opened.
+    "parts" jsonb,
+    -- The Workflow run executing it; null until the workflow has started.
+    "workflow_run_id" text,
+    -- Who paid for the planner: the house key or the member's own key. The
+    -- key itself is never stored.
+    "key_source" text NOT NULL DEFAULT 'house' CONSTRAINT "agent_search_runs_key_source_check" CHECK ("key_source" IN ('house', 'own')),
+    -- Set when the member deletes the run: its content is cleared and its
+    -- accounting stays, so deleting never gives back questions or budget.
+    "deleted_at" timestamptz
+);
+ALTER TABLE "public"."agent_search_runs" OWNER TO "postgres";
+
+-- Conversations their asker chose to share. A row makes the conversation
+-- readable by anyone with its link, signed in or not, as long as every run
+-- in it belongs to account_id; removing the row stops sharing. Deleting the
+-- conversation removes it too. Service role only, like the runs.
+CREATE TABLE IF NOT EXISTS "public"."agent_search_shared_conversations" (
+    "conversation_id" text PRIMARY KEY CHECK (length("conversation_id") <= 100),
+    "account_id" text NOT NULL,
+    "shared_at" timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE "public"."agent_search_shared_conversations" OWNER TO "postgres";
 
 -- Reader comments on a published edition. The display identity is captured at
 -- write time so rendering never joins auth.users; writes go through the API's
@@ -1047,3 +1106,46 @@ REVOKE ALL ON public.account_collection_preferences FROM PUBLIC, anon, authentic
 GRANT SELECT, INSERT, UPDATE ON public.account_collection_preferences TO service_role;
 COMMENT ON TABLE public.account_collection_preferences IS
   'Owner collection preference. False discards automatic observations without deleting content or blocking owner uploads. Absent rows preserve legacy behavior.';
+
+-- Editorial directory visibility only; never changes membership or consent.
+CREATE TABLE public.directory_hidden_users (
+    visibility_key text PRIMARY KEY,
+    account_id text,
+    username text NOT NULL,
+    hidden_by uuid,
+    hidden_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT directory_hidden_users_identity CHECK (
+        username ~ '^[a-z0-9_]{1,15}$' AND
+        ((account_id IS NOT NULL AND account_id ~ '^[0-9]{1,20}$'
+          AND visibility_key = 'id:' || account_id)
+         OR (account_id IS NULL AND visibility_key = 'username:' || username))
+    )
+);
+
+-- AI-written stories for the homepage trending terms, one row per story per day.
+CREATE TABLE IF NOT EXISTS "public"."trend_stories" (
+  "id" uuid primary key default gen_random_uuid(),
+  -- The UTC day the terms were featured on the homepage (the trend window's
+  -- exclusive end; the window covers the seven days before it).
+  "trend_date" date not null,
+  "slug" text not null check ("slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and length("slug") <= 80),
+  "position" smallint not null check ("position" between 0 and 20),
+  "lane" text not null check ("lane" in ('emerging', 'rising', 'falling')),
+  -- Every homepage term this story absorbed; the first is the display term.
+  "terms" text[] not null check (cardinality("terms") between 1 and 6),
+  "label" text not null check (length("label") between 1 and 60),
+  "title" text not null check (length("title") between 4 and 140),
+  "tooltip" text not null check (length("tooltip") between 10 and 280),
+  "summary" text not null check (length("summary") between 20 and 1200),
+  "bullets" jsonb not null default '[]'::jsonb check (jsonb_typeof("bullets") = 'array'),
+  -- Frozen PortalTweet snapshots, like digest edition stories.
+  "tweets" jsonb not null default '[]'::jsonb check (jsonb_typeof("tweets") = 'array'),
+  -- Counts behind the terms at generation time (per-term tweets/authors/change).
+  "stats" jsonb not null default '{}'::jsonb check (jsonb_typeof("stats") = 'object'),
+  "window_since" date not null,
+  "window_until" date not null,
+  "model" text,
+  "generated_at" timestamptz not null default now(),
+  unique ("trend_date", "slug")
+);
+ALTER TABLE "public"."trend_stories" OWNER TO "postgres";

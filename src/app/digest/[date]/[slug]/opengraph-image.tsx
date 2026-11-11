@@ -11,13 +11,14 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 export default async function Image({
   params,
 }: {
-  params: { date: string; slug: string }
+  params: Promise<{ date: string; slug: string }>
 }) {
-  const edition = DATE_PATTERN.test(params.date)
-    ? await getPublishedDigest(params.date)
+  const { date, slug } = await params
+  const edition = DATE_PATTERN.test(date)
+    ? await getPublishedDigest(date)
     : null
   return digestStoryCard(
     edition,
-    edition?.content.stories.find((item) => item.slug === params.slug),
+    edition?.content.stories.find((item) => item.slug === slug),
   )
 }

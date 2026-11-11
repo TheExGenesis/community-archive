@@ -24,7 +24,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   const renderTweetWithThread = (
     tweetId: string,
     depth: number = 0,
-  ): JSX.Element => {
+  ): React.JSX.Element => {
     const tweet = tree.tweets[tweetId]
     const children = tree.children[tweetId] || []
     const isHighlighted = highlightTweetId === tweetId

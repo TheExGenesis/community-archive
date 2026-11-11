@@ -1,5 +1,5 @@
 import { PreviewHeroActions } from '@/components/PreviewSession'
-import dynamic from 'next/dynamic'
+import DynamicHeroCTAButtons from './DynamicHeroCTAButtons'
 import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
@@ -18,19 +18,6 @@ import {
   HomepageStats,
 } from '@/components/home/HomepageDataSections'
 
-const DynamicHeroCTAButtons = dynamic(
-  () => import('@/components/HeroCTAButtons'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
-        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
-        <div className="h-9 w-24 animate-pulse rounded-lg bg-muted sm:h-10 sm:w-36" />
-      </div>
-    ),
-  },
-)
-
 interface ClassicHomepageProps {
   data: HomepageData
   homepagePeople: ReactNode
@@ -44,7 +31,7 @@ export default async function ClassicHomepage({
   isMember,
   showCta,
 }: ClassicHomepageProps) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
   let isOptedIn = false
@@ -142,13 +129,7 @@ export default async function ClassicHomepage({
         </div>
       </section>
 
-      <HexHero
-        stats={
-          <Suspense fallback={<>Preserving public conversations.</>}>
-            <HomepageStats data={data.globalStats} />
-          </Suspense>
-        }
-      />
+      <HexHero />
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
         <HomepagePortal data={data} isMember={isMember} />

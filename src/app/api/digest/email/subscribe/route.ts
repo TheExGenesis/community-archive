@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import {
+  isDigestEmailList,
   isValidSubscriptionEmail,
   maskSubscriptionEmail,
   upsertSubscription,
@@ -14,8 +15,9 @@ export const runtime = 'nodejs'
 // subscribed.
 export async function POST(request: Request) {
   let email: unknown
+  let list: unknown
   try {
-    ;({ email } = await request.json())
+    ;({ email, list } = await request.json())
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
@@ -26,11 +28,19 @@ export async function POST(request: Request) {
     )
   }
 
+  if (list !== undefined && !isDigestEmailList(list)) {
+    return NextResponse.json({ error: 'Unknown list.' }, { status: 400 })
+  }
+
   try {
     // Trusted provider identity from the session, when present, links the
     // subscription to the account so settings can manage it.
     const accountId = await getAuthenticatedAccountId()
-    const subscription = await upsertSubscription(email, accountId)
+    const subscription = await upsertSubscription(
+      email,
+      accountId,
+      list ?? 'daily',
+    )
     return NextResponse.json({
       status: 'subscribed',
       email: maskSubscriptionEmail(subscription.email),

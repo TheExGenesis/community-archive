@@ -4,6 +4,10 @@ export const productFeatures = [
   'strands',
   'birdseye',
   'tweet',
+  'tube',
+  'tweet_cleanup',
+  'ask_archive',
+  'trend_stories',
 ] as const
 export const productActions = [
   'node_selected',
@@ -17,6 +21,43 @@ export const productActions = [
   'filter_changed',
   'load_more',
   'link_copied',
+  'video_played',
+  'video_liked',
+  'video_disliked',
+  'watch_later_added',
+  'external_opened',
+  'related_opened',
+  'playlist_opened',
+  'shuffled',
+  'setting_changed',
+  'history_cleared',
+  'pattern_selected',
+  'bulk_deleted',
+  'shared',
+  'unshared',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]
+
+export const homepageMapActions = [
+  'community_selected',
+  'hex_selected',
+  'selection_cleared',
+  'find_submitted',
+  'content_tab_selected',
+  'story_opened',
+  'members_opened',
+  'archive_overlay_toggled',
+  'zoom_in_clicked',
+  'zoom_out_clicked',
+  'view_reset',
+] as const
+export const homepageMapTabs = [
+  'Stories',
+  'Bangers',
+  'Latest',
+  'Most liked',
+  'Strands',
+] as const
+export type HomepageMapAction = (typeof homepageMapActions)[number]
+export type HomepageMapTab = (typeof homepageMapTabs)[number]

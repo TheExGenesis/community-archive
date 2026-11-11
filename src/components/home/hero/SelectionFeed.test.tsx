@@ -5,6 +5,8 @@ import StoryPanel from './StoryPanel'
 import { useRankedFeed } from './useRankedFeed'
 import { useMapFeed } from './useMapFeed'
 import type { HexSnapshot } from '@/lib/hexMap/types'
+import { captureHomepageMapAction } from '@/lib/posthog'
+jest.mock('@/lib/posthog', () => ({ captureHomepageMapAction: jest.fn() }))
 
 jest.mock('./hero.module.css', () => ({}))
 jest.mock('next/dynamic', () => () => () => null)
@@ -156,6 +158,23 @@ function Panel({ selected = [0] }: { selected?: number[] }) {
     />
   )
 }
+
+it('tracks only deliberate tab changes, not the automatic empty-digest fallback', () => {
+  render(<Panel />)
+  expect(screen.getByRole('tab', { name: 'Best' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  expect(captureHomepageMapAction).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('tab', { name: 'Latest' }))
+  expect(captureHomepageMapAction).toHaveBeenCalledTimes(1)
+  expect(captureHomepageMapAction).toHaveBeenCalledWith(
+    'content_tab_selected',
+    { tab: 'Latest' },
+  )
+  fireEvent.click(screen.getByRole('tab', { name: 'Latest' }))
+  expect(captureHomepageMapAction).toHaveBeenCalledTimes(1)
+})
 
 it('limits mobile browse to the latest digest day, including cached desktop history', () => {
   const edition = (date: string, ids: string[]) => ({

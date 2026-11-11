@@ -1,11 +1,14 @@
 import {
+  CalendarDays,
   GitBranch,
-  LayoutGrid,
+  MessageSquareText,
+  Map as MapIcon,
   Megaphone,
   Network,
   Radio,
   Star,
   TrendingUp,
+  Tv,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -19,7 +22,10 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   trends: TrendingUp,
   graph: Network,
   bulletin: Megaphone,
-  apps: LayoutGrid,
+  map: MapIcon,
+  tube: Tv,
+  ask: MessageSquareText,
+  week: CalendarDays,
 }
 
 /** The bordered icon tile shown beside each submenu item. */

@@ -22,16 +22,17 @@ function paramValue(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
 }
 
-export default function BangersPage({
+export default async function BangersPage({
   searchParams,
 }: {
-  searchParams: BangersSearchParams
+  searchParams: Promise<BangersSearchParams>
 }) {
+  const resolvedSearchParams = await searchParams
   const sort = 'quotes' as const
   const scope: PortalBangersScope =
-    paramValue(searchParams.scope) === 'members' ? 'members' : 'all'
-  const periodValue = paramValue(searchParams.period)
-  const requestedYear = Number(paramValue(searchParams.year))
+    paramValue(resolvedSearchParams.scope) === 'members' ? 'members' : 'all'
+  const periodValue = paramValue(resolvedSearchParams.period)
+  const requestedYear = Number(paramValue(resolvedSearchParams.year))
   const currentYear = new Date().getUTCFullYear()
   const year =
     Number.isInteger(requestedYear) &&
@@ -48,7 +49,7 @@ export default function BangersPage({
         ? undefined
         : 'week'
   const allTime = periodValue === 'all'
-  const query = paramValue(searchParams.q).trim().slice(0, 120)
+  const query = paramValue(resolvedSearchParams.q).trim().slice(0, 120)
   const initialPage = getInitialPortalBangersPage({
     scope,
     sort,

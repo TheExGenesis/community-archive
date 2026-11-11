@@ -24,7 +24,7 @@ export interface RenderedDigestEmail {
   text: string
 }
 
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -49,7 +49,7 @@ const renderQuotedTweet = (tweet: NonNullable<PortalTweet['quotedTweet']>) => `
     <p style="margin:0;font-size:13px;line-height:1.45;color:#374151;">${escapeTweetText(tweet.text)}</p>
   </div>`
 
-const renderTweetCard = (
+export const renderTweetCard = (
   tweet: PortalTweet,
   siteUrl: string,
   monochrome = false,
@@ -81,7 +81,7 @@ const renderTweetCard = (
   </table>`
 }
 
-const tweetToText = (tweet: PortalTweet) =>
+export const tweetToText = (tweet: PortalTweet) =>
   [
     `${tweet.name} (@${tweet.username}):`,
     tweet.text,
@@ -94,8 +94,8 @@ const tweetToText = (tweet: PortalTweet) =>
 
 // Gmail strips webfont imports, so both stacks lean on solid fallbacks:
 // Petrona degrades to Georgia, Manrope to the system sans stack.
-const HEADING_FONT = `Petrona, Georgia, 'Times New Roman', serif`
-const BODY_FONT = `Manrope, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
+export const HEADING_FONT = `Petrona, Georgia, 'Times New Roman', serif`
+export const BODY_FONT = `Manrope, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
 
 // "Tuesday, August 11" + ", 2026"; the year is hidden on narrow screens so
 // the headline stays on one line.

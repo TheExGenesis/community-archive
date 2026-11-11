@@ -4,6 +4,6 @@
     "incremental": false,
     "target": "ES2022"
   },
-  "include": ["publish.ts"],
+  "include": ["publish.ts", "publishWeekly.ts", "trend-stories.ts"],
   "exclude": []
 }

@@ -2,7 +2,7 @@
 import { MAP_REVISION, mapUrl } from '@/lib/hexMap/version'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { SectionReady } from '@/components/PagePerformance'
 import { useArchiveSearch } from '@/components/ArchiveSearchProvider'
@@ -25,7 +25,7 @@ const HexMap = dynamic(() => import('./HexMap'), {
 })
 const emptyCells: number[] = []
 
-export default function HexHero({ stats }: { stats: ReactNode }) {
+export default function HexHero() {
   useEffect(() => {
     void import('./HexMap')
   }, [])
@@ -269,7 +269,6 @@ export default function HexHero({ stats }: { stats: ReactNode }) {
               </p>
             </div>
           )}
-          <div className={styles.stats}>{stats}</div>
         </div>
         <StoryPanel
           snapshot={currentSnapshot ?? null}

@@ -13,8 +13,11 @@ const UUID_PATTERN =
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; commentId: string } },
+  { params: paramsPromise }: {
+    params: Promise<{ id: string; commentId: string }>
+  },
 ) {
+  const params = await paramsPromise
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json(

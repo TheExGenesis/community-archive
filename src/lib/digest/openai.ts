@@ -89,6 +89,14 @@ export interface DigestGenerationRequest {
   reasoningEffort?: string
   maxOutputTokens?: number
   temperature?: number
+  /** Whole-response time limit; defaults to MODEL_REQUEST_TIMEOUT_MS. */
+  timeoutMs?: number
+  /** Structured-output contract; defaults to the daily digest schema. */
+  responseFormat?: {
+    name: string
+    description: string
+    schema: Record<string, unknown>
+  }
 }
 
 export interface DigestGenerationResponse {
@@ -102,7 +110,18 @@ export interface DigestGenerationResponse {
   totalTokens: number | null
 }
 
-const MODEL_REQUEST_TIMEOUT_MS = 240_000
+export const MODEL_REQUEST_TIMEOUT_MS = 240_000
+
+/** The model did not finish its response within the time limit. */
+export class ModelTimeoutError extends Error {
+  constructor(
+    provider: string,
+    readonly timeoutMs: number,
+  ) {
+    super(`${provider} generation timed out after ${timeoutMs / 1_000} seconds`)
+    this.name = 'ModelTimeoutError'
+  }
+}
 
 // Claude's safety classifier can refuse a whole edition over one newsworthy
 // post (for example biosecurity reporting). The digest should still cover
@@ -156,25 +175,29 @@ const describeOpenRouterCompletion = (
   return details.length > 0 ? ` (${details.join(', ')})` : ''
 }
 
+/**
+ * Fetch and read the whole response under one time limit. Providers can send
+ * headers early and stream the body slowly, so the limit must cover the body.
+ */
 const fetchModelResponse = async (
   fetchImpl: typeof fetch,
   input: Parameters<typeof fetch>[0],
   init: RequestInit,
   provider: string,
-): Promise<Response> => {
+  timeoutMs = MODEL_REQUEST_TIMEOUT_MS,
+): Promise<{ response: Response; responseText: string }> => {
   try {
-    return await fetchImpl(input, {
+    const response = await fetchImpl(input, {
       ...init,
-      signal: AbortSignal.timeout(MODEL_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     })
+    return { response, responseText: await response.text() }
   } catch (error) {
     if (
       error instanceof Error &&
       (error.name === 'AbortError' || error.name === 'TimeoutError')
     ) {
-      throw new Error(
-        `${provider} generation timed out after ${MODEL_REQUEST_TIMEOUT_MS / 1_000} seconds`,
-      )
+      throw new ModelTimeoutError(provider, timeoutMs)
     }
     throw error
   }
@@ -207,6 +230,12 @@ export async function generateDigestWithModel(
   request: DigestGenerationRequest,
   fetchImpl: typeof fetch = fetch,
 ): Promise<DigestGenerationResponse> {
+  const responseFormat = request.responseFormat ?? {
+    name: 'community_archive_daily_digest',
+    description:
+      'A concise daily digest assembled only from supplied tweet snapshots.',
+    schema: DIGEST_JSON_SCHEMA as unknown as Record<string, unknown>,
+  }
   const isOpenRouter = request.model.includes('/')
   const isDeepSeek = request.model.startsWith('deepseek-')
   const provider = isOpenRouter
@@ -242,9 +271,9 @@ export async function generateDigestWithModel(
           : {
               type: 'json_schema',
               json_schema: {
-                name: 'community_archive_daily_digest',
+                name: responseFormat.name,
                 strict: true,
-                schema: DIGEST_JSON_SCHEMA,
+                schema: responseFormat.schema,
               },
             },
     }
@@ -256,7 +285,7 @@ export async function generateDigestWithModel(
       body.temperature = request.temperature
     }
 
-    const response = await fetchModelResponse(
+    const { response, responseText } = await fetchModelResponse(
       fetchImpl,
       `${baseUrl}/chat/completions`,
       {
@@ -270,8 +299,8 @@ export async function generateDigestWithModel(
         body: JSON.stringify(body),
       },
       provider,
+      request.timeoutMs,
     )
-    const responseText = await response.text()
     if (!response.ok) {
       throw new Error(
         `OpenRouter generation failed (${response.status}): ${responseText.slice(0, 500)}`,
@@ -342,8 +371,8 @@ export async function generateDigestWithModel(
     text: {
       format: {
         type: 'json_schema',
-        name: 'community_archive_daily_digest',
-        schema: DIGEST_JSON_SCHEMA,
+        name: responseFormat.name,
+        schema: responseFormat.schema,
       },
     },
   }
@@ -355,8 +384,7 @@ export async function generateDigestWithModel(
       verbosity: 'low',
       format: {
         ...((body.text as { format: Record<string, unknown> }).format ?? {}),
-        description:
-          'A concise daily digest assembled only from supplied tweet snapshots.',
+        description: responseFormat.description,
         strict: true,
       },
     }
@@ -368,7 +396,7 @@ export async function generateDigestWithModel(
     body.max_output_tokens = request.maxOutputTokens
   }
 
-  const response = await fetchModelResponse(
+  const { response, responseText } = await fetchModelResponse(
     fetchImpl,
     `${baseUrl}/responses`,
     {
@@ -380,8 +408,8 @@ export async function generateDigestWithModel(
       body: JSON.stringify(body),
     },
     provider,
+    request.timeoutMs,
   )
-  const responseText = await response.text()
   if (!response.ok) {
     throw new Error(
       `${provider} generation failed (${response.status}): ${responseText.slice(0, 500)}`,

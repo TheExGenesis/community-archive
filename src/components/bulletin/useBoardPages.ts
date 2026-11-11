@@ -62,7 +62,9 @@ export function useBoardPages(
 ) {
   const readingRef = useRef(reading)
   readingRef.current = reading
-  const deferred = useRef<{ key: string; page: BulletinPage }>()
+  const deferred = useRef<{ key: string; page: BulletinPage } | undefined>(
+    undefined,
+  )
   const key = filterKey(filters)
   const [state, setState] = useState({
     key: filterKey(DEFAULT_BULLETIN_FILTERS),

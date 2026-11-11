@@ -3682,6 +3682,109 @@ REVOKE ALL ON FUNCTION public.resolve_directory_identity(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.resolve_directory_identity(text)
   TO anon, authenticated, service_role;
 
+-- Resolve current directory members for a bounded list of handles. Same
+-- membership, account, and avatar semantics as public.user_directory, but every
+-- lookup is index-driven instead of rebuilding the full opted-in branch. Reads
+-- stay live: membership and opt-out decisions are never cached.
+-- SECURITY INVOKER keeps the caller's RLS, exactly as with the view.
+CREATE OR REPLACE FUNCTION public.directory_members_by_username(
+  p_usernames text[]
+)
+RETURNS TABLE (
+  account_id text,
+  username text,
+  has_archive boolean,
+  avatar_media_url text
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  WITH names AS (
+    SELECT DISTINCT lower(name) AS name
+    FROM unnest(p_usernames[1:1000]) AS name
+  ),
+  archived AS (
+    SELECT a.account_id, a.username
+    FROM public.all_account a
+    WHERE EXISTS (
+        SELECT 1 FROM public.archive_upload u
+        WHERE u.account_id = a.account_id AND u.upload_phase = 'completed'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.optin blocked
+        WHERE blocked.explicit_optout IS TRUE
+          AND blocked.twitter_user_id = a.account_id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.optin blocked
+        WHERE blocked.explicit_optout IS TRUE
+          AND lower(blocked.username) = lower(a.username)
+      )
+  ),
+  matched_optins AS (
+    SELECT o.id, o.twitter_user_id
+    FROM names
+    JOIN public.optin o ON o.opted_in = true AND lower(o.username) = names.name
+  ),
+  opted_in AS (
+    SELECT DISTINCT ON (COALESCE(c.account_id, 'username:' || lower(c.username)))
+      c.account_id, c.username
+    FROM (
+      SELECT
+        COALESCE(a.account_id, o.twitter_user_id) AS account_id,
+        o.username,
+        o.id,
+        COALESCE(o.opted_in_at, o.created_at, o.updated_at) AS joined_at
+      FROM public.optin o
+      LEFT JOIN public.all_account a
+        ON o.twitter_user_id IS NOT NULL AND a.account_id = o.twitter_user_id
+      WHERE o.opted_in = true
+        AND o.explicit_optout IS NOT TRUE
+        AND (
+          o.id IN (SELECT id FROM matched_optins)
+          OR o.twitter_user_id IN (SELECT twitter_user_id FROM matched_optins)
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM public.optin blocked
+          WHERE blocked.explicit_optout IS TRUE
+            AND o.twitter_user_id IS NOT NULL
+            AND blocked.twitter_user_id = o.twitter_user_id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM public.optin blocked
+          WHERE blocked.explicit_optout IS TRUE
+            AND lower(blocked.username) = lower(o.username)
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM archived m
+          WHERE (o.twitter_user_id IS NOT NULL AND m.account_id = o.twitter_user_id)
+            OR lower(m.username) = lower(o.username)
+        )
+    ) c
+    ORDER BY
+      COALESCE(c.account_id, 'username:' || lower(c.username)),
+      c.joined_at ASC NULLS LAST,
+      'optin:' || c.id::text
+  )
+  SELECT m.account_id, m.username, true AS has_archive, p.avatar_media_url
+  FROM names
+  JOIN archived m ON lower(m.username) = names.name
+  LEFT JOIN public.all_profile p ON p.account_id = m.account_id
+  UNION ALL
+  SELECT o.account_id, o.username, false AS has_archive, p.avatar_media_url
+  FROM opted_in o
+  LEFT JOIN public.all_profile p ON p.account_id = o.account_id
+  WHERE lower(o.username) IN (SELECT name FROM names);
+$$;
+
+ALTER FUNCTION public.directory_members_by_username(text[]) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.directory_members_by_username(text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.directory_members_by_username(text[])
+  TO anon, authenticated, service_role;
+
 -- Private, aggregate-only monitoring bridges for the least-privilege
 -- archive_metrics_exporter role. The functions intentionally expose no user,
 -- account, archive, or free-form metadata labels.
@@ -3880,6 +3983,63 @@ END;
 $$;
 
 ALTER FUNCTION private.enforce_archive_upload_owner() OWNER TO postgres;
+
+-- archive_upload phases: browser clients may only create an upload and hand it
+-- to the worker (uploading <-> ready_for_commit, either -> failed); trusted
+-- callers own committing and completed. A committing row carries the worker's
+-- lease, set on entry and cleared on exit. See
+-- 20261108163000_archive_upload_commit_lease.sql.
+CREATE OR REPLACE FUNCTION private.enforce_archive_upload_transition()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+  v_trusted boolean := COALESCE(v_role = 'service_role', false)
+    OR (v_role IS NULL AND session_user <> 'authenticator');
+BEGIN
+  IF NOT v_trusted THEN
+    IF TG_OP = 'INSERT' THEN
+      IF NEW.upload_phase IS DISTINCT FROM 'uploading'
+         OR NEW.commit_claim_id IS NOT NULL
+         OR NEW.commit_heartbeat_at IS NOT NULL
+         OR NEW.commit_attempts <> 0 THEN
+        RAISE EXCEPTION 'archive upload must start in the uploading phase'
+          USING ERRCODE = '42501';
+      END IF;
+    ELSE
+      IF NEW.commit_claim_id IS DISTINCT FROM OLD.commit_claim_id
+         OR NEW.commit_heartbeat_at IS DISTINCT FROM OLD.commit_heartbeat_at
+         OR NEW.commit_attempts IS DISTINCT FROM OLD.commit_attempts THEN
+        RAISE EXCEPTION 'archive upload commit lease is managed by the archive worker'
+          USING ERRCODE = '42501';
+      END IF;
+      IF NEW.upload_phase IS DISTINCT FROM OLD.upload_phase AND NOT (
+        (OLD.upload_phase = 'uploading'
+          AND NEW.upload_phase IN ('ready_for_commit', 'failed'))
+        OR (OLD.upload_phase = 'ready_for_commit'
+          AND NEW.upload_phase IN ('uploading', 'failed'))
+      ) THEN
+        RAISE EXCEPTION 'archive upload cannot move from % to %',
+          OLD.upload_phase, NEW.upload_phase
+          USING ERRCODE = '42501';
+      END IF;
+    END IF;
+  END IF;
+
+  IF NEW.upload_phase = 'committing' THEN
+    IF TG_OP = 'INSERT' OR OLD.upload_phase IS DISTINCT FROM 'committing' THEN
+      NEW.commit_claim_id := COALESCE(NEW.commit_claim_id, pg_catalog.gen_random_uuid());
+      NEW.commit_heartbeat_at := COALESCE(NEW.commit_heartbeat_at, pg_catalog.now());
+    END IF;
+  ELSE
+    NEW.commit_claim_id := NULL;
+    NEW.commit_heartbeat_at := NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.enforce_archive_upload_transition() OWNER TO postgres;
 
 -- Private dashboard read. No consent or archive data is changed by this function.
 CREATE OR REPLACE FUNCTION public.admin_activity_page(
@@ -4230,6 +4390,125 @@ $$;
 REVOKE ALL ON FUNCTION public.ca_tweet_like_summary(text[], text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ca_tweet_like_summary(text[], text) TO service_role;
 
+-- Adds one model call's or one paid tool's tokens and cost to an agent search
+-- run as the spend happens, so the global daily cap counts runs in progress
+-- and a stopped run keeps what it spent. Increments only: concurrent steps of
+-- one run cannot overwrite each other's spend.
+CREATE OR REPLACE FUNCTION public.agent_search_add_usage(
+  p_run_id text,
+  p_input_tokens integer,
+  p_output_tokens integer,
+  p_cost_usd numeric
+)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+BEGIN
+  IF p_run_id IS NULL
+    OR coalesce(p_input_tokens, 0) < 0
+    OR coalesce(p_output_tokens, 0) < 0
+    OR coalesce(p_cost_usd, 0) < 0
+  THEN
+    RAISE EXCEPTION 'Invalid agent search usage' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.agent_search_runs
+  SET input_tokens = input_tokens + coalesce(p_input_tokens, 0),
+      output_tokens = output_tokens + coalesce(p_output_tokens, 0),
+      cost_usd = cost_usd + coalesce(p_cost_usd, 0)
+  WHERE id = p_run_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Agent search run % not found', p_run_id USING ERRCODE = 'P0002';
+  END IF;
+END
+$$;
+REVOKE ALL ON FUNCTION public.agent_search_add_usage(text, integer, integer, numeric) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agent_search_add_usage(text, integer, integer, numeric) TO service_role;
+
+-- Admits one agent search question: in one transaction, under one lock, it
+-- checks that nobody else owns the conversation, the member's daily and
+-- monthly counts and running run, and the global daily spend, then inserts
+-- the run as running. Returns 'ok' or the reason it refused. Two requests can
+-- never both take the last slot, and the run row exists before any paid work
+-- starts. A house question counts against the member's house questions; an
+-- own-key question counts against all of their questions, under the higher
+-- limits the caller passes for it. cost_usd holds house spend only.
+CREATE OR REPLACE FUNCTION public.agent_search_admit(
+  p_run_id text,
+  p_account_id text,
+  p_conversation_id text,
+  p_question text,
+  p_model text,
+  p_daily_limit integer,
+  p_global_daily_usd numeric,
+  p_stale_after_seconds integer,
+  p_key_source text,
+  p_monthly_limit integer
+)
+RETURNS text LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
+DECLARE
+  day_start timestamptz := date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';
+  month_start timestamptz := date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';
+BEGIN
+  IF p_run_id IS NULL OR p_account_id IS NULL OR p_conversation_id IS NULL
+    OR p_question IS NULL OR p_model IS NULL
+    OR p_daily_limit IS NULL OR p_daily_limit < 0
+    OR p_global_daily_usd IS NULL OR p_global_daily_usd < 0
+    OR p_stale_after_seconds IS NULL OR p_stale_after_seconds < 0
+    OR p_key_source IS NULL OR p_key_source NOT IN ('house', 'own')
+    OR p_monthly_limit IS NULL OR p_monthly_limit < 0
+  THEN
+    RAISE EXCEPTION 'Invalid agent search admission' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtext('public.agent_search_admit'));
+
+  IF EXISTS (
+    SELECT 1 FROM public.agent_search_runs
+    WHERE conversation_id = p_conversation_id AND account_id <> p_account_id
+  ) THEN
+    RETURN 'not_found';
+  END IF;
+
+  IF (
+    SELECT count(*) FROM public.agent_search_runs
+    WHERE account_id = p_account_id
+      AND started_at >= day_start
+      AND (p_key_source = 'own' OR key_source = 'house')
+  ) >= p_daily_limit THEN
+    RETURN 'daily_limit';
+  END IF;
+
+  IF (
+    SELECT count(*) FROM public.agent_search_runs
+    WHERE account_id = p_account_id
+      AND started_at >= month_start
+      AND (p_key_source = 'own' OR key_source = 'house')
+  ) >= p_monthly_limit THEN
+    RETURN 'monthly_limit';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.agent_search_runs
+    WHERE account_id = p_account_id
+      AND status = 'running'
+      AND started_at > now() - make_interval(secs => p_stale_after_seconds)
+  ) THEN
+    RETURN 'run_in_progress';
+  END IF;
+
+  IF (
+    SELECT coalesce(sum(cost_usd), 0) FROM public.agent_search_runs
+    WHERE started_at >= day_start
+  ) >= p_global_daily_usd THEN
+    RETURN 'global_budget';
+  END IF;
+
+  INSERT INTO public.agent_search_runs (id, account_id, conversation_id, question, status, model, key_source)
+  VALUES (p_run_id, p_account_id, p_conversation_id, p_question, 'running', p_model, p_key_source);
+  RETURN 'ok';
+END
+$$;
+REVOKE ALL ON FUNCTION public.agent_search_admit(text, text, text, text, text, integer, numeric, integer, text, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.agent_search_admit(text, text, text, text, text, integer, numeric, integer, text, integer) TO service_role;
+
 -- Public API keys. Callers are website server routes using the service role
 -- after verifying the session; these functions enforce ownership and caps.
 CREATE FUNCTION public.create_public_api_key(owner_user_id uuid, owner_account_id text, new_key_id text, new_key_sha256 text, key_label text)
@@ -4331,3 +4610,38 @@ BEGIN
     'expires_at', found_key.expires_at));
 END
 $$;
+
+-- Owner-write guard for all_account (20261106210000_guard_owner_writes).
+-- SECURITY DEFINER so the policy check runs regardless of the caller's grants.
+CREATE OR REPLACE FUNCTION private.guard_all_account_owner_write()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_role text := auth.jwt()->>'role';
+  v_user_name text := NULLIF(BTRIM(auth.jwt()->'app_metadata'->>'user_name'), '');
+BEGIN
+  IF v_role = 'service_role'
+     OR (v_role IS NULL AND session_user <> 'authenticator') THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_user_name IS NULL THEN
+    RAISE EXCEPTION 'account rows can only be written with a trusted handle'
+      USING ERRCODE = '42501';
+  END IF;
+  NEW.username := v_user_name;
+
+  -- A policy tombstone stays while the stable account ID is blocked; once
+  -- the block is lifted the owner's upload may hydrate the placeholder.
+  IF TG_OP = 'INSERT' THEN
+    NEW.is_tombstone := false;
+  ELSIF OLD.is_tombstone THEN
+    NEW.is_tombstone := public.policy_account_is_blocked(NEW.account_id, NULL);
+  ELSE
+    NEW.is_tombstone := false;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION private.guard_all_account_owner_write() OWNER TO postgres;

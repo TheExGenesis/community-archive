@@ -1,17 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
+import { captureProductAction } from '@/lib/productAnalytics'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import type { PortalTrends } from '@/lib/portal/types'
-import { BODY, CARD, MUTED, SERIF } from './styles'
+import { CARD, MUTED, SERIF } from './styles'
 import { useTrendExplorer } from './trends/useTrendExplorer'
 import { useTrendEvidence } from './trends/useTrendEvidence'
-import { TimelineControls } from './trends/TimelineControls'
+import { TimelineControls, timelineNote } from './trends/TimelineControls'
 import { TrendChart } from './trends/TrendChart'
-import { MAX_SERIES, SERIES_COLORS } from './trends/config'
+import { SERIES_COLORS } from './trends/config'
 import { bucketLabel } from './trends/model'
+import {
+  SelectedTrendStory,
+  TrendStoryRail,
+  storyKey,
+} from './trends/TrendStoryRail'
+import type { TrendStoryCard, TrendStoryDay } from '@/lib/trendStories/core'
 
 type FeedFilter = 'include' | 'off'
 
@@ -28,10 +35,12 @@ export default function TrendsExplorer({
   initialTrends,
   initialLoadFailed = false,
   initialSearch = '',
+  storyDays = [],
 }: {
   initialTrends: PortalTrends
   initialLoadFailed?: boolean
   initialSearch?: string
+  storyDays?: TrendStoryDay[]
 }) {
   const {
     chartRange,
@@ -66,10 +75,53 @@ export default function TrendsExplorer({
     captureExplorerAction,
     removeTerm,
     addTerms,
+    chartTerms,
     retryDefaultTrends,
     selectGranularity,
   } = useTrendExplorer({ initialTrends, initialLoadFailed, initialSearch })
   const [isSelectingRange, setIsSelectingRange] = useState(false)
+  const chartRef = useRef<HTMLDivElement>(null)
+  const [selectedStory, setSelectedStory] = useState<TrendStoryCard | null>(
+    null,
+  )
+  const initialFeedFilters = useRef(feedFilters)
+
+  // Focus the chart and tweet feed on one story's terms, or (null) go back
+  // to every configured term.
+  const selectStory = (story: TrendStoryCard | null) => {
+    setSelectedStory(story)
+    if (!story) {
+      setChartEnabled(
+        Object.fromEntries(configuredTerms.map((term) => [term, true])),
+      )
+      setFeedFilters(
+        Object.fromEntries(
+          configuredTerms.map((term) => [
+            term,
+            initialFeedFilters.current[term] ?? 'include',
+          ]),
+        ),
+      )
+      return
+    }
+    captureProductAction('trend_stories', 'view_changed')
+    if (story.terms.every((term) => configuredTerms.includes(term))) {
+      const only = new Set(story.terms)
+      setChartEnabled(
+        Object.fromEntries(
+          configuredTerms.map((term) => [term, only.has(term)]),
+        ),
+      )
+      setFeedFilters(
+        Object.fromEntries(
+          configuredTerms.map((term) => [
+            term,
+            only.has(term) ? 'include' : 'off',
+          ]),
+        ),
+      )
+    } else void chartTerms(story.terms)
+  }
   const {
     evidence,
     evidenceSort,
@@ -115,12 +167,31 @@ export default function TrendsExplorer({
 
         <ExtensionInstallPrompt surface="trends" className="mb-5" />
 
-        <p className={`mb-4 text-xs ${MUTED}`}>
-          Default terms are trending this week in the community.
-        </p>
-
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
+        <div
+          ref={chartRef}
+          className={`grid scroll-mt-20 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)] ${storyDays.length ? 'xl:grid-cols-[250px_minmax(0,1fr)_minmax(340px,0.72fr)]' : ''}`}
+        >
+          {storyDays.length ? (
+            <div className="min-w-0 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1">
+              <TrendStoryRail
+                days={storyDays}
+                selected={selectedStory ? storyKey(selectedStory) : null}
+                onSelect={selectStory}
+                disabled={isAdding || isLoadingSeries}
+              />
+            </div>
+          ) : null}
           <section className="min-w-0">
+            {selectedStory ? (
+              <SelectedTrendStory
+                story={selectedStory}
+                onClear={() => selectStory(null)}
+              />
+            ) : (
+              <p className={`mb-3 text-xs ${MUTED}`}>
+                Default terms are trending this week in the community.
+              </p>
+            )}
             <div className={`${CARD} mb-4 p-4 sm:p-5`}>
               <form
                 onSubmit={addTerms}
@@ -145,17 +216,11 @@ export default function TrendsExplorer({
                   {isAdding ? 'Adding…' : 'Add trends'}
                 </button>
               </form>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <span
-                  className={`text-[11.5px] ${addError ? 'text-red-600 dark:text-red-400' : MUTED}`}
-                >
-                  {addError ||
-                    'Multi-word trends match all words; up to four distinct words are counted.'}
-                </span>
-                <span className={`text-[11.5px] tabular-nums ${MUTED}`}>
-                  {configuredTerms.length}/{MAX_SERIES} trends
-                </span>
-              </div>
+              {addError && (
+                <p className="mt-2 text-[11.5px] text-red-600 dark:text-red-400">
+                  {addError}
+                </p>
+              )}
             </div>
 
             <div className={`${CARD} overflow-hidden`}>
@@ -259,11 +324,6 @@ export default function TrendsExplorer({
                 onPreset={selectTimeline}
                 disabled={isLoadingSeries || isAdding}
               />
-              {axis === 'log' && (
-                <p className={`px-4 pt-2 text-[11px] ${MUTED}`}>
-                  Log scale compresses large peaks while keeping zero visible.
-                </p>
-              )}
               {chartError && (
                 <div
                   className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100 sm:mx-5"
@@ -304,11 +364,10 @@ export default function TrendsExplorer({
 
               <div className="border-t border-zinc-100 px-4 py-3 dark:border-[#202023] sm:px-5">
                 <div
-                  className={`mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${MUTED}`}
+                  className="flex flex-wrap gap-1.5"
+                  role="group"
+                  aria-label="Series shown"
                 >
-                  Series shown
-                </div>
-                <div className="flex flex-wrap gap-1.5">
                   {configuredTerms.map((term, index) => {
                     const item = series.find((entry) => entry.term === term)
                     const active = !!chartEnabled[term]
@@ -368,11 +427,19 @@ export default function TrendsExplorer({
               </div>
             </div>
 
-            <p className={`mt-3 text-[12px] leading-relaxed ${BODY}`}>
-              Normalization divides each term’s {granularity} count by all
-              archived tweets from that {granularity}, then scales the result to
-              100,000. This makes periods with different archive coverage
-              comparable.
+            <p className={`mt-3 text-[11.5px] leading-relaxed ${MUTED}`}>
+              {[
+                scale === 'normalized'
+                  ? `Per 100k divides each term’s ${granularity} count by all archived tweets from that ${granularity}, so periods with different archive coverage stay comparable.`
+                  : null,
+                axis === 'log'
+                  ? 'Log scale compresses large peaks while keeping zero visible.'
+                  : null,
+                timelineNote(granularity),
+                'Dates use UTC.',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             </p>
           </section>
 

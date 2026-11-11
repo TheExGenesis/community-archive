@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { checkIsAdmin } from '@/app/admin/data'
+import { canViewSpreadExplorer } from '@/app/admin/spread-explorer/access'
 import {
   getSpreadAnchors,
   getSpreadMeta,
@@ -21,8 +21,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { resource: string } },
 ) {
-  // Same identity gate as /admin; a non-admin sees the same 404 as for a route that does not exist.
-  if (!(await checkIsAdmin())) {
+  // Same identity gate as the page; a non-admin sees the same 404 as for a route that does not exist.
+  if (!(await canViewSpreadExplorer())) {
     return new NextResponse('Not Found', { status: 404, headers: HEADERS })
   }
   const query = request.nextUrl.searchParams

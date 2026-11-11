@@ -799,6 +799,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname === '/bulletin' ||
     pathname === '/admin/bulletin' ||
+    pathname === '/admin/spread-explorer' ||
     pathname === '/birdseye' ||
     pathname.startsWith('/birdseye/') ||
     pathname.startsWith('/api/birdseye/')

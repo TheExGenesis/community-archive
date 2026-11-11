@@ -154,12 +154,15 @@ export type NavIcon =
   | 'tube'
   | 'ask'
   | 'week'
+  | 'spread'
 
 export interface NavMenuItem extends NavItem {
   description: string
   icon: NavIcon
   /** Shown only while Ask the archive is visible to the viewer. */
   requiresAsk?: true
+  /** Shown only to admins (or the localhost admin preview of `pnpm dev`). */
+  requiresAdmin?: true
 }
 
 export interface NavGroup {
@@ -258,6 +261,13 @@ export const getPrimaryNav = (): NavEntry[] => [
         description: 'Explore connections between people and ideas.',
         icon: 'graph',
       },
+      {
+        href: '/admin/spread-explorer',
+        label: 'Spread Explorer',
+        description: 'Admin: how any word spreads across the TPOT hex map.',
+        icon: 'spread',
+        requiresAdmin: true,
+      },
     ],
   },
   { href: '/research', label: 'Research' },
@@ -286,12 +296,25 @@ export function isNavItemActive(pathname: string, href: string): boolean {
   )
 }
 
-/** A group's items the viewer may see: Ask the archive only while visible. */
+/** A group's items the viewer may see: Ask the archive only while visible,
+ *  admin tools only for admins. The pages enforce access themselves. */
 export const visibleNavItems = (
   group: NavGroup,
-  { askVisible }: { askVisible: boolean },
+  {
+    askVisible,
+    isAdmin = false,
+    localPreview = null,
+  }: {
+    askVisible: boolean
+    isAdmin?: boolean
+    localPreview?: 'admin' | 'signed-out' | null
+  },
 ): NavMenuItem[] =>
-  group.items.filter((item) => !item.requiresAsk || askVisible)
+  group.items.filter(
+    (item) =>
+      (!item.requiresAsk || askVisible) &&
+      (!item.requiresAdmin || isAdmin || localPreview === 'admin'),
+  )
 
 export const isNavGroupActive = (pathname: string, group: NavGroup): boolean =>
   group.items.some((item) => isNavItemActive(pathname, item.href))

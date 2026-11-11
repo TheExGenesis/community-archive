@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   GitBranch,
+  Hexagon,
   MessageSquareText,
   Map as MapIcon,
   Megaphone,
@@ -26,6 +27,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   tube: Tv,
   ask: MessageSquareText,
   week: CalendarDays,
+  spread: Hexagon,
 }
 
 /** The bordered icon tile shown beside each submenu item. */

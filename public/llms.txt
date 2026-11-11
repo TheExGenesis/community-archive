@@ -22,6 +22,7 @@ headless browsers and scrapers to this file. You do not need to crawl pages:
 ## Start here
 
 - [Docs and access guide](https://www.community-archive.org/docs): Human-readable overview of the bulk dump, API, and raw archives.
+- [Research: You can just do things](https://www.community-archive.org/research/you-can-just-do-things): An example of tracing an idea through the archive. It is a static page; the tweets behind it are in the bulk export and API v1.
 - [API v1 OpenAPI specification](https://analytics.community-archive.org/v1/openapi.json): Machine-readable schema for the current keyed API.
 - [API v1 migration guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-v1-migration.md): Call-by-call mapping from the legacy Supabase REST API to v1, with paging examples.
 - [API keys](https://www.community-archive.org/settings/api-keys): Sign in and create a personal key for v1.

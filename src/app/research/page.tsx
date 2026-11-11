@@ -22,10 +22,25 @@ const MODEL_BEHAVIOR_REPORTS: ResearchPost = {
   author: 'Alexandre Variengien',
 }
 
+// Our own piece, served as a static file from /public/research.
+const YOU_CAN_JUST_DO_THINGS: ResearchPost = {
+  title: 'You can just do things',
+  url: '/research/you-can-just-do-things',
+  date: '2026-11-11T12:00:00.000Z',
+  excerpt:
+    'How one phrase spread from TPOT to tech to politics, traced through 17,657 tweets.',
+  image: null,
+  author: 'Community Archive',
+}
+
 // Public: research built on the archive is useful to visitors and members.
 export default async function ResearchPage() {
   const feedPosts = await getResearchPosts(24)
-  const posts = pinResearchPost([MODEL_BEHAVIOR_REPORTS, ...feedPosts])
+  const posts = pinResearchPost([
+    YOU_CAN_JUST_DO_THINGS,
+    MODEL_BEHAVIOR_REPORTS,
+    ...feedPosts,
+  ])
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">

@@ -169,6 +169,7 @@ export async function requireAdmin(
   loginReturnPath:
     | '/admin'
     | '/admin/bulletin'
+    | '/admin/spread-explorer'
     | '/social-graph'
     | '/settings' = '/admin',
 ) {

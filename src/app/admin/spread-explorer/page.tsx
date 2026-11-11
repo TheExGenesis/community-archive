@@ -11,6 +11,6 @@ export const metadata = {
 // Private admin page: how a word spreads over the TPOT hex map (real usage only).
 // Data comes from the static export behind /api/admin/spread-explorer/*.
 export default async function SpreadExplorerPage() {
-  await requireAdmin()
+  await requireAdmin('/admin/spread-explorer')
   return <SpreadExplorer />
 }

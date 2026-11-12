@@ -1,5 +1,6 @@
 import { FaExternalLinkAlt } from 'react-icons/fa'
 import { getResearchPosts, pinResearchPost } from '@/lib/portal/research'
+import { YOU_CAN_JUST_DO_THINGS } from '@/lib/portal/featuredResearch'
 import { RESEARCH_SOURCE, type ResearchPost } from '@/lib/portal/types'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
@@ -20,17 +21,6 @@ const MODEL_BEHAVIOR_REPORTS: ResearchPost = {
     'Crowdsourced reports of how language models behave in the wild, collected from X through the Community Archive and summarized by model.',
   image: '/images/community/model-behavior-reports.webp',
   author: 'Alexandre Variengien',
-}
-
-// Our own piece, served as a static file from /public/research.
-const YOU_CAN_JUST_DO_THINGS: ResearchPost = {
-  title: 'You can just do things',
-  url: '/research/you-can-just-do-things',
-  date: '2026-11-11T12:00:00.000Z',
-  excerpt:
-    'How one phrase spread from TPOT to tech to politics, traced through 17,657 tweets.',
-  image: '/images/research/you-can-just-do-things.png',
-  author: 'Community Archive',
 }
 
 // Public: research built on the archive is useful to visitors and members.
@@ -66,8 +56,10 @@ export default async function ResearchPage() {
             <a
               key={post.url}
               href={post.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              // Pieces published on this site open in place.
+              {...(post.url.startsWith('/')
+                ? {}
+                : { target: '_blank', rel: 'noopener noreferrer' })}
               className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-white transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
             >
               {post.image && (
@@ -85,7 +77,9 @@ export default async function ResearchPage() {
                   style={SERIF}
                 >
                   {post.title}
-                  <FaExternalLinkAlt className="h-3 w-3 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                  {!post.url.startsWith('/') && (
+                    <FaExternalLinkAlt className="h-3 w-3 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                  )}
                 </div>
                 {post.excerpt && (
                   <div

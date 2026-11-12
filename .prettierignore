@@ -37,3 +37,7 @@ next-env.d.ts
 
 pnpm-lock.yaml
 
+
+# generated research article (one long data line)
+src/app/research/you-can-just-do-things/drawArticle.js
+src/app/research/you-can-just-do-things/content.ts

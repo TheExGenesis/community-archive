@@ -12,8 +12,10 @@ import {
   PortalTweet,
   TermWeek,
   RESEARCH_SOURCE,
+  type ResearchPost,
 } from '@/lib/portal/types'
 import { PORTAL_ARTICLES } from './articles'
+import { YOU_CAN_JUST_DO_THINGS } from '@/lib/portal/featuredResearch'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import TweetCard from '@/components/TweetCard'
 import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
@@ -712,7 +714,10 @@ export function HomepageHighlightsLayout({
         {digest}
       </div>
       <div className="grid items-start gap-6 md:grid-cols-2">
-        {trends}
+        <div className="space-y-6">
+          {trends}
+          <HomeFeaturedPiece post={YOU_CAN_JUST_DO_THINGS} />
+        </div>
         <div className="space-y-6">
           {research}
           <UtilityLink
@@ -919,6 +924,40 @@ export function HomeTrendsPanel({
       />
       <WeeklyKeywordRows weekly={weekly} failed={failed} stories={stories} />
     </div>
+  )
+}
+
+// A research piece published on this site. Static: it reads no data. The
+// image already carries the title, so the card adds only a header row.
+export function HomeFeaturedPiece({ post }: { post: ResearchPost }) {
+  return (
+    <Link
+      href={post.url}
+      onClick={() =>
+        captureDashboardDestination('research_article', 'card', false)
+      }
+      className={`${CARD} group block overflow-hidden font-normal transition-colors hover:border-brand dark:hover:border-brand`}
+    >
+      <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-[#26262a]">
+        <span className="text-[13px] font-bold">New research</span>
+        <span className="text-[12.5px] font-semibold text-brand">
+          Read the piece &rarr;
+        </span>
+      </div>
+      {post.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={post.image}
+          alt={`${post.title}. ${post.excerpt ?? ''}`}
+          loading="lazy"
+          className="aspect-[1200/630] w-full object-cover"
+        />
+      ) : (
+        <div className="px-4 py-3.5 text-[19px] font-semibold" style={SERIF}>
+          {post.title}
+        </div>
+      )}
+    </Link>
   )
 }
 

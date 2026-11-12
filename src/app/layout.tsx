@@ -20,6 +20,7 @@ import Footer from '@/components/Footer'
 import HashScrollHandler from '@/components/HashScrollHandler'
 import PostHogPageView from '@/components/PostHogPageView'
 import PagePerformance from '@/components/PagePerformance'
+import VercelAnalytics from '@/components/VercelAnalytics'
 import PostHogLink from '@/components/PostHogLink'
 import {
   AdminNavigationLink,
@@ -69,6 +70,7 @@ export default function RootLayout({
     >
       <body className="bg-background text-foreground transition-colors duration-300">
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
+        <VercelAnalytics />
         <PostHogProvider>
           <PostHogPageView />
           <PagePerformance />

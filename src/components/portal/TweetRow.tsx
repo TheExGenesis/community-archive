@@ -7,7 +7,12 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { TweetLikeButton } from '@/components/TweetLikeButton'
 import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
 import AnimatedGif from '@/components/AnimatedGif'
-import ImageLightbox from '@/components/ImageLightbox'
+import ImageLightbox, { type LightboxImage } from '@/components/ImageLightbox'
+import {
+  MAX_VISIBLE_MEDIA,
+  MediaOverflowBadge,
+  overflowLabel,
+} from '@/components/MediaOverflowBadge'
 import { TweetAvatar } from '@/components/TweetAvatar'
 export { TweetAvatar, avatarHue } from '@/components/TweetAvatar'
 import {
@@ -105,15 +110,23 @@ function TweetMediaItem({
   sizes,
   className,
   imageClassName,
+  gallery,
+  index,
+  hidden = 0,
 }: {
   item: PortalMedia
   alt: string
   sizes: string
   className: string
   imageClassName: string
+  gallery?: LightboxImage[]
+  index?: number
+  /** Media past this tile that the row does not show. */
+  hidden?: number
 }) {
   const gifVideoUrl = animatedGifVideoUrl(item)
-  if (gifVideoUrl) {
+  // A GIF plays inline, unless it is the tile standing for the hidden media.
+  if (gifVideoUrl && hidden === 0) {
     return (
       <div
         className={`relative overflow-hidden ${className}`}
@@ -132,6 +145,12 @@ function TweetMediaItem({
     )
   }
 
+  const kind =
+    item.type === 'animated_gif'
+      ? 'GIF'
+      : item.type === 'video'
+        ? 'Video'
+        : null
   return (
     <ImageLightbox
       src={item.url}
@@ -141,11 +160,14 @@ function TweetMediaItem({
       sizes={sizes}
       className={className}
       imageClassName={imageClassName}
+      gallery={gallery}
+      index={index}
+      label={hidden > 0 ? overflowLabel(alt, hidden) : undefined}
       badge={
-        item.type === 'animated_gif' ? (
-          <MediaKindBadge kind="GIF" />
-        ) : item.type === 'video' ? (
-          <MediaKindBadge kind="Video" />
+        hidden > 0 ? (
+          <MediaOverflowBadge hidden={hidden} />
+        ) : kind ? (
+          <MediaKindBadge kind={kind} />
         ) : undefined
       }
     />
@@ -169,6 +191,14 @@ function TweetImages({
 }) {
   const images = imageMedia(media)
   if (images.length === 0) return null
+  // Every tile opens the same gallery, so ←/→ walks all of the tweet's media;
+  // a GIF appears there as its still frame.
+  const gallery: LightboxImage[] = images.map((item, index) => ({
+    src: item.url,
+    alt: `${label} ${index + 1}`,
+    width: item.width || 1200,
+    height: item.height || 800,
+  }))
   if (previewOnly)
     return (
       <div className="mt-2">
@@ -178,14 +208,20 @@ function TweetImages({
           sizes="(max-width: 640px) 100vw, 400px"
           className="aspect-video w-full overflow-hidden rounded border border-border"
           imageClassName="h-full w-full object-cover"
+          gallery={gallery}
+          index={0}
         />
       </div>
     )
 
+  const visible = images.slice(0, MAX_VISIBLE_MEDIA)
+  const hiddenAfter = (index: number) =>
+    index === visible.length - 1 ? images.length - visible.length : 0
+
   if (compact && !compactGrid && !constrainMedia) {
     return (
       <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
-        {images.slice(0, 4).map((item, index) => (
+        {visible.map((item, index) => (
           <TweetMediaItem
             key={`${item.url}-${index}`}
             item={item}
@@ -193,6 +229,9 @@ function TweetImages({
             sizes="6rem"
             className="h-16 w-24 flex-none rounded-[4px] border border-zinc-200 bg-zinc-100 dark:border-[#303036] dark:bg-[#202023]"
             imageClassName="h-full w-full object-cover transition-transform hover:scale-[1.02]"
+            gallery={gallery}
+            index={index}
+            hidden={hiddenAfter(index)}
           />
         ))}
       </div>
@@ -205,7 +244,7 @@ function TweetImages({
       aria-label={compactGrid ? 'Quoted tweet media' : undefined}
       className={`mt-2 grid gap-1.5 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${constrainMedia ? 'h-[25svh] max-h-[240px] auto-rows-fr' : ''}`}
     >
-      {images.slice(0, 4).map((item, index) => (
+      {visible.map((item, index) => (
         <TweetMediaItem
           key={`${item.url}-${index}`}
           item={item}
@@ -217,6 +256,9 @@ function TweetImages({
           }
           className={`${constrainMedia ? 'h-full min-h-0' : compactGrid ? (images.length > 1 ? 'aspect-square' : 'aspect-video') : 'max-h-72'} rounded-[4px] border border-zinc-200 bg-zinc-100 dark:border-[#303036] dark:bg-[#202023]`}
           imageClassName={`${constrainMedia ? 'h-full max-h-full object-contain' : compactGrid ? 'h-full object-cover' : 'h-full max-h-72 object-cover'} w-full transition-transform hover:scale-[1.01]`}
+          gallery={gallery}
+          index={index}
+          hidden={hiddenAfter(index)}
         />
       ))}
     </div>

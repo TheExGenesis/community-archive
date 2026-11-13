@@ -156,3 +156,42 @@ Then verify `community_archive_weekly_digest_healthy == 1` and enable the timer:
 ```sh
 ssh prod-firehose 'systemctl enable --now community-archive-weekly-digest.timer'
 ```
+
+## Week so far
+
+`community-archive-week-so-far.timer` runs every day at 09:30 UTC on the same
+host, release and environment. `publishWeekly.ts --week-so-far` weaves the
+current week's published dailies so far into a provisional weekly edition
+(status `in_progress`, public) and archives the previous morning's one.
+
+- It starts once the week has three dailies (Wednesday); earlier runs skip, and
+  `/digest/week` keeps showing last week's final edition until then.
+- Each run is one row with workflow ID `systemd:week-so-far:<monday>:<last
+  daily date>`. A run whose ID already exists (any status) skips without a
+  model call, so a late daily is picked up by the next morning's run. There is
+  no automatic restart.
+- The new edition is stored as a private `draft` first, then the previous one
+  is archived and the new one made public; if that last step fails the previous
+  one is restored. A failed generation leaves the previous edition live.
+- Monday's final weekly edition archives that week's `in_progress` edition.
+  `/digest/week` shows the week-so-far edition only while it is newer than the
+  latest final week. It has no story pages or comments: stories link to their
+  daily stories, and the page ends with a link to last week's edition.
+- Health: the same `community_archive_weekly_digest_healthy` series. A failed
+  automated week-so-far run sets `automated_run_failed` until a later run for
+  the week succeeds, and once three of the week's dailies are three hours old
+  a successful run must exist within the last 36 hours.
+
+Manual run (for example after fixing a failure, same day):
+
+```bash
+ssh prod-firehose 'systemd-run --wait --collect --pipe \
+  --property=EnvironmentFile=/etc/community-archive-nightly-digest.env \
+  --property=WorkingDirectory=/opt/community-archive-nightly-digest \
+  /root/.bun/bin/bun services/nightly-digest/publishWeekly.ts \
+  --week-so-far --workflow-run-id operator-recovery:week-so-far:2026-11-12:1'
+```
+
+Use `--dry-run` to validate without writes. Disable with
+`systemctl disable --now community-archive-week-so-far.timer`; the page then
+keeps the last week-so-far edition until Monday's final edition replaces it.

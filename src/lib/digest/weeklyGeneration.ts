@@ -65,6 +65,8 @@ export async function generateWeeklyDigest(input: {
   weekStart: string
   editions: WeeklySourceEdition[]
   priorWeeks: WeeklyDigestContent[]
+  /** Last day of a week that is still running (a week-so-far edition). */
+  throughDate?: string
   model?: string
   reasoningEffort?: string
   maxOutputTokens?: number
@@ -84,7 +86,7 @@ export async function generateWeeklyDigest(input: {
         ? userPrompt
         : `${userPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected: ${lastError}\nReturn one corrected JSON object only, preserving everything that was not wrong.\n\nREJECTED RESPONSE\n${JSON.stringify(rejected)}`
     const request = {
-      runId: `weekly-${input.weekStart}`,
+      runId: `weekly-${input.weekStart}${input.throughDate ? `-through-${input.throughDate}` : ''}`,
       systemPrompt: WEEKLY_DIGEST_SYSTEM_PROMPT,
       userPrompt: prompt,
       reasoningEffort: input.reasoningEffort ?? 'medium',
@@ -116,6 +118,7 @@ export async function generateWeeklyDigest(input: {
         weekStart: input.weekStart,
         editions: input.editions,
         priorWeeks: input.priorWeeks,
+        throughDate: input.throughDate,
         modelOutput: generated.output,
       })
       return {

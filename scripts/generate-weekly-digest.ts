@@ -8,6 +8,11 @@
  * Weeks are processed in the order given; each week reads the previous two
  * weekly outputs from the output directory for continuity, so pass weeks
  * oldest first. Writes `<week>.json`, `<week>.md` and `<week>.trace.json`.
+ * Earlier weeks missing from the output directory are read from the published
+ * weekly editions instead.
+ *
+ * `--through <date>` writes a week-so-far edition covering the dailies up to
+ * that date (one week only).
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -54,6 +59,22 @@ async function loadEditions(weekStart: string): Promise<WeeklySourceEdition[]> {
   }))
 }
 
+async function loadPublishedWeek(
+  weekStart: string,
+): Promise<WeeklyDigestContent | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anon) return null
+  const client = createClient(url, anon, { auth: { persistSession: false } })
+  const { data } = await client
+    .from('digest_weekly_editions')
+    .select('content')
+    .eq('status', 'published')
+    .eq('week_start', weekStart)
+    .limit(1)
+  return (data?.[0]?.content as WeeklyDigestContent | undefined) ?? null
+}
+
 async function loadPriorWeeks(
   weekStart: string,
 ): Promise<WeeklyDigestContent[]> {
@@ -67,21 +88,30 @@ async function loadPriorWeeks(
         JSON.parse(await readFile(resolve(OUTPUT_DIR, `${key}.json`), 'utf8')),
       )
     } catch {
+      const published = await loadPublishedWeek(key)
       // A missing earlier week simply means less continuity context.
+      if (published) weeks.push(published)
     }
   }
   return priorWeeksFor(weekStart, weeks)
 }
 
 async function main() {
-  const weeks = process.argv.slice(2)
+  const args = process.argv.slice(2)
+  const throughIndex = args.indexOf('--through')
+  const throughDate = throughIndex >= 0 ? args[throughIndex + 1] : undefined
+  const weeks = args.filter(
+    (arg, index) => index !== throughIndex && index !== throughIndex + 1,
+  )
   if (weeks.length === 0) {
     throw new Error('Usage: generate-weekly-digest.ts <monday> [<monday> ...]')
   }
   await mkdir(OUTPUT_DIR, { recursive: true })
   for (const week of weeks) {
     const weekStart = weekStartFor(week)
-    const editions = await loadEditions(weekStart)
+    const editions = (await loadEditions(weekStart)).filter(
+      ({ digestDate }) => !throughDate || digestDate <= throughDate,
+    )
     const priorWeeks = await loadPriorWeeks(weekStart)
     console.log(
       `${weekStart}: ${editions.length} daily editions, prior weeks [${priorWeeks
@@ -93,6 +123,7 @@ async function main() {
       weekStart,
       editions,
       priorWeeks,
+      throughDate,
     })
     const result = {
       ...generated,
@@ -105,15 +136,18 @@ async function main() {
       outputError: attempt.outputError,
     }))
     await writeFile(
-      resolve(OUTPUT_DIR, `${weekStart}.json`),
+      resolve(OUTPUT_DIR, `${weekStart}${throughDate ? '-so-far' : ''}.json`),
       JSON.stringify(result.content, null, 2),
     )
     await writeFile(
-      resolve(OUTPUT_DIR, `${weekStart}.md`),
+      resolve(OUTPUT_DIR, `${weekStart}${throughDate ? '-so-far' : ''}.md`),
       weeklyDigestToMarkdown(result.content),
     )
     await writeFile(
-      resolve(OUTPUT_DIR, `${weekStart}.trace.json`),
+      resolve(
+        OUTPUT_DIR,
+        `${weekStart}${throughDate ? '-so-far' : ''}.trace.json`,
+      ),
       JSON.stringify(
         {
           prompt: result.prompt,

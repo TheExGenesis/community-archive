@@ -1,5 +1,9 @@
 import { Suspense } from 'react'
-import { getCachedWeeklyProfiles } from '@/lib/digest/weeklyData'
+import {
+  getCachedWeekSoFarProfiles,
+  getCachedWeeklyProfiles,
+  type WeeklyDigestEdition,
+} from '@/lib/digest/weeklyData'
 import { WeeklyProfilePrimer } from './WeeklyProfilePrimer'
 
 async function Profiles({
@@ -23,6 +27,28 @@ export function WeeklyProfiles(props: {
   return (
     <Suspense fallback={null}>
       <Profiles {...props} />
+    </Suspense>
+  )
+}
+
+async function WeekSoFarProfilesInner({
+  edition,
+}: {
+  edition: WeeklyDigestEdition
+}) {
+  const profiles = await getCachedWeekSoFarProfiles(edition).catch(() => [])
+  return <WeeklyProfilePrimer profiles={profiles} />
+}
+
+/** Profile hover-card facts for the week-so-far page. */
+export function WeekSoFarProfiles({
+  edition,
+}: {
+  edition: WeeklyDigestEdition
+}) {
+  return (
+    <Suspense fallback={null}>
+      <WeekSoFarProfilesInner edition={edition} />
     </Suspense>
   )
 }

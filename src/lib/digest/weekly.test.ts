@@ -413,3 +413,34 @@ describe('assembleWeeklyDigestContent', () => {
     expect(() => assemble(dup)).toThrow('already in a weekly story')
   })
 })
+
+describe('week so far', () => {
+  it('tells the model the week is still running and ignores later days', () => {
+    const prompt = renderWeeklyDigestPrompt({
+      weekStart: WEEK,
+      editions,
+      priorWeeks: [],
+      throughDate: '2026-10-28',
+    })
+    expect(prompt).toContain('WEEK SO FAR: Monday 2026-10-26')
+    expect(prompt).toContain('run through Wed 2026-10-28')
+    // Tuesday is missing; Friday's edition is after the cut-off and the
+    // remaining days have not happened, so neither is mentioned.
+    expect(prompt).toContain(
+      'No published daily digest exists for: 2026-10-27.',
+    )
+    expect(prompt).not.toContain('2026-10-30#1')
+  })
+
+  it('records the cut-off and counts only days up to it as missing', () => {
+    const content = assembleWeeklyDigestContent({
+      weekStart: WEEK,
+      editions,
+      priorWeeks: [priorWeek],
+      throughDate: '2026-10-30',
+      modelOutput: validOutput,
+    })
+    expect(content.throughDate).toBe('2026-10-30')
+    expect(content.source.missingDates).toEqual(['2026-10-27', '2026-10-29'])
+  })
+})

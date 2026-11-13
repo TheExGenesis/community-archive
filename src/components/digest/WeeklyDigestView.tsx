@@ -135,10 +135,25 @@ function ContinuesFrom({
   )
 }
 
-function WeekNav({ weekStart, weeks }: { weekStart: string; weeks: string[] }) {
+function WeekNav({
+  weekStart,
+  weeks,
+  weekSoFar = false,
+}: {
+  weekStart: string
+  weeks: string[]
+  /** Link the newest final week to the running week's page. */
+  weekSoFar?: boolean
+}) {
   const index = weeks.indexOf(weekStart)
   const newer = index > 0 ? weeks[index - 1] : null
-  const older = index >= 0 && index < weeks.length - 1 ? weeks[index + 1] : null
+  // A running week is newer than every final week in `weeks`.
+  const older =
+    index < 0
+      ? (weeks.find((week) => week < weekStart) ?? null)
+      : index < weeks.length - 1
+        ? weeks[index + 1]
+        : null
   return (
     <nav
       aria-label="Other weeks"
@@ -152,6 +167,10 @@ function WeekNav({ weekStart, weeks }: { weekStart: string; weeks: string[] }) {
       {newer ? (
         <Link href={`/digest/week/${newer}`} className={navLink}>
           Next week →
+        </Link>
+      ) : index === 0 && weekSoFar ? (
+        <Link href="/digest/week" className={navLink}>
+          This week so far →
         </Link>
       ) : null}
       <Link href="/digest" className={navLink}>
@@ -378,6 +397,74 @@ const featuredTweets = (story: WeeklyDigestStory) => {
 }
 
 /** The week's front page: a subtitle, then straight into the stories. */
+/** The daily stories a week-so-far story is built from, oldest first. */
+function DailyStoryLinks({
+  story,
+  previews,
+}: {
+  story: WeeklyDigestStory
+  previews: Previews
+}) {
+  if (story.dailyStories.length === 0) return null
+  const refs = [...story.dailyStories].sort((a, b) =>
+    a.digestDate.localeCompare(b.digestDate),
+  )
+  return (
+    <div className="mt-5 text-sm">
+      <div className={`font-semibold ${MUTED}`}>In the daily digest</div>
+      <ul className="mt-1.5 space-y-1">
+        {refs.map((ref) => (
+          <li key={`${ref.digestDate}-${ref.slug}`} className="leading-[1.5]">
+            <span className={`mr-2 tabular-nums ${MUTED}`}>
+              {shortDay(ref.digestDate)}
+            </span>
+            <DailyRef
+              digestDate={ref.digestDate}
+              slug={ref.slug}
+              previews={previews}
+              className={`font-semibold ${navLink}`}
+            >
+              {plain(ref.title)} →
+            </DailyRef>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** Points the week-so-far reader at last week's final edition. */
+function LastWeek({ edition }: { edition: WeeklyDigestEdition }) {
+  const { content } = edition
+  return (
+    <section className="mt-10 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
+      <h2 className={sectionLabel}>Last week in review</h2>
+      <Link
+        href={`/digest/week/${edition.weekStart}`}
+        className="group mt-4 block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        <span
+          className="block text-[24px] font-semibold leading-[1.15] group-hover:text-brand sm:text-[28px]"
+          style={SERIF}
+        >
+          {weekRangeLabel(content.weekStart, content.weekEnd)}
+        </span>
+        {content.dek ? (
+          <span
+            className="mt-2 block max-w-[60ch] text-[17px] italic leading-[1.45] text-zinc-700 dark:text-zinc-300"
+            style={SERIF}
+          >
+            {content.dek}
+          </span>
+        ) : null}
+        <span className={`mt-3 inline-block text-sm font-semibold ${navLink}`}>
+          Read last week&apos;s Week in Review →
+        </span>
+      </Link>
+    </section>
+  )
+}
+
 export function WeeklyDigestView({
   edition,
   weeks,
@@ -385,10 +472,19 @@ export function WeeklyDigestView({
   profiles,
   bulletin,
   comments,
+  soFar,
+  weekSoFarLink = false,
 }: {
   edition: WeeklyDigestEdition
   weeks: string[]
   previews?: Previews
+  /**
+   * Set for the running week's provisional edition: no story pages, links to
+   * the daily stories instead, and a pointer to last week's final edition.
+   */
+  soFar?: { lastWeek: WeeklyDigestEdition | null }
+  /** Show "This week so far" in the newest final week's navigation. */
+  weekSoFarLink?: boolean
   /** Streams profile hover-card facts in after the page. */
   profiles?: ReactNode
   /** Recommended Bulletin asks and offers, rendered under the stories. */
@@ -404,8 +500,14 @@ export function WeeklyDigestView({
       <div>
         <header className="max-w-[880px]">
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
-            <div className={sectionLabel}>The Week in Review</div>
-            <WeekNav weekStart={edition.weekStart} weeks={weeks} />
+            <div className={sectionLabel}>
+              {soFar ? 'The Week So Far' : 'The Week in Review'}
+            </div>
+            <WeekNav
+              weekStart={edition.weekStart}
+              weeks={weeks}
+              weekSoFar={weekSoFarLink}
+            />
           </div>
           <h1
             className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.01em] sm:text-[52px]"
@@ -422,6 +524,9 @@ export function WeeklyDigestView({
             </p>
           ) : null}
           <p className={`mt-4 text-sm ${MUTED}`}>
+            {soFar && content.throughDate
+              ? `Through ${dayLabel(content.throughDate, { weekday: 'long', day: 'numeric', month: 'long' })}, updated each morning. `
+              : ''}
             Woven from {content.source.editionDates.length} daily{' '}
             {content.source.editionDates.length === 1 ? 'edition' : 'editions'}
             {content.source.missingDates.length > 0
@@ -457,12 +562,19 @@ export function WeeklyDigestView({
                         className="text-[28px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[36px]"
                         style={SERIF}
                       >
-                        <Link
-                          href={weeklyStoryPath(edition.weekStart, story.slug)}
-                          className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        >
-                          {displayTitle(story)}
-                        </Link>
+                        {soFar ? (
+                          displayTitle(story)
+                        ) : (
+                          <Link
+                            href={weeklyStoryPath(
+                              edition.weekStart,
+                              story.slug,
+                            )}
+                            className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                          >
+                            {displayTitle(story)}
+                          </Link>
+                        )}
                       </h3>
                       <p
                         className={`mt-3 max-w-[62ch] text-base leading-[1.65] [text-wrap:pretty] sm:text-[17.5px] ${MUTED}`}
@@ -477,15 +589,23 @@ export function WeeklyDigestView({
                       <div className="mt-6">
                         <TweetCardGrid
                           tweets={featuredTweets(story)}
-                          returnTo={`/digest/week/${edition.weekStart}`}
+                          returnTo={
+                            soFar
+                              ? '/digest/week'
+                              : `/digest/week/${edition.weekStart}`
+                          }
                         />
                       </div>
-                      <Link
-                        href={weeklyStoryPath(edition.weekStart, story.slug)}
-                        className={`mt-5 inline-block text-sm font-semibold ${navLink}`}
-                      >
-                        Read the story →
-                      </Link>
+                      {soFar ? (
+                        <DailyStoryLinks story={story} previews={previews} />
+                      ) : (
+                        <Link
+                          href={weeklyStoryPath(edition.weekStart, story.slug)}
+                          className={`mt-5 inline-block text-sm font-semibold ${navLink}`}
+                        >
+                          Read the story →
+                        </Link>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -494,7 +614,9 @@ export function WeeklyDigestView({
 
             {content.alsoNotable.length > 0 ? (
               <section className="mt-6 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
-                <h2 className={sectionLabel}>Also this week</h2>
+                <h2 className={sectionLabel}>
+                  {soFar ? 'Also so far' : 'Also this week'}
+                </h2>
                 <ul className="mt-5 space-y-3 leading-[1.6]">
                   {content.alsoNotable.map((item) => (
                     <li
@@ -514,6 +636,7 @@ export function WeeklyDigestView({
                 </ul>
               </section>
             ) : null}
+            {soFar?.lastWeek ? <LastWeek edition={soFar.lastWeek} /> : null}
             <DigestSubscribeButton placement="digest" list="weekly" />
           </div>
 

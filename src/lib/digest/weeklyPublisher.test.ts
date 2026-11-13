@@ -1,7 +1,9 @@
 import {
   automatedWorkflowId,
   latestCompletedWeekStart,
+  publishWeekSoFar,
   publishWeeklyDigest,
+  weekSoFarWorkflowId,
   type WeeklyDigestDb,
 } from '../../../services/nightly-digest/publishWeekly'
 import type { WeeklyDigestContent } from './weekly'
@@ -189,5 +191,98 @@ describe('publishWeeklyDigest', () => {
       publishWeeklyDigest({ weekStart: WEEK, db, generate, dryRun: true }),
     ).resolves.toMatchObject({ status: 'dry-run' })
     expect(calls.filter(({ op }) => op !== 'select')).toEqual([])
+  })
+})
+
+describe('publishWeekSoFar', () => {
+  const NOW = new Date('2026-10-29T09:30:00Z')
+  const soFar = dates.slice(0, 4)
+
+  it('waits until the week has three daily digests', async () => {
+    const generate = jest.fn()
+    await expect(
+      publishWeekSoFar({
+        now: NOW,
+        db: fakeDb({ dailyDates: dates.slice(0, 2) }).db,
+        generate,
+      }),
+    ).resolves.toMatchObject({ status: 'too-few-days' })
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it("replaces the previous night's edition with the new one", async () => {
+    const { db, weekly } = fakeDb({
+      dailyDates: soFar,
+      weekly: [
+        {
+          id: 'last-night',
+          week_start: WEEK,
+          status: 'in_progress',
+          workflow_run_id: weekSoFarWorkflowId(WEEK, '2026-10-28'),
+        },
+      ],
+    })
+    const generate = jest.fn().mockResolvedValue(generated)
+    const result = await publishWeekSoFar({ now: NOW, db, generate })
+    expect(result.status).toBe('published')
+    expect(generate.mock.calls[0][0]).toMatchObject({
+      weekStart: WEEK,
+      throughDate: '2026-10-29',
+    })
+    expect(weekly.find(({ id }) => id === 'last-night')?.status).toBe(
+      'archived',
+    )
+    const row = weekly.find(
+      ({ workflow_run_id }) =>
+        workflow_run_id === weekSoFarWorkflowId(WEEK, '2026-10-29'),
+    )
+    expect(row).toMatchObject({ status: 'in_progress', content })
+    expect(row?.published_at).toBeTruthy()
+  })
+
+  it('skips a day that already ran, even if it failed', async () => {
+    const { db } = fakeDb({
+      dailyDates: soFar,
+      weekly: [
+        {
+          id: 'earlier',
+          week_start: WEEK,
+          status: 'failed',
+          workflow_run_id: weekSoFarWorkflowId(WEEK, '2026-10-29'),
+        },
+      ],
+    })
+    const generate = jest.fn()
+    await expect(
+      publishWeekSoFar({ now: NOW, db, generate }),
+    ).resolves.toMatchObject({ status: 'already-run' })
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it("keeps last night's edition public when generation fails", async () => {
+    const { db, weekly } = fakeDb({
+      dailyDates: soFar,
+      weekly: [{ id: 'last-night', week_start: WEEK, status: 'in_progress' }],
+    })
+    const generate = jest.fn().mockRejectedValue(new Error('timed out'))
+    await expect(publishWeekSoFar({ now: NOW, db, generate })).rejects.toThrow(
+      'timed out',
+    )
+    expect(weekly.find(({ id }) => id === 'last-night')?.status).toBe(
+      'in_progress',
+    )
+    expect(weekly.find(({ id }) => id !== 'last-night')).toMatchObject({
+      status: 'failed',
+      error: 'timed out',
+    })
+  })
+
+  it('archives the week so far when the final week publishes', async () => {
+    const { db, weekly } = fakeDb({
+      weekly: [{ id: 'sunday', week_start: WEEK, status: 'in_progress' }],
+    })
+    const generate = jest.fn().mockResolvedValue(generated)
+    await publishWeeklyDigest({ weekStart: WEEK, db, generate })
+    expect(weekly.find(({ id }) => id === 'sunday')?.status).toBe('archived')
   })
 })

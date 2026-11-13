@@ -117,6 +117,11 @@ export interface WeeklyDigestContent {
   alsoNotable: WeeklyAlsoNotable[]
   /** Absent until the publisher freezes the analytics series. */
   trends?: WeeklyTrends
+  /**
+   * Set on a week-so-far edition: the last daily digest it covers. The week
+   * is still running, so days after this are not missing, just not yet here.
+   */
+  throughDate?: string
   source: {
     editionDates: string[]
     missingDates: string[]
@@ -307,15 +312,27 @@ const storyEngagement = (story: DigestStory) => {
   }
 }
 
+/** Days of the week a (possibly unfinished) edition should have covered. */
+const coveredDates = (weekStart: string, throughDate?: string) =>
+  weekDates(weekStart).filter((date) => !throughDate || date <= throughDate)
+
 export function renderWeeklyDigestPrompt(input: {
   weekStart: string
   editions: WeeklySourceEdition[]
   priorWeeks: WeeklyDigestContent[]
+  /** Last day of a week that is still running (a week-so-far edition). */
+  throughDate?: string
 }): string {
   const dates = weekDates(input.weekStart)
-  const editions = sortedWeekEditions(input.weekStart, input.editions)
+  const editions = sortedWeekEditions(
+    input.weekStart,
+    input.editions,
+    input.throughDate,
+  )
   const present = new Set(editions.map(({ digestDate }) => digestDate))
-  const missing = dates.filter((date) => !present.has(date))
+  const missing = coveredDates(input.weekStart, input.throughDate).filter(
+    (date) => !present.has(date),
+  )
 
   const days = editions.map(({ digestDate, content }) => ({
     digest_date: digestDate,
@@ -355,11 +372,19 @@ export function renderWeeklyDigestPrompt(input: {
     }),
   )
 
+  const header = input.throughDate
+    ? [
+        `WEEK SO FAR: Monday ${input.weekStart} to Sunday ${dates[6]}, still in progress. The daily digests so far run through ${weekday(input.throughDate)} ${input.throughDate}; the later days have not happened yet.`,
+        'Write the week so far: select and describe stories only from the days supplied. Do not imply the week is over, do not predict how stories will develop, and do not mention that later days are absent. An "ongoing" story still needs daily stories from at least two dates.',
+      ]
+    : [`WEEK: Monday ${input.weekStart} to Sunday ${dates[6]}.`]
   return [
-    `WEEK: Monday ${input.weekStart} to Sunday ${dates[6]}.`,
+    ...header,
     missing.length
       ? `No published daily digest exists for: ${missing.join(', ')}. Do not speculate about those days.`
-      : 'A daily digest was published for every day of the week.',
+      : input.throughDate
+        ? 'A daily digest was published for every day so far.'
+        : 'A daily digest was published for every day of the week.',
     '',
     "THIS WEEK'S DAILY STORIES",
     JSON.stringify(days, null, 2),
@@ -375,8 +400,9 @@ export function renderWeeklyDigestPrompt(input: {
 function sortedWeekEditions(
   weekStart: string,
   editions: WeeklySourceEdition[],
+  throughDate?: string,
 ): WeeklySourceEdition[] {
-  const dates = new Set(weekDates(weekStart))
+  const dates = new Set(coveredDates(weekStart, throughDate))
   const byDate = new Map<string, WeeklySourceEdition>()
   for (const edition of editions) {
     if (!dates.has(edition.digestDate)) continue
@@ -439,9 +465,14 @@ export function assembleWeeklyDigestContent(input: {
   priorWeeks: WeeklyDigestContent[]
   modelOutput: unknown
   generatedAt?: string
+  throughDate?: string
 }): WeeklyDigestContent {
   const dates = weekDates(input.weekStart)
-  const editions = sortedWeekEditions(input.weekStart, input.editions)
+  const editions = sortedWeekEditions(
+    input.weekStart,
+    input.editions,
+    input.throughDate,
+  )
   if (editions.length === 0) {
     throw new Error(`No published daily digests for week ${input.weekStart}`)
   }
@@ -751,9 +782,12 @@ export function assembleWeeklyDigestContent(input: {
     executiveSummary,
     stories,
     alsoNotable,
+    ...(input.throughDate ? { throughDate: input.throughDate } : {}),
     source: {
       editionDates: Array.from(present).sort(),
-      missingDates: dates.filter((date) => !present.has(date)),
+      missingDates: coveredDates(input.weekStart, input.throughDate).filter(
+        (date) => !present.has(date),
+      ),
       dailyStoryCount: daily.size,
       priorWeekStarts: prior.map(({ weekStart }) => weekStart),
     },

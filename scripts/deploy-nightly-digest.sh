@@ -25,6 +25,10 @@ rsync -a "$repo_root/ops/nightly-digest/community-archive-weekly-digest.service"
   "$host:/etc/systemd/system/community-archive-weekly-digest.service"
 rsync -a "$repo_root/ops/nightly-digest/community-archive-weekly-digest.timer" \
   "$host:/etc/systemd/system/community-archive-weekly-digest.timer"
+rsync -a "$repo_root/ops/nightly-digest/community-archive-week-so-far.service" \
+  "$host:/etc/systemd/system/community-archive-week-so-far.service"
+rsync -a "$repo_root/ops/nightly-digest/community-archive-week-so-far.timer" \
+  "$host:/etc/systemd/system/community-archive-week-so-far.timer"
 
 ssh "$host" bash -s -- "$stage" "$release" "$previous" <<'REMOTE'
 set -euo pipefail
@@ -39,7 +43,9 @@ systemd-analyze verify \
   /etc/systemd/system/community-archive-nightly-digest.service \
   /etc/systemd/system/community-archive-nightly-digest.timer \
   /etc/systemd/system/community-archive-weekly-digest.service \
-  /etc/systemd/system/community-archive-weekly-digest.timer
+  /etc/systemd/system/community-archive-weekly-digest.timer \
+  /etc/systemd/system/community-archive-week-so-far.service \
+  /etc/systemd/system/community-archive-week-so-far.timer
 rm -rf "$previous"
 if test -d "$release"; then mv "$release" "$previous"; fi
 mv "$stage" "$release"
@@ -52,6 +58,10 @@ systemctl disable --now community-archive-weekly-digest.timer >/dev/null 2>&1 ||
 systemctl reset-failed community-archive-weekly-digest.service >/dev/null 2>&1 || true
 systemctl cat community-archive-weekly-digest.service >/dev/null
 systemctl cat community-archive-weekly-digest.timer >/dev/null
+systemctl disable --now community-archive-week-so-far.timer >/dev/null 2>&1 || true
+systemctl reset-failed community-archive-week-so-far.service >/dev/null 2>&1 || true
+systemctl cat community-archive-week-so-far.service >/dev/null
+systemctl cat community-archive-week-so-far.timer >/dev/null
 REMOTE
 
-echo "Nightly and weekly digest installed on $host with both timers disabled."
+echo "Nightly, weekly and week-so-far digest installed on $host with all three timers disabled."

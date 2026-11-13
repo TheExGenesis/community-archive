@@ -13,6 +13,7 @@ import {
   getPublishedWeeklyDigest,
   listPublishedWeeks,
   getCachedWeeklyRefPreviews,
+  getWeekSoFar,
   prebuiltWeeklyParams,
 } from '@/lib/digest/weeklyData'
 
@@ -55,9 +56,10 @@ export default async function WeeklyDigestPage({
   params: Promise<{ weekStart: string }>
 }) {
   const { weekStart } = await params
-  const [edition, weeks] = await Promise.all([
+  const [edition, weeks, soFar] = await Promise.all([
     getPublishedWeeklyDigest(weekStart),
     listPublishedWeeks(),
+    getWeekSoFar(),
   ])
   if (!edition) notFound()
   const previews = await getCachedWeeklyRefPreviews(edition.weekStart)
@@ -69,6 +71,7 @@ export default async function WeeklyDigestPage({
       profiles={<WeeklyProfiles weekStart={edition.weekStart} />}
       bulletin={<WeeklyBulletin edition={edition} />}
       comments={<WeeklyDiscussion edition={edition} />}
+      weekSoFarLink={Boolean(soFar && soFar.weekStart > edition.weekStart)}
     />
   )
 }

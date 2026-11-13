@@ -124,6 +124,30 @@ export const getPublishedWeeklyDigest = requestCache(
     )(),
 )
 
+async function readWeekSoFar(): Promise<WeeklyDigestEdition | null> {
+  const { data, error } = await weeklyTable()
+    .select(PUBLIC_COLUMNS)
+    .eq('status', 'in_progress')
+    .order('week_start', { ascending: false })
+    .limit(1)
+  if (error) {
+    console.error('Week-so-far digest read failed:', error.message)
+    return null
+  }
+  const row = (data as WeeklyRow[] | null)?.[0]
+  return row ? mapRow(row) : null
+}
+
+/**
+ * The newest provisional edition for a week that is still running, refreshed
+ * each morning. Callers show it only when it is newer than the latest final
+ * week (the final edition archives it, but a failed archive must not win).
+ */
+export const getWeekSoFar = (): Promise<WeeklyDigestEdition | null> =>
+  unstable_cache(readWeekSoFar, ['weekly-digest-week-so-far'], {
+    revalidate: SHARED_READ_SECONDS,
+  })()
+
 /** Published week starts, newest first, for navigation. */
 export const listPublishedWeeks = (limit = 26): Promise<string[]> =>
   unstable_cache(
@@ -289,6 +313,24 @@ export const getCachedWeeklyRefPreviews = (weekStart: string) =>
     },
     ['weekly-ref-previews', weekStart],
     { revalidate: 3600 },
+  )()
+
+/**
+ * Previews and profiles for a week-so-far edition. Keyed by edition id: each
+ * morning's edition is a new row, so a cached entry never outlives its text.
+ */
+export const getCachedWeekSoFarRefPreviews = (edition: WeeklyDigestEdition) =>
+  unstable_cache(
+    () => loadWeeklyRefPreviews(edition.content),
+    ['week-so-far-ref-previews', edition.id],
+    { revalidate: 3600 },
+  )()
+
+export const getCachedWeekSoFarProfiles = (edition: WeeklyDigestEdition) =>
+  unstable_cache(
+    () => loadWeeklyProfiles(edition.content, weekPageHandles(edition.content)),
+    ['week-so-far-profiles', edition.id],
+    { revalidate: 86_400 },
   )()
 
 /**

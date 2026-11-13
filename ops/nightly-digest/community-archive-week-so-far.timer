@@ -1,0 +1,16 @@
+[Unit]
+Description=Weave the current week's dailies so far into the week-so-far digest
+
+[Timer]
+# The daily edition publishes around 07:30 UTC; 09:30 UTC leaves margin and
+# runs after Monday's 09:00 weekly publisher. Runs before Wednesday find fewer
+# than three dailies and skip. Health expects a fresh run once three dailies
+# are three hours old (see community_archive_monitoring_weekly_digest).
+OnCalendar=*-*-* 09:30:00 UTC
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=0
+Unit=community-archive-week-so-far.service
+
+[Install]
+WantedBy=timers.target

@@ -1,6 +1,7 @@
 import { capturePostHogEvent } from '@/lib/posthog'
 import '@testing-library/jest-dom'
 import { fireEvent, render, screen } from '@testing-library/react'
+import type React from 'react'
 import TweetComponent from './TweetComponent'
 import type { TweetData } from '@/lib/tweets/types'
 
@@ -20,19 +21,26 @@ jest.mock('@/components/ImageLightbox', () => ({
   __esModule: true,
   default: ({
     alt,
+    label,
+    badge,
     gallery,
     index,
   }: {
     alt: string
+    label?: string
+    badge?: React.ReactNode
     gallery?: { src: string }[]
     index?: number
   }) => (
     <span
       data-testid="lightbox"
       aria-label={alt}
+      data-label={label}
       data-index={index}
       data-gallery={gallery?.map((image) => image.src).join(' ')}
-    />
+    >
+      {badge}
+    </span>
   ),
 }))
 
@@ -256,4 +264,39 @@ describe('compact search row', () => {
     expect(opened).not.toHaveBeenCalled()
     open.mockRestore()
   })
+  test.each([
+    ['compact row', { compact: true }, 4],
+    ['full view', {}, 13],
+    ['permalink page', { isPermalinkPage: true }, 13],
+  ])(
+    'a 13-photo tweet in the %s shows the right tiles and a 13-image gallery',
+    (_, props, tileCount) => {
+      const media = Array.from({ length: 13 }, (_, n) => ({
+        media_url: `https://example.com/${n + 1}.jpg`,
+        media_type: 'photo',
+      }))
+      const { container } = render(
+        <TweetComponent tweet={{ ...tweet, media }} {...props} />,
+      )
+      const thumbs = screen.getAllByLabelText(/^Tweet image/)
+      expect(thumbs).toHaveLength(tileCount)
+      thumbs.forEach((thumb, index) => {
+        expect(thumb).toHaveAttribute('data-index', String(index))
+        expect(thumb.getAttribute('data-gallery')?.split(' ')).toHaveLength(13)
+      })
+      const overflow = screen.queryByTestId('media-overflow')
+      if (tileCount === 4) {
+        expect(overflow).toHaveTextContent('+9')
+        expect(thumbs[3]).toContainElement(overflow)
+        expect(thumbs[3]).toHaveAttribute(
+          'data-label',
+          'Enlarge tweet image 4, 9 more images',
+        )
+      } else {
+        expect(overflow).toBeNull()
+        // More than four photos switch the full view to the dense grid.
+        expect(container.querySelector('.sm\\:grid-cols-3')).not.toBeNull()
+      }
+    },
+  )
 })

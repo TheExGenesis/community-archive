@@ -22,6 +22,11 @@ import { HighlightedText } from '@/components/HighlightedText'
 import { decodeTweetText } from '@/lib/tweetText'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import ImageLightbox, { type LightboxImage } from '@/components/ImageLightbox'
+import {
+  MAX_VISIBLE_MEDIA,
+  MediaOverflowBadge,
+  overflowLabel,
+} from '@/components/MediaOverflowBadge'
 import TweetLikeButton from '@/components/TweetLikeButton'
 import TweetLikers from '@/components/TweetLikers'
 import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
@@ -198,34 +203,48 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     const gallery = toGallery(renderableMedia, 'Tweet image')
 
     if (compact) {
+      const visible = renderableMedia.slice(0, MAX_VISIBLE_MEDIA)
+      const hidden = renderableMedia.length - visible.length
       return (
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-          {renderableMedia.slice(0, 4).map((mediaItem, index) => (
-            <ImageLightbox
-              key={index}
-              src={mediaItem.media_url}
-              alt={`Tweet image ${index + 1}`}
-              width={mediaItem.width || 1200}
-              height={mediaItem.height || 800}
-              gallery={gallery}
-              index={index}
-              sizes="(max-width: 640px) 7rem, 9rem"
-              className="h-20 w-28 flex-none rounded-md border border-border bg-muted sm:h-24 sm:w-36"
-              imageClassName="h-full w-full object-cover transition-transform hover:scale-[1.02]"
-            />
-          ))}
-          {renderableMedia.length > 4 && (
-            <div className="flex h-20 w-20 flex-none items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground sm:h-24">
-              +{renderableMedia.length - 4} more
-            </div>
-          )}
+          {visible.map((mediaItem, index) => {
+            const alt = `Tweet image ${index + 1}`
+            const overflow = index === visible.length - 1 && hidden > 0
+            return (
+              <ImageLightbox
+                key={index}
+                src={mediaItem.media_url}
+                alt={alt}
+                width={mediaItem.width || 1200}
+                height={mediaItem.height || 800}
+                gallery={gallery}
+                index={index}
+                label={overflow ? overflowLabel(alt, hidden) : undefined}
+                badge={
+                  overflow ? <MediaOverflowBadge hidden={hidden} /> : undefined
+                }
+                sizes="(max-width: 640px) 7rem, 9rem"
+                className="h-20 w-28 flex-none rounded-md border border-border bg-muted sm:h-24 sm:w-36"
+                imageClassName="h-full w-full object-cover transition-transform hover:scale-[1.02]"
+              />
+            )
+          })}
         </div>
       )
     }
 
+    // Past four, square tiles in three columns keep a 20-photo tweet compact;
+    // next/image loads them lazily as they scroll into view.
+    const dense = renderableMedia.length > MAX_VISIBLE_MEDIA
     return (
       <div
-        className={`my-3 grid gap-2 ${renderableMedia.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+        className={`my-3 grid gap-2 ${
+          dense
+            ? 'grid-cols-2 sm:grid-cols-3'
+            : renderableMedia.length > 1
+              ? 'grid-cols-2'
+              : 'grid-cols-1'
+        }`}
       >
         {renderableMedia.map((mediaItem, index) => (
           <ImageLightbox
@@ -237,12 +256,14 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             gallery={gallery}
             index={index}
             sizes={
-              renderableMedia.length > 1
-                ? '(max-width: 640px) 50vw, 360px'
-                : '(max-width: 640px) 100vw, 720px'
+              dense
+                ? '(max-width: 640px) 50vw, 240px'
+                : renderableMedia.length > 1
+                  ? '(max-width: 640px) 50vw, 360px'
+                  : '(max-width: 640px) 100vw, 720px'
             }
-            className="rounded-lg border border-border bg-muted"
-            imageClassName="h-full max-h-96 min-h-40 w-full object-cover transition-transform hover:scale-[1.01]"
+            className={`rounded-lg border border-border bg-muted ${dense ? 'aspect-square' : ''}`}
+            imageClassName={`${dense ? 'h-full' : 'h-full max-h-96 min-h-40'} w-full object-cover transition-transform hover:scale-[1.01]`}
           />
         ))}
       </div>
@@ -266,6 +287,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     const quotedProfilePic = quotedTweet.avatar_media_url
     const quotedMedia = (quotedTweet.media ?? []).filter(isRenderableMedia)
     const quotedGallery = toGallery(quotedMedia, 'Quoted tweet image')
+    const quotedVisible = quotedMedia.slice(0, MAX_VISIBLE_MEDIA)
+    const quotedHidden = quotedMedia.length - quotedVisible.length
     const quotedProfileHref = userProfileHref(
       quotedTweet.username,
       quotedTweet.account_id,
@@ -344,17 +367,27 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                     : 'mt-2 flex flex-col space-y-1'
                 }
               >
-                {quotedMedia
-                  .slice(0, compact ? 3 : undefined)
-                  .map((mediaItem, index) => (
+                {quotedVisible.map((mediaItem, index) => {
+                  const alt = `Quoted tweet image ${index + 1}`
+                  const overflow =
+                    index === quotedVisible.length - 1 && quotedHidden > 0
+                  return (
                     <ImageLightbox
                       key={index}
                       src={mediaItem.media_url}
-                      alt={`Quoted tweet image ${index + 1}`}
+                      alt={alt}
                       width={mediaItem.width || 1200}
                       height={mediaItem.height || 800}
                       gallery={quotedGallery}
                       index={index}
+                      label={
+                        overflow ? overflowLabel(alt, quotedHidden) : undefined
+                      }
+                      badge={
+                        overflow ? (
+                          <MediaOverflowBadge hidden={quotedHidden} />
+                        ) : undefined
+                      }
                       sizes={
                         compact ? '6rem' : '(max-width: 640px) 100vw, 640px'
                       }
@@ -367,7 +400,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                           : 'h-auto max-h-48 w-full object-contain transition-transform hover:scale-[1.01]'
                       }
                     />
-                  ))}
+                  )
+                })}
               </div>
             )}
             <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">

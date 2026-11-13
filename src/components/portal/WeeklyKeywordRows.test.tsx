@@ -214,6 +214,17 @@ test('refills rows freed by a story merge with spare terms, after the ranked ter
   expect(names()).toHaveLength(6)
   expect(names().slice(-2)).toEqual(['reserve one', 'reserve two'])
 
+  // A spare that only repeats words of a ranked term is skipped.
+  rerender(
+    <WeeklyKeywordRows
+      weekly={[...six, spare('ai', 3), spare('reserve one', 2)]}
+      failed={false}
+      stories={[story]}
+    />,
+  )
+  expect(names()).toContain('reserve one')
+  expect(names().filter((name) => name === 'ai')).toHaveLength(0)
+
   // Without merges, spare terms never displace a ranked term.
   rerender(
     <WeeklyKeywordRows

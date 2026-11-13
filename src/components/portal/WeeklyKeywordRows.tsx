@@ -76,7 +76,16 @@ export function WeeklyKeywordRows({
       </p>
     )
   const weekly = allTerms.filter((row) => !row.reserve)
-  const reserve = allTerms.filter((row) => row.reserve)
+  // A spare whose words all appear in a ranked term ("jensen" beside
+  // "jensen huang") would read as a duplicate row, so it never backfills.
+  const rankedWords = weekly.map((row) => new Set(row.term.split(' ')))
+  const reserve = allTerms.filter(
+    (row) =>
+      row.reserve &&
+      !rankedWords.some((words) =>
+        row.term.split(' ').every((word) => words.has(word)),
+      ),
+  )
   const dynamic = weekly.length === 0 || weekly.every((row) => row.lane)
   const weighted = [...weekly, ...reserve].every(
     (row) =>

@@ -132,3 +132,30 @@ test('rejects invalid shares before using them for bar widths or effect ordering
     ).toThrow('invalid')
   }
 })
+
+test('keeps spare terms out unless requested, and validates them like ranked terms', () => {
+  const spare = { ...response.data[0], term: 'agent swarms' }
+  const withReserve = { ...response, reserve: [spare] }
+  expect(mapWeeklyKeywords(withReserve).map((row) => row.term)).toEqual([
+    'ai agents',
+  ])
+  const all = mapWeeklyKeywords(withReserve, { includeReserve: true })
+  expect(all.map((row) => [row.term, row.reserve])).toEqual([
+    ['ai agents', undefined],
+    ['agent swarms', true],
+  ])
+  // A gateway without the field still maps.
+  expect(mapWeeklyKeywords(response, { includeReserve: true })).toHaveLength(1)
+  expect(() =>
+    mapWeeklyKeywords({ ...response, reserve: [response.data[0]] }),
+  ).toThrow()
+  expect(() =>
+    mapWeeklyKeywords({ ...response, reserve: [spare, spare] }),
+  ).toThrow()
+  expect(() =>
+    mapWeeklyKeywords({
+      ...response,
+      reserve: [{ ...spare, currentPer100k: -1 }],
+    }),
+  ).toThrow()
+})

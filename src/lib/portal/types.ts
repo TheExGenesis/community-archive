@@ -81,6 +81,8 @@ export interface PortalStats {
 export interface TermWeek {
   /** Present for automatically discovered, share-normalized homepage terms. */
   lane?: 'emerging' | 'rising' | 'falling'
+  /** A spare term that only refills rows merged into a trend story. */
+  reserve?: true
   currentAuthors?: number
   currentPer100k?: number
   previousPer100k?: number

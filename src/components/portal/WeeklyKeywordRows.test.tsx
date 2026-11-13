@@ -175,3 +175,63 @@ test('merges story terms into one row that opens the story and explains it on ho
   expect(tip).toHaveTextContent('Agents ship everywhere')
   expect(tip).toHaveTextContent('Merged: ai agents · model')
 })
+
+test('refills rows freed by a story merge with spare terms, after the ranked terms', () => {
+  const spare = (term: string, n: number): TermWeek => ({
+    term,
+    lane: 'rising',
+    reserve: true,
+    currentPer100k: 1000 * n,
+    previousPer100k: 500 * n,
+    last7: 40 * n,
+    prev7: 20 * n,
+    deltaPct: 100,
+    status: 'comparable',
+  })
+  const six = [
+    ...words,
+    { ...words[1], term: 'agents' },
+    { ...words[1], term: 'tooling' },
+    { ...words[2], term: 'summer' },
+  ]
+  const story = {
+    trendDate: '2026-09-07',
+    slug: 'ai-agents',
+    terms: ['ai agents', 'model', 'agents'],
+    label: 'AI agents',
+    title: 'Agents ship everywhere',
+    tooltip: 'Everyone is posting about their new agent setups.',
+  }
+  const { rerender } = render(
+    <WeeklyKeywordRows
+      weekly={[...six, spare('reserve one', 2), spare('reserve two', 1)]}
+      failed={false}
+      stories={[story]}
+    />,
+  )
+  const names = () =>
+    screen.getAllByRole('link').map((link) => link.textContent)
+  expect(names()).toHaveLength(6)
+  expect(names().slice(-2)).toEqual(['reserve one', 'reserve two'])
+
+  // A spare that only repeats words of a ranked term is skipped.
+  rerender(
+    <WeeklyKeywordRows
+      weekly={[...six, spare('ai', 3), spare('reserve one', 2)]}
+      failed={false}
+      stories={[story]}
+    />,
+  )
+  expect(names()).toContain('reserve one')
+  expect(names().filter((name) => name === 'ai')).toHaveLength(0)
+
+  // Without merges, spare terms never displace a ranked term.
+  rerender(
+    <WeeklyKeywordRows
+      weekly={[...six, spare('reserve one', 50)]}
+      failed={false}
+    />,
+  )
+  expect(names()).toHaveLength(6)
+  expect(names()).not.toContain('reserve one')
+})

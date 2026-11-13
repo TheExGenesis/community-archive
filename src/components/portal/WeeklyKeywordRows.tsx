@@ -61,7 +61,7 @@ function StoryTerm({ story }: { story: TrendStoryLink }) {
 }
 
 export function WeeklyKeywordRows({
-  weekly,
+  weekly: allTerms,
   failed,
   stories = [],
 }: {
@@ -75,8 +75,19 @@ export function WeeklyKeywordRows({
         Trending terms are temporarily unavailable.
       </p>
     )
+  const weekly = allTerms.filter((row) => !row.reserve)
+  // A spare whose words all appear in a ranked term ("jensen" beside
+  // "jensen huang") would read as a duplicate row, so it never backfills.
+  const rankedWords = weekly.map((row) => new Set(row.term.split(' ')))
+  const reserve = allTerms.filter(
+    (row) =>
+      row.reserve &&
+      !rankedWords.some((words) =>
+        row.term.split(' ').every((word) => words.has(word)),
+      ),
+  )
   const dynamic = weekly.length === 0 || weekly.every((row) => row.lane)
-  const weighted = weekly.every(
+  const weighted = [...weekly, ...reserve].every(
     (row) =>
       row.currentPer100k !== undefined && row.previousPer100k !== undefined,
   )
@@ -92,8 +103,12 @@ export function WeeklyKeywordRows({
         b.current - a.current ||
         a.term.localeCompare(b.term),
     )
-  // Terms the nightly AI pass merged into one story share a single row.
-  const grouped = groupTermsByStory(sorted, stories).slice(0, 6)
+  // Terms the nightly AI pass merged into one story share a single row;
+  // spare terms, in the gateway's lane-rank order, refill the freed rows.
+  const grouped = groupTermsByStory(
+    [...sorted, ...reserve.map((row) => ({ ...row, ...activity(row) }))],
+    stories,
+  ).slice(0, 6)
   const rows = grouped.map((entry) => entry.term)
   const max = Math.max(1, ...rows.flatMap((row) => [row.current, row.previous]))
   const width = (value: number) => `${(value / max) * 100}%`

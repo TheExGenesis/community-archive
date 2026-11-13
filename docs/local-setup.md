@@ -126,6 +126,30 @@ a literal token would be committed to this public repository.
 The token carries your full account permissions; `--read-only` only limits what
 the MCP server itself will do. The same variable is used by `pnpm gen-types`.
 
+### PostHog MCP server (AI agents)
+
+`.mcp.json` also registers PostHog's remote MCP server as `posthog-ca`, pinned
+to the Community Archive project (`546185`) through the `x-posthog-project-id`
+header. It authenticates with a personal API key read from `POSTHOG_CA_API_KEY`.
+The same rule applies: never paste the key into `.mcp.json`.
+
+1. Create a personal API key at **PostHog → Settings → Personal API keys** using
+   the **MCP Server** preset and restrict it to the Community Archive project.
+   Choose read scopes only if the agent should not create or edit dashboards,
+   insights, alerts, or flags.
+2. Export it in the environment that launches your agent and restart the agent:
+
+   ```bash
+   export POSTHOG_CA_API_KEY="<your key>"
+   ```
+
+3. To exclude every write tool regardless of key scopes, add
+   `"x-posthog-read-only": "true"` to the server's `headers` in your own
+   user-level MCP settings.
+
+A PostHog connection authorized through claude.ai for another organization does
+not see this project; use this entry for Community Archive data.
+
 ### Supabase local instance setup
 
 Echoing [Supabase's Local Development instructions](https://supabase.com/docs/guides/cli/local-development?queryGroups=access-method&access-method=postgres#access-your-projects-services):

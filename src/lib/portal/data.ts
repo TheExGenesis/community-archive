@@ -1215,7 +1215,9 @@ export function startHomepageData() {
       'weekly-trends',
       // The gateway caches by UTC day and membership. Read it directly so a
       // failed freshness check cannot serve an older Next Data Cache entry.
-      () => fetchPortalWeeklyTrends(),
+      // Spare terms refill rows that trend stories merge together.
+      () =>
+        fetchPortalWeeklyTrends(undefined, undefined, { includeReserve: true }),
       [],
     ),
     research: loadPortalComponentData(

@@ -1,17 +1,21 @@
 import type { TermWeek } from './types'
 
+type WeeklyKeywordRow = {
+  term: string
+  lane: 'emerging' | 'rising' | 'falling'
+  currentTweets: number
+  previousTweets: number
+  currentAuthors: number
+  previousAuthors: number
+  currentPer100k: number
+  previousPer100k: number
+  changePct: number | null
+}
+
 export interface WeeklyKeywordsResponse {
-  data: Array<{
-    term: string
-    lane: 'emerging' | 'rising' | 'falling'
-    currentTweets: number
-    previousTweets: number
-    currentAuthors: number
-    previousAuthors: number
-    currentPer100k: number
-    previousPer100k: number
-    changePct: number | null
-  }>
+  data: WeeklyKeywordRow[]
+  /** Next-ranked terms per lane, for backfilling rows merged into a story. */
+  reserve?: WeeklyKeywordRow[]
   window: {
     endDate: string
     sinceDate: string
@@ -22,8 +26,14 @@ export interface WeeklyKeywordsResponse {
   population: 'community_members'
 }
 
+/**
+ * Spare terms (`reserve: true`) are appended only on request: the homepage
+ * uses them to refill rows that trend stories merged, every other consumer
+ * keeps the six ranked terms.
+ */
 export function mapWeeklyKeywords(
   response: WeeklyKeywordsResponse,
+  { includeReserve = false }: { includeReserve?: boolean } = {},
 ): TermWeek[] {
   const invalid = () => new Error('ClickHouse returned invalid weekly keywords')
   if (
@@ -31,6 +41,8 @@ export function mapWeeklyKeywords(
     response.population !== 'community_members' ||
     !Array.isArray(response.data) ||
     response.data.length > 6 ||
+    (response.reserve !== undefined &&
+      (!Array.isArray(response.reserve) || response.reserve.length > 6)) ||
     !response.window
   )
     throw invalid()
@@ -67,8 +79,12 @@ export function mapWeeklyKeywords(
   )
     throw invalid()
   const seen = new Set<string>()
-  const lanes = { emerging: 0, rising: 0, falling: 0 }
-  return response.data.map((row) => {
+  const counters = () => ({ emerging: 0, rising: 0, falling: 0 })
+  const toTermWeek = (
+    row: WeeklyKeywordRow,
+    lanes: Record<WeeklyKeywordRow['lane'], number>,
+    reserve: boolean,
+  ): TermWeek => {
     if (
       !row ||
       !Object.hasOwn(lanes, row.lane) ||
@@ -95,6 +111,7 @@ export function mapWeeklyKeywords(
       throw invalid()
     seen.add(row.term)
     return {
+      ...(reserve ? { reserve: true as const } : {}),
       term: row.term,
       lane: row.lane,
       last7: row.currentTweets,
@@ -112,5 +129,12 @@ export function mapWeeklyKeywords(
           ? 'new'
           : 'inactive',
     }
-  })
+  }
+  const lanes = counters()
+  const primary = response.data.map((row) => toTermWeek(row, lanes, false))
+  const reserveLanes = counters()
+  const reserve = (response.reserve ?? []).map((row) =>
+    toTermWeek(row, reserveLanes, true),
+  )
+  return includeReserve ? [...primary, ...reserve] : primary
 }

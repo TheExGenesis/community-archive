@@ -908,6 +908,7 @@ export async function fetchPortalTrends(
 export async function fetchPortalWeeklyTrends(
   now = new Date(),
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+  { includeReserve = false }: { includeReserve?: boolean } = {},
 ): Promise<TermWeek[]> {
   try {
     return mapWeeklyKeywords(
@@ -916,6 +917,7 @@ export async function fetchPortalWeeklyTrends(
         new URLSearchParams(),
         { timeoutMs: 60_000 },
       ),
+      { includeReserve },
     )
   } catch (error) {
     // The gateway and website deploy independently. Only an absent route uses

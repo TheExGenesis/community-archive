@@ -10,6 +10,7 @@ import {
   filtersToQuery,
   LIBRARY_DATA_URL,
   LIBRARY_KINDS,
+  CHARACTERISTIC_MIN_MEMBERS,
   LIBRARY_SORTS,
   libraryShard,
   libraryShardUrl,
@@ -134,6 +135,15 @@ export function LibraryHome() {
           </span>
         )}
       </div>
+
+      {data && filters.sort === 'characteristic' && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Books, films and ideas come first when members mention them far
+          more than their Wikipedia fame predicts (at least{' '}
+          {CHARACTERISTIC_MIN_MEMBERS} members). Everything else follows by
+          member count.
+        </p>
+      )}
 
       {failed && (
         <p className="py-12 text-center text-muted-foreground">

@@ -37,6 +37,11 @@ export interface LibraryWork {
   la: number
   /** Found by a shared link, or by the title written out. */
   by: 'link' | 'name'
+  /**
+   * Monthly English Wikipedia views: general fame, for the characteristic
+   * sort. Only books, films and ideas with a matching page have it.
+   */
+  v?: number
 }
 
 export interface LibraryData {
@@ -75,14 +80,37 @@ export const LIBRARY_KINDS: [LibraryKind, string, string][] = [
   ['code', 'Code', 'Code'],
 ]
 
-export type LibrarySort = 'members' | 'likes' | 'recent' | 'oldest'
+export type LibrarySort =
+  | 'characteristic'
+  | 'members'
+  | 'likes'
+  | 'recent'
+  | 'oldest'
 
 export const LIBRARY_SORTS: [LibrarySort, string][] = [
+  ['characteristic', 'Most characteristic'],
   ['members', 'Most members'],
   ['likes', 'Most liked'],
   ['recent', 'Tweeted most recently'],
   ['oldest', 'Oldest first'],
 ]
+
+export const DEFAULT_LIBRARY_SORT: LibrarySort = 'characteristic'
+
+/** How strongly the characteristic sort discounts general fame (0 = none). */
+export const FAME_WEIGHT = 0.5
+/** Fewer members than this and a work is too thin to rank on fame. */
+export const CHARACTERISTIC_MIN_MEMBERS = 8
+
+/**
+ * members × (members / fame)^FAME_WEIGHT, in logs: a work rises when members
+ * mention it far more than its Wikipedia views predict. Null when the work has
+ * no fame measure or too few members.
+ */
+export function characteristicScore(w: LibraryWork): number | null {
+  if (!w.v || w.v <= 0 || w.n < CHARACTERISTIC_MIN_MEMBERS) return null
+  return (1 + FAME_WEIGHT) * Math.log(w.n) - FAME_WEIGHT * Math.log(w.v)
+}
 
 export interface LibraryFilters {
   kind: LibraryKind | ''
@@ -109,7 +137,7 @@ export function filtersFromParams(params: URLSearchParams): LibraryFilters {
     q: params.get('q') ?? '',
     sort: LIBRARY_SORTS.some(([s]) => s === sort)
       ? (sort as LibrarySort)
-      : 'members',
+      : DEFAULT_LIBRARY_SORT,
   }
 }
 
@@ -117,7 +145,7 @@ export function filtersToQuery(f: LibraryFilters): string {
   const p = new URLSearchParams()
   if (f.kind) p.set('kind', f.kind)
   if (f.q) p.set('q', f.q)
-  if (f.sort !== 'members') p.set('sort', f.sort)
+  if (f.sort !== DEFAULT_LIBRARY_SORT) p.set('sort', f.sort)
   const s = p.toString()
   return s ? `?${s}` : ''
 }
@@ -138,8 +166,24 @@ export function selectWorks(
       (!f.kind || w.k === f.kind) &&
       (!q || `${w.t} ${w.s} ${w.d}`.toLowerCase().includes(q)),
   )
-  const by: Record<LibrarySort, (a: LibraryWork, b: LibraryWork) => number> = {
-    members: (a, b) => b.n - a.n || b.l - a.l,
+  const members = (a: LibraryWork, b: LibraryWork) => b.n - a.n || b.l - a.l
+  if (f.sort === 'characteristic') {
+    // Works with a fame measure rank by score; the rest follow by members.
+    const score = new Map(out.map((w) => [w.id, characteristicScore(w)]))
+    return out.sort((a, b) => {
+      const sa = score.get(a.id) ?? null
+      const sb = score.get(b.id) ?? null
+      if (sa !== null && sb !== null) return sb - sa || members(a, b)
+      if (sa !== null) return -1
+      if (sb !== null) return 1
+      return members(a, b)
+    })
+  }
+  const by: Record<
+    Exclude<LibrarySort, 'characteristic'>,
+    (a: LibraryWork, b: LibraryWork) => number
+  > = {
+    members,
     likes: (a, b) => b.l - a.l || b.n - a.n,
     recent: (a, b) => b.la - a.la,
     oldest: (a, b) => a.f - b.f,

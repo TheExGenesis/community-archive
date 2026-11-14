@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export the TPOT spread explorer's real-usage data as static files for the admin page.
 
-The admin spread explorer (src/app/admin/spread-explorer) reads precomputed files
+The spread explorer (src/app/spread-explorer) reads precomputed files
 instead of a live ClickHouse: one `meta.json` with the map, and word counts
 sharded by CRC32(token) % shards so any typed word costs one small fetch.
 
@@ -19,7 +19,7 @@ Sources (all local, the STLM workspace):
 
 Output: `meta.json`, `vocab.json`, `handles.json.gz`, `words/<shard>.json.gz`.
 The export names real accounts (central accounts per hex, handles for anchors),
-so it is served only behind the admin gate: never commit it or put it in `public/`.
+and is served through the unlisted page's cached API: never commit it or put it in `public/`.
 """
 
 from __future__ import annotations

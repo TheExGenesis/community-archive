@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createServerServiceRoleClient } from '@/utils/supabase'
-import { fetchSafeRemoteResource } from '@/lib/linkPreviews'
+import { decodeHtml, fetchSafeRemoteResource } from '@/lib/linkPreviews'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const image = await fetchSafeRemoteResource(data.image_url, {
+    // Rows cached before the metadata parser decoded entities still hold
+    // "&amp;" in the query string; decode here until they expire.
+    const image = await fetchSafeRemoteResource(decodeHtml(data.image_url), {
       accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif',
       maximumBytes: 2 * 1024 * 1024,
       allowedContentTypes: (contentType) =>

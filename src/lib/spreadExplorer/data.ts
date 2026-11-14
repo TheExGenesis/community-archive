@@ -8,8 +8,9 @@ import type { SpreadAnchor, SpreadMeta, SpreadVocab, SpreadWord } from './types'
 
 // The export (scripts/build-spread-explorer-data.py) lives either in a local
 // directory (SPREAD_EXPLORER_DATA_DIR, for development) or in a private
-// Supabase Storage bucket read with the service role. It names real accounts,
-// so every reader of this module must sit behind the admin gate.
+// Supabase Storage bucket read with the service role. The bucket stays
+// private; the unlisted page reads it through /api/spread-explorer/*, whose
+// answers the edge caches.
 const BUCKET = process.env.SPREAD_EXPLORER_BUCKET || 'spread-explorer'
 const SHARD_CACHE_SIZE = 48
 

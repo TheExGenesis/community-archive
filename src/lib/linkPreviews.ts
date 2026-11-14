@@ -86,7 +86,7 @@ interface PreviewMetadata {
 
 export class UnsafePreviewUrlError extends Error {}
 
-const decodeHtml = (value: string) =>
+export const decodeHtml = (value: string) =>
   value
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
@@ -414,7 +414,7 @@ export async function fetchLinkPreviewMetadata(
 
   const canonicalUrl = normalizePreviewUrl(
     canonical
-      ? new URL(canonical, result.finalUrl).toString()
+      ? new URL(decodeHtml(canonical), result.finalUrl).toString()
       : result.finalUrl,
   )
   const rawImage =
@@ -425,7 +425,9 @@ export async function fetchLinkPreviewMetadata(
   if (rawImage) {
     try {
       imageUrl = normalizePreviewUrl(
-        new URL(rawImage, result.finalUrl).toString(),
+        // Attribute values are HTML-escaped: an unescaped "&amp;" in the
+        // query string makes most image hosts answer 404.
+        new URL(decodeHtml(rawImage), result.finalUrl).toString(),
       )
     } catch {
       imageUrl = null
@@ -552,8 +554,15 @@ export async function fetchXVideoSyndicationMetadata(
   }
 }
 
-function rowToPreview(row: CachedPreviewRow): TweetLinkPreview | null {
+export function rowToPreview(row: CachedPreviewRow): TweetLinkPreview | null {
   if (row.status !== 'ready' || !row.title) return null
+  // A shortened link can resolve to a plain tweet permalink, most often the
+  // tweet's own photo. The card already shows that content, so no link card.
+  try {
+    if (row.canonical_url && !previewCandidate(row.canonical_url)) return null
+  } catch {
+    return null
+  }
   return {
     urlHash: row.url_hash,
     url: row.normalized_url,

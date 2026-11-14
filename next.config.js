@@ -68,6 +68,12 @@ const nextConfig = {
         permanent: true,
       },
       { source: '/opportunities', destination: '/bulletin', permanent: true },
+      // The spread explorer began as an admin page; shared links keep working.
+      {
+        source: '/admin/spread-explorer',
+        destination: '/spread-explorer',
+        permanent: true,
+      },
       {
         source: '/opportunities/about',
         destination: '/bulletin/about',

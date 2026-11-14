@@ -44,6 +44,10 @@ export function TweetLinkPreviews({
     previews: TweetLinkPreview[]
   }>({ tweetId, previews: [] })
   const previews = result.tweetId === tweetId ? result.previews : []
+  // Hide the picture slot when the proxied image cannot be loaded.
+  const [brokenImages, setBrokenImages] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
   useEffect(() => {
     if (!visible) return
     let current = true
@@ -66,7 +70,9 @@ export function TweetLinkPreviews({
           onClick={(event) => event.stopPropagation()}
           className={`group flex ${preview.isVideo && !compact ? 'flex-col' : ''} overflow-hidden rounded-[6px] border border-zinc-200 bg-zinc-50 transition-colors hover:border-zinc-300 dark:border-[#303036] dark:bg-[#202023] dark:hover:border-[#45454d] ${compact ? 'min-h-16' : 'min-h-20'}`}
         >
-          {preview.imageUrl && !compact ? (
+          {preview.imageUrl &&
+          !compact &&
+          !brokenImages.has(preview.urlHash) ? (
             <div
               className={
                 preview.isVideo
@@ -79,6 +85,11 @@ export function TweetLinkPreviews({
                 alt=""
                 fill
                 unoptimized
+                onError={() =>
+                  setBrokenImages((current) =>
+                    new Set(current).add(preview.urlHash),
+                  )
+                }
                 sizes={
                   preview.isVideo ? '(max-width: 640px) 100vw, 640px' : '144px'
                 }

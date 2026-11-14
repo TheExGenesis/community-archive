@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { ImgHTMLAttributes } from 'react'
 import { TweetLinkPreviews } from './TweetLinkPreviews'
 
@@ -131,4 +131,33 @@ test('shows a linked video poster with a play indicator and opens X', async () =
   )
   expect(container.querySelector('.aspect-video')).toBeInTheDocument()
   expect(link.querySelector('svg')).toBeInTheDocument()
+})
+
+test('drops the picture slot when the preview image fails to load', async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        previews: [
+          {
+            urlHash: 'c'.repeat(64),
+            url: 'https://example.com/story',
+            canonicalUrl: 'https://example.com/story',
+            title: 'A story with a broken picture',
+            description: null,
+            imageUrl: 'https://example.com/missing.jpg',
+            siteName: 'example.com',
+            isXArticle: false,
+          },
+        ],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ),
+  )
+
+  const { container } = render(<TweetLinkPreviews tweetId="4242" />)
+  expect(await screen.findByText('A story with a broken picture')).toBeVisible()
+  fireEvent.error(container.querySelector('img')!)
+
+  expect(container.querySelector('img')).not.toBeInTheDocument()
+  expect(screen.getByText('A story with a broken picture')).toBeVisible()
 })

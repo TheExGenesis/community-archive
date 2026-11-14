@@ -14,6 +14,7 @@ import {
   previewCandidate,
   getTweetLinkPreviews,
   previewUrlHash,
+  rowToPreview,
 } from './linkPreviews'
 
 import { xVideoFromUrl } from './xVideoUrl'
@@ -414,4 +415,54 @@ describe('linked X videos', () => {
       expect(upsert).toHaveBeenCalledTimes(1)
     },
   )
+})
+
+describe('preview images and self links', () => {
+  test('decodes HTML entities in the preview image URL', async () => {
+    const html = `<head><meta property="og:title" content="A page">
+      <meta property="og:image" content="https://pbs.twimg.com/media/abc?format=webp&amp;name=large"></head>`
+    const fetcher = jest.fn(
+      async () =>
+        new Response(html, {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+    ) as unknown as typeof fetch
+
+    const metadata = await fetchLinkPreviewMetadata(
+      'https://example.com/page',
+      fetcher,
+      publicResolver,
+    )
+
+    expect(metadata.imageUrl).toBe(
+      'https://pbs.twimg.com/media/abc?format=webp&name=large',
+    )
+  })
+
+  test('omits a cached card whose destination is a plain tweet permalink', () => {
+    const row = {
+      url_hash: 'a'.repeat(64),
+      normalized_url: 'https://t.co/bNF91Yy4Sr',
+      canonical_url: 'https://x.com/krystalball/status/2120512137843859820',
+      title: 'Krystal Ball (@krystalball) on X',
+      description: null,
+      image_url: 'https://pbs.twimg.com/media/abc?format=webp&name=large',
+      site_name: 'X (formerly Twitter)',
+      content_type: 'text/html',
+      status: 'ready',
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    }
+    expect(rowToPreview(row)).toBeNull()
+    expect(
+      rowToPreview({ ...row, canonical_url: 'https://example.com/story' }),
+    ).toMatchObject({ canonicalUrl: 'https://example.com/story' })
+    expect(
+      rowToPreview({
+        ...row,
+        canonical_url:
+          'https://x.com/someone/status/2120512137843859820/video/1',
+      }),
+    ).toMatchObject({ isVideo: true })
+  })
 })

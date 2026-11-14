@@ -289,3 +289,19 @@ describe('ClickHouse analytics gateway requests', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 })
+
+describe('library snapshot endpoints', () => {
+  it('allows the catalogue and numbered shards only', () => {
+    const base = 'https://gateway.example/analytics'
+    const none = new URLSearchParams('q=x')
+    expect(analyticsGatewayRequestUrl(['library'], none, base).toString()).toBe(
+      'https://gateway.example/analytics/library',
+    )
+    expect(
+      analyticsGatewayRequestUrl(['library', 'shard', '31'], none, base).toString(),
+    ).toBe('https://gateway.example/analytics/library/shard/31')
+    expect(() =>
+      analyticsGatewayRequestUrl(['library', 'shard', '..'], none, base),
+    ).toThrow('Unsupported')
+  })
+})

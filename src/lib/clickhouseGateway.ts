@@ -10,6 +10,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'search',
   ]),
   'social-graph': new Set(),
+  library: new Set(),
   'recent-neighbors': new Set(['username']),
   search: new Set([
     'q',
@@ -157,6 +158,13 @@ export function analyticsGatewayRequestUrl(
       'include_usernames',
       'exclude_usernames',
     ])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'library' &&
+    cleanPath[1] === 'shard' &&
+    /^\d{1,4}$/.test(cleanPath[2])
+  ) {
+    allowedParams = new Set()
   }
 
   if (!allowedParams)

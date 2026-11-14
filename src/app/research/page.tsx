@@ -62,13 +62,24 @@ export default async function ResearchPage() {
                 : { target: '_blank', rel: 'noopener noreferrer' })}
               className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-white transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
             >
+              {post.imageLight && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={post.imageLight}
+                  alt=""
+                  loading="lazy"
+                  className="h-36 w-full border-b border-zinc-200 object-cover dark:hidden"
+                />
+              )}
               {post.image && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={post.image}
                   alt=""
                   loading="lazy"
-                  className="h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                  className={`h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a] ${
+                    post.imageLight ? 'hidden dark:block' : ''
+                  }`}
                 />
               )}
               <div className="p-[18px]">

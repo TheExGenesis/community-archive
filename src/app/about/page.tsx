@@ -6,28 +6,102 @@ import {
   pastProjectContributors,
 } from '@/lib/projectContributors'
 import { userProfileHref } from '@/lib/navigation'
+import FundersThanks from '@/components/FundersThanks'
+
+function A({ href, children }: { href: string; children: React.ReactNode }) {
+  const className = 'text-brand hover:underline'
+  return href.startsWith('/') ? (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+    >
+      {children}
+    </a>
+  )
+}
 
 export const metadata = {
   title: 'About · Community Archive',
   description:
-    'Community Archive is open-source public infrastructure for collecting, hosting, and serving Twitter archives that people choose to share.',
+    'Community Archive maps how ideas spread in online communities: an open archive of tweets people choose to share, tools built on it, and research into how ideas travel.',
 }
 
 export default function AboutPage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-6 text-3xl font-bold">About Community Archive</h1>
+      <h1 className="mb-3 text-3xl font-bold">About Community Archive</h1>
+      <p className="mb-6 text-xl text-muted-foreground">
+        Mapping how ideas spread in online communities.
+      </p>
 
       <section className="mb-12">
-        <h2 className="mb-4 mt-8 text-2xl font-semibold">Our Mission</h2>
-        <p className="mb-4 text-lg text-muted-foreground">
-          We believe in the immense cultural, historical, and economic value
-          embedded in our collective digital data.
-        </p>
+        <h2 className="mb-4 mt-8 text-2xl font-semibold">What we do</h2>
         <p className="mb-4 text-muted-foreground">
-          Our goal is to build open-source, public infrastructure to{' '}
-          <strong>collect, host, and serve</strong> this data, empowering
-          communities to use it for any purpose they choose.
+          The Community Archive does three things.
+        </p>
+        <ol className="list-decimal space-y-5 pl-5 text-muted-foreground marker:font-semibold marker:text-foreground">
+          <li>
+            <strong className="text-foreground">
+              It archives posts for posterity.
+            </strong>{' '}
+            27 million tweets from 2,400 accounts are open to everyone: from
+            communities such as TPOT, rationality, effective altruism and AI
+            Twitter, shared by the people who wrote them.
+          </li>
+          <li>
+            <strong className="text-foreground">
+              It powers tools for communities, epistemics and coordination.
+            </strong>{' '}
+            Our own include the <A href="/digest">daily</A> and{' '}
+            <A href="/digest/week">weekly digests</A> and{' '}
+            <A href="/search/ask">agentic search</A>. Dozens more are{' '}
+            <A href="/community">built by the community</A>, such as{' '}
+            <A href="https://modelbehavior.report/">Model Behavior Reports</A>{' '}
+            and <A href="https://cuties.app/">Cuties</A>.
+          </li>
+          <li>
+            <strong className="text-foreground">
+              We research how ideas spread online.
+            </strong>{' '}
+            The <A href="/spread-explorer">spread explorer</A> shows an idea
+            moving like weather across a map of Twitter, and our first report
+            traces the phrase{' '}
+            <A href="/research/you-can-just-do-things">
+              &ldquo;you can just do things&rdquo;
+            </A>{' '}
+            from TPOT to tech to politics, a first step towards tracing the
+            history of any idea. For research we also draw on a private dataset
+            of more than 40 billion tweets from 180 million accounts, about 5%
+            of all of Twitter, and with{' '}
+            <A href="https://www.calcifercomputing.com/reports/tlm">
+              Calcifer Computing
+            </A>{' '}
+            we have trained a 1-billion-parameter language model of where and
+            when things are said.
+          </li>
+        </ol>
+        <p className="mt-5 text-muted-foreground">
+          We also help build the field of AI for epistemics. In 2025 we hosted
+          the{' '}
+          <A href="https://xiqo.substack.com/p/the-unconference-on-ai-for-collective">
+            AI for Collective Sensemaking unconference
+          </A>{' '}
+          in New York, with about 100 attendees, and the{' '}
+          <A href="https://xiqo.substack.com/p/the-community-archive-hackathon">
+            Community Archive hackathon
+          </A>
+          , with more than 60 participants and 16 final submissions.
+        </p>
+        <p className="mt-4 text-muted-foreground">
+          All of it runs on open-source, public infrastructure that{' '}
+          <strong>collects, hosts, and serves</strong> data people choose to
+          share, so that communities can use it for any purpose they choose.
         </p>
       </section>
 
@@ -87,6 +161,16 @@ export default function AboutPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="mb-12">
+        <h2 className="mb-2 mt-8 text-2xl font-semibold">Funders and Thanks</h2>
+        <p className="mb-4 text-muted-foreground">
+          The archive exists because of the people who funded and housed it. Our
+          community backers are on the <A href="/supporters">supporters page</A>
+          .
+        </p>
+        <FundersThanks />
       </section>
 
       <section className="mb-12">

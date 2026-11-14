@@ -5,7 +5,7 @@ import { LIBRARY_CACHE_CONTROL } from './cache'
 
 export const dynamic = 'force-dynamic'
 
-/** The CA Library catalogue: a weekly file snapshot served by the gateway. */
+/** The CA Library catalogue: a daily file snapshot served by the gateway. */
 export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(await fetchAnalyticsGatewayJson(['library']), {

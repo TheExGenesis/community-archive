@@ -45,7 +45,7 @@ export interface LibraryWork {
 }
 
 export interface LibraryData {
-  /** ISO time of the weekly build. */
+  /** ISO time of the daily build. */
   generatedAt: string
   generated: number
   shards: number
@@ -119,7 +119,7 @@ export interface LibraryFilters {
 }
 
 /**
- * Mirrors the shard function of the weekly worker and the query gateway
+ * Mirrors the shard function of the daily worker and the query gateway
  * (control-panel repository, ops/clickhouse-library and
  * ops/clickhouse-query-gateway/library.mjs).
  */

@@ -71,7 +71,11 @@ const FUNDERS: { key: string; body: ReactNode }[] = [
     key: 'portal',
     body: (
       <>
-        The <Name>Portal residency</Name>, where the archive was born.
+        The{' '}
+        <Ext href="https://xiqo.substack.com/p/through-the-portal">
+          Portal residency
+        </Ext>
+        , where the archive was born.
       </>
     ),
   },

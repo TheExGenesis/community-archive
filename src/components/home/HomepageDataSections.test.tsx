@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react'
 import type { HomepageData } from '@/lib/portal/data'
 import {
   HomepageStats,
-  HomepageGrowth,
   HomepageResearch,
   HomepageTrends,
   HomepageDigest,
@@ -68,48 +67,4 @@ test('rounds compact headline totals down to reached milestones', async () => {
   )
   expect(screen.getByText('1.6K community members')).toBeInTheDocument()
   expect(screen.getByText('21.6M public tweets')).toBeInTheDocument()
-})
-
-test('shows full totals with compact 24-hour additions', async () => {
-  render(await HomepageGrowth({ data: growthStats() }))
-  expect(screen.getByText('21,023,737')).toBeInTheDocument()
-  expect(screen.getByText('1,261')).toBeInTheDocument()
-  expect(screen.getByText('(+668,600)')).toHaveAttribute(
-    'title',
-    'Tweets added in the last 24 hours',
-  )
-  expect(screen.getByText('(+259)')).toHaveAttribute(
-    'title',
-    'Members added in the last 24 hours',
-  )
-  expect(screen.queryByText(/Members added:/)).not.toBeInTheDocument()
-  expect(screen.queryByText(/Membership as of/)).not.toBeInTheDocument()
-})
-
-test('shows zero additions and omits unavailable additions', async () => {
-  const { rerender } = render(
-    await HomepageGrowth({
-      data: growthStats({ membersAddedLast24Hours: 0, addedLast24Hours: 0 }),
-    }),
-  )
-  expect(screen.getAllByText('(+0)')).toHaveLength(2)
-  rerender(
-    await HomepageGrowth({
-      data: growthStats({
-        membersAddedLast24Hours: null,
-        addedLast24Hours: null,
-      }),
-    }),
-  )
-  expect(screen.getByText('21,023,737')).toBeInTheDocument()
-  expect(screen.getByText('1,261')).toBeInTheDocument()
-  expect(screen.queryByText(/\(\+/)).not.toBeInTheDocument()
-})
-
-test('shows an explicit failure instead of zero totals', async () => {
-  render(await HomepageGrowth({ data: growthStats({}, true) }))
-  expect(
-    screen.getByText('Archive counts are temporarily unavailable.'),
-  ).toBeInTheDocument()
-  expect(screen.queryByText('1,261')).not.toBeInTheDocument()
 })

@@ -5,6 +5,20 @@ product events for actions and outcomes. Signed-out and anonymous-auth sessions
 are excluded; logging out stops collection and recording. Browser measurement
 respects DNT and cannot count clients that block or never execute analytics.
 
+## Page views for all visitors
+
+Vercel Web Analytics counts page views and referrers for every visitor, signed
+in or not, without cookies or a visitor identity. Use it for questions such as
+how many people read a research post and where they came from. It is loaded by
+`src/components/VercelAnalytics.tsx`, which reduces each address to its route
+template (the same rule PostHog uses) and sends nothing when the browser sets
+Do Not Track. Results are in the Vercel project's Analytics tab.
+
+Its counts are not people: a scraper that runs a full browser is counted, and a
+reader who blocks analytics is not. Each page view is a billed event on the Pro
+plan ($0.03 per 1,000 at the time of writing), so check usage after a traffic
+spike. PostHog remains signed-in only and is still the place for product use.
+
 ## Weekly review: 15 minutes
 
 Start with [Product Pulse v2](https://us.posthog.com/project/546185/dashboard/2080935)

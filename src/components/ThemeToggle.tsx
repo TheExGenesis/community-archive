@@ -15,7 +15,10 @@ type ThemeToggleProps = {
 }
 
 const ThemeToggle = ({ side }: ThemeToggleProps) => {
-  const { setTheme } = useTheme()
+  const { setTheme, forcedTheme } = useTheme()
+
+  // A page that forces its theme (the dark-only spread explorer) has nothing to toggle.
+  if (forcedTheme) return null
 
   return (
     <DropdownMenu>

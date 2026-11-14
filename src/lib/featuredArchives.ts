@@ -28,6 +28,27 @@ export const FEATURED_ARCHIVE_GROUPS = [
         'https://pbs.twimg.com/profile_images/378800000405146386/3399885bef1d5f51eef9627b1943fbd4_normal.png',
       num_tweets: 13_744,
     },
+    {
+      account_id: '17479925',
+      username: 'robbensinger',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/623283107756687360/cFxQ5o55_normal.jpg',
+      num_tweets: 28_212,
+    },
+    {
+      account_id: '1601593543',
+      username: 'DavidDuvenaud',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/2104014495949492225/H8Ohatac_normal.jpg',
+      num_tweets: 1_510,
+    },
+    {
+      account_id: '829108178059096064',
+      username: 'jd_pressman',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1850957204570193920/pBuQN2tH_normal.jpg',
+      num_tweets: 19_036,
+    },
   ],
   [
     {
@@ -67,6 +88,20 @@ export const FEATURED_ARCHIVE_GROUPS = [
         'https://pbs.twimg.com/profile_images/2021435361260601347/V4IXxe1B_normal.jpg',
       num_tweets: 38_259,
     },
+    {
+      account_id: '3467611',
+      username: 'mbateman',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/2086847655355817984/8TXwd-9Q_normal.jpg',
+      num_tweets: 40_231,
+    },
+    {
+      account_id: '22151118',
+      username: 'm_ashcroft',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/2083642812583550976/IWclpH2t_normal.jpg',
+      num_tweets: 58_076,
+    },
   ],
   [
     {
@@ -96,6 +131,27 @@ export const FEATURED_ARCHIVE_GROUPS = [
       avatar_media_url:
         'https://pbs.twimg.com/profile_images/1378277804526067724/FDI5ymb6_normal.jpg',
       num_tweets: 17_085,
+    },
+    {
+      account_id: '1006723260384309249',
+      username: 'tracewoodgrains',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/2081984049284067328/BKde_Eah_normal.jpg',
+      num_tweets: 68_546,
+    },
+    {
+      account_id: '4902221',
+      username: 'ArtirKel',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/2059737041185955840/TP_k2Aw1_normal.jpg',
+      num_tweets: 184_331,
+    },
+    {
+      account_id: '14368342',
+      username: 'DRMacIver',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1379848103117910018/S9QuMkFY_normal.jpg',
+      num_tweets: 144_713,
     },
   ],
   [
@@ -193,6 +249,13 @@ export const FEATURED_ARCHIVE_GROUPS = [
       avatar_media_url:
         'https://pbs.twimg.com/profile_images/1876662518631829504/USrP45mT_normal.jpg',
       num_tweets: 27_309,
+    },
+    {
+      account_id: '795885295',
+      username: 'Aella_Girl',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1908328831485669376/Jo1ipjZJ_normal.jpg',
+      num_tweets: 58_506,
     },
   ],
   [

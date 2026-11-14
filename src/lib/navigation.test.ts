@@ -62,6 +62,7 @@ describe('site navigation', () => {
         ['Strands', '/strands'],
         ['Conversation Map', '/conversation-map'],
         ['CA Tube', '/tube'],
+        ['CA Library', '/library'],
         ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
         ['Social Graph', '/social-graph'],

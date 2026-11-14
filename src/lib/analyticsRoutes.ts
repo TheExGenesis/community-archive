@@ -20,6 +20,7 @@ export const analyticsRoutes = {
   '/trending': ['trend_stories', 'product'],
   '/trending/[date]': ['trend_stories', 'product'],
   '/trending/[date]/[slug]': ['trend_story', 'product'],
+  '/library': ['library', 'product'],
   '/tube': ['tube', 'product'],
   '/tube/watch/[id]': ['tube_watch', 'product'],
   '/tube/liked': ['tube_library', 'product'],

@@ -152,6 +152,7 @@ export type NavIcon =
   | 'bulletin'
   | 'map'
   | 'tube'
+  | 'library'
   | 'ask'
   | 'week'
   | 'spread'
@@ -242,6 +243,12 @@ export const getPrimaryNav = (): NavEntry[] => [
         label: 'CA Tube',
         description: 'YouTube videos the community keeps sharing.',
         icon: 'tube',
+      },
+      {
+        href: '/library',
+        label: 'CA Library',
+        description: 'Essays, books, films and papers the community keeps citing.',
+        icon: 'library',
       },
       {
         href: '/bulletin',

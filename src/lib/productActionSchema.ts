@@ -5,6 +5,7 @@ export const productFeatures = [
   'birdseye',
   'tweet',
   'tube',
+  'library',
   'tweet_cleanup',
   'ask_archive',
   'trend_stories',

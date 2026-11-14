@@ -23,14 +23,30 @@ const MODEL_BEHAVIOR_REPORTS: ResearchPost = {
   author: 'Alexandre Variengien',
 }
 
+const COMMUNITY_ARCHIVE_PAPER: ResearchPost = {
+  title: 'The Community Archive: An Ethically Sourced X (Twitter) Dataset',
+  url: 'https://arxiv.org/abs/2610.30392',
+  date: '2026-10-21T19:56:23.000Z',
+  excerpt:
+    "Our paper on the dataset: every post is shared with its author's consent, with a sample analysis of content-based homophily.",
+  image: '/images/research/community-archive-paper.png',
+  author: 'Duderstadt, Shehata, Vendrov, Carvalho',
+}
+
+const byNewest = (a: ResearchPost, b: ResearchPost) =>
+  (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)
+
 // Public: research built on the archive is useful to visitors and members.
 export default async function ResearchPage() {
   const feedPosts = await getResearchPosts(24)
-  const posts = pinResearchPost([
+  // The two pinned pieces lead; everything else is newest first.
+  const [lead, pinned, ...rest] = pinResearchPost([
     YOU_CAN_JUST_DO_THINGS,
     MODEL_BEHAVIOR_REPORTS,
+    COMMUNITY_ARCHIVE_PAPER,
     ...feedPosts,
   ])
+  const posts = [lead, pinned, ...rest.sort(byNewest)]
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">

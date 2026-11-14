@@ -147,16 +147,27 @@ export default function AboutPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           {pastProjectContributors.map((contributor) => (
             <div
-              key={contributor.username}
+              key={contributor.name}
               className="rounded-lg bg-muted p-4 dark:bg-card"
             >
               <h3 className="text-lg font-semibold">
-                <Link
-                  href={userProfileHref(contributor.username)}
-                  className="transition-colors hover:text-brand"
-                >
-                  {contributor.name}
-                </Link>
+                {contributor.username ? (
+                  <Link
+                    href={userProfileHref(contributor.username)}
+                    className="transition-colors hover:text-brand"
+                  >
+                    {contributor.name}
+                  </Link>
+                ) : (
+                  <a
+                    href={contributor.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="transition-colors hover:text-brand"
+                  >
+                    {contributor.name}
+                  </a>
+                )}
               </h3>
             </div>
           ))}

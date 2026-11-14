@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Suspense } from 'react'
 import { AdminTable } from './AdminTable'
 import { AdminActivityFeed } from './AdminActivityFeed'
+import { AskUsageSection } from './AskUsageSection'
 import { DigestSubscribersSection } from './DigestSubscribersSection'
 import { loadActivityPage } from './activityFeedData'
 import {
@@ -192,6 +193,10 @@ export default async function AdminPage({
             Daily scans, candidates, notices produced, costs and failures.
           </p>
         </Link>
+
+        <Suspense fallback={<SectionSkeleton label="Loading Ask usage" />}>
+          <AskUsageSection />
+        </Suspense>
 
         <Suspense
           fallback={<SectionSkeleton label="Loading digest subscribers" />}

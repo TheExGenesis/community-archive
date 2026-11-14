@@ -10,6 +10,7 @@ import {
   filtersToQuery,
   LIBRARY_DATA_URL,
   LIBRARY_KINDS,
+  CHARACTERISTIC_MIN_MEMBERS,
   LIBRARY_SORTS,
   libraryShard,
   libraryShardUrl,
@@ -135,9 +136,18 @@ export function LibraryHome() {
         )}
       </div>
 
+      {data && filters.sort === 'characteristic' && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Books, films and ideas come first when members mention them far
+          more than their Wikipedia fame predicts (at least{' '}
+          {CHARACTERISTIC_MIN_MEMBERS} members). Everything else follows by
+          member count.
+        </p>
+      )}
+
       {failed && (
         <p className="py-12 text-center text-muted-foreground">
-          The library is temporarily unavailable. It is rebuilt every Monday
+          The library is temporarily unavailable. It is rebuilt every day
           and no live database query runs from this page, so it will return
           with the next snapshot.
         </p>
@@ -184,7 +194,7 @@ export function LibraryHome() {
         <h2 className="font-medium text-foreground">How this is made</h2>
         {data && (
           <p>
-            Rebuilt every Monday. Last built{' '}
+            Rebuilt daily. Last built{' '}
             {new Date(data.generated * 1000).toISOString().slice(0, 10)}.
           </p>
         )}

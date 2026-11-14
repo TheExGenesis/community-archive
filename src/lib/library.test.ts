@@ -1,4 +1,5 @@
 import {
+  characteristicScore,
   countByKind,
   filtersFromParams,
   filtersToQuery,
@@ -29,14 +30,15 @@ describe('library filters', () => {
     const f = filtersFromParams(new URLSearchParams('kind=book&q=dune&sort=likes'))
     expect(f).toEqual({ kind: 'book', q: 'dune', sort: 'likes' })
     expect(filtersToQuery(f)).toBe('?kind=book&q=dune&sort=likes')
-    expect(filtersToQuery({ kind: '', q: '', sort: 'members' })).toBe('')
+    expect(filtersToQuery({ kind: '', q: '', sort: 'characteristic' })).toBe('')
+    expect(filtersToQuery({ kind: '', q: '', sort: 'members' })).toBe('?sort=members')
   })
 
   it('ignores unknown kinds and sorts', () => {
     expect(filtersFromParams(new URLSearchParams('kind=nope&sort=x'))).toEqual({
       kind: '',
       q: '',
-      sort: 'members',
+      sort: 'characteristic',
     })
   })
 
@@ -52,6 +54,19 @@ describe('library filters', () => {
     expect(ids({ kind: 'book', q: '', sort: 'likes' })).toEqual(['c', 'b'])
     expect(ids({ kind: '', q: 'johnstone', sort: 'members' })).toEqual(['b'])
     expect(countByKind(works).get('book')).toBe(2)
+  })
+
+  it('ranks by members against fame, then the rest by members', () => {
+    const works = [
+      work({ id: 'famous', k: 'film', n: 200, v: 100000 }),
+      work({ id: 'niche', k: 'book', n: 40, v: 300 }),
+      work({ id: 'thin', k: 'book', n: 5, v: 10 }),
+      work({ id: 'essay', n: 90 }),
+    ]
+    const ids = selectWorks(works, { kind: '', q: '', sort: 'characteristic' }).map((w) => w.id)
+    expect(ids).toEqual(['niche', 'famous', 'essay', 'thin'])
+    expect(characteristicScore(works[2])).toBeNull()
+    expect(characteristicScore(works[3])).toBeNull()
   })
 
   it('shows one year or a span', () => {

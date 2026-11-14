@@ -2,6 +2,7 @@ import {
   CalendarDays,
   GitBranch,
   Hexagon,
+  LayoutGrid,
   LibraryBig,
   MessageSquareText,
   Map as MapIcon,
@@ -30,6 +31,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   ask: MessageSquareText,
   week: CalendarDays,
   spread: Hexagon,
+  more: LayoutGrid,
 }
 
 /** The bordered icon tile shown beside each submenu item. */

@@ -9,5 +9,6 @@ export const YOU_CAN_JUST_DO_THINGS: ResearchPost = {
   excerpt:
     'How one phrase spread from TPOT to tech to politics, traced through 17,657 tweets.',
   image: '/images/research/you-can-just-do-things.png',
+  imageLight: '/images/research/you-can-just-do-things-light.png',
   author: 'Community Archive',
 }

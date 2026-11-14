@@ -143,6 +143,8 @@ export interface ResearchPost {
   date: string
   excerpt: string
   image: string | null
+  // Optional light-background version, shown in light mode.
+  imageLight?: string | null
   author: string | null
 }
 

@@ -13,65 +13,6 @@ import { formatNumber } from '@/lib/formatNumber'
 import type { HomepageData } from '@/lib/portal/data'
 import { measureServerRead } from '@/lib/performance/server'
 
-export async function HomepageGrowth({
-  data,
-}: {
-  data: HomepageData['globalStats']
-}) {
-  const stats = await data
-  if (stats.failed) {
-    return (
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        Archive counts are temporarily unavailable.
-      </p>
-    )
-  }
-  const {
-    totalTweets,
-    memberCount,
-    membersAddedLast24Hours,
-    addedLast24Hours,
-  } = stats.data
-  const count = (value: number) => value.toLocaleString('en-US')
-  return (
-    <p className="mt-4 text-center text-sm text-muted-foreground">
-      <span className="inline-block whitespace-nowrap">
-        <strong className="font-medium tabular-nums text-foreground">
-          {count(totalTweets)}
-        </strong>{' '}
-        tweets
-        {addedLast24Hours != null && (
-          <span
-            className="tabular-nums"
-            title="Tweets added in the last 24 hours"
-            aria-label={`${count(addedLast24Hours)} tweets added in the last 24 hours`}
-          >
-            {' '}
-            (+{count(addedLast24Hours)})
-          </span>
-        )}
-      </span>
-      {' · '}
-      <span className="inline-block whitespace-nowrap">
-        <strong className="font-medium tabular-nums text-foreground">
-          {count(memberCount)}
-        </strong>{' '}
-        members
-        {membersAddedLast24Hours != null && (
-          <span
-            className="tabular-nums"
-            title="Members added in the last 24 hours"
-            aria-label={`${count(membersAddedLast24Hours)} members added in the last 24 hours`}
-          >
-            {' '}
-            (+{count(membersAddedLast24Hours)})
-          </span>
-        )}
-      </span>
-    </p>
-  )
-}
-
 export async function HomepageStats({
   data,
 }: {
@@ -169,23 +110,9 @@ export function HomepagePortal({
   return (
     <HomepageHighlightsLayout
       digest={
-        <>
-          <Suspense fallback={<SectionLoading label="daily digest" />}>
-            <HomepageDigest />
-          </Suspense>
-          <Suspense
-            fallback={
-              <p
-                role="status"
-                className="mt-4 text-center text-sm text-muted-foreground"
-              >
-                Loading archive counts…
-              </p>
-            }
-          >
-            <HomepageGrowth data={data.globalStats} />
-          </Suspense>
-        </>
+        <Suspense fallback={<SectionLoading label="daily digest" />}>
+          <HomepageDigest />
+        </Suspense>
       }
       trends={
         <Suspense fallback={<SectionLoading label="trending terms" />}>

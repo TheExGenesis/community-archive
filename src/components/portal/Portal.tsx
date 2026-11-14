@@ -945,13 +945,26 @@ export function HomeFeaturedPiece({ post }: { post: ResearchPost }) {
         </span>
       </div>
       {post.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={post.image}
-          alt={`${post.title}. ${post.excerpt ?? ''}`}
-          loading="lazy"
-          className="aspect-[1200/630] w-full object-cover"
-        />
+        <>
+          {post.imageLight && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={post.imageLight}
+              alt={`${post.title}. ${post.excerpt ?? ''}`}
+              loading="lazy"
+              className="aspect-[1200/630] w-full object-cover dark:hidden"
+            />
+          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.image}
+            alt={`${post.title}. ${post.excerpt ?? ''}`}
+            loading="lazy"
+            className={`aspect-[1200/630] w-full object-cover ${
+              post.imageLight ? 'hidden dark:block' : ''
+            }`}
+          />
+        </>
       ) : (
         <div className="px-4 py-3.5 text-[19px] font-semibold" style={SERIF}>
           {post.title}

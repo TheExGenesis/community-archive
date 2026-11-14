@@ -23,14 +23,30 @@ const MODEL_BEHAVIOR_REPORTS: ResearchPost = {
   author: 'Alexandre Variengien',
 }
 
+const COMMUNITY_ARCHIVE_PAPER: ResearchPost = {
+  title: 'The Community Archive: An Ethically Sourced X (Twitter) Dataset',
+  url: 'https://arxiv.org/abs/2610.30392',
+  date: '2026-10-21T19:56:23.000Z',
+  excerpt:
+    "Our paper on the dataset: every post is shared with its author's consent, with a sample analysis of content-based homophily.",
+  image: '/images/research/community-archive-paper.png',
+  author: 'Duderstadt, Shehata, Vendrov, Carvalho',
+}
+
+const byNewest = (a: ResearchPost, b: ResearchPost) =>
+  (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)
+
 // Public: research built on the archive is useful to visitors and members.
 export default async function ResearchPage() {
   const feedPosts = await getResearchPosts(24)
-  const posts = pinResearchPost([
+  // The two pinned pieces lead; everything else is newest first.
+  const [lead, pinned, ...rest] = pinResearchPost([
     YOU_CAN_JUST_DO_THINGS,
     MODEL_BEHAVIOR_REPORTS,
+    COMMUNITY_ARCHIVE_PAPER,
     ...feedPosts,
   ])
+  const posts = [lead, pinned, ...rest.sort(byNewest)]
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
@@ -62,13 +78,24 @@ export default async function ResearchPage() {
                 : { target: '_blank', rel: 'noopener noreferrer' })}
               className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-white transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
             >
+              {post.imageLight && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={post.imageLight}
+                  alt=""
+                  loading="lazy"
+                  className="h-36 w-full border-b border-zinc-200 object-cover dark:hidden"
+                />
+              )}
               {post.image && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={post.image}
                   alt=""
                   loading="lazy"
-                  className="h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                  className={`h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a] ${
+                    post.imageLight ? 'hidden dark:block' : ''
+                  }`}
                 />
               )}
               <div className="p-[18px]">

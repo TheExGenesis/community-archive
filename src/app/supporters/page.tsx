@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { FaHeart } from 'react-icons/fa'
+import FundersThanks from '@/components/FundersThanks'
 import TieredSupportersDisplay from '@/components/TieredSupportersDisplay'
 import { getOpenCollectiveContributors } from '@/lib/supporters'
 
@@ -22,43 +23,17 @@ export default async function SupportersPage() {
         <div className="text-center">
           <h1 className="text-4xl font-bold text-foreground">Our Supporters</h1>
           <p className="mt-3 text-base text-muted-foreground">
-            Thanks to everyone who makes the public archive possible.
+            Thanks to the funders and backers who make the public archive
+            possible.
           </p>
         </div>
 
         <div className="mx-auto max-w-4xl rounded-lg border border-border bg-card p-6 md:p-8">
-          <div className="mb-6 text-center">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Major Backers
+          <div className="mb-6">
+            <p className="mb-4 text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Funders
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-              <Link
-                href="https://survivalandflourishing.fund/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-muted-foreground transition-colors hover:text-brand"
-              >
-                Survival and Flourishing Fund
-              </Link>
-              <span className="text-muted-foreground">•</span>
-              <Link
-                href="https://x.com/VitalikButerin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-muted-foreground transition-colors hover:text-brand"
-              >
-                Vitalik Buterin via Kanro
-              </Link>
-              <span className="text-muted-foreground">•</span>
-              <Link
-                href="https://x.com/pwang"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-muted-foreground transition-colors hover:text-brand"
-              >
-                Peter Wang
-              </Link>
-            </div>
+            <FundersThanks className="mx-auto max-w-2xl" />
           </div>
 
           <div className="my-6 border-t border-border" />

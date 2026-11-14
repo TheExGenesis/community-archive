@@ -271,6 +271,27 @@ For PR-created Vercel Preview deployments, add the values from `.env.staging.gen
 
 After updating Preview env vars, redeploy the PR preview so the new values are picked up.
 
+### Mock sign-in on previews and in local development
+
+Previews sign in for real against the staging project: the sign-in button
+offers the seeded mock users (`alice_dev`, a regular member, and `xiq_dev`, the
+staging admin) and calls `/api/auth/dev-login`, so server-gated pages such as
+`/admin` see a real session. The "Preview view" switch in the corner only
+changes what the browser shows; it never creates a session, so it cannot open
+admin or member-only pages. It is the fallback only where no mock login exists
+(a build pointed at production Supabase).
+
+To do the same locally without Docker:
+
+```bash
+pnpm env:staging   # writes .env.staging.local from the Vercel Preview env
+pnpm dev:staging   # next dev on 127.0.0.1:3000 against the staging project
+```
+
+`env:staging` drops Vercel's build markers and secret placeholders and refuses
+a file that points at production Supabase. Sign in as `xiq_dev` for admin pages.
+Everything you do is written to staging, never production.
+
 ### Programmatic smoke checks for protected previews
 
 The project's Vercel Preview deployments require SSO. For a non-interactive

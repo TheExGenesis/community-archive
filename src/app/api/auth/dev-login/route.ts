@@ -93,12 +93,24 @@ export async function POST(request: NextRequest) {
     const displayName =
       (body.displayName as string | undefined) ?? stagingConfig.displayName
 
-    const email = isDevelopment()
+    // A staging mock user picked by name (previews, or local dev against the
+    // staging project) always uses its own staging account and password.
+    const stagingPick =
+      isStagingDevLoginEnabled() && typeof body.username === 'string'
+    if (stagingPick && !stagingConfig.password) {
+      return NextResponse.json(
+        { error: 'STAGING_DEV_LOGIN_PASSWORD must be set for staging login' },
+        { status: 500 },
+      )
+    }
+    const isLocalDevUser = isDevelopment() && !stagingPick
+
+    const email = isLocalDevUser
       ? (body.email ?? stagingConfig.email)
       : body.username
         ? `${username}@${STAGING_EMAIL_DOMAIN}`
         : stagingConfig.email
-    const password = isDevelopment()
+    const password = isLocalDevUser
       ? (body.password ?? stagingConfig.password ?? 'devpassword123')
       : stagingConfig.password
 
@@ -121,12 +133,12 @@ export async function POST(request: NextRequest) {
               full_name: displayName,
               user_name: username,
               provider_id: providerId,
-              provider: isDevelopment() ? 'email' : 'staging',
+              provider: isLocalDevUser ? 'email' : 'staging',
             },
             app_metadata: {
               provider_id: providerId,
               user_name: username,
-              provider: isDevelopment() ? 'email' : 'staging',
+              provider: isLocalDevUser ? 'email' : 'staging',
             },
           })
 

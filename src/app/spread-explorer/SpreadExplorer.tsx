@@ -3,12 +3,14 @@
 // The TPOT spread explorer's real-usage map, ported from the explorer's
 // static/app.js: one full-width hex map coloured by how much more or less a word
 // is used in each hex than on average, a month slider with play, named regions,
-// anchors by handle, hover details and a side panel for a clicked hex. The model
-// map, posts and account lists of the local explorer are not part of this
-// hosted version: the data is a static export of aggregate counts.
+// highlighted accounts by username, hover details and a side panel for a clicked
+// hex. The model map, posts and account lists of the local explorer are not part
+// of this hosted version: the data is a static export of aggregate counts.
+// Unlisted and dark only (src/providers/ThemeProvider.tsx forces the theme).
 
 import { useEffect, useRef } from 'react'
 import { realZ, LOW_TWEETS, WINDOW_HALF } from '@/lib/spreadExplorer/stats'
+import { SPREAD_SUGGESTIONS } from '@/lib/spreadExplorer/suggestions'
 import type {
   SpreadAnchor,
   SpreadMeta,
@@ -16,7 +18,7 @@ import type {
   SpreadWord,
 } from '@/lib/spreadExplorer/types'
 
-const API = '/api/admin/spread-explorer'
+const API = '/api/spread-explorer'
 const CLIP = 2.5
 const UNUSED = '#19191d'
 const STOPS = [
@@ -43,7 +45,8 @@ const ATLAS = [
   '#6aa596',
 ]
 const FONT = '-apple-system, "Segoe UI", Helvetica, Arial, sans-serif'
-const REGION_MODES = ['Regions: off', 'Regions: borders', 'Regions: countries']
+// Space kept under the map so the uses-per-month chart stays on screen.
+const BELOW_MAP = 140
 
 type Geometry = {
   W: number
@@ -96,8 +99,6 @@ const monthName = (m: string) =>
 
 async function api<T>(path: string): Promise<T> {
   const r = await fetch(API + path, { credentials: 'same-origin' })
-  if (r.status === 404)
-    throw new Error('Not available (are you signed in as the admin?)')
   const body = (await r.json().catch(() => ({}))) as { error?: string }
   if (!r.ok) throw new Error(body.error || r.statusText)
   return body as T
@@ -188,8 +189,13 @@ export default function SpreadExplorer() {
         pad = 10,
         W = cv.clientWidth,
         aspect = (f.y1 - f.y0) / (f.x1 - f.x0)
+      // as tall as the viewport allows with the month chart still in view
+      const top = cv.getBoundingClientRect().top + window.scrollY
       const H = Math.round(
-        Math.max(360, Math.min(W * aspect, window.innerHeight - 250)),
+        Math.max(
+          260,
+          Math.min(W * aspect, window.innerHeight - top - BELOW_MAP),
+        ),
       )
       const k = Math.min(
         (W - 2 * pad) / (f.x1 - f.x0),
@@ -569,7 +575,7 @@ export default function SpreadExplorer() {
       const uses = S.real ? S.real.total.reduce((a, b) => a + b, 0) : 0
       $('.spx-title').textContent = `How “${S.word}” spread · ${now}`
       $('.spx-sub').textContent = S.real
-        ? `${uses.toLocaleString()} real uses, ${monthName(m.months[0])} – ${monthName(m.months[m.months.length - 1])} · each hex is a group of socially close accounts · colour = standard deviations above (red) or below (blue) this word's own average · 3-month window around ${now}`
+        ? `${uses.toLocaleString()} uses, ${monthName(m.months[0])} – ${monthName(m.months[m.months.length - 1])} · each hex is a cluster of accounts that talk to each other · red = the word is used more there than its own average, blue = less (3 months around ${now})`
         : ''
       drawMap()
       drawTimeline()
@@ -735,7 +741,7 @@ export default function SpreadExplorer() {
               )
               .join('')
           : '') +
-        `<p class="d note">Posts and per-account lists are only in the local explorer: this page serves a static export of counts.</p>`
+        `<p class="d note">This page shows counts only: no posts and no per-account lists.</p>`
       render()
     }
 
@@ -743,22 +749,32 @@ export default function SpreadExplorer() {
     function showPicker(filter: string) {
       const f = filter.trim().toLowerCase(),
         picker = $('.spx-picker')
-      const words = f
-        ? S.vocab.filter((w) => w[0].startsWith(f)).slice(0, 20)
-        : S.vocab.slice(0, 20)
+      const row = (w: string, n: number | undefined) =>
+        `<div class="w${w === S.word ? ' cur' : ''}" data-w="${esc(w)}"><span>${esc(w)}</span><span>${n == null ? '' : n.toLocaleString()}</span></div>`
+      const cols =
+        '<div class="cols"><span>word</span><span>uses since 2024</span></div>'
+      if (!f) {
+        // nothing typed yet: the curated words, not the most used ones ("the", "to", …)
+        const count = new Map(S.vocab)
+        picker.innerHTML =
+          '<div class="hint">Type any word, or try one of these</div>' +
+          cols +
+          SPREAD_SUGGESTIONS.map(
+            (g) =>
+              `<div class="group">${esc(g.group)}</div>` +
+              g.words.map((w) => row(w, count.get(w))).join(''),
+          ).join('')
+        picker.scrollTop = 0
+        picker.style.display = 'block'
+        return
+      }
+      const words = S.vocab.filter((w) => w[0].startsWith(f)).slice(0, 20)
       picker.innerHTML =
-        (f && !words.some((w) => w[0] === f)
+        (!words.some((w) => w[0] === f)
           ? `<div class="any" data-w="${esc(f)}">Search “${esc(f)}” <span>Enter</span></div>`
           : '') +
-        (words.length
-          ? '<div class="cols"><span>word</span><span>uses since 2024</span></div>'
-          : '') +
-        words
-          .map(
-            (w) =>
-              `<div class="w${w[0] === S.word ? ' cur' : ''}" data-w="${esc(w[0])}"><span>${esc(w[0])}</span><span>${w[1].toLocaleString()}</span></div>`,
-          )
-          .join('')
+        (words.length ? cols : '') +
+        words.map((w) => row(w[0], w[1])).join('')
       picker.style.display = picker.innerHTML ? 'block' : 'none'
     }
 
@@ -858,14 +874,29 @@ export default function SpreadExplorer() {
         setT(+(e.target as HTMLInputElement).value)
       })
       on($('.spx-play'), 'click', () => play(!S.timer))
-      const regionsBtn = $('.spx-regions')
-      regionsBtn.textContent = REGION_MODES[S.regionMode]
-      regionsBtn.classList.toggle('on', S.regionMode > 0)
-      on(regionsBtn, 'click', () => {
-        S.regionMode = (S.regionMode + 1) % 3
-        regionsBtn.textContent = REGION_MODES[S.regionMode]
-        regionsBtn.classList.toggle('on', S.regionMode > 0)
-        render()
+      const regionButtons = Array.from(
+        el.querySelectorAll<HTMLButtonElement>('.spx-regions button'),
+      )
+      const showRegionMode = () => {
+        regionButtons.forEach((b) => {
+          const active = +b.dataset.mode! === S.regionMode
+          b.classList.toggle('on', active)
+          b.setAttribute('aria-pressed', String(active))
+        })
+        // the word's colour scale means nothing while regions are filled
+        $('.spx-legend').style.visibility =
+          S.regionMode === 2 ? 'hidden' : 'visible'
+      }
+      showRegionMode()
+      regionButtons.forEach((b) =>
+        on(b, 'click', () => {
+          S.regionMode = +b.dataset.mode!
+          showRegionMode()
+          render()
+        }),
+      )
+      on(anchorsInput, 'keydown', (ev: KeyboardEvent) => {
+        if (ev.key === 'Enter') anchorsInput.blur()
       })
       on($('.spx-close'), 'click', () => {
         S.sel = []
@@ -959,6 +990,7 @@ export default function SpreadExplorer() {
         readHash()
         wordInput.value = S.word
         anchorsInput.value = S.anchorText
+        showRegionMode()
         if (S.word !== w) loadWord()
         else if (S.anchorText !== a) loadAnchors()
         else showPanel()
@@ -1004,32 +1036,59 @@ export default function SpreadExplorer() {
           aria-label="Month"
         />
         <span className="spx-month" />
-        <span>
-          <label htmlFor="spx-anchors">Anchors</label>
+        <span title="Pin accounts on the map to see where they sit. Type X usernames separated by commas, then press Enter.">
+          <label htmlFor="spx-anchors">Find accounts</label>
           <input
             id="spx-anchors"
             className="spx-anchors"
             type="text"
-            placeholder="handles, comma-separated"
+            placeholder="X usernames, e.g. @alice, @bob"
+            autoComplete="off"
+            autoCapitalize="off"
             spellCheck={false}
           />
         </span>
-        <button
-          type="button"
-          className="spx-regions"
-          title="Show the map's regions: off, borders, or coloured like countries"
-        >
-          Regions
-        </button>
-        <span className="spx-legend">
-          −2.5 sd <i /> +2.5 sd
+        <span className="regions">
+          <label id="spx-regions-label">Regions</label>
+          <span
+            className="spx-regions"
+            role="group"
+            aria-labelledby="spx-regions-label"
+          >
+            <button
+              type="button"
+              data-mode="0"
+              title="No region outlines or names"
+            >
+              Off
+            </button>
+            <button
+              type="button"
+              data-mode="1"
+              title="Outline and name the map’s regions, over the word’s colours"
+            >
+              Borders
+            </button>
+            <button
+              type="button"
+              data-mode="2"
+              title="Fill each region with its own colour, like countries on a map (hides the word’s colours)"
+            >
+              Countries
+            </button>
+          </span>
         </span>
       </header>
       <main>
         <h1 className="spx-title" />
         <div className="spx-sub" />
         <div className="map">
-          <h2>REAL usage</h2>
+          <span
+            className="spx-legend"
+            title="Standard deviations below or above this word’s own average use, from −2.5 to +2.5"
+          >
+            used less <i /> used more
+          </span>
           <canvas className="spx-map" />
         </div>
         <canvas className="spx-timeline" />
@@ -1054,9 +1113,9 @@ export default function SpreadExplorer() {
 
 const CSS = `
 .spx { --bg:#0e0e10; --panel:#17171a; --line:#2a2a30; --text:#e8e8ea; --dim:#9a9aa3; --accent:#f2c14e;
-  background:var(--bg); color:var(--text); font:14px/1.4 ${FONT}; min-height:100vh; position:relative; }
+  background:var(--bg); color:var(--text); font:14px/1.4 ${FONT}; min-height:calc(100vh - 3.5rem); position:relative; }
 .spx * { box-sizing:border-box; }
-.spx header { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); }
+.spx header { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; padding:8px 16px; border-bottom:1px solid var(--line); }
 .spx header label { color:var(--dim); font-size:12px; margin-right:4px; }
 .spx input[type=text] { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; }
 .spx .spx-word { width:190px; font-weight:600; }
@@ -1069,23 +1128,29 @@ const CSS = `
 .spx .spx-picker .w { cursor:pointer; } .spx .spx-picker .w:hover, .spx .spx-picker .any:hover { background:#2e2e36; }
 .spx .spx-picker .w.cur span:first-child { color:var(--accent); }
 .spx .spx-picker .any { padding:7px 10px; cursor:pointer; border-bottom:1px solid var(--line); } .spx .spx-picker .any span { color:var(--dim); font-size:11px; }
-.spx .spx-anchors { width:300px; }
+.spx .spx-picker .hint { padding:8px 10px 2px; color:var(--dim); font-size:12px; }
+.spx .spx-picker .group { padding:10px 10px 3px; color:var(--accent); font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+.spx .spx-anchors { width:250px; }
+.spx .regions { display:inline-flex; align-items:center; }
+.spx .spx-regions { display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+.spx .spx-regions button { border:none; border-radius:0; padding:6px 10px; color:var(--dim); }
+.spx .spx-regions button + button { border-left:1px solid var(--line); }
+.spx .spx-regions button.on { background:#f2c14e22; color:var(--accent); }
 .spx button { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
 .spx button.on { border-color:var(--accent); color:var(--accent); }
-.spx .spx-slider { width:260px; accent-color:#4a8fe0; }
-.spx .spx-month { font-weight:700; min-width:128px; display:inline-block; }
-.spx .spx-legend { display:flex; align-items:center; gap:6px; color:var(--dim); font-size:12px; margin-left:auto; }
-.spx .spx-legend i { display:block; width:150px; height:10px; border-radius:3px;
+.spx .spx-slider { width:200px; accent-color:#4a8fe0; }
+.spx .spx-month { font-weight:700; min-width:76px; display:inline-block; }
+.spx .spx-legend { position:absolute; top:10px; right:12px; z-index:2; display:flex; align-items:center; gap:6px; color:var(--dim); font-size:12px;
+  background:#0e0e10cc; border-radius:6px; padding:4px 9px; }
+.spx .spx-legend i { display:block; width:120px; height:10px; border-radius:3px;
   background:linear-gradient(90deg,#053061,#2166ac,#4393c3,#92c5de,#f7f7f7,#f4a582,#d6604d,#b2182b,#67001f); }
-.spx main { padding:14px 20px 28px; transition:margin-right .15s; }
+.spx main { padding:10px 20px 20px; transition:margin-right .15s; }
 .spx.drawer main { margin-right:400px; }
-.spx h1 { font-size:22px; margin:0 0 4px; letter-spacing:-.01em; font-weight:700; }
-.spx .spx-sub { color:var(--dim); font-size:12px; margin-bottom:12px; min-height:16px; }
+.spx h1 { font-size:20px; margin:0 0 2px; letter-spacing:-.01em; font-weight:700; }
+.spx .spx-sub { color:var(--dim); font-size:12px; margin-bottom:8px; min-height:16px; }
 .spx .map { background:#111113; border:1px solid #1c1c21; border-radius:12px; position:relative; overflow:hidden; }
-.spx .map h2 { position:absolute; top:10px; left:14px; z-index:2; font-size:12px; font-weight:700; letter-spacing:.06em; margin:0; padding:4px 9px; color:var(--text);
-  background:#0e0e10cc; border-radius:6px; pointer-events:none; }
 .spx .map canvas { display:block; width:100%; cursor:crosshair; }
-.spx .spx-timeline { display:block; width:100%; height:104px; margin-top:16px; background:#111113; border:1px solid #1c1c21; border-radius:12px; cursor:pointer; }
+.spx .spx-timeline { display:block; width:100%; height:104px; margin-top:12px; background:#111113; border:1px solid #1c1c21; border-radius:12px; cursor:pointer; }
 .spx .spx-foot { color:var(--dim); font-size:11px; margin-top:8px; }
 .spx .spx-err { color:#ff8f8f; font-size:12px; min-height:16px; }
 .spx .spx-tip { position:fixed; pointer-events:none; background:#1d1d22; border:1px solid var(--line); border-radius:8px; padding:8px 10px;

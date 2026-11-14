@@ -262,9 +262,10 @@ export const getPrimaryNav = (): NavEntry[] => [
         icon: 'graph',
       },
       {
-        href: '/admin/spread-explorer',
+        // Open to anyone with the link, but listed only for admins.
+        href: '/spread-explorer',
         label: 'Spread Explorer',
-        description: 'Admin: how any word spreads across the TPOT hex map.',
+        description: 'Unlisted: how any word spreads across the TPOT hex map.',
         icon: 'spread',
         requiresAdmin: true,
       },

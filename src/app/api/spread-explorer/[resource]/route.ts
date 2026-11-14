@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { canViewSpreadExplorer } from '@/app/admin/spread-explorer/access'
 import {
   getSpreadAnchors,
   getSpreadMeta,
@@ -10,24 +9,34 @@ import { normalizeWord, parseHandles } from '@/lib/spreadExplorer/tokens'
 
 export const dynamic = 'force-dynamic'
 
-// Everything here names real accounts (central accounts per hex, anchors), so
-// the response is private to the admin session and never cached by the edge.
-const HEADERS = { 'Cache-Control': 'private, no-store' }
+// The explorer is open to anyone with the link, and its data is a static
+// export that changes only when a new one is uploaded. Successful answers are
+// therefore cached by the edge for a day, so repeat and automated requests
+// do not reach this function or Supabase Storage.
+const CACHED = {
+  'Cache-Control':
+    'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800',
+  'X-Robots-Tag': 'noindex, nofollow',
+}
+const UNCACHED = {
+  'Cache-Control': 'no-store',
+  'X-Robots-Tag': 'noindex, nofollow',
+}
 
 const json = (body: unknown, status = 200) =>
-  NextResponse.json(body, { status, headers: HEADERS })
+  NextResponse.json(body, {
+    status,
+    headers: status === 200 ? CACHED : UNCACHED,
+  })
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { resource: string } },
+  { params }: { params: Promise<{ resource: string }> },
 ) {
-  // Same identity gate as the page; a non-admin sees the same 404 as for a route that does not exist.
-  if (!(await canViewSpreadExplorer())) {
-    return new NextResponse('Not Found', { status: 404, headers: HEADERS })
-  }
+  const { resource } = await params
   const query = request.nextUrl.searchParams
   try {
-    switch (params.resource) {
+    switch (resource) {
       case 'meta':
         return json(await getSpreadMeta())
       case 'vocab':
@@ -42,10 +51,10 @@ export async function GET(
           anchors: await getSpreadAnchors(parseHandles(query.get('handles'))),
         })
       default:
-        return new NextResponse('Not Found', { status: 404, headers: HEADERS })
+        return new NextResponse('Not Found', { status: 404, headers: UNCACHED })
     }
   } catch (error) {
-    console.error('[spread-explorer]', params.resource, error)
+    console.error('[spread-explorer]', resource, error)
     return json({ error: 'Spread explorer data is unavailable' }, 502)
   }
 }

@@ -65,7 +65,7 @@ describe('site navigation', () => {
         ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
         ['Social Graph', '/social-graph'],
-        ['Spread Explorer', '/admin/spread-explorer'],
+        ['Spread Explorer', '/spread-explorer'],
       ],
     })
     expect(nav.slice(0, 2)).toEqual([
@@ -190,7 +190,7 @@ test('the Spread Explorer is listed only for admins and the local admin preview'
     .find((group) => group.label === 'Tools')!
   const shows = (audience: Parameters<typeof visibleNavItems>[1]) =>
     visibleNavItems(tools, audience).some(
-      (item) => item.href === '/admin/spread-explorer',
+      (item) => item.href === '/spread-explorer',
     )
   expect(shows({ askVisible: true })).toBe(false)
   expect(shows({ askVisible: true, localPreview: 'signed-out' })).toBe(false)

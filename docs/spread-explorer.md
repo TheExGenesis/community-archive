@@ -1,17 +1,29 @@
-# Admin spread explorer
+# Spread explorer
 
-`/admin/spread-explorer` shows how any word spreads over the TPOT hex map:
+`/spread-explorer` shows how any word spreads over the TPOT hex map:
 1,730 hexes of socially close accounts (Community Archive members and their
 mutual 1-hop ties), coloured by how much more or less a word is used in each
 hex than on average, month by month from 2022 to mid-2026. It is the
 real-usage half of the STLM spread explorer; the model map, posts and account
 lists of that local tool are not part of this page.
 
-It is private: the page and its API use the same identity gate as `/admin`
-(`requireAdmin` / `checkIsAdmin` in `src/app/admin/data.ts`). Anyone else gets
-the same 404 as for a page that does not exist. The data names real accounts
-(central accounts per hex, handles for anchors), so it is never placed under
-`public/` or committed.
+It is unlisted: anyone with the link can open it, signed in or not, but the
+Tools menu lists it only for admins (`requiresAdmin` in
+`src/lib/navigation.ts`) and it is `noindex`. `/admin/spread-explorer`, its
+first address, redirects to it. The page is dark only:
+`src/providers/ThemeProvider.tsx` forces the dark theme on this path, so the
+site header and footer follow, and the theme toggle is hidden there.
+
+The data names real accounts (central accounts per hex, handles for "Find
+accounts"), most of them not members, and it is a fixed export: an opt-out
+made after the export date is not reflected until a new export is uploaded.
+The files stay in a private bucket and are never placed under `public/` or
+committed.
+
+Before anything is typed, the word box suggests the local explorer's curated
+words by group (`src/lib/spreadExplorer/suggestions.ts`, from its
+`word_groups.json`: single tokens that are in the vocabulary, without slurs).
+Typing filters the whole vocabulary.
 
 ## Data
 
@@ -39,16 +51,17 @@ Where the server reads it from:
 
 ## API
 
-`GET /api/admin/spread-explorer/{meta|vocab|word?w=|anchors?handles=}`,
-admin session required, `Cache-Control: private, no-store`.
+`GET /api/spread-explorer/{meta|vocab|word?w=|anchors?handles=}`, no session
+needed. Successful answers carry
+`Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=604800`,
+so the edge serves repeats without invoking the function or reading Storage.
+After uploading a new export, expect up to a day before every cached answer
+is replaced (or purge the CDN cache for `/api/spread-explorer/*`).
 
 ## Local development
 
 ```sh
-supabase start
-SPREAD_EXPLORER_DATA_DIR=/path/to/export ENABLE_STAGING_DEV_LOGIN=true pnpm dev
+SPREAD_EXPLORER_DATA_DIR=/path/to/export pnpm dev
 ```
 
-Sign in through `/login` with the staging dev login as `xiq_dev` (the staging
-admin allowlist in `src/app/admin/data.ts`), then open
-`http://localhost:3000/admin/spread-explorer#w=vibecoding`.
+Open `http://localhost:3000/spread-explorer#w=vibecoding`.

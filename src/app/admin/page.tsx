@@ -164,7 +164,7 @@ export default async function AdminPage({
         </Link>
 
         <Link
-          href="/admin/spread-explorer"
+          href="/spread-explorer"
           className="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
         >
           <h2 className="font-semibold">Spread explorer →</h2>

@@ -93,6 +93,8 @@ const NOINDEX_PATH_PREFIXES = [
   '/admin',
   '/auth',
   '/guest',
+  // Unlisted: open by link, kept out of search engines.
+  '/spread-explorer',
 ]
 
 // ─── In-memory rate limiting (secondary signal) ──────────────────────────────
@@ -799,7 +801,6 @@ export async function middleware(request: NextRequest) {
   if (
     pathname === '/bulletin' ||
     pathname === '/admin/bulletin' ||
-    pathname === '/admin/spread-explorer' ||
     pathname === '/birdseye' ||
     pathname.startsWith('/birdseye/') ||
     pathname.startsWith('/api/birdseye/')

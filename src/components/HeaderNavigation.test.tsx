@@ -48,18 +48,21 @@ describe('HeaderNavigation', () => {
     render(<HeaderNavigation entries={getPrimaryNav()} label="Main" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Tools' }))
-    const bangers = screen.getByRole('link', { name: /Bangers/ })
-    expect(bangers).toHaveTextContent('The best tweets of all time.')
-    expect(screen.getByRole('link', { name: /Strands/ })).toHaveAttribute(
-      'href',
-      '/strands',
+    const library = screen.getByRole('link', { name: /CA Library/ })
+    expect(library).toHaveTextContent(
+      'Essays, books, films and papers the community keeps citing.',
     )
+    expect(screen.getByRole('link', { name: /More tools/ })).toHaveAttribute(
+      'href',
+      '/more-tools',
+    )
+    expect(screen.queryByRole('link', { name: /^Strands/ })).toBeNull()
 
-    fireEvent.click(bangers)
+    fireEvent.click(library)
     expect(capturePostHogEvent).toHaveBeenCalledWith(
       'navigation_item_clicked',
       {
-        destination: 'bangers',
+        destination: 'library',
         surface: 'desktop',
         already_active: false,
       },

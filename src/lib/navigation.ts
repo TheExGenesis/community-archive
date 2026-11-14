@@ -156,6 +156,7 @@ export type NavIcon =
   | 'ask'
   | 'week'
   | 'spread'
+  | 'more'
 
 export interface NavMenuItem extends NavItem {
   description: string
@@ -169,12 +170,47 @@ export interface NavMenuItem extends NavItem {
 export interface NavGroup {
   label: string
   items: NavMenuItem[]
+  /** Pages reached through one of the items; they keep the group active. */
+  more?: NavMenuItem[]
 }
 
 export type NavEntry = NavGroup | NavItem
 
 export const isNavGroup = (entry: NavEntry): entry is NavGroup =>
   'items' in entry
+
+/**
+ * First-party tools that are not in the Tools menu itself. They are listed on
+ * /more-tools, which the menu's last item opens.
+ */
+export const getMoreTools = (): NavMenuItem[] => [
+  {
+    href: BANGERS_WEEK_HREF,
+    label: 'Bangers',
+    description: 'The best tweets of all time.',
+    icon: 'bangers',
+  },
+  {
+    href: '/strands',
+    label: 'Strands',
+    description: 'Follow ideas and narratives as they evolve over time.',
+    icon: 'strands',
+  },
+  {
+    href: '/conversation-map',
+    label: 'Conversation Map',
+    description: 'A zoomable map of each year’s most-quoted posts.',
+    icon: 'map',
+  },
+  {
+    href: '/social-graph',
+    label: 'Social Graph',
+    description: 'Explore connections between people and ideas.',
+    icon: 'graph',
+  },
+]
+
+export const MORE_TOOLS_HREF = '/more-tools'
 
 /**
  * Single source of truth for site navigation: Home, Today's Digest, the
@@ -187,6 +223,12 @@ export const getPrimaryNav = (): NavEntry[] => [
   {
     label: 'Explore archive',
     items: [
+      {
+        href: '/digest/week',
+        label: 'The Week in Review',
+        description: "The week's top stories, woven from the daily digests.",
+        icon: 'week',
+      },
       {
         href: '/search/ask',
         label: 'Ask the archive',
@@ -208,36 +250,12 @@ export const getPrimaryNav = (): NavEntry[] => [
           "Watch tweets arrive from the community's browser extensions.",
         icon: 'stream',
       },
-      {
-        href: '/digest/week',
-        label: 'The Week in Review',
-        description: "The week's top stories, woven from the daily digests.",
-        icon: 'week',
-      },
     ],
   },
   { href: '/community', label: 'Community' },
   {
     label: 'Tools',
     items: [
-      {
-        href: BANGERS_WEEK_HREF,
-        label: 'Bangers',
-        description: 'The best tweets of all time.',
-        icon: 'bangers',
-      },
-      {
-        href: '/strands',
-        label: 'Strands',
-        description: 'Follow ideas and narratives as they evolve over time.',
-        icon: 'strands',
-      },
-      {
-        href: '/conversation-map',
-        label: 'Conversation Map',
-        description: 'A zoomable map of each year’s most-quoted posts.',
-        icon: 'map',
-      },
       {
         href: '/tube',
         label: 'CA Tube',
@@ -263,12 +281,6 @@ export const getPrimaryNav = (): NavEntry[] => [
         icon: 'trends',
       },
       {
-        href: '/social-graph',
-        label: 'Social Graph',
-        description: 'Explore connections between people and ideas.',
-        icon: 'graph',
-      },
-      {
         // Open to anyone with the link, but listed only for admins.
         href: '/spread-explorer',
         label: 'Spread Explorer',
@@ -276,7 +288,14 @@ export const getPrimaryNav = (): NavEntry[] => [
         icon: 'spread',
         requiresAdmin: true,
       },
+      {
+        href: MORE_TOOLS_HREF,
+        label: 'More tools',
+        description: 'Bangers, Strands, Conversation Map and Social Graph.',
+        icon: 'more',
+      },
     ],
+    more: getMoreTools(),
   },
   { href: '/research', label: 'Research' },
 ]
@@ -325,4 +344,6 @@ export const visibleNavItems = (
   )
 
 export const isNavGroupActive = (pathname: string, group: NavGroup): boolean =>
-  group.items.some((item) => isNavItemActive(pathname, item.href))
+  [...group.items, ...(group.more ?? [])].some((item) =>
+    isNavItemActive(pathname, item.href),
+  )

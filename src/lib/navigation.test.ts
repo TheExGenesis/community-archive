@@ -1,6 +1,7 @@
 import {
   flattenNav,
   getMobileNav,
+  getMoreTools,
   getPrimaryNav,
   isNavGroup,
   visibleNavItems,
@@ -52,23 +53,30 @@ describe('site navigation', () => {
     )
     expect(menus).toEqual({
       'Explore archive': [
+        ['The Week in Review', '/digest/week'],
         ['Ask the archive', '/search/ask'],
         ['Explore by user', '/user-dir'],
         ['Live Stream', '/stream'],
-        ['The Week in Review', '/digest/week'],
       ],
       Tools: [
-        ['Bangers', '/bangers?period=week'],
-        ['Strands', '/strands'],
-        ['Conversation Map', '/conversation-map'],
         ['CA Tube', '/tube'],
         ['CA Library', '/library'],
         ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
-        ['Social Graph', '/social-graph'],
         ['Spread Explorer', '/spread-explorer'],
+        ['More tools', '/more-tools'],
       ],
     })
+    expect(getMoreTools().map((item) => [item.label, item.href])).toEqual([
+      ['Bangers', '/bangers?period=week'],
+      ['Strands', '/strands'],
+      ['Conversation Map', '/conversation-map'],
+      ['Social Graph', '/social-graph'],
+    ])
+    const tools = nav.filter(isNavGroup).find((g) => g.label === 'Tools')!
+    expect(isNavGroupActive('/strands', tools)).toBe(true)
+    expect(isNavGroupActive('/more-tools', tools)).toBe(true)
+    expect(isNavGroupActive('/stream', tools)).toBe(false)
     expect(nav.slice(0, 2)).toEqual([
       { href: '/', label: 'Home' },
       { href: '/digest', label: "Today's Digest" },

@@ -144,11 +144,13 @@ export default function RootLayout({
                           </div>
                         </div>
                       </header>
+                      {/* Pages read the audience too: the homepage and /search
+                          boxes show Ask AI from it. */}
+                      <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+                        {children}
+                        <Footer />
+                      </div>
                     </NavigationAudienceProvider>
-                    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
-                      {children}
-                      <Footer />
-                    </div>
                     <div className="hidden min-[980px]:block">
                       <ReactQueryDevtools initialIsOpen={false} />
                     </div>

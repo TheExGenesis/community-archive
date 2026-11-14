@@ -181,6 +181,12 @@ progress and a stopped or failed run keeps what it spent (`usage.ts`):
 Prices are standard-tier, short-context list prices; long-context surcharges
 are not modelled.
 
+The admin dashboard (`/admin`, "Ask the archive usage";
+`src/app/admin/askUsageData.ts`) shows questions, askers, failures, own-key
+questions, tokens and house spend by UTC day for the last 14 days, today's
+spend against the global cap, and the month so far. It reads the run records'
+counters only, never questions or answers.
+
 ## History
 
 A question and its follow-ups form a conversation, keyed by the page's chat id

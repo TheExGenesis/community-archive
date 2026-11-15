@@ -22,8 +22,14 @@ export function DigestDaySelector({
   availableDays = [],
   variant = 'card',
   generation,
+  week,
+  title = 'Choose a day',
 }: {
+  /** The open edition's day, or a day in `week` that picks the first month. */
   currentDate: string
+  /** Tint a week's days instead of marking `currentDate` as the open day. */
+  week?: { start: string; end: string }
+  title?: string
   editions?: DigestEdition[]
   availableDays?: DigestCalendarDay[]
   variant?: 'card' | 'editorial'
@@ -90,7 +96,7 @@ export function DigestDaySelector({
               : 'font-semibold'
           }
         >
-          Choose a day
+          {title}
         </h2>
         {availableMonths.length > 1 ? (
           <nav className="flex items-center gap-1" aria-label="Digest months">
@@ -147,7 +153,8 @@ export function DigestDaySelector({
             return <span key={`empty-${index}`} aria-hidden="true" />
           const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           const availableDay = daysByDate.get(date)
-          const isCurrent = date === currentDate
+          const isCurrent = !week && date === currentDate
+          const inWeek = Boolean(week && date >= week.start && date <= week.end)
           const runningRunId = runningByDate.get(date)
           if (runningRunId) {
             return (
@@ -155,7 +162,7 @@ export function DigestDaySelector({
                 key={date}
                 href={`/admin/digest?run=${runningRunId}`}
                 aria-label={`View running digest job for ${date}`}
-                className="dark:bg-amber-950/35 flex aspect-square items-center justify-center rounded-[6px] border border-amber-300 bg-amber-50 text-[12.5px] font-semibold text-amber-900 ring-1 ring-amber-200 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-800 dark:text-amber-100 dark:ring-amber-900"
+                className="flex aspect-square items-center justify-center rounded-[6px] border border-amber-300 bg-amber-50 text-[12.5px] font-semibold text-amber-900 ring-1 ring-amber-200 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-100 dark:ring-amber-900"
               >
                 <span className="mr-1 h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
                 {day}
@@ -186,7 +193,9 @@ export function DigestDaySelector({
                 key={date}
                 className={`flex aspect-square items-center justify-center rounded-[6px] ${
                   editorial ? 'text-[12.5px]' : 'text-xs'
-                } text-zinc-300 dark:text-zinc-700`}
+                } text-zinc-300 dark:text-zinc-700 ${
+                  inWeek ? 'bg-zinc-50 dark:bg-zinc-900/60' : ''
+                }`}
               >
                 {day}
               </span>
@@ -209,7 +218,9 @@ export function DigestDaySelector({
                   ? `border text-[12.5px] ${
                       isCurrent
                         ? 'border-zinc-500 bg-zinc-100 font-bold text-zinc-950 dark:border-zinc-400 dark:bg-[#1b1b1e] dark:text-zinc-100'
-                        : 'border-transparent font-normal text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#1b1b1e]'
+                        : inWeek
+                          ? 'border-transparent bg-blue-50 font-semibold text-brand hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/70'
+                          : 'border-transparent font-normal text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#1b1b1e]'
                     }`
                   : `text-xs font-semibold ${
                       isCurrent
@@ -249,7 +260,9 @@ export function DigestDaySelector({
       >
         {generation
           ? 'Blue days are ready to generate. Amber days are running and safe to leave.'
-          : 'Available days have an edition. A dot marks preview data.'}
+          : week
+            ? "Open any day's edition. This week's days are tinted."
+            : 'Available days have an edition. A dot marks preview data.'}
       </p>
     </section>
   )

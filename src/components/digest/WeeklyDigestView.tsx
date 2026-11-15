@@ -24,6 +24,8 @@ import {
 } from '@/lib/digest/weekly'
 import type { WeeklyDigestEdition } from '@/lib/digest/weeklyData'
 import { WEEKLY_MAP_COLORS } from '@/lib/digest/weeklyMap'
+import type { WeeklyStoryChange } from '@/lib/digest/weeklyChanges'
+import { ChangeDay } from '@/components/digest/ChangeDay'
 
 type Previews = Record<string, WeeklyRefPreview>
 
@@ -284,13 +286,41 @@ function topTrendTerms(content: WeeklyDigestContent, limit: number) {
     .map((series) => series.term)
 }
 
-/** Daily-style sidebar: earlier weeks this one continues, trends, keywords. */
+/** "New today" / "Updated today" beside a week-so-far story. */
+function ChangePill({
+  change,
+  day,
+}: {
+  change: WeeklyStoryChange
+  day: string
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] ${
+        change === 'new'
+          ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-200 dark:ring-emerald-900'
+          : 'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900'
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`h-1.5 w-1.5 rounded-full ${change === 'new' ? 'bg-emerald-500' : 'bg-amber-500'}`}
+      />
+      {change === 'new' ? 'New' : 'Updated'} <ChangeDay day={day} />
+    </span>
+  )
+}
+
+/** Daily-style sidebar: the day calendar, earlier weeks this one continues,
+ *  trends, keywords. */
 function WeekSidebar({
   content,
   previews,
+  calendar,
 }: {
   content: WeeklyDigestContent
   previews: Previews
+  calendar?: ReactNode
 }) {
   const continued = content.stories.flatMap((story) =>
     story.continuesFrom.map((ref) => ({ ref, story })),
@@ -305,6 +335,11 @@ function WeekSidebar({
 
   return (
     <aside className="border-zinc-200 pt-2 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-9 lg:border-l lg:pl-10">
+      {calendar ? (
+        <div className="mb-8 border-b border-zinc-200 pb-7 dark:border-zinc-800">
+          {calendar}
+        </div>
+      ) : null}
       {continued.length > 0 ? (
         <section>
           <h2 className={sidebarHeading} style={SERIF}>
@@ -474,6 +509,10 @@ export function WeeklyDigestView({
   comments,
   soFar,
   weekSoFarLink = false,
+  calendar,
+  subscribers,
+  changes = {},
+  changeDay,
 }: {
   edition: WeeklyDigestEdition
   weeks: string[]
@@ -489,8 +528,16 @@ export function WeeklyDigestView({
   profiles?: ReactNode
   /** Recommended Bulletin asks and offers, rendered under the stories. */
   bulletin?: ReactNode
-  /** The edition's discussion thread. */
+  /** The week's discussion thread. */
   comments?: ReactNode
+  /** Day calendar linking to the daily editions. */
+  calendar?: ReactNode
+  /** Subscriber count shown in the header row. */
+  subscribers?: ReactNode
+  /** Week-so-far stories that are new or updated, by slug. */
+  changes?: Record<string, WeeklyStoryChange>
+  /** The daily edition (`YYYY-MM-DD`) those changes came from. */
+  changeDay?: string
 }) {
   const content = edition.content
   const range = weekRangeLabel(content.weekStart, content.weekEnd)
@@ -503,11 +550,15 @@ export function WeeklyDigestView({
             <div className={sectionLabel}>
               {soFar ? 'The Week So Far' : 'The Week in Review'}
             </div>
-            <WeekNav
-              weekStart={edition.weekStart}
-              weeks={weeks}
-              weekSoFar={weekSoFarLink}
-            />
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {subscribers}
+              <div id="digest-subscribe-header" className="contents" />
+              <WeekNav
+                weekStart={edition.weekStart}
+                weeks={weeks}
+                weekSoFar={weekSoFarLink}
+              />
+            </div>
           </div>
           <h1
             className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.01em] sm:text-[52px]"
@@ -536,6 +587,7 @@ export function WeeklyDigestView({
               : ''}
             .
           </p>
+          <DigestSubscribeButton placement="digest" list="weekly" />
         </header>
         <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
         <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
@@ -558,6 +610,14 @@ export function WeeklyDigestView({
                       {index + 1}
                     </span>
                     <div className="min-w-0">
+                      {changes[story.slug] && changeDay ? (
+                        <div className="mb-2.5">
+                          <ChangePill
+                            change={changes[story.slug]}
+                            day={changeDay}
+                          />
+                        </div>
+                      ) : null}
                       <h3
                         className="text-[28px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[36px]"
                         style={SERIF}
@@ -637,10 +697,13 @@ export function WeeklyDigestView({
               </section>
             ) : null}
             {soFar?.lastWeek ? <LastWeek edition={soFar.lastWeek} /> : null}
-            <DigestSubscribeButton placement="digest" list="weekly" />
           </div>
 
-          <WeekSidebar content={content} previews={previews} />
+          <WeekSidebar
+            content={content}
+            previews={previews}
+            calendar={calendar}
+          />
         </div>
 
         {bulletin}

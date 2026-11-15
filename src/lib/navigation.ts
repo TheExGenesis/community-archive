@@ -155,6 +155,7 @@ export type NavIcon =
   | 'library'
   | 'ask'
   | 'week'
+  | 'daily'
   | 'spread'
   | 'more'
 
@@ -212,22 +213,24 @@ export const getMoreTools = (): NavMenuItem[] => [
 
 export const MORE_TOOLS_HREF = '/more-tools'
 
+export const WEEKLY_DIGEST_HREF = '/digest/week'
+
 /**
- * Single source of truth for site navigation: Home, Today's Digest, the
- * archive menu, Community, the Tools menu of first-party products, then
- * Research — the same for every audience.
+ * Single source of truth for site navigation: Home, This Week's Digest, the
+ * archive menu (which leads with the daily digest), Community, the Tools menu
+ * of first-party products, then Research — the same for every audience.
  */
 export const getPrimaryNav = (): NavEntry[] => [
   { href: '/', label: 'Home' },
-  { href: '/digest', label: "Today's Digest" },
+  { href: WEEKLY_DIGEST_HREF, label: "This Week's Digest" },
   {
     label: 'Explore archive',
     items: [
       {
-        href: '/digest/week',
-        label: 'The Week in Review',
-        description: "The week's top stories, woven from the daily digests.",
-        icon: 'week',
+        href: '/digest',
+        label: "Today's Digest",
+        description: 'What happened yesterday, in a few readable stories.',
+        icon: 'daily',
       },
       {
         href: '/search/ask',
@@ -265,7 +268,8 @@ export const getPrimaryNav = (): NavEntry[] => [
       {
         href: '/library',
         label: 'CA Library',
-        description: 'Essays, books, films and papers the community keeps citing.',
+        description:
+          'Essays, books, films and papers the community keeps citing.',
         icon: 'library',
       },
       {
@@ -317,6 +321,12 @@ export const flattenNav = (entries: NavEntry[]): NavItem[] =>
 export function isNavItemActive(pathname: string, href: string): boolean {
   if (href.includes('#')) return false
   const itemPathname = href.split('?')[0]
+  // The weekly digest lives under /digest but has its own nav item.
+  if (
+    itemPathname === '/digest' &&
+    isNavItemActive(pathname, WEEKLY_DIGEST_HREF)
+  )
+    return false
   return (
     pathname === itemPathname ||
     (itemPathname !== '/' && pathname.startsWith(`${itemPathname}/`))

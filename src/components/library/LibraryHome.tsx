@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpRight, ChevronDown, Search } from 'lucide-react'
 import {
   countByKind,
@@ -12,22 +12,24 @@ import {
   LIBRARY_KINDS,
   CHARACTERISTIC_MIN_MEMBERS,
   LIBRARY_SORTS,
-  libraryShard,
-  libraryShardUrl,
   selectWorks,
   yearSpan,
   type LibraryData,
-  type LibraryDetail,
   type LibraryFilters,
   type LibrarySort,
   type LibraryWork,
 } from '@/lib/library'
 import { captureProductAction } from '@/lib/productAnalytics'
+import {
+  Cover,
+  KIND_LABEL,
+  LibraryTweets,
+  libraryWorkHref,
+  MemberAvatars,
+  useLibraryDetail,
+} from './shared'
 
 const PAGE = 60
-const KIND_LABEL = Object.fromEntries(LIBRARY_KINDS.map(([k, , one]) => [k, one]))
-
-type Shard = Record<string, LibraryDetail>
 
 export function LibraryHome() {
   const router = useRouter()
@@ -71,7 +73,7 @@ export function LibraryHome() {
         <p className="mt-2 text-muted-foreground">
           What the archive keeps passing around: essays, books, films, videos
           and papers that at least {data?.minMembers ?? 3} members tweeted
-          about. The number beside each work is how many members did.
+          about.
         </p>
       </header>
 
@@ -138,10 +140,10 @@ export function LibraryHome() {
 
       {data && filters.sort === 'characteristic' && (
         <p className="mb-3 text-xs text-muted-foreground">
-          Books, films and ideas come first when members mention them far
-          more than their Wikipedia fame predicts (at least{' '}
-          {CHARACTERISTIC_MIN_MEMBERS} members). Everything else follows by
-          member count.
+          Each kind is ranked on its own and the kinds are mixed. Books, films
+          and ideas rank by how much more members mention them than their
+          Wikipedia fame predicts (at least {CHARACTERISTIC_MIN_MEMBERS}{' '}
+          members); everything else by member count.
         </p>
       )}
 
@@ -202,8 +204,10 @@ export function LibraryHome() {
           Essays, papers, ideas, sites, code and music are found by link: a work
           is listed when at least three members tweeted the same page. Books
           and films are found by name, because members rarely link them. A
-          title counts once members have written it out with its author or
-          year and Open Library or Wikipedia confirms it. No AI model reads the
+          title is found once members have written it out with its author or
+          year and Open Library or Wikipedia confirms it. A short title then
+          counts only beside its author or year, unless Wikipedia gives that
+          title to the book itself (Impro, Neuromancer). No AI model reads the
           tweets.
         </p>
         <p>
@@ -235,11 +239,9 @@ function WorkRow({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="group grid w-full grid-cols-[2.75rem_minmax(0,1fr)_auto] items-baseline gap-3 px-1 py-3 text-left sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:gap-4"
+        className="group grid w-full grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 px-1 py-3 text-left sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:gap-4"
       >
-        <span className="text-right text-xl font-semibold tabular-nums leading-tight">
-          {w.n}
-        </span>
+        <Cover work={w} />
         <span className="min-w-0">
           <span className="block break-words text-base font-medium leading-snug group-hover:underline sm:text-lg">
             {w.t}
@@ -250,6 +252,7 @@ function WorkRow({
             </span>
             {w.s && <span className="break-words">{w.s}</span>}
             <span className="tabular-nums">
+              {w.n.toLocaleString()} {w.n === 1 ? 'member' : 'members'} ·{' '}
               {w.tw.toLocaleString()} tweets · {yearSpan(w)}
             </span>
           </span>
@@ -263,93 +266,48 @@ function WorkRow({
   )
 }
 
-const shardCache = new Map<number, Promise<Shard>>()
-
-function loadShard(n: number): Promise<Shard> {
-  let p = shardCache.get(n)
-  if (!p) {
-    p = fetch(libraryShardUrl(n)).then((r) =>
-      r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
-    )
-    p.catch(() => shardCache.delete(n))
-    shardCache.set(n, p)
-  }
-  return p
-}
-
 function WorkDetail({ work: w, shards }: { work: LibraryWork; shards: number }) {
-  const [detail, setDetail] = useState<LibraryDetail | null>(null)
-  const [failed, setFailed] = useState(false)
-  const current = useRef(w.id)
-
-  useEffect(() => {
-    current.current = w.id
-    setDetail(null)
-    setFailed(false)
-    loadShard(libraryShard(w.id, shards))
-      .then((s) => {
-        if (current.current === w.id) setDetail(s[w.id] ?? { who: [], top: [] })
-      })
-      .catch(() => setFailed(true))
-  }, [w.id, shards])
-
+  const detail = useLibraryDetail(w.id, shards)
   const internal = w.u.startsWith('/')
   const linkClass =
     'inline-flex items-center gap-1 text-sm font-medium underline underline-offset-2'
-  const more = detail ? w.n - Math.min(detail.who.length, 24) : 0
 
   return (
-    <div className="space-y-3 pb-5 pl-1 pr-1 sm:pl-[4.75rem]">
+    <div className="space-y-3 pb-5 pl-1 pr-1 sm:pl-[5.75rem]">
       {w.d && <p className="text-sm text-muted-foreground">{w.d}</p>}
-      {internal ? (
-        <Link href={w.u} className={linkClass}>
-          Watch in CA Tube
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        <Link href={libraryWorkHref(w.id)} className={linkClass}>
+          All tweets about it
         </Link>
-      ) : (
-        <a
-          href={w.u}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => captureProductAction('library', 'external_opened')}
-          className={linkClass}
-        >
-          {w.by === 'name' ? 'About this work' : 'Open the original'}
-          <ArrowUpRight className="h-4 w-4" />
-        </a>
-      )}
-      {failed && (
+        {internal ? (
+          <Link href={w.u} className={linkClass}>
+            Watch in CA Tube
+          </Link>
+        ) : (
+          <a
+            href={w.u}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => captureProductAction('library', 'external_opened')}
+            className={linkClass}
+          >
+            {w.by === 'name' ? 'About this work' : 'Open the original'}
+            <ArrowUpRight className="h-4 w-4" />
+          </a>
+        )}
+      </div>
+      {detail === 'failed' && (
         <p className="text-sm text-muted-foreground">
           The tweets could not be loaded. Close and reopen this work to try again.
         </p>
       )}
-      {!detail && !failed && (
+      {detail === null && (
         <p className="text-sm text-muted-foreground">Loading tweets…</p>
       )}
-      {detail && (
+      {detail && detail !== 'failed' && (
         <>
-          <p className="break-words text-sm text-muted-foreground">
-            Tweeted by{' '}
-            {detail.who.slice(0, 24).map((u) => `@${u}`).join(', ')}
-            {more > 0 && ` and ${more} more`}
-          </p>
-          <ul className="space-y-2">
-            {detail.top.map((t) => (
-              <li
-                key={t.i}
-                className="rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
-              >
-                <div className="mb-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">@{t.u}</span>
-                  <span>{new Date(t.c * 1000).toISOString().slice(0, 10)}</span>
-                  <span className="tabular-nums">{t.f.toLocaleString()} likes</span>
-                  <Link href={`/tweets/${t.i}`} className="underline">
-                    Open tweet
-                  </Link>
-                </div>
-                <p className="whitespace-pre-wrap break-words">{t.x}</p>
-              </li>
-            ))}
-          </ul>
+          <MemberAvatars detail={detail} members={w.n} />
+          <LibraryTweets tweets={detail.top} />
         </>
       )}
     </div>

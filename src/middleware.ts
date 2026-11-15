@@ -853,7 +853,10 @@ export const config = {
      * - robots.txt (crawler rules)
      * - sitemap.xml (sitemap)
      * - .well-known/workflow/ (authenticated Workflow queue delivery)
+     * - api/library/cover/ (CA Library covers: the image optimizer fetches
+     *   them with no browser headers; the route serves only covers the
+     *   library worker recorded, CDN-cached for 30 days)
      */
-    '/((?!_next/static|_next/image|images/|audio/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml|\\.well-known/workflow/).*)',
+    '/((?!_next/static|_next/image|api/library/cover/|images/|audio/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml|\\.well-known/workflow/).*)',
   ],
 }

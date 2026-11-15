@@ -56,15 +56,19 @@ describe('library filters', () => {
     expect(countByKind(works).get('book')).toBe(2)
   })
 
-  it('ranks by members against fame, then the rest by members', () => {
+  it('ranks each kind by members against fame, then interleaves kinds', () => {
     const works = [
-      work({ id: 'famous', k: 'film', n: 200, v: 100000 }),
+      work({ id: 'famous', k: 'book', n: 200, v: 100000 }),
       work({ id: 'niche', k: 'book', n: 40, v: 300 }),
       work({ id: 'thin', k: 'book', n: 5, v: 10 }),
       work({ id: 'essay', n: 90 }),
+      work({ id: 'essay2', n: 30 }),
     ]
-    const ids = selectWorks(works, { kind: '', q: '', sort: 'characteristic' }).map((w) => w.id)
-    expect(ids).toEqual(['niche', 'famous', 'essay', 'thin'])
+    const ids = (kind: LibraryWork['k'] | '') =>
+      selectWorks(works, { kind, q: '', sort: 'characteristic' }).map((w) => w.id)
+    expect(ids('book')).toEqual(['niche', 'famous', 'thin'])
+    // Positions: niche 1/6, essay 1/4, famous 1/2, essay2 3/4, thin 5/6.
+    expect(ids('')).toEqual(['niche', 'essay', 'famous', 'essay2', 'thin'])
     expect(characteristicScore(works[2])).toBeNull()
     expect(characteristicScore(works[3])).toBeNull()
   })

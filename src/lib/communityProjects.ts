@@ -396,6 +396,45 @@ export function mergeCommunityCatalog(
   return Array.from(bySlug.values())
 }
 
+/** The apps the header's Community menu previews, in order. */
+export const COMMUNITY_MENU_PICKS = [
+  'model-behavior-reports',
+  'cuties-b9b5e204',
+  'common-tongue',
+  'distill',
+] as const
+
+export type CommunityMenuApp = Pick<
+  CommunityProject,
+  'slug' | 'name' | 'summary' | 'image' | 'projectUrl' | 'coverClass'
+>
+
+export interface CommunityMenu {
+  /** Every app in the live gallery, the previewed ones included. */
+  count: number
+  apps: CommunityMenuApp[]
+}
+
+export function communityMenu(catalog: CommunityProject[]): CommunityMenu {
+  const bySlug = new Map(catalog.map((p) => [p.slug, p]))
+  const apps = COMMUNITY_MENU_PICKS.flatMap((slug) => {
+    const p = bySlug.get(slug)
+    return p
+      ? [
+          {
+            slug: p.slug,
+            name: p.name,
+            summary: p.summary,
+            image: p.image,
+            projectUrl: p.projectUrl,
+            coverClass: p.coverClass,
+          },
+        ]
+      : []
+  })
+  return { count: catalog.length, apps }
+}
+
 export const HOMEPAGE_FEATURED_PROJECT_COUNT = 6
 
 /** Featured projects lead; fill the second row from the existing gallery. */

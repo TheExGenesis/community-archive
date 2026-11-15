@@ -201,3 +201,26 @@ describe('community project catalog', () => {
     ])
   })
 })
+
+describe('communityMenu', () => {
+  it('previews the picked apps in order and counts the whole gallery', () => {
+    const { communityMenu, mergeCommunityCatalog, COMMUNITY_PROJECTS } =
+      jest.requireActual('./communityProjects')
+    const cuties = {
+      ...COMMUNITY_PROJECTS[0],
+      slug: 'cuties-b9b5e204',
+      name: 'Cuties',
+      projectUrl: 'https://cuties.app/',
+    }
+    const catalog = mergeCommunityCatalog([cuties])
+    const menu = communityMenu(catalog)
+    expect(menu.count).toBe(COMMUNITY_PROJECTS.length + 1)
+    expect(menu.apps.map((a: { slug: string }) => a.slug)).toEqual([
+      'model-behavior-reports',
+      'cuties-b9b5e204',
+      'common-tongue',
+      'distill',
+    ])
+    expect(menu.apps[1].image).toBe('/images/community/cuties-preview.webp')
+  })
+})

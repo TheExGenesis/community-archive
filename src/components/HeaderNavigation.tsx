@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import * as NavigationMenu from '@radix-ui/react-navigation-menu'
 import { ChevronDown } from 'lucide-react'
 import NavIcon from '@/components/NavIcon'
@@ -19,7 +19,11 @@ import {
   NavItem,
 } from '@/lib/navigation'
 import { capturePostHogEvent } from '@/lib/posthog'
-import { COMMUNITY_PROJECTS } from '@/lib/communityProjects'
+import {
+  communityMenu,
+  mergeCommunityCatalog,
+  type CommunityMenu as CommunityMenuData,
+} from '@/lib/communityProjects'
 import { useNavigationAudience } from '@/components/NavigationAudience'
 
 const topLevelStyle =
@@ -128,10 +132,23 @@ function GroupMenu({
   )
 }
 
-// Static curated projects, so the menu costs no request or database read.
-const COMMUNITY_PREVIEW = COMMUNITY_PROJECTS.filter(
-  (p) => p.featured && p.image && p.projectUrl,
-).slice(0, 4)
+// The live gallery (picks plus count) comes from an hourly-cached route,
+// requested once per page load and only when the viewer reaches for the menu.
+let communityMenuRequest: Promise<CommunityMenuData> | null = null
+function loadCommunityMenu(): Promise<CommunityMenuData> {
+  communityMenuRequest ??= fetch('/api/community/menu')
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+    .catch(() => communityMenu(mergeCommunityCatalog([])))
+  return communityMenuRequest
+}
+
+function useCommunityMenu() {
+  const [menu, setMenu] = useState<CommunityMenuData | null>(null)
+  const load = useCallback(() => {
+    void loadCommunityMenu().then(setMenu)
+  }, [])
+  return { menu, load }
+}
 
 /** Community stays a link to the gallery; hovering it previews a few apps. */
 function CommunityMenu({
@@ -146,10 +163,14 @@ function CommunityMenu({
   openedAt: React.MutableRefObject<number>
 }) {
   const isActive = isNavItemActive(pathname, item.href)
+  const { menu, load } = useCommunityMenu()
+  const more = menu ? menu.count - menu.apps.length : 0
   return (
     <NavigationMenu.Item value={item.label} className="relative">
       <NavigationMenu.Trigger
         asChild
+        onPointerEnter={load}
+        onFocus={load}
         onClick={(event) => {
           if (isOpen && Date.now() - openedAt.current < HOVER_CLICK_GRACE_MS) {
             event.preventDefault()
@@ -178,24 +199,36 @@ function CommunityMenu({
             Built by the community
           </p>
           <ul className="grid grid-cols-2 gap-2">
-            {COMMUNITY_PREVIEW.map((p) => (
+            {!menu &&
+              [0, 1, 2, 3].map((i) => (
+                <li
+                  key={i}
+                  aria-hidden="true"
+                  className="aspect-[1200/880] animate-pulse rounded-lg bg-muted"
+                />
+              ))}
+            {menu?.apps.map((p) => (
               <li key={p.slug}>
                 <NavigationMenu.Link asChild>
                   <a
-                    href={p.projectUrl}
+                    href={p.projectUrl ?? item.href}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => trackClick(item.href, isActive)}
                     className="group/app block overflow-hidden rounded-lg border border-border transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
                   >
-                    <span className="relative block aspect-[1200/630] bg-muted">
-                      <Image
-                        src={p.image!}
-                        alt=""
-                        fill
-                        sizes="260px"
-                        className="object-cover"
-                      />
+                    <span
+                      className={`relative block aspect-[1200/630] bg-gradient-to-br ${p.coverClass}`}
+                    >
+                      {p.image && (
+                        <Image
+                          src={p.image}
+                          alt=""
+                          fill
+                          sizes="260px"
+                          className="object-cover"
+                        />
+                      )}
                     </span>
                     <span className="block px-2.5 py-2">
                       <span className="block text-[13.5px] font-semibold leading-tight">
@@ -217,8 +250,9 @@ function CommunityMenu({
               className="mt-2 flex items-center justify-between rounded-lg px-2.5 py-2 text-[13px] font-semibold text-brand transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
             >
               <span>
-                {COMMUNITY_PROJECTS.length - COMMUNITY_PREVIEW.length}+ more
-                tools, experiments, research and games
+                {more > 0
+                  ? `${more} more tools, experiments, research and games`
+                  : 'Tools, experiments, research and games'}
               </span>
               <span aria-hidden="true">See all &rarr;</span>
             </Link>

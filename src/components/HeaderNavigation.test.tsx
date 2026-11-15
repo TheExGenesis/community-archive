@@ -22,15 +22,16 @@ describe('HeaderNavigation', () => {
       ),
     ).toEqual([
       'Home',
-      "This Week's Digest",
+      'This Week',
       'Explore archive',
       'Community',
       'Tools',
       'Research',
     ])
-    expect(
-      screen.getByRole('link', { name: "This Week's Digest" }),
-    ).toHaveAttribute('href', '/digest/week')
+    expect(screen.getByRole('link', { name: 'This Week' })).toHaveAttribute(
+      'href',
+      '/digest/week',
+    )
   })
 
   it('marks the menu holding the current page as active', () => {

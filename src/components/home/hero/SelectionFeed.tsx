@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import Link from 'next/link'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useRankedFeed, rankedFeedRows } from './useRankedFeed'
 import {
   BEST_PERIODS,
@@ -57,6 +57,15 @@ function More({
     </button>
   ) : null
 }
+// A cluster's Digest tab filters the shared browse pages (two digest days for
+// the whole map each), so a page often holds nothing for this area. Scan ahead
+// for the reader until a screenful is visible, but bound each round so a quiet
+// area cannot walk the whole archive; the reader can then ask for more.
+export const AREA_SCAN_TARGET = 6
+export const AREA_SCAN_PAGES = 8
+const storyCount = (page: StoryPage) =>
+  page.stories.length +
+  page.editions.reduce((n, edition) => n + edition.stories.length, 0)
 function AreaStories({
   snapshot,
   kind,
@@ -77,34 +86,57 @@ function AreaStories({
     true,
     snapshot,
   )
-  const hasStories = !!q.data?.pages.some(
-    (page) =>
-      page.stories.length ||
-      page.editions.some((edition) => edition.stories.length),
-  )
-  const firstFallback = q.data?.pages.findIndex(
-    (page) =>
-      page.countryFallback &&
-      (page.stories.length ||
-        page.editions.some((edition) => edition.stories.length)),
-  )
+  const pages = q.data?.pages ?? []
+  const visible = pages.reduce((n, page) => n + storyCount(page), 0)
+  const [round, setRound] = useState({ goal: AREA_SCAN_TARGET, from: 0 })
+  const roundSpent = pages.length - round.from >= AREA_SCAN_PAGES
+  const scanning =
+    q.isSuccess &&
+    !!q.hasNextPage &&
+    !q.isFetchNextPageError &&
+    visible < round.goal &&
+    !roundSpent
+  const { isFetching, fetchNextPage } = q
+  // A read-ahead page can land within one render, so key on the page count too.
   useEffect(() => {
-    if (q.isSuccess && !q.isFetching && !hasStories) onEmpty?.()
-  }, [q.isSuccess, q.isFetching, hasStories, onEmpty])
+    if (scanning && !isFetching) void fetchNextPage()
+  }, [scanning, isFetching, fetchNextPage, pages.length])
+  const loadMore = useCallback(() => {
+    if (q.isFetchNextPageError) {
+      void fetchNextPage()
+      return
+    }
+    setRound({ goal: visible + AREA_SCAN_TARGET, from: pages.length })
+  }, [q.isFetchNextPageError, fetchNextPage, visible, pages.length])
+  const firstFallback = pages.findIndex(
+    (page) => page.countryFallback && storyCount(page) > 0,
+  )
+  // Empty only once the scan has run out; a failed page is not an empty area.
+  const settledEmpty =
+    q.isSuccess &&
+    !isFetching &&
+    !q.isFetchNextPageError &&
+    !scanning &&
+    visible === 0
+  useEffect(() => {
+    if (settledEmpty) onEmpty?.()
+  }, [settledEmpty, onEmpty])
   return (
     <section>
       {kind === 'strand' && (
         <h3 className={styles.sectionTitle}>Strands, all time</h3>
       )}
-      {q.isPending ? (
-        <p className={styles.message}>Loading stories…</p>
+      {q.isPending || (scanning && visible === 0) ? (
+        <p className={styles.message} role="status">
+          {q.isPending ? 'Loading stories…' : 'Looking for stories here…'}
+        </p>
       ) : q.isError && !q.data ? (
         <p className={styles.message}>
           Stories could not load.{' '}
           <button onClick={() => q.refetch()}>Retry</button>
         </p>
       ) : (
-        q.data?.pages.map((p, i) => (
+        pages.map((p, i) => (
           <div key={i}>
             {i === firstFallback && (
               <p className={styles.sectionTitle}>From the same country</p>
@@ -123,23 +155,24 @@ function AreaStories({
           </div>
         ))
       )}
-      {q.data && !hasStories && (
+      {settledEmpty && (
         <p className={styles.message}>
-          No stories in this area on these pages.
+          {q.hasNextPage
+            ? 'No stories in this area in recent digests.'
+            : 'No stories in this area yet.'}
         </p>
       )}
-      <More
-        next={q.hasNextPage}
-        loading={q.isFetchingNextPage}
-        error={q.isFetchNextPageError}
-        paused={
-          !q.data?.pages.at(-1)?.stories.length &&
-          !q.data?.pages
-            .at(-1)
-            ?.editions.some((edition) => edition.stories.length)
-        }
-        load={q.fetchNextPage}
-      />
+      {!(scanning && visible === 0) && (
+        <More
+          next={!!q.hasNextPage}
+          loading={q.isFetchingNextPage || scanning}
+          error={q.isFetchNextPageError}
+          // A round that ran out of pages without filling the screen waits
+          // for the reader instead of letting the sentinel start another.
+          paused={roundSpent && visible < round.goal}
+          load={loadMore}
+        />
+      )}
     </section>
   )
 }
@@ -221,7 +254,7 @@ export default function SelectionFeed({
       )}
       {tab === 'Stories' || tab === 'Strands' ? (
         <AreaStories
-          key={tab}
+          key={`${tab}:${ids}`}
           snapshot={snapshot}
           kind={tab === 'Stories' ? 'digest' : 'strand'}
           cells={ids}

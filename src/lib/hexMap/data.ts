@@ -4,6 +4,8 @@ import {
   getPublishedDigestEditions,
 } from '@/lib/digest/data'
 import { getPreviewDigestEdition } from '@/lib/digest/mock'
+import { getPublishedWeeklyDigest, getWeekSoFar } from '@/lib/digest/weeklyData'
+import type { DigestStory } from '@/lib/digest/types'
 import { getStrands } from '@/lib/community-apps/data'
 import { readMembers } from '@/lib/directoryMembers'
 import { filterStrands } from '@/lib/community-apps/strand-list'
@@ -13,7 +15,7 @@ import { locate, type MapLookup } from './gateway'
 import { measureServerRead } from '@/lib/performance/server'
 import snapshot from './snapshot.json'
 import { selectStories } from './selectStories'
-import type { MapStory, StoryPage, StoryDetail } from './stories'
+import type { MapStory, StoryPage, StoryDetail, WeeklyMapPage } from './stories'
 
 // Top-level posts must come from current members. Opt-outs are enforced at
 // ingestion, so stored quoted context is served as-is.
@@ -104,9 +106,35 @@ async function unlocatedStoryPage(
   let editions
   if (preview) editions = offset === 0 ? [preview] : []
   else editions = await getPublishedDigestEditions(offset)
-  const tweets = editions.flatMap((e) =>
-    e.content.stories.flatMap((s) => [...s.bangers, ...s.commentary]),
+  const { stories, lookup } = await checkedDigestStories(
+    editions.flatMap((e) =>
+      e.content.stories.map((story) => ({ digestDate: e.digestDate, story })),
+    ),
   )
+  let next = 0
+  const page: StoryPage = {
+    stories: [],
+    editions: editions.map((e) => ({
+      date: e.digestDate,
+      isPreview: e.isPreview,
+      headline: e.content.executiveSummary[0],
+      stories: e.content.stories.map(() => stories[next++]),
+    })),
+    nextOffset: !preview && editions.length === 2 ? offset + 2 : null,
+    located: false,
+  }
+  return { page, lookup }
+}
+
+// Daily digest stories as map cards, with only current members' posts
+// contributing people. Locations are looked up alongside, not applied.
+async function checkedDigestStories(
+  items: { digestDate: string; story: DigestStory }[],
+): Promise<{ stories: MapStory[]; lookup: MapLookup | null }> {
+  const tweets = items.flatMap(({ story: s }) => [
+    ...s.bangers,
+    ...s.commentary,
+  ])
   const names = Array.from(new Set(tweets.map((t) => t.username.toLowerCase())))
   // Overlap independent reads. If candidates exceed the gateway limit, locate
   // the filtered members afterward as before.
@@ -117,32 +145,115 @@ async function unlocatedStoryPage(
   const lookup = await (pendingLookup ??
     storyLocations(allowed.map((t) => t.username)))
   const byId = new Map(allowed.map((t) => [t.id, t]))
-  const page: StoryPage = {
-    stories: [],
-    editions: editions.map((e) => ({
-      date: e.digestDate,
-      isPreview: e.isPreview,
-      headline: e.content.executiveSummary[0],
-      stories: e.content.stories.map((s) => ({
-        id: `${e.digestDate}/${s.slug}`,
-        kind,
-        title: s.title,
-        subtitle: s.subtitle,
-        date: e.digestDate,
-        category: s.category ?? 'Story',
-        href: `/digest/${e.digestDate}/${s.slug}`,
-        people: people(
-          [...s.bangers, ...s.commentary].flatMap((t) =>
-            byId.has(t.id) ? [byId.get(t.id)!] : [],
-          ),
+  const stories = items.map(
+    ({ digestDate, story: s }): MapStory => ({
+      id: `${digestDate}/${s.slug}`,
+      kind: 'digest',
+      title: s.title,
+      subtitle: s.subtitle,
+      date: digestDate,
+      category: s.category ?? 'Story',
+      href: `/digest/${digestDate}/${s.slug}`,
+      people: people(
+        [...s.bangers, ...s.commentary].flatMap((t) =>
+          byId.has(t.id) ? [byId.get(t.id)!] : [],
         ),
-        cells: [],
-      })),
-    })),
-    nextOffset: !preview && editions.length === 2 ? offset + 2 : null,
-    located: false,
+      ),
+      cells: [],
+    }),
+  )
+  return { stories, lookup }
+}
+
+function applyLocations(stories: MapStory[], lookup: MapLookup) {
+  const byName = new Map(
+    lookup.people.map((p) => [p.username.toLowerCase(), p.cell]),
+  )
+  for (const story of stories) {
+    story.people = story.people.map((p) => ({
+      ...p,
+      cell: byName.get(p.username.toLowerCase()),
+    }))
+    story.cells = Array.from(
+      new Set(
+        story.people.flatMap((p) =>
+          byName.has(p.username.toLowerCase())
+            ? [byName.get(p.username.toLowerCase())!]
+            : [],
+        ),
+      ),
+    )
+    story.origin = story.cells[0]
+    story.country =
+      story.origin === undefined
+        ? undefined
+        : snapshot.regions.find(
+            (r) => r.id === snapshot.cells[story.origin!].region,
+          )?.short
   }
-  return { page, lookup }
+}
+
+/**
+ * The current Week in Review for the map's browse panel: the running week's
+ * edition when it is newer than the latest final week (as /digest/week shows
+ * it), else that final week. Each weekly story carries the daily stories it
+ * cites, which the map already knows how to highlight and open.
+ */
+export async function weeklyMapPage(): Promise<WeeklyMapPage> {
+  const [latest, soFar] = await Promise.all([
+    getPublishedWeeklyDigest(),
+    getWeekSoFar(),
+  ])
+  const running = !!soFar && (!latest || soFar.weekStart > latest.weekStart)
+  const edition = running ? soFar : latest
+  // The weekly reads report failures as null. A current week always exists
+  // once the Week in Review has started, so treat none as unavailable rather
+  // than serving (and caching) an empty section.
+  if (!edition) throw new Error('Weekly digest unavailable')
+  const { content } = edition
+  const dates = Array.from(
+    new Set(
+      content.stories.flatMap((s) => s.dailyStories.map((r) => r.digestDate)),
+    ),
+  )
+  const dailies = new Map(
+    await Promise.all(
+      dates.map(
+        async (date) =>
+          [date, await getPublishedDigest(date, { strict: true })] as const,
+      ),
+    ),
+  )
+  const refs = content.stories.map((weekly) =>
+    weekly.dailyStories.flatMap((ref) => {
+      const story = dailies
+        .get(ref.digestDate)
+        ?.content.stories.find((s) => s.slug === ref.slug)
+      return story ? [{ digestDate: ref.digestDate, story }] : []
+    }),
+  )
+  const { stories, lookup } = await checkedDigestStories(refs.flat())
+  if (lookup) applyLocations(stories, lookup)
+  let next = 0
+  return {
+    weekStart: content.weekStart,
+    weekEnd: content.weekEnd,
+    soFar: running,
+    throughDate: running ? content.throughDate : undefined,
+    stories: content.stories.map((weekly, index) => ({
+      id: `${edition.weekStart}/${weekly.slug}`,
+      title: weekly.title,
+      subtitle: weekly.subtitle,
+      // A week-so-far edition has no story pages yet; its stories are
+      // anchors on the current week page.
+      href: running
+        ? `/digest/week#${weekly.slug}`
+        : `/digest/week/${edition.weekStart}/${weekly.slug}`,
+      days: weekly.days,
+      stories: refs[index].map(() => stories[next++]),
+    })),
+    located: !!lookup,
+  }
 }
 
 export async function storyDetail(
@@ -200,31 +311,7 @@ export async function storyPage(
   const { page, lookup } = await unlocatedStoryPage(kind, offset)
   const stories = [...page.stories, ...page.editions.flatMap((e) => e.stories)]
   if (lookup) {
-    const byName = new Map(
-      lookup.people.map((p) => [p.username.toLowerCase(), p.cell]),
-    )
-    for (const story of stories) {
-      story.people = story.people.map((p) => ({
-        ...p,
-        cell: byName.get(p.username.toLowerCase()),
-      }))
-      story.cells = Array.from(
-        new Set(
-          story.people.flatMap((p) =>
-            byName.has(p.username.toLowerCase())
-              ? [byName.get(p.username.toLowerCase())!]
-              : [],
-          ),
-        ),
-      )
-      story.origin = story.cells[0]
-      story.country =
-        story.origin === undefined
-          ? undefined
-          : snapshot.regions.find(
-              (r) => r.id === snapshot.cells[story.origin!].region,
-            )?.short
-    }
+    applyLocations(stories, lookup)
     page.located = true
   } else if (cells.length) {
     throw new Error('Story locations unavailable')

@@ -3,7 +3,8 @@ import snapshot from './snapshot.json'
 jest.mock('./gateway', () => ({
   locate: jest.fn().mockRejectedValue(new Error('Unavailable')),
 }))
-import { memberTweets, storyPage, locatedDetail } from './data'
+import { memberTweets, storyPage, locatedDetail, weeklyMapPage } from './data'
+import { getPublishedWeeklyDigest, getWeekSoFar } from '@/lib/digest/weeklyData'
 import {
   getPublishedDigest,
   getPublishedDigestEditions,
@@ -29,6 +30,10 @@ jest.mock('@/lib/digest/database', () => ({}))
 jest.mock('@/lib/digest/data', () => ({
   getPublishedDigest: jest.fn(),
   getPublishedDigestEditions: jest.fn(),
+}))
+jest.mock('@/lib/digest/weeklyData', () => ({
+  getPublishedWeeklyDigest: jest.fn(),
+  getWeekSoFar: jest.fn(),
 }))
 jest.mock('@/lib/digest/mock', () => ({ getPreviewDigestEdition: () => null }))
 jest.mock('@/lib/community-apps/strand-list', () => ({
@@ -216,4 +221,125 @@ it('overlaps Digest locations with the membership read and never exposes nonmemb
   await expect(storyPage('digest', 0, [0])).rejects.toThrow(
     'membership unavailable',
   )
+})
+
+type Weekly = NonNullable<Awaited<ReturnType<typeof getPublishedWeeklyDigest>>>
+const week = (weekStart: string, slugs: [string, string][]) =>
+  ({
+    id: weekStart,
+    weekStart,
+    publishedAt: null,
+    content: {
+      weekStart,
+      weekEnd: '2026-11-15',
+      throughDate: '2026-11-13',
+      stories: [
+        {
+          slug: 'big-week',
+          title: 'A big week',
+          subtitle: 'What happened',
+          days: slugs.map(([date]) => date),
+          dailyStories: slugs.map(([digestDate, slug]) => ({
+            digestDate,
+            slug,
+            title: slug,
+          })),
+        },
+      ],
+    },
+  }) as unknown as Weekly
+const daily = (date: string, slug: string, author: string) =>
+  ({
+    digestDate: date,
+    content: {
+      stories: [
+        {
+          slug,
+          title: `Story ${slug}`,
+          subtitle: 'Daily',
+          category: 'Tech',
+          bangers: [tweet(author)],
+          commentary: [tweet('outsider')],
+        },
+      ],
+    },
+  }) as unknown as NonNullable<Awaited<ReturnType<typeof getPublishedDigest>>>
+
+it('serves the running week so far, opened into its located daily stories', async () => {
+  jest.mocked(getPublishedDigest).mockClear()
+  jest
+    .mocked(getPublishedWeeklyDigest)
+    .mockResolvedValue(week('2026-11-02', []))
+  jest.mocked(getWeekSoFar).mockResolvedValue(
+    week('2026-11-09', [
+      ['2026-11-10', 'one'],
+      ['2026-11-11', 'two'],
+      ['2026-11-11', 'missing'],
+    ]),
+  )
+  jest
+    .mocked(getPublishedDigest)
+    .mockImplementation(async (date?: string) =>
+      date === '2026-11-10'
+        ? daily('2026-11-10', 'one', 'alice')
+        : daily('2026-11-11', 'two', 'bob'),
+    )
+  jest.mocked(readMembers).mockResolvedValue(members(['alice', 'bob']))
+  jest.mocked(locate).mockResolvedValue({
+    version: snapshot.version,
+    counts: {},
+    people: [
+      { account_id: 'alice', username: 'alice', cell: 0 },
+      { account_id: 'bob', username: 'bob', cell: 1 },
+      { account_id: 'outsider', username: 'outsider', cell: 2 },
+    ],
+  })
+  const page = await weeklyMapPage()
+  // One read per digest day, however many stories cite it.
+  expect(getPublishedDigest).toHaveBeenCalledTimes(2)
+  expect(page).toMatchObject({
+    weekStart: '2026-11-09',
+    soFar: true,
+    throughDate: '2026-11-13',
+    located: true,
+  })
+  const [story] = page.stories
+  // No story pages exist for a running week; link its anchor instead.
+  expect(story.href).toBe('/digest/week#big-week')
+  expect(story.stories.map((s) => [s.id, s.href, s.cells])).toEqual([
+    ['2026-11-10/one', '/digest/2026-11-10/one', [0]],
+    ['2026-11-11/two', '/digest/2026-11-11/two', [1]],
+  ])
+  expect(story.stories.flatMap((s) => s.people.map((p) => p.username))).toEqual(
+    ['alice', 'bob'],
+  )
+})
+
+it('serves the final week when no newer week is running, and fails rather than serving an empty week', async () => {
+  jest
+    .mocked(getPublishedWeeklyDigest)
+    .mockResolvedValue(week('2026-11-02', [['2026-11-03', 'one']]))
+  jest.mocked(getWeekSoFar).mockResolvedValue(week('2026-11-02', []))
+  jest
+    .mocked(getPublishedDigest)
+    .mockResolvedValue(daily('2026-11-03', 'one', 'alice'))
+  jest.mocked(readMembers).mockResolvedValue(members(['alice']))
+  jest.mocked(locate).mockRejectedValue(new Error('Offline'))
+  const page = await weeklyMapPage()
+  expect(page.soFar).toBe(false)
+  expect(page.throughDate).toBeUndefined()
+  expect(page.located).toBe(false)
+  expect(page.stories[0].href).toBe('/digest/week/2026-11-02/big-week')
+  expect(page.stories[0].stories[0].cells).toEqual([])
+
+  jest.mocked(getPublishedWeeklyDigest).mockResolvedValue(null)
+  jest.mocked(getWeekSoFar).mockResolvedValue(null)
+  await expect(weeklyMapPage()).rejects.toThrow('Weekly digest unavailable')
+  jest
+    .mocked(getPublishedWeeklyDigest)
+    .mockResolvedValue(week('2026-11-02', [['2026-11-03', 'one']]))
+  jest
+    .mocked(getPublishedDigest)
+    .mockRejectedValue(new Error('Published digest is temporarily unavailable'))
+  await expect(weeklyMapPage()).rejects.toThrow('temporarily unavailable')
 })

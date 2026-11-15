@@ -1,9 +1,16 @@
 import { MAP_VERSION } from '@/lib/hexMap/version'
 import { NextRequest, NextResponse } from 'next/server'
-import { storyPage } from '@/lib/hexMap/data'
+import { storyPage, weeklyMapPage } from '@/lib/hexMap/data'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 const headers = { 'Cache-Control': 'private, no-store' }
+// The current Week in Review is the same for every reader, so the edge shares
+// it. An opted-out account can stay visible for the shared weekly read (5
+// minutes, see weeklyData.ts) plus this window (2 minutes, 1 more while
+// revalidating); ingestion removes it from the stored editions themselves.
+const weeklyHeaders = {
+  'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60',
+}
 export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get('version') !== MAP_VERSION)
     return NextResponse.json(
@@ -24,6 +31,25 @@ export async function GET(request: NextRequest) {
       { status: 400, headers },
     )
   const offset = request.nextUrl.searchParams.get('offset') ?? '0'
+  if (kind === 'weekly') {
+    if (cells.length || offset !== '0')
+      return NextResponse.json(
+        { error: 'Invalid story page' },
+        { status: 400, headers },
+      )
+    try {
+      const page = await weeklyMapPage()
+      // Without locations the section still reads, but must not be shared.
+      return NextResponse.json(page, {
+        headers: page.located ? weeklyHeaders : headers,
+      })
+    } catch {
+      return NextResponse.json(
+        { error: 'This week’s stories are temporarily unavailable.' },
+        { status: 503, headers },
+      )
+    }
+  }
   if (!['digest', 'strand'].includes(kind) || !/^\d{1,5}$/.test(offset))
     return NextResponse.json(
       { error: 'Invalid story page' },

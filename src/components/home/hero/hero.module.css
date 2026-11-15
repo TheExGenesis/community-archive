@@ -804,3 +804,36 @@
     position: static;
   }
 }
+
+/* This week: Week in Review stories that open into their daily stories. */
+.weeklySection {
+  margin-bottom: 28px;
+}
+.weeklyStory {
+  border-bottom: 1px solid hsl(var(--border));
+}
+.weeklyStory > .story {
+  border-bottom: 0;
+  border-left: 3px solid var(--weekly-color, hsl(var(--brand)));
+  padding-left: 10px;
+}
+.weeklyStory > .story:hover,
+.weeklyStory > .story:focus-visible {
+  background: hsl(var(--muted) / 0.4);
+}
+.weeklyToggle {
+  float: right;
+  font-size: 14px;
+  line-height: 1;
+  color: hsl(var(--brand-deep));
+}
+.weeklyDailies {
+  margin: 0 0 6px 13px;
+  border-left: 1px solid hsl(var(--border));
+}
+.weeklyDailies .story:last-of-type {
+  border-bottom: 0;
+}
+.weeklyDailies .detailLink {
+  margin: 6px 8px 12px;
+}

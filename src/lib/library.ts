@@ -76,6 +76,11 @@ export interface LibraryTweet {
   m?: [string, string, number, number][]
   /** The tweet it quotes. */
   q?: LibraryTweet
+  /** For a reply: the tweet id and username it answers, and that tweet when
+   * the archive has it. */
+  rt?: string
+  ru?: string
+  p?: LibraryTweet
 }
 
 export interface LibraryDetail {

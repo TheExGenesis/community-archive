@@ -6,13 +6,16 @@ import {
 } from '@/components/digest/WeeklyDigestView'
 import {
   WeeklyBulletin,
+  WeeklyCalendar,
   WeeklyDiscussion,
+  WeeklySubscriberCount,
 } from '@/components/digest/WeeklyEngagement'
 import {
   WeekSoFarProfiles,
   WeeklyProfiles,
 } from '@/components/digest/WeeklyProfiles'
 import {
+  getCachedWeekSoFarChanges,
   getCachedWeekSoFarRefPreviews,
   getCachedWeeklyRefPreviews,
   getPublishedWeeklyDigest,
@@ -76,6 +79,8 @@ function FinalWeek({
       profiles={<WeeklyProfiles weekStart={edition.weekStart} />}
       bulletin={<WeeklyBulletin edition={edition} />}
       comments={<WeeklyDiscussion edition={edition} />}
+      calendar={<WeeklyCalendar edition={edition} />}
+      subscribers={<WeeklySubscriberCount />}
     />
   )
 }
@@ -83,9 +88,12 @@ function FinalWeek({
 export default async function LatestWeeklyDigestPage() {
   const { latest, running, weeks } = await loadCurrent()
   if (running) {
-    const previews = await getCachedWeekSoFarRefPreviews(running)
-    // No comments: each morning's edition replaces the last, so a thread on
-    // it would disappear overnight.
+    const [previews, changes] = await Promise.all([
+      getCachedWeekSoFarRefPreviews(running),
+      getCachedWeekSoFarChanges(running),
+    ])
+    // Each morning's edition replaces the last; the discussion belongs to the
+    // week, so it carries across them and into the final edition.
     return (
       <WeeklyDigestView
         edition={running}
@@ -94,6 +102,14 @@ export default async function LatestWeeklyDigestPage() {
         soFar={{ lastWeek: latest }}
         profiles={<WeekSoFarProfiles edition={running} />}
         bulletin={<WeeklyBulletin edition={running} />}
+        comments={<WeeklyDiscussion edition={running} />}
+        calendar={<WeeklyCalendar edition={running} />}
+        subscribers={<WeeklySubscriberCount />}
+        changes={changes}
+        changeDay={
+          running.content.throughDate ??
+          (running.publishedAt ?? running.content.generatedAt).slice(0, 10)
+        }
       />
     )
   }

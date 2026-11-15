@@ -17,7 +17,7 @@ import { DigestSubscriberCount } from './DigestSubscriberCount'
 import { DigestViewCount } from './DigestViewCount'
 import { DigestTopTerms } from './DigestTopTerms'
 import { DigestBulletinCards } from './DigestBulletinCards'
-import { getPublishedWeeklyDigest } from '@/lib/digest/weeklyData'
+import { getPublishedWeeklyDigest, getWeekSoFar } from '@/lib/digest/weeklyData'
 import { weekStartFor } from '@/lib/digest/weekly'
 import {
   loadDigestBulletinItemsForViewer,
@@ -171,6 +171,19 @@ async function Calendar({
 
 /** Links the week this edition belongs to, or else the latest weekly edition. */
 async function WeeklyLink({ date }: { date: string }) {
+  const soFar = await getWeekSoFar()
+  if (soFar && soFar.weekStart === weekStartFor(date)) {
+    const final = await getPublishedWeeklyDigest(soFar.weekStart)
+    if (!final)
+      return (
+        <Link
+          href="/digest/week"
+          className="mt-6 block border-t border-zinc-200 pt-4 text-sm font-semibold text-brand hover:underline dark:border-zinc-800"
+        >
+          This week so far →
+        </Link>
+      )
+  }
   const weekly =
     (await getPublishedWeeklyDigest(weekStartFor(date))) ??
     (await getPublishedWeeklyDigest())

@@ -4,7 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ProfilePreview } from '@/app/api/profile/[account_id]/preview/route'
 import { resolveProfileCore } from '@/lib/metaTwitter/profile'
 import { getPublishedDigest } from './data'
-import { createDigestReadClient } from './database'
+import { createDigestAdminClient, createDigestReadClient } from './database'
+import { weeklyStoryChanges, type WeeklyStoryChange } from './weeklyChanges'
 import { isRecord } from './types'
 import {
   dailyPreviewKey,
@@ -358,3 +359,46 @@ export const getCachedWeeklyProfiles = (weekStart: string, storySlug = '') =>
     ['weekly-profiles', weekStart, storySlug],
     { revalidate: 86_400 },
   )()
+
+/**
+ * Which stories of a week-so-far edition are new or updated since the
+ * edition it replaced that morning. The replaced edition is archived and not
+ * public, so it is read server-side and only the comparison is kept: cached
+ * per edition id, since each morning's edition is a new row.
+ */
+export const getCachedWeekSoFarChanges = (edition: WeeklyDigestEdition) =>
+  unstable_cache(
+    async (): Promise<Record<string, WeeklyStoryChange>> => {
+      const through = edition.content.throughDate
+      const { data, error } = await (
+        createDigestAdminClient() as unknown as SupabaseClient
+      )
+        .from('digest_weekly_editions')
+        .select('id,content')
+        .eq('week_start', edition.weekStart)
+        .eq('status', 'archived')
+        .neq('id', edition.id)
+        .not('published_at', 'is', null)
+        .order('published_at', { ascending: false })
+        .limit(7)
+      if (error) {
+        // Throw so a failed read is retried rather than cached as "all new".
+        throw new Error(`Week-so-far history read failed: ${error.message}`)
+      }
+      const previous = ((data ?? []) as { id: string; content: unknown }[])
+        .map((row) => parseWeeklyDigestContent(row.content))
+        .find(
+          (content): content is WeeklyDigestContent =>
+            content !== null &&
+            Boolean(content.throughDate) &&
+            Boolean(through) &&
+            content.throughDate! < through!,
+        )
+      return weeklyStoryChanges(edition.content, previous ?? null)
+    },
+    ['week-so-far-changes', edition.id],
+    { revalidate: 86_400 },
+  )().catch((error) => {
+    console.error(error)
+    return {}
+  })

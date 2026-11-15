@@ -86,6 +86,7 @@ export type DigestEditionCommentRow = {
 export type DigestWeeklyEditionStatusRow = {
   id: string
   status: string
+  week_start: string
 }
 
 type TableDefinition<Row, Insert, Update> = {

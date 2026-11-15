@@ -45,18 +45,36 @@ describe('HeaderNavigation', () => {
     ).not.toHaveClass('bg-brand/10')
   })
 
-  it('keeps Community a gallery link that previews a few apps', () => {
+  it('keeps Community a gallery link that previews the live picks', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        count: 19,
+        apps: [
+          {
+            slug: 'cuties-b9b5e204',
+            name: 'Cuties',
+            summary: 'Find friends through a vouch network.',
+            projectUrl: 'https://cuties.app/',
+            coverClass: 'from-a',
+          },
+        ],
+      }),
+    })
+    global.fetch = fetchMock as unknown as typeof fetch
     render(<HeaderNavigation entries={getPrimaryNav()} label="Main" />)
 
     const community = screen.getByRole('link', { name: 'Community' })
     expect(community).toHaveAttribute('href', '/community')
-    fireEvent.click(screen.getByRole('link', { name: 'Community' }))
-    expect(screen.getByRole('link', { name: /Pairwise/ })).toHaveAttribute(
-      'target',
-      '_blank',
+    fireEvent.focus(community)
+    fireEvent.click(community)
+    expect(await screen.findByRole('link', { name: /Cuties/ })).toHaveAttribute(
+      'href',
+      'https://cuties.app/',
     )
+    expect(fetchMock).toHaveBeenCalledWith('/api/community/menu')
     expect(
-      screen.getByRole('link', { name: /more tools, experiments/ }),
+      screen.getByRole('link', { name: /18 more tools, experiments/ }),
     ).toHaveAttribute('href', '/community')
   })
 

@@ -4,7 +4,8 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import StoryCard from './StoryCard'
 import SelectionFeed from './SelectionFeed'
-import { useCallback, useEffect, useRef } from 'react'
+import WeeklyStories, { weeklyStoriesOptions } from './WeeklyStories'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
@@ -72,6 +73,13 @@ export default function StoryPanel({
     'stories?kind=digest',
     !open && !selected.length,
   )
+  // This week leads browse. Its expanded story survives opening a daily
+  // story and coming back, because the panel stays mounted.
+  const weekly = useQuery({
+    ...weeklyStoriesOptions,
+    enabled: !open && !selected.length,
+  })
+  const [expandedWeekly, setExpandedWeekly] = useState<string | null>(null)
   const selectedIds = [...selected].sort((a, b) => a - b).join(',')
   const manualTabSelection = useRef<string | null>(null)
   const showBestWhenEmpty = useCallback(() => {
@@ -342,6 +350,20 @@ export default function StoryPanel({
         </>
       ) : (
         <>
+          {weekly.data ? (
+            <WeeklyStories
+              page={weekly.data}
+              expanded={expandedWeekly}
+              onExpand={setExpandedWeekly}
+              onOpen={onOpen}
+              onHover={onHover}
+            />
+          ) : weekly.isError ? (
+            <p className={styles.message}>
+              This week’s stories could not load.{' '}
+              <button onClick={() => weekly.refetch()}>Try again</button>
+            </p>
+          ) : null}
           <div aria-label="Digest">
             {query.isPending ? (
               <p className={styles.message} role="status">

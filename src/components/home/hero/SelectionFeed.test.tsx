@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
-import SelectionFeed from './SelectionFeed'
+import SelectionFeed, {
+  AREA_SCAN_PAGES,
+  AREA_SCAN_TARGET,
+} from './SelectionFeed'
 import StoryPanel from './StoryPanel'
 import { useRankedFeed } from './useRankedFeed'
 import { useMapFeed } from './useMapFeed'
@@ -79,7 +82,7 @@ afterAll(() => {
 beforeEach(() => {
   jest.clearAllMocks()
   mobile = false
-  result = { ...base, data: { pages: [empty] } }
+  result = { ...base, hasNextPage: false, data: { pages: [empty] } }
   jest.mocked(useRankedFeed).mockReturnValue({
     ...base,
     hasNextPage: false,
@@ -96,30 +99,46 @@ beforeEach(() => {
           }) as unknown as ReturnType<typeof useMapFeed>,
   )
 })
+const onEmpty = jest.fn()
 function Feed() {
   return (
     <SelectionFeed
       snapshot={null}
       cells={[0]}
       tab="Stories"
+      onEmptyDigest={onEmpty}
       onOpen={noop}
       onHover={noop}
       onTweetHover={noop}
     />
   )
 }
-it('does not add country headings for empty pages or repeated retries; labels actual fallback content once', () => {
+const storyPage = (count: number, prefix = 'story') => ({
+  ...empty,
+  stories: Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${i}` })),
+})
+it('scans further pages for the reader instead of stopping on an empty one, and labels fallback content once', () => {
+  result = { ...base, data: { pages: [empty] } }
   const { rerender } = render(<Feed />)
-  expect(screen.queryByText('From the same country')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
   expect(load).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Looking for stories here…',
+  )
+  expect(
+    screen.queryByRole('button', { name: 'Load more' }),
+  ).not.toBeInTheDocument()
+  expect(screen.queryByText(/No stories in this area/)).not.toBeInTheDocument()
+  expect(onEmpty).not.toHaveBeenCalled()
   result = {
     ...base,
     isFetchNextPageError: true,
     data: { pages: [empty, empty] },
   }
   rerender(<Feed />)
+  expect(load).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getByRole('button', { name: 'Retry loading more' }))
+  expect(load).toHaveBeenCalledTimes(2)
+  expect(onEmpty).not.toHaveBeenCalled()
   expect(screen.queryByText('From the same country')).not.toBeInTheDocument()
   result = {
     ...base,
@@ -136,6 +155,36 @@ it('does not add country headings for empty pages or repeated retries; labels ac
   expect(screen.getAllByText('From the same country')).toHaveLength(1)
   expect(screen.getByText('first')).toBeInTheDocument()
   expect(screen.getByText('second')).toBeInTheDocument()
+  expect(onEmpty).not.toHaveBeenCalled()
+})
+it('keeps scanning while fewer than a screenful of stories show, then waits for the reader', () => {
+  result = { ...base, data: { pages: [storyPage(2)] } }
+  const { rerender } = render(<Feed />)
+  expect(load).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('story-0')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled()
+  load.mockClear()
+  result = { ...base, data: { pages: [storyPage(AREA_SCAN_TARGET)] } }
+  rerender(<Feed />)
+  expect(load).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(load).toHaveBeenCalledTimes(1)
+})
+it('bounds the scan and only then treats the area as empty', () => {
+  result = {
+    ...base,
+    data: { pages: Array.from({ length: AREA_SCAN_PAGES }, () => empty) },
+  }
+  render(<Feed />)
+  expect(load).not.toHaveBeenCalled()
+  expect(onEmpty).toHaveBeenCalledTimes(1)
+  expect(
+    screen.getByText('No stories in this area in recent digests.'),
+  ).toBeInTheDocument()
+  // The exhausted round waits for the reader rather than auto-loading.
+  expect(observe).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(load).toHaveBeenCalledTimes(1)
 })
 const snapshot = {
   cells: [{ accounts: 10, archived: 2, region: 1 }],
@@ -262,9 +311,7 @@ it('defaults an empty digest to Best but lets the user return to Digest', () => 
     'aria-selected',
     'true',
   )
-  expect(
-    screen.getByText('No stories in this area on these pages.'),
-  ).toBeInTheDocument()
+  expect(screen.getByText('No stories in this area yet.')).toBeInTheDocument()
 })
 it('keeps Digest selected on a load failure instead of treating it as empty', () => {
   result = { ...base, isSuccess: false, isError: true, data: undefined }
@@ -308,10 +355,7 @@ it.each([true, false])(
   'uses the correct pagination root and scroll ownership (mobile: %s)',
   (isMobile) => {
     mobile = isMobile
-    result = {
-      ...base,
-      data: { pages: [{ ...empty, stories: [{ id: 'story' }] }] },
-    }
+    result = { ...base, data: { pages: [storyPage(AREA_SCAN_TARGET)] } }
     render(<Panel />)
     expect(window.IntersectionObserver).toHaveBeenCalledWith(
       expect.any(Function),

@@ -47,6 +47,7 @@ export const homepageMapActions = [
   'find_submitted',
   'content_tab_selected',
   'story_opened',
+  'weekly_story_expanded',
   'members_opened',
   'archive_overlay_toggled',
   'zoom_in_clicked',

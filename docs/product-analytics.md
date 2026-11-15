@@ -117,6 +117,8 @@ story IDs, coordinates, or hover/pan/zoom frames.
   Latest, Most liked, or Strands. Automatic empty-Digest fallback is excluded.
 - `story_opened` / `members_opened`: opening a story or the members dialog.
   Hover, focus and prefetch are excluded.
+- `weekly_story_expanded`: opening a This week story into its daily stories
+  in the browse panel. Collapsing it is not counted.
 - `archive_overlay_toggled`: the Show archived switch, with `enabled`.
 - `zoom_in_clicked` / `zoom_out_clicked` / `view_reset`: explicit buttons and
   their keyboard equivalents. Wheel and pinch gestures are intentionally not

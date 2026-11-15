@@ -155,24 +155,88 @@ export function MemberAvatars({
   )
 }
 
+type ExternalParent = { t: string; u: string; n: string; av: string; x: string; f: number; c: number }
+
+const externalParents = new Map<string, Promise<LibraryTweet | null>>()
+
+/** Reply parents outside the archive come from X's embed API at render time
+ * only, through the same cached route CA Tube uses. */
+function useExternalParent(id: string | undefined): LibraryTweet | null | undefined {
+  const [parent, setParent] = useState<LibraryTweet | null | undefined>(id ? undefined : null)
+  useEffect(() => {
+    if (!id) return
+    if (!externalParents.has(id)) {
+      externalParents.set(
+        id,
+        fetch(`/api/syndication/tweet/${id}`)
+          .then((r) => (r.ok ? r.json() : { tweet: null }))
+          .then(({ tweet: p }: { tweet: ExternalParent | null }) =>
+            p ? { i: p.t, u: p.u, n: p.n, a: p.av, x: p.x, f: p.f, c: p.c } : null,
+          )
+          .catch(() => null),
+      )
+    }
+    let live = true
+    externalParents.get(id)!.then((p) => live && setParent(p))
+    return () => {
+      live = false
+    }
+  }, [id])
+  return parent
+}
+
+function LibraryTweetItem({ t }: { t: LibraryTweet }) {
+  const external = useExternalParent(t.p ? undefined : t.rt)
+  const parent = t.p ?? external
+  return (
+    <li className="overflow-hidden rounded-xl border border-border bg-card">
+      {parent && (
+        <div className="relative">
+          <div className="opacity-75">
+            <TweetCard
+              tweet={libraryTweetToPortal(parent)}
+              compact
+              collapsible
+              constrainMedia
+              showDate
+              quotedTweetDisplay="summary"
+            />
+          </div>
+          {/* Thread line from the parent's avatar down to the reply's
+              (TweetCard's compact avatar: 34px at 17px from the left). */}
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-3 left-[33px] top-[3.25rem] z-10 w-0.5 rounded-full bg-muted-foreground/40"
+          />
+        </div>
+      )}
+      {!parent && t.rt && external === undefined && (
+        <div className="mx-3 mt-3 h-10 animate-pulse rounded-lg bg-muted" />
+      )}
+      {!parent && t.rt && external === null && t.ru && (
+        <p className="px-4 pt-3 text-xs text-muted-foreground">
+          Replying to @{t.ru}
+        </p>
+      )}
+      <TweetCard
+        tweet={libraryTweetToPortal(t)}
+        compact
+        collapsible
+        constrainMedia
+        showDate
+        showExternalLink
+        quotedTweetDisplay="summary"
+      />
+    </li>
+  )
+}
+
+/** Tweets about a work; a reply shows the tweet it answers above it. */
 export function LibraryTweets({ tweets }: { tweets: LibraryTweet[] }) {
   return (
     <ul className="space-y-2">
       {tweets.map((t) => (
-        <li
-          key={t.i}
-          className="overflow-hidden rounded-xl border border-border bg-card"
-        >
-          <TweetCard
-            tweet={libraryTweetToPortal(t)}
-            compact
-            collapsible
-            constrainMedia
-            showDate
-            showExternalLink
-            quotedTweetDisplay="summary"
-          />
-        </li>
+        <LibraryTweetItem key={t.i} t={t} />
       ))}
     </ul>
   )

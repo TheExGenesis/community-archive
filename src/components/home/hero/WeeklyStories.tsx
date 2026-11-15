@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { useMemo, type CSSProperties } from 'react'
 import { queryOptions } from '@tanstack/react-query'
 import { mapUrl } from '@/lib/hexMap/version'
-import { WEEKLY_MAP_COLORS } from '@/lib/digest/weeklyMap'
 import type {
   MapStory,
   WeeklyMapPage,
@@ -57,6 +56,13 @@ export function weeklyHighlight(story: WeeklyMapStory): MapStory {
     origin: story.stories.find((s) => s.origin !== undefined)?.origin,
   }
 }
+
+/**
+ * The rank bar is grey, darkest for the top story. The map's clusters carry
+ * their own colours, so a coloured bar here would read as a cluster colour.
+ */
+const rankShade = (index: number) =>
+  `hsl(var(--foreground) / ${Math.max(0.8 - index * 0.13, 0.2).toFixed(2)})`
 
 function WeeklyCard({
   story,
@@ -155,7 +161,7 @@ export default function WeeklyStories({
         <WeeklyCard
           key={story.id}
           story={story}
-          color={WEEKLY_MAP_COLORS[index % WEEKLY_MAP_COLORS.length]}
+          color={rankShade(index)}
           expanded={expanded === story.id}
           onExpand={onExpand}
           onOpen={onOpen}

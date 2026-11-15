@@ -1,9 +1,8 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpRight, ChevronDown, Search } from 'lucide-react'
 import {
   countByKind,
@@ -13,27 +12,24 @@ import {
   LIBRARY_KINDS,
   CHARACTERISTIC_MIN_MEMBERS,
   LIBRARY_SORTS,
-  libraryShard,
-  libraryShardUrl,
-  libraryTweetToPortal,
   selectWorks,
   yearSpan,
   type LibraryData,
-  type LibraryDetail,
   type LibraryFilters,
   type LibrarySort,
   type LibraryWork,
 } from '@/lib/library'
 import { captureProductAction } from '@/lib/productAnalytics'
-import { libraryCoverSrc } from '@/lib/libraryCover'
-import { userProfileHref } from '@/lib/navigation'
-import { TweetCard } from '@/components/TweetCard'
-import { TweetAvatar } from '@/components/TweetAvatar'
+import {
+  Cover,
+  KIND_LABEL,
+  LibraryTweets,
+  libraryWorkHref,
+  MemberAvatars,
+  useLibraryDetail,
+} from './shared'
 
 const PAGE = 60
-const KIND_LABEL = Object.fromEntries(LIBRARY_KINDS.map(([k, , one]) => [k, one]))
-
-type Shard = Record<string, LibraryDetail>
 
 export function LibraryHome() {
   const router = useRouter()
@@ -270,153 +266,48 @@ function WorkRow({
   )
 }
 
-const PORTRAIT = new Set(['book', 'film'])
-
-// Drawn covers for works without a picture: one tint per kind, each with a
-// dark-theme pair so the title keeps its contrast.
-const COVER_TINT: Record<string, string> = {
-  essay: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
-  paper: 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200',
-  site: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
-  code: 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200',
-  wiki: 'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200',
-  book: 'bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-200',
-  film: 'bg-zinc-800 text-zinc-100 dark:bg-zinc-900 dark:text-zinc-200',
-}
-
-function Cover({ work: w }: { work: LibraryWork }) {
-  const [broken, setBroken] = useState(false)
-  const shape = PORTRAIT.has(w.k) ? 'aspect-[2/3] w-10 sm:w-12' : 'aspect-[16/10] w-full'
-  return (
-    <span
-      className={`relative mx-auto block overflow-hidden rounded-[3px] border border-border/60 ${shape}`}
-      aria-hidden="true"
-    >
-      {w.im && !broken ? (
-        <Image
-          src={libraryCoverSrc(w.id, w.im)}
-          alt=""
-          fill
-          sizes="72px"
-          className="object-cover"
-          onError={() => setBroken(true)}
-        />
-      ) : (
-        <span
-          className={`flex h-full w-full items-end p-1 font-serif text-[0.5rem] font-medium leading-[1.15] sm:text-[0.55rem] ${COVER_TINT[w.k] ?? 'bg-muted text-muted-foreground'}`}
-        >
-          <span className="line-clamp-3 break-words">{w.t}</span>
-        </span>
-      )}
-    </span>
-  )
-}
-
-const shardCache = new Map<number, Promise<Shard>>()
-
-function loadShard(n: number): Promise<Shard> {
-  let p = shardCache.get(n)
-  if (!p) {
-    p = fetch(libraryShardUrl(n)).then((r) =>
-      r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)),
-    )
-    p.catch(() => shardCache.delete(n))
-    shardCache.set(n, p)
-  }
-  return p
-}
-
 function WorkDetail({ work: w, shards }: { work: LibraryWork; shards: number }) {
-  const [detail, setDetail] = useState<LibraryDetail | null>(null)
-  const [failed, setFailed] = useState(false)
-  const current = useRef(w.id)
-
-  useEffect(() => {
-    current.current = w.id
-    setDetail(null)
-    setFailed(false)
-    loadShard(libraryShard(w.id, shards))
-      .then((s) => {
-        if (current.current === w.id) setDetail(s[w.id] ?? { who: [], top: [] })
-      })
-      .catch(() => setFailed(true))
-  }, [w.id, shards])
-
+  const detail = useLibraryDetail(w.id, shards)
   const internal = w.u.startsWith('/')
   const linkClass =
     'inline-flex items-center gap-1 text-sm font-medium underline underline-offset-2'
-  const more = detail ? w.n - Math.min(detail.who.length, 24) : 0
 
   return (
     <div className="space-y-3 pb-5 pl-1 pr-1 sm:pl-[5.75rem]">
       {w.d && <p className="text-sm text-muted-foreground">{w.d}</p>}
-      {internal ? (
-        <Link href={w.u} className={linkClass}>
-          Watch in CA Tube
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        <Link href={libraryWorkHref(w.id)} className={linkClass}>
+          All tweets about it
         </Link>
-      ) : (
-        <a
-          href={w.u}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => captureProductAction('library', 'external_opened')}
-          className={linkClass}
-        >
-          {w.by === 'name' ? 'About this work' : 'Open the original'}
-          <ArrowUpRight className="h-4 w-4" />
-        </a>
-      )}
-      {failed && (
+        {internal ? (
+          <Link href={w.u} className={linkClass}>
+            Watch in CA Tube
+          </Link>
+        ) : (
+          <a
+            href={w.u}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => captureProductAction('library', 'external_opened')}
+            className={linkClass}
+          >
+            {w.by === 'name' ? 'About this work' : 'Open the original'}
+            <ArrowUpRight className="h-4 w-4" />
+          </a>
+        )}
+      </div>
+      {detail === 'failed' && (
         <p className="text-sm text-muted-foreground">
           The tweets could not be loaded. Close and reopen this work to try again.
         </p>
       )}
-      {!detail && !failed && (
+      {detail === null && (
         <p className="text-sm text-muted-foreground">Loading tweets…</p>
       )}
-      {detail && (
+      {detail && detail !== 'failed' && (
         <>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="flex -space-x-1.5" aria-hidden="true">
-              {detail.who.slice(0, 12).map((u, i) => (
-                <span key={u} className="rounded-full ring-2 ring-background">
-                  <TweetAvatar
-                    tweet={{ id: `who-${u}`, username: u, avatar: detail.wa?.[i] || null }}
-                    size={24}
-                  />
-                </span>
-              ))}
-            </span>
-            <p className="min-w-0 break-words text-sm text-muted-foreground">
-              Tweeted by{' '}
-              {detail.who.slice(0, 24).map((u, i) => (
-                <span key={u}>
-                  {i > 0 && ', '}
-                  <Link href={userProfileHref(u)} className="hover:underline">
-                    @{u}
-                  </Link>
-                </span>
-              ))}
-              {more > 0 && ` and ${more} more`}
-            </p>
-          </div>
-          <ul className="space-y-2">
-            {detail.top.map((t) => (
-              <li
-                key={t.i}
-                className="overflow-hidden rounded-xl border border-border bg-card"
-              >
-                <TweetCard
-                  tweet={libraryTweetToPortal(t)}
-                  compact
-                  constrainMedia
-                  showDate
-                  showExternalLink
-                  quotedTweetDisplay="summary"
-                />
-              </li>
-            ))}
-          </ul>
+          <MemberAvatars detail={detail} members={w.n} />
+          <LibraryTweets tweets={detail.top} />
         </>
       )}
     </div>

@@ -82,7 +82,10 @@ export interface LibraryDetail {
   who: string[]
   /** Avatar beside each name in `who` ('' when unknown). */
   wa?: string[]
+  /** The most liked tweets, shown in the row. */
   top: LibraryTweet[]
+  /** The rest of the stored tweets (up to 100 in all), for the work's page. */
+  more?: LibraryTweet[]
 }
 
 const media = (m: LibraryTweet['m']): PortalMedia[] =>

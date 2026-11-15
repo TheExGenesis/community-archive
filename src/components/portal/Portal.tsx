@@ -74,9 +74,11 @@ function PanelHeader({
   title,
   action,
   live,
+  aside,
   divider = true,
 }: {
   title: string
+  aside?: ReactNode
   action?: {
     label: string
     href: string
@@ -97,6 +99,7 @@ function PanelHeader({
           <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
         )}
         <span className="text-[13px] font-bold">{title}</span>
+        {aside}
       </div>
       {action &&
         (action.external ? (
@@ -926,11 +929,13 @@ export function HomeTrendsPanel({
   failed,
   isMember,
   stories,
+  titleAside,
 }: {
   weekly: TermWeek[]
   failed: boolean
   isMember: boolean
   stories?: TrendStoryLink[]
+  titleAside?: ReactNode
 }) {
   return (
     <div className={`${CARD} flex flex-col`}>
@@ -940,6 +945,7 @@ export function HomeTrendsPanel({
             ? 'Tracked terms · 7 days'
             : 'Trending terms · 7 days'
         }
+        aside={titleAside}
         action={{
           label: isMember ? 'Trends explorer' : 'Sign in for Trends',
           href: isMember ? '/trends' : signInHref('/trends'),

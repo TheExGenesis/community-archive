@@ -49,6 +49,7 @@ jest.mock('@/components/home/HomepageDataSections', () => ({
   HomepageStats: () => <>14.0M public tweets from 700 community members.</>,
   HomepagePortal: () => <div data-testid="shared-dashboard" />,
   HomepagePortalFallback: () => <div data-testid="dashboard-fallback" />,
+  HomepageGrowthCounter: () => null,
 }))
 jest.mock('@/components/ExtensionInstallPrompt', () => ({
   __esModule: true,

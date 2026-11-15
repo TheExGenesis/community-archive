@@ -14,6 +14,7 @@ import HomepageUpload from './HomepageUpload'
 import { createServerClient } from '@/utils/supabase'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import {
+  HomepageGrowthCounter,
   HomepagePortal,
   HomepageStats,
 } from '@/components/home/HomepageDataSections'
@@ -55,6 +56,16 @@ export default async function ClassicHomepage({
       <section
         className={`${styles.intro} overflow-hidden bg-card pb-[72px] pt-12 dark:bg-background md:pb-[88px] md:pt-16`}
       >
+        {/* Placement trial: the same 24h counter in four spots. Keep one. */}
+        <Suspense fallback={null}>
+          <HomepageGrowthCounter data={data.globalStats} placement="top-left" />
+        </Suspense>
+        <Suspense fallback={null}>
+          <HomepageGrowthCounter
+            data={data.globalStats}
+            placement="top-right"
+          />
+        </Suspense>
         <div
           className={`${styles.content} relative z-10 mx-auto w-full max-w-5xl space-y-6 px-4 text-center sm:px-6 md:space-y-8 lg:px-8`}
         >
@@ -74,6 +85,12 @@ export default async function ClassicHomepage({
                 <HomepageStats data={data.globalStats} />
               </Suspense>
             </p>
+            <Suspense fallback={null}>
+              <HomepageGrowthCounter
+                data={data.globalStats}
+                placement="subline"
+              />
+            </Suspense>
           </div>
 
           <PreviewHeroActions

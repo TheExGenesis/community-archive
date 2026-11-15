@@ -86,6 +86,15 @@ export type DigestEditionCommentRow = {
 export type DigestWeeklyEditionStatusRow = {
   id: string
   status: string
+  week_start: string
+}
+
+/** One reader's like of a week (all of that week's editions share it). */
+export type DigestWeeklyLikeRow = {
+  id: string
+  week_start: string
+  user_id: string
+  created_at: string
 }
 
 type TableDefinition<Row, Insert, Update> = {
@@ -146,6 +155,11 @@ type DigestDatabase = {
         never,
         never
       >
+      digest_weekly_likes: TableDefinition<
+        DigestWeeklyLikeRow,
+        Pick<DigestWeeklyLikeRow, 'week_start' | 'user_id'>,
+        never
+      >
       digest_weekly_edition_comments: TableDefinition<
         DigestEditionCommentRow,
         Partial<DigestEditionCommentRow> &
@@ -158,6 +172,10 @@ type DigestDatabase = {
       record_digest_view: {
         Args: { p_edition_id: string }
         Returns: number
+      }
+      record_digest_weekly_view: {
+        Args: { p_week_start: string }
+        Returns: number | null
       }
       publish_digest_edition: {
         Args: { p_edition_id: string }

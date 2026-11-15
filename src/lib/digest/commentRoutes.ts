@@ -8,7 +8,7 @@ import {
 } from '@/lib/digest/database'
 import {
   DIGEST_COMMENT_TABLES,
-  ensurePublishedEdition,
+  resolveCommentThread,
   mapDigestComment,
   MAX_COMMENT_LENGTH,
   resolveCommenterIdentity,
@@ -30,23 +30,23 @@ const viewer = async () => {
 }
 
 /**
- * Comment list and create handlers for a daily or weekly edition. Writes go
- * through the service-role client after the session is verified; the edition
- * must be published.
+ * Comment list and create handlers for a daily edition or a week. Writes go
+ * through the service-role client after the session is verified; the thread
+ * must have a public edition (see `resolveCommentThread`).
  */
 export function digestCommentHandlers(kind: DigestCommentKind) {
   const table = DIGEST_COMMENT_TABLES[kind].comments
 
   async function GET(_request: Request, { params }: EditionParams) {
     const { editionId } = await params
-    const edition = await ensurePublishedEdition(editionId, kind)
-    if ('error' in edition) return edition.error
+    const resolved = await resolveCommentThread(editionId, kind)
+    if ('error' in resolved) return resolved.error
 
     const user = await viewer()
     const { data, error } = await createDigestAdminClient()
       .from(table)
       .select('*')
-      .eq('edition_id', editionId)
+      .in('edition_id', resolved.thread.editionIds)
       .is('deleted_at', null)
       .order('created_at', { ascending: true })
 
@@ -72,8 +72,8 @@ export function digestCommentHandlers(kind: DigestCommentKind) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const edition = await ensurePublishedEdition(editionId, kind)
-    if ('error' in edition) return edition.error
+    const resolved = await resolveCommentThread(editionId, kind)
+    if ('error' in resolved) return resolved.error
 
     let body: unknown
     try {
@@ -95,7 +95,7 @@ export function digestCommentHandlers(kind: DigestCommentKind) {
     const { data, error } = await createDigestAdminClient()
       .from(table)
       .insert({
-        edition_id: editionId,
+        edition_id: resolved.thread.writeTo,
         user_id: user.id,
         content,
         username,
@@ -129,15 +129,15 @@ export function digestCommentDeleteHandler(kind: DigestCommentKind) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const edition = await ensurePublishedEdition(editionId, kind)
-    if ('error' in edition) return edition.error
+    const resolved = await resolveCommentThread(editionId, kind)
+    if ('error' in resolved) return resolved.error
 
     const admin = createDigestAdminClient()
     const { data: comment, error: lookupError } = await admin
       .from(table)
       .select('id,user_id,deleted_at')
       .eq('id', commentId)
-      .eq('edition_id', editionId)
+      .in('edition_id', resolved.thread.editionIds)
       .maybeSingle()
 
     if (lookupError) {

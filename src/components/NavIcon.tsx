@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  Newspaper,
   GitBranch,
   Hexagon,
   LayoutGrid,
@@ -30,6 +31,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   library: LibraryBig,
   ask: MessageSquareText,
   week: CalendarDays,
+  daily: Newspaper,
   spread: Hexagon,
   more: LayoutGrid,
 }

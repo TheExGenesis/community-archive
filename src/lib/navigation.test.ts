@@ -37,7 +37,7 @@ describe('site navigation', () => {
     const nav = getPrimaryNav()
     expect(nav.map((entry) => entry.label)).toEqual([
       'Home',
-      "Today's Digest",
+      "This Week's Digest",
       'Explore archive',
       'Community',
       'Tools',
@@ -53,7 +53,7 @@ describe('site navigation', () => {
     )
     expect(menus).toEqual({
       'Explore archive': [
-        ['The Week in Review', '/digest/week'],
+        ["Today's Digest", '/digest'],
         ['Ask the archive', '/search/ask'],
         ['Explore by user', '/user-dir'],
         ['Live Stream', '/stream'],
@@ -79,7 +79,7 @@ describe('site navigation', () => {
     expect(isNavGroupActive('/stream', tools)).toBe(false)
     expect(nav.slice(0, 2)).toEqual([
       { href: '/', label: 'Home' },
-      { href: '/digest', label: "Today's Digest" },
+      { href: '/digest/week', label: "This Week's Digest" },
     ])
     expect(nav[3]).toEqual({ href: '/community', label: 'Community' })
     expect(nav[5]).toEqual({ href: '/research', label: 'Research' })
@@ -105,6 +105,12 @@ describe('site navigation', () => {
     const [explore, tools] = getPrimaryNav().filter(isNavGroup)
     expect(isNavGroupActive('/strands/abc', tools)).toBe(true)
     expect(isNavGroupActive('/strands/abc', explore)).toBe(false)
+    // Week pages light up the weekly item only, daily pages the menu.
+    expect(isNavItemActive('/digest/week/2026-11-09', '/digest/week')).toBe(
+      true,
+    )
+    expect(isNavGroupActive('/digest/week/2026-11-09', explore)).toBe(false)
+    expect(isNavGroupActive('/digest/2026-11-13/slug', explore)).toBe(true)
   })
 })
 

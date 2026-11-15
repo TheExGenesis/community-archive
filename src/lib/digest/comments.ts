@@ -52,10 +52,6 @@ export const resolveCommenterIdentity = (user: User) => {
   return { username, displayName }
 }
 
-/**
- * Confirms the edition exists and is published. Returns an error response
- * instead when the id is malformed, unknown, or not yet public.
- */
 export type DigestCommentKind = 'daily' | 'weekly'
 
 /** Edition and comment tables for each kind of digest. */
@@ -67,29 +63,89 @@ export const DIGEST_COMMENT_TABLES = {
   },
 } as const
 
-export async function ensurePublishedEdition(
+/**
+ * The editions a discussion thread reads from and the one new comments are
+ * written to. A daily thread is its edition. A weekly thread is the whole
+ * week: the week-so-far edition is replaced (archived) every morning and the
+ * final edition then archives the last one, so the thread gathers every
+ * public edition of that week and writes to the newest open one.
+ */
+export interface DigestCommentThread {
+  editionIds: string[]
+  writeTo: string
+  /** The week a weekly thread belongs to. */
+  weekStart?: string
+}
+
+type WeeklyThreadRow = { id: string; status: string; week_start: string }
+
+// Statuses a reader may have seen a weekly edition in. Comments are only ever
+// written to `published` or `in_progress` rows; `archived` keeps the threads
+// of superseded week-so-far rows.
+const WEEKLY_THREAD_STATUSES = ['in_progress', 'archived', 'published']
+
+/** Pick the edition a week's new comments go to: the final edition once it
+ *  exists, otherwise the running week-so-far edition. */
+export function weeklyThreadFromRows(
+  rows: WeeklyThreadRow[],
+): DigestCommentThread | null {
+  const open =
+    rows.find((row) => row.status === 'published') ??
+    rows.find((row) => row.status === 'in_progress')
+  return open
+    ? {
+        editionIds: rows.map((row) => row.id),
+        writeTo: open.id,
+        weekStart: open.week_start,
+      }
+    : null
+}
+
+/**
+ * Resolves the thread for an edition id, or an error response when the id is
+ * malformed, unknown, or not public.
+ */
+export async function resolveCommentThread(
   editionId: string,
   kind: DigestCommentKind = 'daily',
-): Promise<{ error: NextResponse } | { ok: true }> {
+): Promise<{ error: NextResponse } | { thread: DigestCommentThread }> {
   const notFound = {
     error: NextResponse.json({ error: 'Edition not found' }, { status: 404 }),
   }
-  if (!UUID_PATTERN.test(editionId)) return notFound
-
-  const admin = createDigestAdminClient()
-  const { data: edition, error } = await admin
-    .from(DIGEST_COMMENT_TABLES[kind].editions)
-    .select('id,status')
-    .eq('id', editionId)
-    .maybeSingle()
-
-  if (error) {
-    console.error('Digest comment edition lookup failed:', error.message)
+  const failed = (message: string) => {
+    console.error('Digest comment edition lookup failed:', message)
     return {
       error: NextResponse.json({ error: 'Lookup failed' }, { status: 500 }),
     }
   }
-  if (!edition || edition.status !== 'published') return notFound
+  if (!UUID_PATTERN.test(editionId)) return notFound
 
-  return { ok: true }
+  const admin = createDigestAdminClient()
+  if (kind === 'daily') {
+    const { data: edition, error } = await admin
+      .from(DIGEST_COMMENT_TABLES.daily.editions)
+      .select('id,status')
+      .eq('id', editionId)
+      .maybeSingle()
+    if (error) return failed(error.message)
+    if (!edition || edition.status !== 'published') return notFound
+    return { thread: { editionIds: [editionId], writeTo: editionId } }
+  }
+
+  const weekly = () => admin.from(DIGEST_COMMENT_TABLES.weekly.editions)
+  const { data: edition, error } = await weekly()
+    .select('id,status,week_start')
+    .eq('id', editionId)
+    .maybeSingle()
+  if (error) return failed(error.message)
+  const row: WeeklyThreadRow | null = edition
+  if (!row || !WEEKLY_THREAD_STATUSES.includes(row.status)) return notFound
+
+  const { data: rows, error: weekError } = await weekly()
+    .select('id,status,week_start')
+    .eq('week_start', row.week_start)
+    .in('status', WEEKLY_THREAD_STATUSES)
+  if (weekError) return failed(weekError.message)
+  const thread = weeklyThreadFromRows(rows ?? [])
+  return thread ? { thread } : notFound
 }

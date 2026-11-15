@@ -14,13 +14,21 @@ describe('weeklyThreadFromRows', () => {
         row('tue', 'archived'),
         row('wed', 'in_progress'),
       ]),
-    ).toEqual({ editionIds: ['mon', 'tue', 'wed'], writeTo: 'wed' })
+    ).toEqual({
+      editionIds: ['mon', 'tue', 'wed'],
+      writeTo: 'wed',
+      weekStart: '2026-11-09',
+    })
   })
 
   test('writes to the final edition once the week is published', () => {
     expect(
       weeklyThreadFromRows([row('wed', 'archived'), row('final', 'published')]),
-    ).toEqual({ editionIds: ['wed', 'final'], writeTo: 'final' })
+    ).toEqual({
+      editionIds: ['wed', 'final'],
+      writeTo: 'final',
+      weekStart: '2026-11-09',
+    })
   })
 
   test('has no thread when no edition of the week is open', () => {

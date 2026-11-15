@@ -8,6 +8,7 @@ import {
   WeeklyBulletin,
   WeeklyCalendar,
   WeeklyDiscussion,
+  WeeklyReactions,
   WeeklySubscriberCount,
 } from '@/components/digest/WeeklyEngagement'
 import { WeeklyProfiles } from '@/components/digest/WeeklyProfiles'
@@ -74,7 +75,12 @@ export default async function WeeklyDigestPage({
       bulletin={<WeeklyBulletin edition={edition} />}
       comments={<WeeklyDiscussion edition={edition} />}
       calendar={<WeeklyCalendar edition={edition} />}
-      subscribers={<WeeklySubscriberCount />}
+      subscribers={
+        <>
+          <WeeklyReactions edition={edition} />
+          <WeeklySubscriberCount />
+        </>
+      }
       weekSoFarLink={Boolean(soFar && soFar.weekStart > edition.weekStart)}
     />
   )

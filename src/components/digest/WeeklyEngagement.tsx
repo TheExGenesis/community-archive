@@ -7,6 +7,8 @@ import { BulletinItems } from './PublishedDigestView'
 import { DigestDaySelector } from './DigestDaySelector'
 import { getActiveDigestSubscriberCount } from '@/lib/digest/emailSubscriptions'
 import { WeeklyComments } from './WeeklyComments'
+import { DigestViewCount } from './DigestViewCount'
+import { LikeButton } from '@/components/engagement/LikeButton'
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -98,6 +100,27 @@ async function SubscriberCount() {
     // A failed count must not break the week or look like zero subscribers.
     return null
   }
+}
+
+/**
+ * Like button and view count for the week. Both belong to the week, so every
+ * edition of it shares them; the button hydrates its count and the viewer's
+ * state from the API, keeping the page itself cacheable.
+ */
+export function WeeklyReactions({ edition }: { edition: WeeklyDigestEdition }) {
+  // Local sample editions have no database row.
+  if (!UUID_PATTERN.test(edition.id)) return null
+  const endpoint = `/api/digest/week/${edition.id}`
+  return (
+    <>
+      <LikeButton endpoint={endpoint} noun="week" initialCount={0} />
+      <DigestViewCount
+        key={edition.weekStart}
+        editionId={edition.id}
+        endpoint={endpoint}
+      />
+    </>
+  )
 }
 
 /** Weekly-list subscriber count for the header row. */

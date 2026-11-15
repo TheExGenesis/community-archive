@@ -8,6 +8,7 @@ import {
   WeeklyBulletin,
   WeeklyCalendar,
   WeeklyDiscussion,
+  WeeklyReactions,
   WeeklySubscriberCount,
 } from '@/components/digest/WeeklyEngagement'
 import {
@@ -80,7 +81,12 @@ function FinalWeek({
       bulletin={<WeeklyBulletin edition={edition} />}
       comments={<WeeklyDiscussion edition={edition} />}
       calendar={<WeeklyCalendar edition={edition} />}
-      subscribers={<WeeklySubscriberCount />}
+      subscribers={
+        <>
+          <WeeklyReactions edition={edition} />
+          <WeeklySubscriberCount />
+        </>
+      }
     />
   )
 }
@@ -104,7 +110,12 @@ export default async function LatestWeeklyDigestPage() {
         bulletin={<WeeklyBulletin edition={running} />}
         comments={<WeeklyDiscussion edition={running} />}
         calendar={<WeeklyCalendar edition={running} />}
-        subscribers={<WeeklySubscriberCount />}
+        subscribers={
+          <>
+            <WeeklyReactions edition={running} />
+            <WeeklySubscriberCount />
+          </>
+        }
         changes={changes}
         changeDay={
           running.content.throughDate ??

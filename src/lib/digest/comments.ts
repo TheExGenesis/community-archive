@@ -73,6 +73,8 @@ export const DIGEST_COMMENT_TABLES = {
 export interface DigestCommentThread {
   editionIds: string[]
   writeTo: string
+  /** The week a weekly thread belongs to. */
+  weekStart?: string
 }
 
 type WeeklyThreadRow = { id: string; status: string; week_start: string }
@@ -91,7 +93,11 @@ export function weeklyThreadFromRows(
     rows.find((row) => row.status === 'published') ??
     rows.find((row) => row.status === 'in_progress')
   return open
-    ? { editionIds: rows.map((row) => row.id), writeTo: open.id }
+    ? {
+        editionIds: rows.map((row) => row.id),
+        writeTo: open.id,
+        weekStart: open.week_start,
+      }
     : null
 }
 

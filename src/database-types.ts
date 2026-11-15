@@ -466,6 +466,34 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"digest_weekly_likes": {
+                  Row: {
+                    "created_at": string,"id": string,"user_id": string,"week_start": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"user_id": string,"week_start": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"user_id"?: string,"week_start"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"digest_weekly_views": {
+                  Row: {
+                    "view_count": number,"week_start": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "view_count"?: number,"week_start": string
+                  }
+                  Update: {
+                    "view_count"?: number,"week_start"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"directory_hidden_users": {
                   Row: {
                     "account_id": string | null,"hidden_at": string,"hidden_by": string | null,"username": string,"visibility_key": string
@@ -1500,6 +1528,9 @@ isOneToOne: false
       } },
 "record_digest_view":
 { Args: { "p_edition_id": string }; Returns: number
+                           },
+"record_digest_weekly_view":
+{ Args: { "p_week_start": string }; Returns: number
                            },
 "refresh_global_activity_summary":
 { Args: Record<PropertyKey, never>; Returns: undefined

@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,6 +15,7 @@ import {
   LIBRARY_SORTS,
   libraryShard,
   libraryShardUrl,
+  libraryTweetToPortal,
   selectWorks,
   yearSpan,
   type LibraryData,
@@ -23,6 +25,10 @@ import {
   type LibraryWork,
 } from '@/lib/library'
 import { captureProductAction } from '@/lib/productAnalytics'
+import { libraryCoverSrc } from '@/lib/libraryCover'
+import { userProfileHref } from '@/lib/navigation'
+import { TweetCard } from '@/components/TweetCard'
+import { TweetAvatar } from '@/components/TweetAvatar'
 
 const PAGE = 60
 const KIND_LABEL = Object.fromEntries(LIBRARY_KINDS.map(([k, , one]) => [k, one]))
@@ -71,7 +77,7 @@ export function LibraryHome() {
         <p className="mt-2 text-muted-foreground">
           What the archive keeps passing around: essays, books, films, videos
           and papers that at least {data?.minMembers ?? 3} members tweeted
-          about. The number beside each work is how many members did.
+          about.
         </p>
       </header>
 
@@ -138,10 +144,10 @@ export function LibraryHome() {
 
       {data && filters.sort === 'characteristic' && (
         <p className="mb-3 text-xs text-muted-foreground">
-          Books, films and ideas come first when members mention them far
-          more than their Wikipedia fame predicts (at least{' '}
-          {CHARACTERISTIC_MIN_MEMBERS} members). Everything else follows by
-          member count.
+          Each kind is ranked on its own and the kinds are mixed. Books, films
+          and ideas rank by how much more members mention them than their
+          Wikipedia fame predicts (at least {CHARACTERISTIC_MIN_MEMBERS}{' '}
+          members); everything else by member count.
         </p>
       )}
 
@@ -202,8 +208,10 @@ export function LibraryHome() {
           Essays, papers, ideas, sites, code and music are found by link: a work
           is listed when at least three members tweeted the same page. Books
           and films are found by name, because members rarely link them. A
-          title counts once members have written it out with its author or
-          year and Open Library or Wikipedia confirms it. No AI model reads the
+          title is found once members have written it out with its author or
+          year and Open Library or Wikipedia confirms it. A short title then
+          counts only beside its author or year, unless Wikipedia gives that
+          title to the book itself (Impro, Neuromancer). No AI model reads the
           tweets.
         </p>
         <p>
@@ -235,11 +243,9 @@ function WorkRow({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="group grid w-full grid-cols-[2.75rem_minmax(0,1fr)_auto] items-baseline gap-3 px-1 py-3 text-left sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] sm:gap-4"
+        className="group grid w-full grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 px-1 py-3 text-left sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:gap-4"
       >
-        <span className="text-right text-xl font-semibold tabular-nums leading-tight">
-          {w.n}
-        </span>
+        <Cover work={w} />
         <span className="min-w-0">
           <span className="block break-words text-base font-medium leading-snug group-hover:underline sm:text-lg">
             {w.t}
@@ -250,6 +256,7 @@ function WorkRow({
             </span>
             {w.s && <span className="break-words">{w.s}</span>}
             <span className="tabular-nums">
+              {w.n.toLocaleString()} {w.n === 1 ? 'member' : 'members'} ·{' '}
               {w.tw.toLocaleString()} tweets · {yearSpan(w)}
             </span>
           </span>
@@ -260,6 +267,48 @@ function WorkRow({
       </button>
       {open && <WorkDetail work={w} shards={shards} />}
     </>
+  )
+}
+
+const PORTRAIT = new Set(['book', 'film'])
+
+// Drawn covers for works without a picture: one tint per kind, each with a
+// dark-theme pair so the title keeps its contrast.
+const COVER_TINT: Record<string, string> = {
+  essay: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
+  paper: 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200',
+  site: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
+  code: 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200',
+  wiki: 'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200',
+  book: 'bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-200',
+  film: 'bg-zinc-800 text-zinc-100 dark:bg-zinc-900 dark:text-zinc-200',
+}
+
+function Cover({ work: w }: { work: LibraryWork }) {
+  const [broken, setBroken] = useState(false)
+  const shape = PORTRAIT.has(w.k) ? 'aspect-[2/3] w-10 sm:w-12' : 'aspect-[16/10] w-full'
+  return (
+    <span
+      className={`relative mx-auto block overflow-hidden rounded-[3px] border border-border/60 ${shape}`}
+      aria-hidden="true"
+    >
+      {w.im && !broken ? (
+        <Image
+          src={libraryCoverSrc(w.id, w.im)}
+          alt=""
+          fill
+          sizes="72px"
+          className="object-cover"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <span
+          className={`flex h-full w-full items-end p-1 font-serif text-[0.5rem] font-medium leading-[1.15] sm:text-[0.55rem] ${COVER_TINT[w.k] ?? 'bg-muted text-muted-foreground'}`}
+        >
+          <span className="line-clamp-3 break-words">{w.t}</span>
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -299,7 +348,7 @@ function WorkDetail({ work: w, shards }: { work: LibraryWork; shards: number }) 
   const more = detail ? w.n - Math.min(detail.who.length, 24) : 0
 
   return (
-    <div className="space-y-3 pb-5 pl-1 pr-1 sm:pl-[4.75rem]">
+    <div className="space-y-3 pb-5 pl-1 pr-1 sm:pl-[5.75rem]">
       {w.d && <p className="text-sm text-muted-foreground">{w.d}</p>}
       {internal ? (
         <Link href={w.u} className={linkClass}>
@@ -327,26 +376,44 @@ function WorkDetail({ work: w, shards }: { work: LibraryWork; shards: number }) 
       )}
       {detail && (
         <>
-          <p className="break-words text-sm text-muted-foreground">
-            Tweeted by{' '}
-            {detail.who.slice(0, 24).map((u) => `@${u}`).join(', ')}
-            {more > 0 && ` and ${more} more`}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="flex -space-x-1.5" aria-hidden="true">
+              {detail.who.slice(0, 12).map((u, i) => (
+                <span key={u} className="rounded-full ring-2 ring-background">
+                  <TweetAvatar
+                    tweet={{ id: `who-${u}`, username: u, avatar: detail.wa?.[i] || null }}
+                    size={24}
+                  />
+                </span>
+              ))}
+            </span>
+            <p className="min-w-0 break-words text-sm text-muted-foreground">
+              Tweeted by{' '}
+              {detail.who.slice(0, 24).map((u, i) => (
+                <span key={u}>
+                  {i > 0 && ', '}
+                  <Link href={userProfileHref(u)} className="hover:underline">
+                    @{u}
+                  </Link>
+                </span>
+              ))}
+              {more > 0 && ` and ${more} more`}
+            </p>
+          </div>
           <ul className="space-y-2">
             {detail.top.map((t) => (
               <li
                 key={t.i}
-                className="rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+                className="overflow-hidden rounded-xl border border-border bg-card"
               >
-                <div className="mb-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">@{t.u}</span>
-                  <span>{new Date(t.c * 1000).toISOString().slice(0, 10)}</span>
-                  <span className="tabular-nums">{t.f.toLocaleString()} likes</span>
-                  <Link href={`/tweets/${t.i}`} className="underline">
-                    Open tweet
-                  </Link>
-                </div>
-                <p className="whitespace-pre-wrap break-words">{t.x}</p>
+                <TweetCard
+                  tweet={libraryTweetToPortal(t)}
+                  compact
+                  constrainMedia
+                  showDate
+                  showExternalLink
+                  quotedTweetDisplay="summary"
+                />
               </li>
             ))}
           </ul>

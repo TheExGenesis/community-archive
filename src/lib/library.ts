@@ -1,5 +1,7 @@
 /** Data contract and list logic for /library (CA Library). */
 
+import type { PortalMedia, PortalTweet } from '@/lib/portal/types'
+
 export const LIBRARY_DATA_URL = '/api/library'
 export const libraryShardUrl = (n: number) => `/api/library/shard/${n}`
 
@@ -42,6 +44,11 @@ export interface LibraryWork {
    * sort. Only books, films and ideas with a matching page have it.
    */
   v?: number
+  /**
+   * Cover image from one of the hosts in next.config.js images.remotePatterns
+   * (the worker's COVER_HOSTS). Works without one get a drawn cover.
+   */
+  im?: string
 }
 
 export interface LibraryData {
@@ -55,15 +62,67 @@ export interface LibraryData {
 
 export interface LibraryTweet {
   i: string
+  /** Username, display name and avatar of the author. */
   u: string
+  n?: string
+  a?: string
+  /** Likes and retweets. */
   f: number
+  r?: number
+  /** Full text, and epoch seconds. */
   x: string
   c: number
+  /** Media as [url, type, width, height]. */
+  m?: [string, string, number, number][]
+  /** The tweet it quotes. */
+  q?: LibraryTweet
 }
 
 export interface LibraryDetail {
   who: string[]
+  /** Avatar beside each name in `who` ('' when unknown). */
+  wa?: string[]
   top: LibraryTweet[]
+}
+
+const media = (m: LibraryTweet['m']): PortalMedia[] =>
+  (m ?? []).map(([url, type, width, height]) => ({
+    url,
+    type,
+    width: width || undefined,
+    height: height || undefined,
+  }))
+
+/** A sampled tweet in the shape the site's TweetCard renders. */
+export function libraryTweetToPortal(t: LibraryTweet): PortalTweet {
+  const at = new Date(t.c * 1000).toISOString()
+  const q = t.q
+  return {
+    id: t.i,
+    username: t.u,
+    name: t.n || t.u,
+    avatar: t.a || null,
+    text: t.x,
+    createdAt: at,
+    observedAt: at,
+    likes: t.f,
+    rts: t.r ?? 0,
+    retweetCountAvailable: t.r !== undefined,
+    media: media(t.m),
+    quotedTweet: q
+      ? {
+          id: q.i,
+          username: q.u,
+          name: q.n || q.u,
+          avatar: q.a || null,
+          text: q.x,
+          createdAt: new Date(q.c * 1000).toISOString(),
+          likes: q.f,
+          rts: q.r ?? 0,
+          media: media(q.m),
+        }
+      : undefined,
+  }
 }
 
 /** Shelf order and labels: plural for the tabs, singular for a work's tag. */
@@ -168,16 +227,30 @@ export function selectWorks(
   )
   const members = (a: LibraryWork, b: LibraryWork) => b.n - a.n || b.l - a.l
   if (f.sort === 'characteristic') {
-    // Works with a fame measure rank by score; the rest follow by members.
+    // Rank each kind on its own: works with a fame measure by score, the
+    // rest by members. Then interleave kinds by relative position, so the top
+    // 1% of essays sits beside the top 1% of books. Members read far more
+    // books than the general public, so one ranking across kinds would be
+    // mostly books.
     const score = new Map(out.map((w) => [w.id, characteristicScore(w)]))
-    return out.sort((a, b) => {
+    const withinKind = (a: LibraryWork, b: LibraryWork) => {
       const sa = score.get(a.id) ?? null
       const sb = score.get(b.id) ?? null
       if (sa !== null && sb !== null) return sb - sa || members(a, b)
       if (sa !== null) return -1
       if (sb !== null) return 1
       return members(a, b)
+    }
+    const byKind = new Map<LibraryKind, LibraryWork[]>()
+    for (const w of out) byKind.set(w.k, [...(byKind.get(w.k) ?? []), w])
+    const position = new Map<string, number>()
+    byKind.forEach((list) => {
+      list.sort(withinKind)
+      list.forEach((w, i) => position.set(w.id, (i + 0.5) / list.length))
     })
+    return out.sort(
+      (a, b) => position.get(a.id)! - position.get(b.id)! || members(a, b),
+    )
   }
   const by: Record<
     Exclude<LibrarySort, 'characteristic'>,

@@ -37,6 +37,49 @@ export async function HomepageStats({
   )
 }
 
+/**
+ * New tweets and members in the last 24 hours, pinned to the hero's top-left
+ * corner. Reads the same cached summary as the hero line. Renders nothing when
+ * the gateway omits both deltas, so a failed read never shows an invented zero.
+ * Hidden below sm, where the title needs the hero's top padding.
+ */
+export async function HomepageGrowthCounter({
+  data,
+}: {
+  data: HomepageData['globalStats']
+}) {
+  const result = await data
+  if (result.failed) return null
+  const tweets = result.data.addedLast24Hours
+  const members = result.data.membersAddedLast24Hours ?? null
+  if (tweets == null && members == null) return null
+  const parts = [
+    tweets != null
+      ? `+${tweets.toLocaleString('en-US')} tweet${tweets === 1 ? '' : 's'}`
+      : null,
+    members != null
+      ? `+${members.toLocaleString('en-US')} member${members === 1 ? '' : 's'}`
+      : null,
+  ].filter(Boolean)
+  return (
+    <span
+      title="Added to the archive in the last 24 hours"
+      className="absolute left-4 top-3 hidden items-center gap-[7px] whitespace-nowrap rounded-full border border-border bg-background/70 px-2.5 py-1 text-[12px] text-muted-foreground backdrop-blur sm:left-6 sm:inline-flex"
+    >
+      <span
+        aria-hidden
+        className="h-[7px] w-[7px] flex-shrink-0 animate-pulse rounded-full bg-[#2acf80]"
+      />
+      <span className="tabular-nums">
+        <span className="font-semibold text-[#16a34a] dark:text-[#2acf80]">
+          {parts.join(' · ')}
+        </span>{' '}
+        in 24h
+      </span>
+    </span>
+  )
+}
+
 export async function HomepageDigest() {
   const preview = await measureServerRead(
     'homepage.digest',

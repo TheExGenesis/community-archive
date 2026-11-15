@@ -5,6 +5,7 @@ import {
   HomepageResearch,
   HomepageTrends,
   HomepageDigest,
+  HomepageGrowthCounter,
 } from './HomepageDataSections'
 import { getLatestDigestPreview } from '@/lib/digest/data'
 
@@ -67,4 +68,31 @@ test('rounds compact headline totals down to reached milestones', async () => {
   )
   expect(screen.getByText('1.6K community members')).toBeInTheDocument()
   expect(screen.getByText('21.6M public tweets')).toBeInTheDocument()
+})
+
+test('shows 24h tweet and member growth', async () => {
+  const { container } = render(
+    await HomepageGrowthCounter({ data: growthStats() }),
+  )
+  expect(container).toHaveTextContent('+668,600 tweets · +259 members in 24h')
+})
+
+test('growth counter omits missing deltas and hides on failure', async () => {
+  const { container } = render(
+    await HomepageGrowthCounter({
+      data: growthStats({ membersAddedLast24Hours: null }),
+    }),
+  )
+  expect(container).toHaveTextContent('+668,600 tweets in 24h')
+  expect(
+    await HomepageGrowthCounter({
+      data: growthStats({
+        addedLast24Hours: null,
+        membersAddedLast24Hours: null,
+      }),
+    }),
+  ).toBeNull()
+  expect(
+    await HomepageGrowthCounter({ data: growthStats({}, true) }),
+  ).toBeNull()
 })

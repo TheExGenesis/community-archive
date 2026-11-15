@@ -498,7 +498,7 @@ export function WeeklyDigestView({
   return (
     <Page content={content} profiles={profiles}>
       <div>
-        <header className="max-w-[880px]">
+        <header>
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
             <div className={sectionLabel}>
               {soFar ? 'The Week So Far' : 'The Week in Review'}
@@ -509,33 +509,42 @@ export function WeeklyDigestView({
               weekSoFar={weekSoFarLink}
             />
           </div>
-          <h1
-            className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.01em] sm:text-[52px]"
-            style={SERIF}
-          >
-            {range}
-          </h1>
-          {content.dek ? (
-            <p
-              className="mt-4 max-w-[46ch] text-[21px] italic leading-[1.4] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300 sm:text-[24px]"
-              style={SERIF}
-            >
-              {content.dek}
-            </p>
-          ) : null}
-          <p className={`mt-4 text-sm ${MUTED}`}>
-            {soFar && content.throughDate
-              ? `Through ${dayLabel(content.throughDate, { weekday: 'long', day: 'numeric', month: 'long' })}, updated each morning. `
-              : ''}
-            Woven from {content.source.editionDates.length} daily{' '}
-            {content.source.editionDates.length === 1 ? 'edition' : 'editions'}
-            {content.source.missingDates.length > 0
-              ? ` (no edition on ${content.source.missingDates
-                  .map((date) => dayLabel(date, { weekday: 'long' }))
-                  .join(', ')})`
-              : ''}
-            .
-          </p>
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
+            <div className="min-w-0 max-w-[880px]">
+              <h1
+                className="mt-5 text-[38px] font-semibold leading-[1.05] tracking-[-0.01em] sm:text-[52px]"
+                style={SERIF}
+              >
+                {range}
+              </h1>
+              {content.dek ? (
+                <p
+                  className="mt-4 max-w-[46ch] text-[21px] italic leading-[1.4] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300 sm:text-[24px]"
+                  style={SERIF}
+                >
+                  {content.dek}
+                </p>
+              ) : null}
+              <p className={`mt-4 text-sm ${MUTED}`}>
+                {soFar && content.throughDate
+                  ? `Through ${dayLabel(content.throughDate, { weekday: 'long', day: 'numeric', month: 'long' })}, updated each morning. `
+                  : ''}
+                Woven from {content.source.editionDates.length} daily{' '}
+                {content.source.editionDates.length === 1
+                  ? 'edition'
+                  : 'editions'}
+                {content.source.missingDates.length > 0
+                  ? ` (no edition on ${content.source.missingDates
+                      .map((date) => dayLabel(date, { weekday: 'long' }))
+                      .join(', ')})`
+                  : ''}
+                .
+              </p>
+            </div>
+            <div className="shrink-0 lg:pt-6">
+              <DigestSubscribeButton placement="home" list="weekly" />
+            </div>
+          </div>
         </header>
         <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
         <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />

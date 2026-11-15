@@ -593,9 +593,14 @@ export function WeeklyDigestView({
               </p>
             </div>
             <div className="shrink-0 lg:pt-6">
-              <DigestSubscribeButton placement="home" list="weekly" />
+              <DigestSubscribeButton
+                placement="home"
+                list="weekly"
+                hideWhenSubscribed
+              />
             </div>
           </div>
+          <DigestSubscribeButton placement="digest" list="weekly" />
         </header>
         <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
         <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />

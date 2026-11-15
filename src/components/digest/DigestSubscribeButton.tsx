@@ -48,9 +48,11 @@ const pillClasses =
 function SubscribeControl({
   placement,
   list,
+  hideWhenSubscribed,
 }: {
   placement: Placement
   list: List
+  hideWhenSubscribed: boolean
 }) {
   const copy = LIST_COPY[list]
   // Nullable outside the app router (e.g. bare jsdom renders).
@@ -61,6 +63,7 @@ function SubscribeControl({
     null,
   )
   const [message, setMessage] = useState<string | null>(null)
+  const [subscribedOnLoad, setSubscribedOnLoad] = useState(false)
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -89,6 +92,7 @@ function SubscribeControl({
           typeof body.email === 'string'
         ) {
           setSubscription({ id: body.id, email: body.email })
+          setSubscribedOnLoad(true)
           setPhase('done')
         } else {
           setPhase(startsWithEmailField ? 'open' : 'idle')
@@ -182,6 +186,7 @@ function SubscribeControl({
         )
       }
       setSubscription(null)
+      setSubscribedOnLoad(false)
       setPhase(startsWithEmailField ? 'open' : 'idle')
       setMessage('Unsubscribed ✓')
     } catch (cause) {
@@ -195,6 +200,8 @@ function SubscribeControl({
   }
 
   if (phase === 'done' || phase === 'unsubscribing') {
+    // Another control on the page already shows existing subscribers.
+    if (hideWhenSubscribed && subscribedOnLoad) return null
     const control = (
       <div className="flex flex-wrap items-center gap-2">
         {subscription ? (
@@ -349,10 +356,16 @@ function SubscribeControl({
 export function DigestSubscribeButton({
   placement = 'compact',
   list = 'daily',
+  hideWhenSubscribed = false,
 }: {
   placement?: Placement
   /** Which email list this control subscribes to. */
   list?: List
+  /**
+   * Render nothing for viewers already subscribed when the page loads, for a
+   * second control on a page whose main one shows the subscribed state.
+   */
+  hideWhenSubscribed?: boolean
 }) {
   return (
     // useSearchParams needs a Suspense boundary on statically rendered pages.
@@ -363,7 +376,11 @@ export function DigestSubscribeButton({
         )
       }
     >
-      <SubscribeControl placement={placement} list={list} />
+      <SubscribeControl
+        placement={placement}
+        list={list}
+        hideWhenSubscribed={hideWhenSubscribed}
+      />
     </Suspense>
   )
 }

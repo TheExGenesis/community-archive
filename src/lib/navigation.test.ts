@@ -33,14 +33,14 @@ describe('site navigation', () => {
     expect(navAnalyticsDestination('/community')).toBe('community')
   })
 
-  it('leads with Home and the digest, then Explore, Community, Tools, Research', () => {
+  it('leads with Home and the digest, then Explore, Tools, Community, Research', () => {
     const nav = getPrimaryNav()
     expect(nav.map((entry) => entry.label)).toEqual([
       'Home',
       'This Week',
       'Explore archive',
-      'Community',
       'Tools',
+      'Community',
       'Research',
     ])
     const menus = Object.fromEntries(
@@ -54,20 +54,18 @@ describe('site navigation', () => {
     expect(menus).toEqual({
       'Explore archive': [
         ["Today's Digest", '/digest'],
-        ['Ask the archive', '/search/ask'],
-        ['Explore by user', '/user-dir'],
-        ['Live Stream', '/stream'],
+        ['CA Library', '/library'],
       ],
       Tools: [
-        ['CA Tube', '/tube'],
-        ['CA Library', '/library'],
         ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
+        ['Ask the archive', '/search/ask'],
         ['Spread Explorer', '/spread-explorer'],
         ['More tools', '/more-tools'],
       ],
     })
     expect(getMoreTools().map((item) => [item.label, item.href])).toEqual([
+      ['CA Tube', '/tube'],
       ['Bangers', '/bangers?period=week'],
       ['Strands', '/strands'],
       ['Conversation Map', '/conversation-map'],
@@ -77,11 +75,21 @@ describe('site navigation', () => {
     expect(isNavGroupActive('/strands', tools)).toBe(true)
     expect(isNavGroupActive('/more-tools', tools)).toBe(true)
     expect(isNavGroupActive('/stream', tools)).toBe(false)
+    expect(isNavGroupActive('/tube', tools)).toBe(true)
+    const explore = nav
+      .filter(isNavGroup)
+      .find((g) => g.label === 'Explore archive')!
+    expect(isNavGroupActive('/stream', explore)).toBe(true)
+    expect(isNavGroupActive('/user-dir', explore)).toBe(true)
     expect(nav.slice(0, 2)).toEqual([
       { href: '/', label: 'Home' },
       { href: '/digest/week', label: 'This Week' },
     ])
-    expect(nav[3]).toEqual({ href: '/community', label: 'Community' })
+    expect(nav[4]).toEqual({
+      href: '/community',
+      label: 'Community',
+      preview: 'community',
+    })
     expect(nav[5]).toEqual({ href: '/research', label: 'Research' })
     for (const item of nav.filter(isNavGroup).flatMap((g) => g.items)) {
       expect(item.description).toMatch(/\.$/)

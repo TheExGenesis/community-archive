@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useRef, useState } from 'react'
@@ -18,6 +19,7 @@ import {
   NavItem,
 } from '@/lib/navigation'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { COMMUNITY_PROJECTS } from '@/lib/communityProjects'
 import { useNavigationAudience } from '@/components/NavigationAudience'
 
 const topLevelStyle =
@@ -126,6 +128,107 @@ function GroupMenu({
   )
 }
 
+// Static curated projects, so the menu costs no request or database read.
+const COMMUNITY_PREVIEW = COMMUNITY_PROJECTS.filter(
+  (p) => p.featured && p.image && p.projectUrl,
+).slice(0, 4)
+
+/** Community stays a link to the gallery; hovering it previews a few apps. */
+function CommunityMenu({
+  item,
+  pathname,
+  isOpen,
+  openedAt,
+}: {
+  item: NavItem
+  pathname: string
+  isOpen: boolean
+  openedAt: React.MutableRefObject<number>
+}) {
+  const isActive = isNavItemActive(pathname, item.href)
+  return (
+    <NavigationMenu.Item value={item.label} className="relative">
+      <NavigationMenu.Trigger
+        asChild
+        onClick={(event) => {
+          if (isOpen && Date.now() - openedAt.current < HOVER_CLICK_GRACE_MS) {
+            event.preventDefault()
+          }
+        }}
+      >
+        <Link
+          href={item.href}
+          onClick={() => trackClick(item.href, isActive)}
+          className={cn(
+            topLevelStyle,
+            'group data-[state=open]:bg-brand/5 data-[state=open]:text-brand-deep',
+            isActive && activeStyle,
+          )}
+        >
+          {item.label}
+          <ChevronDown
+            className="h-3.5 w-3.5 opacity-60 transition-transform duration-200 group-data-[state=open]:rotate-180"
+            aria-hidden="true"
+          />
+        </Link>
+      </NavigationMenu.Trigger>
+      <NavigationMenu.Content className="absolute right-0 top-full origin-top-right pt-2 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <div className="w-[30rem] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg shadow-black/5 dark:shadow-black/40">
+          <p className="px-1 pb-2.5 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Built by the community
+          </p>
+          <ul className="grid grid-cols-2 gap-2">
+            {COMMUNITY_PREVIEW.map((p) => (
+              <li key={p.slug}>
+                <NavigationMenu.Link asChild>
+                  <a
+                    href={p.projectUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => trackClick(item.href, isActive)}
+                    className="group/app block overflow-hidden rounded-lg border border-border transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+                  >
+                    <span className="relative block aspect-[1200/630] bg-muted">
+                      <Image
+                        src={p.image!}
+                        alt=""
+                        fill
+                        sizes="260px"
+                        className="object-cover"
+                      />
+                    </span>
+                    <span className="block px-2.5 py-2">
+                      <span className="block text-[13.5px] font-semibold leading-tight">
+                        {p.name}
+                      </span>
+                      <span className="mt-0.5 line-clamp-2 block text-[12px] leading-snug text-muted-foreground">
+                        {p.summary}
+                      </span>
+                    </span>
+                  </a>
+                </NavigationMenu.Link>
+              </li>
+            ))}
+          </ul>
+          <NavigationMenu.Link asChild active={isActive}>
+            <Link
+              href={item.href}
+              onClick={() => trackClick(item.href, isActive)}
+              className="mt-2 flex items-center justify-between rounded-lg px-2.5 py-2 text-[13px] font-semibold text-brand transition-colors hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+            >
+              <span>
+                {COMMUNITY_PROJECTS.length - COMMUNITY_PREVIEW.length}+ more
+                tools, experiments, research and games
+              </span>
+              <span aria-hidden="true">See all &rarr;</span>
+            </Link>
+          </NavigationMenu.Link>
+        </div>
+      </NavigationMenu.Content>
+    </NavigationMenu.Item>
+  )
+}
+
 export default function HeaderNavigation({
   entries,
   label,
@@ -154,6 +257,14 @@ export default function HeaderNavigation({
             <GroupMenu
               key={entry.label}
               group={entry}
+              pathname={pathname}
+              isOpen={openMenu === entry.label}
+              openedAt={openedAt}
+            />
+          ) : entry.preview === 'community' ? (
+            <CommunityMenu
+              key={entry.href}
+              item={entry}
               pathname={pathname}
               isOpen={openMenu === entry.label}
               openedAt={openedAt}

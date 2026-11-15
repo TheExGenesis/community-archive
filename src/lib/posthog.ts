@@ -86,6 +86,7 @@ const isDashboardDestination = isOneOf([
   'tool',
   'tools',
   'trends',
+  'user_directory',
 ])
 const isDashboardLinkSurface = isOneOf(['card', 'list', 'panel_header'])
 const isTweetCardAction = isOneOf([

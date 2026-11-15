@@ -5,6 +5,8 @@ import { isTwitterUsername } from './apiInputValidation'
 export interface NavItem {
   href: string
   label: string
+  /** On desktop, hovering the link opens a preview panel of this kind. */
+  preview?: 'community'
 }
 
 export function navAnalyticsDestination(href: string): string {
@@ -186,6 +188,12 @@ export const isNavGroup = (entry: NavEntry): entry is NavGroup =>
  */
 export const getMoreTools = (): NavMenuItem[] => [
   {
+    href: '/tube',
+    label: 'CA Tube',
+    description: 'YouTube videos the community keeps sharing.',
+    icon: 'tube',
+  },
+  {
     href: BANGERS_WEEK_HREF,
     label: 'Bangers',
     description: 'The best tweets of all time.',
@@ -217,8 +225,8 @@ export const WEEKLY_DIGEST_HREF = '/digest/week'
 
 /**
  * Single source of truth for site navigation: Home, This Week, the
- * archive menu (which leads with the daily digest), Community, the Tools menu
- * of first-party products, then Research — the same for every audience.
+ * archive menu (which leads with the daily digest), the Tools menu of
+ * first-party products, Community, then Research — the same for every audience.
  */
 export const getPrimaryNav = (): NavEntry[] => [
   { href: '/', label: 'Home' },
@@ -233,13 +241,15 @@ export const getPrimaryNav = (): NavEntry[] => [
         icon: 'daily',
       },
       {
-        href: '/search/ask',
-        label: 'Ask the archive',
+        href: '/library',
+        label: 'CA Library',
         description:
-          'Ask a question; an agent searches members’ tweets and cites them.',
-        icon: 'ask',
-        requiresAsk: true,
+          'Essays, books, films and papers the community keeps citing.',
+        icon: 'library',
       },
+    ],
+    // Reached from the homepage rather than the menu; they keep it active.
+    more: [
       {
         href: '/user-dir',
         label: 'Explore by user',
@@ -255,23 +265,9 @@ export const getPrimaryNav = (): NavEntry[] => [
       },
     ],
   },
-  { href: '/community', label: 'Community' },
   {
     label: 'Tools',
     items: [
-      {
-        href: '/tube',
-        label: 'CA Tube',
-        description: 'YouTube videos the community keeps sharing.',
-        icon: 'tube',
-      },
-      {
-        href: '/library',
-        label: 'CA Library',
-        description:
-          'Essays, books, films and papers the community keeps citing.',
-        icon: 'library',
-      },
       {
         href: '/bulletin',
         label: 'Bulletin Board',
@@ -285,6 +281,14 @@ export const getPrimaryNav = (): NavEntry[] => [
         icon: 'trends',
       },
       {
+        href: '/search/ask',
+        label: 'Ask the archive',
+        description:
+          'Agentic search: ask a question, and an AI searches members’ tweets and cites them.',
+        icon: 'ask',
+        requiresAsk: true,
+      },
+      {
         // Open to anyone with the link, but listed only for admins.
         href: '/spread-explorer',
         label: 'Spread Explorer',
@@ -295,12 +299,14 @@ export const getPrimaryNav = (): NavEntry[] => [
       {
         href: MORE_TOOLS_HREF,
         label: 'More tools',
-        description: 'Bangers, Strands, Conversation Map and Social Graph.',
+        description:
+          'CA Tube, Bangers, Strands, Conversation Map and Social Graph.',
         icon: 'more',
       },
     ],
     more: getMoreTools(),
   },
+  { href: '/community', label: 'Community', preview: 'community' },
   { href: '/research', label: 'Research' },
 ]
 

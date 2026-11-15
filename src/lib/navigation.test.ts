@@ -33,14 +33,14 @@ describe('site navigation', () => {
     expect(navAnalyticsDestination('/community')).toBe('community')
   })
 
-  it('leads with Home and the digest, then Explore, Community, Tools, Research', () => {
+  it('leads with Home and the digest, then Explore, Tools, Community, Research', () => {
     const nav = getPrimaryNav()
     expect(nav.map((entry) => entry.label)).toEqual([
       'Home',
       'This Week',
       'Explore archive',
-      'Community',
       'Tools',
+      'Community',
       'Research',
     ])
     const menus = Object.fromEntries(
@@ -54,12 +54,12 @@ describe('site navigation', () => {
     expect(menus).toEqual({
       'Explore archive': [
         ["Today's Digest", '/digest'],
-        ['Ask the archive', '/search/ask'],
         ['CA Library', '/library'],
       ],
       Tools: [
         ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
+        ['Ask the archive', '/search/ask'],
         ['Spread Explorer', '/spread-explorer'],
         ['More tools', '/more-tools'],
       ],
@@ -85,7 +85,7 @@ describe('site navigation', () => {
       { href: '/', label: 'Home' },
       { href: '/digest/week', label: 'This Week' },
     ])
-    expect(nav[3]).toEqual({
+    expect(nav[4]).toEqual({
       href: '/community',
       label: 'Community',
       preview: 'community',

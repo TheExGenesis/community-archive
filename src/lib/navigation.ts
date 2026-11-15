@@ -225,8 +225,8 @@ export const WEEKLY_DIGEST_HREF = '/digest/week'
 
 /**
  * Single source of truth for site navigation: Home, This Week, the
- * archive menu (which leads with the daily digest), Community, the Tools menu
- * of first-party products, then Research — the same for every audience.
+ * archive menu (which leads with the daily digest), the Tools menu of
+ * first-party products, Community, then Research — the same for every audience.
  */
 export const getPrimaryNav = (): NavEntry[] => [
   { href: '/', label: 'Home' },
@@ -239,14 +239,6 @@ export const getPrimaryNav = (): NavEntry[] => [
         label: "Today's Digest",
         description: 'What happened yesterday, in a few readable stories.',
         icon: 'daily',
-      },
-      {
-        href: '/search/ask',
-        label: 'Ask the archive',
-        description:
-          'Ask a question; an agent searches members’ tweets and cites them.',
-        icon: 'ask',
-        requiresAsk: true,
       },
       {
         href: '/library',
@@ -273,7 +265,6 @@ export const getPrimaryNav = (): NavEntry[] => [
       },
     ],
   },
-  { href: '/community', label: 'Community', preview: 'community' },
   {
     label: 'Tools',
     items: [
@@ -288,6 +279,14 @@ export const getPrimaryNav = (): NavEntry[] => [
         label: 'Trends',
         description: 'Discover what the community is talking about.',
         icon: 'trends',
+      },
+      {
+        href: '/search/ask',
+        label: 'Ask the archive',
+        description:
+          'Agentic search: ask a question, and an AI searches members’ tweets and cites them.',
+        icon: 'ask',
+        requiresAsk: true,
       },
       {
         // Open to anyone with the link, but listed only for admins.
@@ -307,6 +306,7 @@ export const getPrimaryNav = (): NavEntry[] => [
     ],
     more: getMoreTools(),
   },
+  { href: '/community', label: 'Community', preview: 'community' },
   { href: '/research', label: 'Research' },
 ]
 

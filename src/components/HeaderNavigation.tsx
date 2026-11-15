@@ -172,7 +172,7 @@ function CommunityMenu({
           />
         </Link>
       </NavigationMenu.Trigger>
-      <NavigationMenu.Content className="absolute left-0 top-full origin-top-left pt-2 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+      <NavigationMenu.Content className="absolute right-0 top-full origin-top-right pt-2 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
         <div className="w-[30rem] rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-lg shadow-black/5 dark:shadow-black/40">
           <p className="px-1 pb-2.5 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Built by the community

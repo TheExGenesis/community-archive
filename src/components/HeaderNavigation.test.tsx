@@ -12,7 +12,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 describe('HeaderNavigation', () => {
-  it('renders Home, the digest, Explore, Community, Tools, then Research', () => {
+  it('renders Home, the digest, Explore, Tools, Community, then Research', () => {
     render(<HeaderNavigation entries={getPrimaryNav()} label="Main" />)
 
     const nav = screen.getByRole('navigation', { name: 'Main' })
@@ -24,8 +24,8 @@ describe('HeaderNavigation', () => {
       'Home',
       'This Week',
       'Explore archive',
-      'Community',
       'Tools',
+      'Community',
       'Research',
     ])
     expect(screen.getByRole('link', { name: 'This Week' })).toHaveAttribute(

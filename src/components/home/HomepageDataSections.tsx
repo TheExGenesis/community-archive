@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from 'react'
+import { Suspense } from 'react'
 import { toTrendStoryLink, trendDateForTerms } from '@/lib/trendStories/core'
 import { getTrendStoriesForDateSafe } from '@/lib/trendStories/data'
 import { SectionReady } from '@/components/PagePerformance'
@@ -37,56 +37,34 @@ export async function HomepageStats({
   )
 }
 
-export type GrowthCounterPlacement =
-  | 'top-left'
-  | 'top-right'
-  | 'subline'
-  | 'trends'
-
-const GROWTH_PLACEMENT_CLASS: Record<GrowthCounterPlacement, string> = {
-  // The corners sit in the hero's top padding; below sm the title needs it.
-  'top-left': 'absolute left-4 top-3 hidden sm:inline-flex sm:left-6',
-  'top-right': 'absolute right-4 top-3 hidden sm:inline-flex sm:right-6',
-  subline: 'inline-flex',
-  // Half-width panel header: below lg it would push the title onto two lines.
-  trends: 'hidden lg:inline-flex',
-}
-
 /**
- * New tweets and members in the last 24 hours, from the same cached summary
- * as the hero line. Renders nothing when the gateway omits both deltas, so an
- * older gateway or a failed read never shows an invented zero.
+ * New tweets and members in the last 24 hours, pinned to the hero's top-left
+ * corner. Reads the same cached summary as the hero line. Renders nothing when
+ * the gateway omits both deltas, so a failed read never shows an invented zero.
+ * Hidden below sm, where the title needs the hero's top padding.
  */
 export async function HomepageGrowthCounter({
   data,
-  placement,
 }: {
   data: HomepageData['globalStats']
-  placement: GrowthCounterPlacement
 }) {
   const result = await data
   if (result.failed) return null
   const tweets = result.data.addedLast24Hours
   const members = result.data.membersAddedLast24Hours ?? null
   if (tweets == null && members == null) return null
-  const compact = placement === 'trends'
-  const count = (n: number) =>
-    compact ? formatNumber(n) : n.toLocaleString('en-US')
   const parts = [
-    tweets != null ? `+${count(tweets)} tweet${tweets === 1 ? '' : 's'}` : null,
+    tweets != null
+      ? `+${tweets.toLocaleString('en-US')} tweet${tweets === 1 ? '' : 's'}`
+      : null,
     members != null
-      ? `+${count(members)} member${members === 1 ? '' : 's'}`
+      ? `+${members.toLocaleString('en-US')} member${members === 1 ? '' : 's'}`
       : null,
   ].filter(Boolean)
   return (
     <span
-      data-growth-counter={placement}
       title="Added to the archive in the last 24 hours"
-      className={`${GROWTH_PLACEMENT_CLASS[placement]} items-center gap-[7px] whitespace-nowrap ${
-        compact
-          ? 'text-[11.5px] font-normal text-muted-foreground'
-          : 'rounded-full border border-border bg-background/70 px-2.5 py-1 text-[12px] text-muted-foreground backdrop-blur'
-      }`}
+      className="absolute left-4 top-3 hidden items-center gap-[7px] whitespace-nowrap rounded-full border border-border bg-background/70 px-2.5 py-1 text-[12px] text-muted-foreground backdrop-blur sm:left-6 sm:inline-flex"
     >
       <span
         aria-hidden
@@ -118,11 +96,9 @@ export async function HomepageDigest() {
 export async function HomepageTrends({
   data,
   isMember,
-  titleAside,
 }: {
   data: HomepageData['trends']
   isMember: boolean
-  titleAside?: ReactNode
 }) {
   const result = await data
   const stories = result.failed
@@ -134,7 +110,6 @@ export async function HomepageTrends({
       failed={result.failed}
       isMember={isMember}
       stories={stories.map(toTrendStoryLink)}
-      titleAside={titleAside}
     />
   )
 }
@@ -184,18 +159,7 @@ export function HomepagePortal({
       }
       trends={
         <Suspense fallback={<SectionLoading label="trending terms" />}>
-          <HomepageTrends
-            data={data.trends}
-            isMember={isMember}
-            titleAside={
-              <Suspense fallback={null}>
-                <HomepageGrowthCounter
-                  data={data.globalStats}
-                  placement="trends"
-                />
-              </Suspense>
-            }
-          />
+          <HomepageTrends data={data.trends} isMember={isMember} />
         </Suspense>
       }
       research={

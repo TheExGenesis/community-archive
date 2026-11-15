@@ -70,22 +70,17 @@ test('rounds compact headline totals down to reached milestones', async () => {
   expect(screen.getByText('21.6M public tweets')).toBeInTheDocument()
 })
 
-test('shows 24h tweet and member growth, compact in the trends header', async () => {
-  const { container, rerender } = render(
-    await HomepageGrowthCounter({ data: growthStats(), placement: 'subline' }),
+test('shows 24h tweet and member growth', async () => {
+  const { container } = render(
+    await HomepageGrowthCounter({ data: growthStats() }),
   )
   expect(container).toHaveTextContent('+668,600 tweets · +259 members in 24h')
-  rerender(
-    await HomepageGrowthCounter({ data: growthStats(), placement: 'trends' }),
-  )
-  expect(container).toHaveTextContent('+668.6K tweets · +259 members in 24h')
 })
 
 test('growth counter omits missing deltas and hides on failure', async () => {
   const { container } = render(
     await HomepageGrowthCounter({
       data: growthStats({ membersAddedLast24Hours: null }),
-      placement: 'top-left',
     }),
   )
   expect(container).toHaveTextContent('+668,600 tweets in 24h')
@@ -95,13 +90,9 @@ test('growth counter omits missing deltas and hides on failure', async () => {
         addedLast24Hours: null,
         membersAddedLast24Hours: null,
       }),
-      placement: 'top-right',
     }),
   ).toBeNull()
   expect(
-    await HomepageGrowthCounter({
-      data: growthStats({}, true),
-      placement: 'subline',
-    }),
+    await HomepageGrowthCounter({ data: growthStats({}, true) }),
   ).toBeNull()
 })

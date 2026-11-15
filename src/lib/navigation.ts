@@ -241,6 +241,12 @@ export const getPrimaryNav = (): NavEntry[] => [
         icon: 'daily',
       },
       {
+        href: '/bulletin',
+        label: 'Bulletin Board',
+        description: 'Asks, offers, and opportunities across the community.',
+        icon: 'bulletin',
+      },
+      {
         href: '/library',
         label: 'CA Library',
         description:
@@ -269,24 +275,18 @@ export const getPrimaryNav = (): NavEntry[] => [
     label: 'Tools',
     items: [
       {
-        href: '/bulletin',
-        label: 'Bulletin Board',
-        description: 'Asks, offers, and opportunities across the community.',
-        icon: 'bulletin',
-      },
-      {
-        href: '/trends',
-        label: 'Trends',
-        description: 'Discover what the community is talking about.',
-        icon: 'trends',
-      },
-      {
         href: '/search/ask',
         label: 'Ask the archive',
         description:
           'Agentic search: ask a question, and an AI searches members’ tweets and cites them.',
         icon: 'ask',
         requiresAsk: true,
+      },
+      {
+        href: '/trends',
+        label: 'Trends',
+        description: 'Discover what the community is talking about.',
+        icon: 'trends',
       },
       {
         // Open to anyone with the link, but listed only for admins.

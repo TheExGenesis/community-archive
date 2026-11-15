@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCallback, useRef, useState } from 'react'
 import * as NavigationMenu from '@radix-ui/react-navigation-menu'
-import { ChevronDown } from 'lucide-react'
+import { ArrowUpRight, ChevronDown } from 'lucide-react'
 import NavIcon from '@/components/NavIcon'
 import { cn } from '@/utils/tailwind'
 import {
@@ -231,8 +231,13 @@ function CommunityMenu({
                       )}
                     </span>
                     <span className="block px-2.5 py-2">
-                      <span className="block text-[13.5px] font-semibold leading-tight">
+                      <span className="flex items-center gap-1 text-[13.5px] font-semibold leading-tight">
                         {p.name}
+                        <ArrowUpRight
+                          className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors group-hover/app:text-brand"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">(opens in a new tab)</span>
                       </span>
                       <span className="mt-0.5 line-clamp-2 block text-[12px] leading-snug text-muted-foreground">
                         {p.summary}

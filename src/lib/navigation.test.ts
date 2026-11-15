@@ -54,12 +54,12 @@ describe('site navigation', () => {
     expect(menus).toEqual({
       'Explore archive': [
         ["Today's Digest", '/digest'],
+        ['Bulletin Board', '/bulletin'],
         ['CA Library', '/library'],
       ],
       Tools: [
-        ['Bulletin Board', '/bulletin'],
-        ['Trends', '/trends'],
         ['Ask the archive', '/search/ask'],
+        ['Trends', '/trends'],
         ['Spread Explorer', '/spread-explorer'],
         ['More tools', '/more-tools'],
       ],

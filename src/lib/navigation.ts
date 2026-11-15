@@ -5,6 +5,8 @@ import { isTwitterUsername } from './apiInputValidation'
 export interface NavItem {
   href: string
   label: string
+  /** On desktop, hovering the link opens a preview panel of this kind. */
+  preview?: 'community'
 }
 
 export function navAnalyticsDestination(href: string): string {
@@ -186,6 +188,12 @@ export const isNavGroup = (entry: NavEntry): entry is NavGroup =>
  */
 export const getMoreTools = (): NavMenuItem[] => [
   {
+    href: '/tube',
+    label: 'CA Tube',
+    description: 'YouTube videos the community keeps sharing.',
+    icon: 'tube',
+  },
+  {
     href: BANGERS_WEEK_HREF,
     label: 'Bangers',
     description: 'The best tweets of all time.',
@@ -241,6 +249,16 @@ export const getPrimaryNav = (): NavEntry[] => [
         requiresAsk: true,
       },
       {
+        href: '/library',
+        label: 'CA Library',
+        description:
+          'Essays, books, films and papers the community keeps citing.',
+        icon: 'library',
+      },
+    ],
+    // Reached from the homepage rather than the menu; they keep it active.
+    more: [
+      {
         href: '/user-dir',
         label: 'Explore by user',
         description: 'Browse people and their archived tweets.',
@@ -255,23 +273,10 @@ export const getPrimaryNav = (): NavEntry[] => [
       },
     ],
   },
-  { href: '/community', label: 'Community' },
+  { href: '/community', label: 'Community', preview: 'community' },
   {
     label: 'Tools',
     items: [
-      {
-        href: '/tube',
-        label: 'CA Tube',
-        description: 'YouTube videos the community keeps sharing.',
-        icon: 'tube',
-      },
-      {
-        href: '/library',
-        label: 'CA Library',
-        description:
-          'Essays, books, films and papers the community keeps citing.',
-        icon: 'library',
-      },
       {
         href: '/bulletin',
         label: 'Bulletin Board',
@@ -295,7 +300,8 @@ export const getPrimaryNav = (): NavEntry[] => [
       {
         href: MORE_TOOLS_HREF,
         label: 'More tools',
-        description: 'Bangers, Strands, Conversation Map and Social Graph.',
+        description:
+          'CA Tube, Bangers, Strands, Conversation Map and Social Graph.',
         icon: 'more',
       },
     ],

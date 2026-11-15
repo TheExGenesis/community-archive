@@ -6,7 +6,12 @@ import type { TrendStoryLink } from '@/lib/trendStories/core'
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { FaDatabase, FaExternalLinkAlt, FaUsers } from 'react-icons/fa'
+import {
+  FaBroadcastTower,
+  FaDatabase,
+  FaExternalLinkAlt,
+  FaUsers,
+} from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
@@ -42,6 +47,7 @@ type DashboardDestination =
   | 'research'
   | 'research_article'
   | 'trends'
+  | 'user_directory'
 
 function captureDashboardDestination(
   destination: DashboardDestination,
@@ -720,6 +726,24 @@ export function HomepageHighlightsLayout({
         </div>
         <div className="space-y-6">
           {research}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <UtilityLink
+              href="/user-dir"
+              destination="user_directory"
+              title="See members"
+              note="Browse people and their archived tweets"
+              action="Browse"
+              icon={<FaUsers className="h-[17px] w-[17px]" />}
+            />
+            <UtilityLink
+              href="/stream"
+              destination="live_stream"
+              title="See live tweets"
+              note="Tweets arriving from members’ extensions"
+              action="Watch"
+              icon={<FaBroadcastTower className="h-[17px] w-[17px]" />}
+            />
+          </div>
           <UtilityLink
             href={ARCHIVE_EXPORT_URL}
             destination="data_export"

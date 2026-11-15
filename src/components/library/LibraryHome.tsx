@@ -20,6 +20,7 @@ import {
   type LibraryWork,
 } from '@/lib/library'
 import { captureProductAction } from '@/lib/productAnalytics'
+import NavIcon from '@/components/NavIcon'
 import {
   Cover,
   KIND_LABEL,
@@ -68,13 +69,31 @@ export function LibraryHome() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 sm:px-6">
-      <header className="mb-6 max-w-2xl">
-        <h1 className="text-3xl font-semibold tracking-tight">CA Library</h1>
-        <p className="mt-2 text-muted-foreground">
-          What the archive keeps passing around: essays, books, films, videos
-          and papers that at least {data?.minMembers ?? 3} members tweeted
-          about.
-        </p>
+      <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="max-w-2xl">
+          <h1 className="text-3xl font-semibold tracking-tight">CA Library</h1>
+          <p className="mt-2 text-muted-foreground">
+            What the archive keeps passing around: essays, books, films, videos
+            and papers that at least {data?.minMembers ?? 3} members tweeted
+            about.
+          </p>
+        </div>
+        <Link
+          href="/tube"
+          onClick={() => captureProductAction('library', 'related_opened')}
+          className="group flex shrink-0 items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 md:max-w-[17rem]"
+        >
+          <NavIcon name="tube" />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold leading-tight">
+              Watch in CA Tube{' '}
+              <span aria-hidden="true" className="text-brand">&rarr;</span>
+            </span>
+            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+              The YouTube videos members share, as one watchable feed.
+            </span>
+          </span>
+        </Link>
       </header>
 
       <div className="mb-4 flex flex-wrap gap-2">

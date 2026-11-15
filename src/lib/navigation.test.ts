@@ -55,12 +55,9 @@ describe('site navigation', () => {
       'Explore archive': [
         ["Today's Digest", '/digest'],
         ['Ask the archive', '/search/ask'],
-        ['Explore by user', '/user-dir'],
-        ['Live Stream', '/stream'],
+        ['CA Library', '/library'],
       ],
       Tools: [
-        ['CA Tube', '/tube'],
-        ['CA Library', '/library'],
         ['Bulletin Board', '/bulletin'],
         ['Trends', '/trends'],
         ['Spread Explorer', '/spread-explorer'],
@@ -68,6 +65,7 @@ describe('site navigation', () => {
       ],
     })
     expect(getMoreTools().map((item) => [item.label, item.href])).toEqual([
+      ['CA Tube', '/tube'],
       ['Bangers', '/bangers?period=week'],
       ['Strands', '/strands'],
       ['Conversation Map', '/conversation-map'],
@@ -77,11 +75,21 @@ describe('site navigation', () => {
     expect(isNavGroupActive('/strands', tools)).toBe(true)
     expect(isNavGroupActive('/more-tools', tools)).toBe(true)
     expect(isNavGroupActive('/stream', tools)).toBe(false)
+    expect(isNavGroupActive('/tube', tools)).toBe(true)
+    const explore = nav
+      .filter(isNavGroup)
+      .find((g) => g.label === 'Explore archive')!
+    expect(isNavGroupActive('/stream', explore)).toBe(true)
+    expect(isNavGroupActive('/user-dir', explore)).toBe(true)
     expect(nav.slice(0, 2)).toEqual([
       { href: '/', label: 'Home' },
       { href: '/digest/week', label: 'This Week' },
     ])
-    expect(nav[3]).toEqual({ href: '/community', label: 'Community' })
+    expect(nav[3]).toEqual({
+      href: '/community',
+      label: 'Community',
+      preview: 'community',
+    })
     expect(nav[5]).toEqual({ href: '/research', label: 'Research' })
     for (const item of nav.filter(isNavGroup).flatMap((g) => g.items)) {
       expect(item.description).toMatch(/\.$/)

@@ -37,7 +37,7 @@ describe('site navigation', () => {
     const nav = getPrimaryNav()
     expect(nav.map((entry) => entry.label)).toEqual([
       'Home',
-      "This Week's Digest",
+      'This Week',
       'Explore archive',
       'Community',
       'Tools',
@@ -79,7 +79,7 @@ describe('site navigation', () => {
     expect(isNavGroupActive('/stream', tools)).toBe(false)
     expect(nav.slice(0, 2)).toEqual([
       { href: '/', label: 'Home' },
-      { href: '/digest/week', label: "This Week's Digest" },
+      { href: '/digest/week', label: 'This Week' },
     ])
     expect(nav[3]).toEqual({ href: '/community', label: 'Community' })
     expect(nav[5]).toEqual({ href: '/research', label: 'Research' })

@@ -216,13 +216,13 @@ export const MORE_TOOLS_HREF = '/more-tools'
 export const WEEKLY_DIGEST_HREF = '/digest/week'
 
 /**
- * Single source of truth for site navigation: Home, This Week's Digest, the
+ * Single source of truth for site navigation: Home, This Week, the
  * archive menu (which leads with the daily digest), Community, the Tools menu
  * of first-party products, then Research — the same for every audience.
  */
 export const getPrimaryNav = (): NavEntry[] => [
   { href: '/', label: 'Home' },
-  { href: WEEKLY_DIGEST_HREF, label: "This Week's Digest" },
+  { href: WEEKLY_DIGEST_HREF, label: 'This Week' },
   {
     label: 'Explore archive',
     items: [

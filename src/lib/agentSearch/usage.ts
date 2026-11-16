@@ -6,6 +6,7 @@ import {
   type ModelCallUsage,
 } from './model'
 import { getAgentSearchRunStore, type RunUsageDelta } from './runStore'
+import type { BashToolOutput } from './workspace/output'
 
 // Spend is added to the run as it happens, by the step that spent it, so the
 // global cap counts runs still in progress and a Stop keeps what was spent.
@@ -71,6 +72,30 @@ export async function recordModelUsage(
     })
     .catch((error) =>
       console.warn('[agent-search] failed to log model call', error),
+    )
+}
+
+/**
+ * One shell command's timing, appended to the store's command log if it
+ * keeps one (the local file store does). Losing a line never fails the
+ * command.
+ */
+export async function logCommandTiming(
+  runId: string,
+  command: string,
+  output: Pick<BashToolOutput, 'timing' | 'exitCode' | 'summary'>,
+): Promise<void> {
+  const store = getAgentSearchRunStore()
+  if (!output.timing || !store.logCommand) return
+  await store
+    .logCommand(runId, {
+      command: command.slice(0, 300),
+      exitCode: output.exitCode,
+      summary: output.summary,
+      ...output.timing,
+    })
+    .catch((error) =>
+      console.warn('[agent-search] failed to log command timing', error),
     )
 }
 

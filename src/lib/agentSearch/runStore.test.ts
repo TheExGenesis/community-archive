@@ -167,6 +167,28 @@ describe('file run store', () => {
     await expect(store.logModelCall!('../x', entry)).rejects.toThrow(
       'Invalid agent search run id',
     )
+    // Command timings go to their own log, which never counts as a run.
+    await store.logCommand!('wrun_01', {
+      command: 'search x',
+      exitCode: 0,
+      summary: 'Searched “x” · 3 tweets',
+      startedAt: '2026-10-08T00:00:01.000Z',
+      ms: 40,
+      execMs: 35,
+      pageMs: 5,
+      gateway: { calls: 1, sumMs: 30, wallMs: 30, failed: 0 },
+      semantic: { calls: 0, sumMs: 0, wallMs: 0, failed: 0 },
+      scorer: { calls: 0, sumMs: 0, wallMs: 0, failed: 0 },
+      localMs: 10,
+      phases: { search: 32 },
+      spans: [['gateway', 'search', 'search', 1, 30, true]],
+    })
+    const commands = await readFile(
+      path.join(dir, 'wrun_01.commands.jsonl'),
+      'utf8',
+    )
+    expect(JSON.parse(commands.trim()).gateway.calls).toBe(1)
+    expect(await store.countSince('42', '2026-10-08T00:00:00.000Z')).toBe(1)
   })
 
   test('refuses duplicate runs, unknown updates and unsafe ids', async () => {

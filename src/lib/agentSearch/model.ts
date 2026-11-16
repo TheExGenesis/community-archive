@@ -208,6 +208,12 @@ export interface ModelCallUsage {
 /** What else a planner call reported, for the local call log. */
 export interface ModelCallDetail {
   ms: number
+  /** When the call was sent. */
+  startedAt?: string
+  /** Streamed calls: ms to the first reasoning, text or tool-call chunk. */
+  firstOutputMs?: number
+  /** Streamed calls: ms to the first text or tool-call chunk, after reasoning. */
+  firstActionMs?: number
   finishReason?: string
   reasoningTokens?: number
   /** OpenRouter only: the upstream provider that served the call. */
@@ -301,6 +307,16 @@ function readOpenRouterChunk(raw: unknown, detail: ModelCallDetail) {
   }
 }
 
+// Stream parts that are the model's own output: any of them ends the wait
+// for a first token; the action parts end its reasoning.
+const ACTION_PARTS = new Set([
+  'text-delta',
+  'tool-input-start',
+  'tool-input-delta',
+  'tool-call',
+])
+const OUTPUT_PARTS = new Set(['reasoning-delta', ...Array.from(ACTION_PARTS)])
+
 /** The error a call on a member's own key failed with, said plainly. */
 function ownKeyCallError(error: unknown): unknown {
   const status = (error as { statusCode?: unknown } | null)?.statusCode
@@ -383,6 +399,7 @@ export class EnvLanguageModel {
     if (this.runId)
       await recordModelCallUsage(this.runId, this.spec, result?.usage, {
         ms: Date.now() - startedAt,
+        startedAt: new Date(startedAt).toISOString(),
         finishReason: finishReasonText(result?.finishReason),
         ...(this.sealedKey ? { ownKey: true } : {}),
       })
@@ -402,13 +419,23 @@ export class EnvLanguageModel {
         peekRaw ? { ...options, includeRawChunks: true } : options,
       ),
     )
-    const detail: ModelCallDetail = this.sealedKey
-      ? { ms: 0, ownKey: true }
-      : { ms: 0 }
+    const detail: ModelCallDetail = {
+      ms: 0,
+      startedAt: new Date(startedAt).toISOString(),
+      ...(this.sealedKey ? { ownKey: true } : {}),
+    }
     let usage: unknown = null
     const stream = (result.stream as ReadableStream<any>).pipeThrough(
       new TransformStream<any, any>({
         transform(part, controller) {
+          // How long the call took to start answering, and to act.
+          const type = part?.type
+          if (detail.firstOutputMs === undefined && OUTPUT_PARTS.has(type)) {
+            detail.firstOutputMs = Date.now() - startedAt
+          }
+          if (detail.firstActionMs === undefined && ACTION_PARTS.has(type)) {
+            detail.firstActionMs = Date.now() - startedAt
+          }
           if (part?.type === 'raw') {
             readOpenRouterChunk(part.rawValue, detail)
             if (peekRaw) return

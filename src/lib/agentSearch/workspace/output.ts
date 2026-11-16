@@ -1,3 +1,4 @@
+import type { CommandTiming } from '../trace'
 import type { AgentTweet } from '../types'
 import type { ManifestChanges } from './manifest'
 
@@ -32,6 +33,8 @@ export interface BashToolOutput {
    * cannot change it.
    */
   model?: { output: string; exitCode: number }
+  /** Where the command's time went, for the call log; not sent to the page. */
+  timing?: CommandTiming
 }
 
 const MODEL_OUTPUT_CHARS = 4000
@@ -99,8 +102,9 @@ export function streamedBashOutput(
 ): BashToolOutput {
   const tweets = output.tweets.filter((tweet) => !sent.has(tweet.id))
   for (const tweet of tweets) sent.add(tweet.id)
+  const { timing: _timing, ...rest } = output
   return {
-    ...output,
+    ...rest,
     model: output.model ?? bashModelOutput(output),
     stdout: output.stdout.slice(0, PAGE_STDOUT_CHARS),
     tweets,

@@ -128,6 +128,60 @@ export function estimateModelCostUsd(
   )
 }
 
+export type ReasoningEffort =
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max'
+
+const REASONING_EFFORTS = new Set<string>([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+])
+
+/**
+ * The planner's reasoning effort, per model. A model left to its provider's
+ * default runs at an effort nobody chose: on OpenRouter Gemini 3.5 Flash-Lite
+ * defaults to minimal and reasoned 0 tokens, and GPT-6.1 Sol called directly
+ * reasoned a median 85 tokens a turn (pilot runs, 2026-11-16). DeepSeek's
+ * entry is its OpenRouter default, written down.
+ */
+export const MODEL_REASONING_EFFORT: Record<string, ReasoningEffort> = {
+  'openrouter:deepseek/deepseek-v4.1-flash': 'high',
+  'openrouter:google/gemini-4-hydrogen': 'medium',
+  'openrouter:google/gemini-3.5-flash-lite': 'high',
+  'openrouter:openai/gpt-6.1-sol': 'medium',
+  'openai:gpt-6.1-sol': 'medium',
+}
+
+/**
+ * The effort to ask the planner for: AGENT_SEARCH_REASONING_EFFORT, else the
+ * model's entry above. Null sends nothing, leaving the provider's default;
+ * `default` in the env asks for that explicitly. Throws on an unknown value.
+ */
+export function agentSearchReasoningEffort(
+  spec: string,
+  value = process.env.AGENT_SEARCH_REASONING_EFFORT,
+): ReasoningEffort | null {
+  const effort = value?.trim().toLowerCase()
+  if (!effort) return MODEL_REASONING_EFFORT[spec] ?? null
+  if (effort === 'default') return null
+  if (!REASONING_EFFORTS.has(effort)) {
+    throw new Error(
+      `Invalid AGENT_SEARCH_REASONING_EFFORT: ${JSON.stringify(value)}`,
+    )
+  }
+  return effort as ReasoningEffort
+}
+
 export function agentSearchScorerModelSpec(
   value = process.env.AGENT_SEARCH_SCORER_MODEL,
 ): string {
@@ -173,6 +227,7 @@ export function createProviderModel(
   }
   const apiKey = ownKey ?? process.env.OPENROUTER_API_KEY
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured')
+  const effort = agentSearchReasoningEffort(spec)
   return createOpenAICompatible({
     name: 'openrouter',
     // The Daily Digest's name first (shared OPENROUTER_API_KEY), then ours.
@@ -189,6 +244,7 @@ export function createProviderModel(
         body.provider = { ...body.provider, data_collection: 'deny', zdr: true }
         // Usage accounting: the final chunk reports what the call cost.
         body.usage = { include: true }
+        if (effort) body.reasoning = { ...body.reasoning, effort }
         init = { ...init, body: JSON.stringify(body) }
       }
       return fetch(input, init)
@@ -307,6 +363,122 @@ function readOpenRouterChunk(raw: unknown, detail: ModelCallDetail) {
   }
 }
 
+// --- Reasoning across tool calls ---------------------------------------------
+// OpenRouter returns a model's reasoning as `reasoning_details` and asks for
+// it back, unmodified, on the assistant message that made the tool calls
+// (openrouter.ai/docs/guides/best-practices/reasoning-tokens, "Preserving
+// Reasoning"). Gemini's carry its thought signature: without them Gemini 3.5
+// Flash-Lite ended its third call with MALFORMED_FUNCTION_CALL in 3 runs of 3,
+// and DeepSeek V4.1 Flash, given its own back, answered a question in 112 s
+// that it had circled on for 226 s without answering (pilot, 2026-11-16).
+//
+// @ai-sdk/openai-compatible neither reads nor returns the field, and the
+// agents keep no reasoning parts across steps, so the details ride on each
+// step's first tool call as provider metadata, which both agents keep in the
+// conversation, and move to the message (as `openaiCompatible` options, which
+// the provider spreads into the request message) before the next call.
+
+/** Where a tool call carries the reasoning details of its step. */
+export const REASONING_DETAILS_KEY = 'openrouter'
+
+type ReasoningDetail = Record<string, unknown> & {
+  type?: string
+  index?: number
+}
+
+const CONCATENATED = ['text', 'summary', 'data'] as const
+
+/**
+ * Adds streamed `reasoning_details` pieces to those so far. OpenRouter builds
+ * the sequence "by concatenating all chunks in order": a piece with the index
+ * and type of the last one extends it; any other starts a new detail.
+ */
+export function mergeReasoningDetails(
+  details: ReasoningDetail[],
+  pieces: unknown,
+): ReasoningDetail[] {
+  if (!Array.isArray(pieces)) return details
+  const merged = [...details]
+  for (const piece of pieces as ReasoningDetail[]) {
+    if (!piece || typeof piece !== 'object') continue
+    const last = merged[merged.length - 1]
+    if (
+      last &&
+      piece.index !== undefined &&
+      last.index === piece.index &&
+      last.type === piece.type
+    ) {
+      const next: ReasoningDetail = { ...last }
+      for (const [key, value] of Object.entries(piece)) {
+        if (value === null || value === undefined) continue
+        next[key] =
+          (CONCATENATED as readonly string[]).includes(key) &&
+          typeof value === 'string' &&
+          typeof last[key] === 'string'
+            ? (last[key] as string) + value
+            : value
+      }
+      merged[merged.length - 1] = next
+    } else {
+      merged.push({ ...piece })
+    }
+  }
+  return merged
+}
+
+/** The step's reasoning details on its first tool call; other parts as they are. */
+export function withStepReasoning<T extends { type?: string }>(
+  parts: T[],
+  details: ReasoningDetail[],
+): T[] {
+  if (!details.length) return parts
+  const first = parts.findIndex((part) => part?.type === 'tool-call')
+  if (first === -1) return parts
+  return parts.map((part, index) => {
+    if (index !== first) return part
+    const metadata = (part as { providerMetadata?: Record<string, any> })
+      .providerMetadata
+    return {
+      ...part,
+      providerMetadata: {
+        ...metadata,
+        [REASONING_DETAILS_KEY]: {
+          ...metadata?.[REASONING_DETAILS_KEY],
+          reasoning_details: details,
+        },
+      },
+    }
+  })
+}
+
+/**
+ * Puts each assistant message's reasoning details, carried on its tool calls,
+ * back on the message itself, where OpenRouter reads them.
+ */
+export function liftReasoningDetails<T>(prompt: T): T {
+  if (!Array.isArray(prompt)) return prompt
+  return prompt.map((message) => {
+    if (message?.role !== 'assistant' || !Array.isArray(message.content)) {
+      return message
+    }
+    const details = (message.content as any[]).flatMap(
+      (part) =>
+        part?.providerOptions?.[REASONING_DETAILS_KEY]?.reasoning_details ?? [],
+    )
+    if (!details.length) return message
+    return {
+      ...message,
+      providerOptions: {
+        ...message.providerOptions,
+        openaiCompatible: {
+          ...message.providerOptions?.openaiCompatible,
+          reasoning_details: details,
+        },
+      },
+    }
+  }) as T
+}
+
 // Stream parts that are the model's own output: any of them ends the wait
 // for a first token; the action parts end its reasoning.
 const ACTION_PARTS = new Set([
@@ -393,9 +565,47 @@ export class EnvLanguageModel {
     return this.inner().supportedUrls ?? {}
   }
 
+  /**
+   * The call as sent: OpenRouter gets the reasoning details of earlier steps
+   * back (its effort goes in the request body, createProviderModel); OpenAI
+   * gets the reasoning effort unless the caller chose one.
+   */
+  private prepareCall(options: any): any {
+    if (this.provider === 'openrouter') {
+      return options?.prompt
+        ? { ...options, prompt: liftReasoningDetails(options.prompt) }
+        : options
+    }
+    const effort = agentSearchReasoningEffort(this.spec)
+    if (!effort || options?.providerOptions?.openai?.reasoningEffort) {
+      return options
+    }
+    return {
+      ...options,
+      providerOptions: {
+        ...options?.providerOptions,
+        openai: {
+          ...options?.providerOptions?.openai,
+          reasoningEffort: effort,
+        },
+      },
+    }
+  }
+
   async doGenerate(options: unknown) {
     const startedAt = Date.now()
-    const result = await this.call<any>((model) => model.doGenerate(options))
+    const callOptions = this.prepareCall(options)
+    let result = await this.call<any>((model) => model.doGenerate(callOptions))
+    if (this.provider === 'openrouter' && Array.isArray(result?.content)) {
+      const details = mergeReasoningDetails(
+        [],
+        result.response?.body?.choices?.[0]?.message?.reasoning_details,
+      )
+      result = {
+        ...result,
+        content: withStepReasoning(result.content, details),
+      }
+    }
     if (this.runId)
       await recordModelCallUsage(this.runId, this.spec, result?.usage, {
         ms: Date.now() - startedAt,
@@ -408,17 +618,34 @@ export class EnvLanguageModel {
 
   async doStream(options: any) {
     const runId = this.runId
-    if (!runId) return this.call<any>((model) => model.doStream(options))
+    const openRouter = this.provider === 'openrouter'
+    const callOptions = this.prepareCall(options)
+    if (!runId && !openRouter) {
+      return this.call<any>((model) => model.doStream(callOptions))
+    }
     const spec = this.spec
     const startedAt = Date.now()
-    // OpenRouter's raw chunks say who served the call and what it cost. Ask
-    // for them, and pass them on only if the caller asked too.
-    const peekRaw = this.provider === 'openrouter' && !options?.includeRawChunks
+    // OpenRouter's raw chunks say who served the call, what it cost and how
+    // the model reasoned. Ask for them, and pass them on only if the caller
+    // asked too.
+    const peekRaw = openRouter && !callOptions?.includeRawChunks
     const result = await this.call<any>((model) =>
       model.doStream(
-        peekRaw ? { ...options, includeRawChunks: true } : options,
+        peekRaw ? { ...callOptions, includeRawChunks: true } : callOptions,
       ),
     )
+    // Tool calls wait for the end of the stream, so the reasoning details
+    // streamed after them still reach the first one.
+    let reasoning: ReasoningDetail[] = []
+    let toolCalls: any[] = []
+    const releaseToolCalls = (
+      controller: TransformStreamDefaultController<any>,
+    ) => {
+      for (const part of withStepReasoning(toolCalls, reasoning)) {
+        controller.enqueue(part)
+      }
+      toolCalls = []
+    }
     const detail: ModelCallDetail = {
       ms: 0,
       startedAt: new Date(startedAt).toISOString(),
@@ -438,17 +665,29 @@ export class EnvLanguageModel {
           }
           if (part?.type === 'raw') {
             readOpenRouterChunk(part.rawValue, detail)
+            if (openRouter) {
+              reasoning = mergeReasoningDetails(
+                reasoning,
+                part.rawValue?.choices?.[0]?.delta?.reasoning_details,
+              )
+            }
             if (peekRaw) return
           }
+          if (openRouter && part?.type === 'tool-call') {
+            toolCalls.push(part)
+            return
+          }
           if (part?.type === 'finish') {
+            releaseToolCalls(controller)
             usage = part.usage
             detail.finishReason = finishReasonText(part.finishReason)
           }
           controller.enqueue(part)
         },
         // A failed write fails the call: the cap must not miss spend.
-        async flush() {
-          if (usage) {
+        async flush(controller) {
+          releaseToolCalls(controller)
+          if (runId && usage) {
             detail.ms = Date.now() - startedAt
             await recordModelCallUsage(runId, spec, usage, detail)
           }

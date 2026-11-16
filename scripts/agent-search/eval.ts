@@ -771,6 +771,8 @@ async function main() {
   const meta = {
     startedAt,
     model: modelSpec,
+    reasoningEffort:
+      mods.model.agentSearchReasoningEffort(modelSpec) ?? 'provider default',
     tools: mode,
     scorerModel:
       scorer === 'decisions'

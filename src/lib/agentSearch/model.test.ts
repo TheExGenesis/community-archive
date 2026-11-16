@@ -9,11 +9,16 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import {
   EnvLanguageModel,
   MODEL_PRICES_USD_PER_MTOK,
+  REASONING_DETAILS_KEY,
+  agentSearchReasoningEffort,
   estimateModelCostUsd,
+  liftReasoningDetails,
+  mergeReasoningDetails,
   parseModelSpec,
   readModelCallUsage,
   resolveModelPrice,
   setModelUsageRecorder,
+  withStepReasoning,
 } from './model'
 import { sealOwnKey } from './ownKey'
 
@@ -389,5 +394,240 @@ describe('EnvLanguageModel on a member’s own key', () => {
       new EnvLanguageModel(SPEC, 'asr_1', sealed).doStream({}),
     ).rejects.toThrow('Using your own key is not available right now.')
     expect(createOpenAICompatible).not.toHaveBeenCalled()
+  })
+})
+
+describe('planner reasoning effort', () => {
+  test('uses the model’s entry, the env override, or nothing', () => {
+    const deepseek = 'openrouter:deepseek/deepseek-v4.1-flash'
+    expect(agentSearchReasoningEffort(deepseek, undefined)).toBe('high')
+    expect(agentSearchReasoningEffort('openai:gpt-6.1-sol', undefined)).toBe(
+      'medium',
+    )
+    expect(agentSearchReasoningEffort(deepseek, ' LOW ')).toBe('low')
+    expect(agentSearchReasoningEffort(deepseek, 'default')).toBeNull()
+    expect(agentSearchReasoningEffort('openrouter:x/unlisted', '')).toBeNull()
+    expect(() => agentSearchReasoningEffort(deepseek, 'loud')).toThrow(
+      'Invalid AGENT_SEARCH_REASONING_EFFORT',
+    )
+  })
+
+  test('OpenRouter calls carry the effort in the request body', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock)
+      .mockReset()
+      .mockReturnValue(() => ({ doGenerate: jest.fn() }))
+    const realFetch = global.fetch
+    const sent = jest.fn().mockResolvedValue(new Response('{}'))
+    global.fetch = sent as any
+    try {
+      await new EnvLanguageModel(
+        'openrouter:google/gemini-4-hydrogen',
+      ).doGenerate({})
+      const { fetch } = (createOpenAICompatible as jest.Mock).mock.calls[0][0]
+      await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'google/gemini-4-hydrogen' }),
+      })
+      const body = JSON.parse(sent.mock.calls[0][1].body)
+      expect(body.reasoning).toEqual({ effort: 'medium' })
+      expect(body.provider).toEqual({ data_collection: 'deny', zdr: true })
+    } finally {
+      global.fetch = realFetch
+      delete process.env.OPENROUTER_API_KEY
+    }
+  })
+
+  test('OpenAI calls ask for the effort unless the caller chose one', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    const doGenerate = jest.fn().mockResolvedValue({ content: [] })
+    ;(createOpenAI as jest.Mock).mockReset().mockReturnValue(() => ({
+      doGenerate,
+    }))
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol')
+    await model.doGenerate({ prompt: [] })
+    await model.doGenerate({
+      providerOptions: { openai: { reasoningEffort: 'low' } },
+    })
+    expect(doGenerate.mock.calls[0][0].providerOptions).toEqual({
+      openai: { reasoningEffort: 'medium' },
+    })
+    expect(doGenerate.mock.calls[1][0].providerOptions).toEqual({
+      openai: { reasoningEffort: 'low' },
+    })
+    delete process.env.OPENAI_API_KEY
+  })
+})
+
+describe('reasoning details across tool calls', () => {
+  const SPEC = 'openrouter:google/gemini-3.5-flash-lite'
+  const encrypted = {
+    type: 'reasoning.encrypted',
+    data: 'c2lnbmF0dXJl',
+    format: 'google-gemini-v1',
+    index: 0,
+  }
+
+  beforeEach(() => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock).mockReset()
+  })
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  test('streamed pieces of one detail join; a new index starts another', () => {
+    let details = mergeReasoningDetails(
+      [],
+      [{ type: 'reasoning.text', text: 'Let me ', index: 0, signature: null }],
+    )
+    details = mergeReasoningDetails(details, [
+      { type: 'reasoning.text', text: 'think.', index: 0, signature: 'sig' },
+      { ...encrypted, index: 1 },
+    ])
+    details = mergeReasoningDetails(details, undefined)
+    expect(details).toEqual([
+      {
+        type: 'reasoning.text',
+        text: 'Let me think.',
+        index: 0,
+        signature: 'sig',
+      },
+      { ...encrypted, index: 1 },
+    ])
+  })
+
+  test('a step’s details ride on its first tool call only', () => {
+    const parts = [
+      { type: 'text', text: 'checking' },
+      {
+        type: 'tool-call',
+        toolCallId: 'a',
+        providerMetadata: { other: { x: 1 } },
+      },
+      { type: 'tool-call', toolCallId: 'b' },
+    ]
+    const out = withStepReasoning(parts, [encrypted])
+    expect(out[0]).toBe(parts[0])
+    expect(out[1]).toEqual({
+      ...parts[1],
+      providerMetadata: {
+        other: { x: 1 },
+        [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+      },
+    })
+    expect(out[2]).toBe(parts[2])
+    expect(withStepReasoning(parts, [])).toBe(parts)
+  })
+
+  test('details on a tool call go back on its message before the next call', () => {
+    const prompt = [
+      { role: 'user', content: [{ type: 'text', text: 'q' }] },
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'a',
+            providerOptions: {
+              [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+            },
+          },
+        ],
+        providerOptions: { openaiCompatible: { name: 'x' } },
+      },
+      { role: 'tool', content: [] },
+      { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+    ]
+    const lifted = liftReasoningDetails(prompt)
+    expect(lifted[0]).toBe(prompt[0])
+    expect(lifted[1].providerOptions).toEqual({
+      openaiCompatible: { name: 'x', reasoning_details: [encrypted] },
+    })
+    expect(lifted[2]).toBe(prompt[2])
+    expect(lifted[3]).toBe(prompt[3])
+  })
+
+  test('a streamed call holds its tool calls until the end, with the reasoning streamed after them', async () => {
+    const doStream = jest.fn().mockResolvedValue({
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'tool-call',
+            toolCallId: 'a',
+            input: '{}',
+          })
+          controller.enqueue({
+            type: 'raw',
+            rawValue: {
+              choices: [{ delta: { reasoning_details: [encrypted] } }],
+            },
+          })
+          controller.enqueue({
+            type: 'tool-call',
+            toolCallId: 'b',
+            input: '{}',
+          })
+          controller.enqueue({
+            type: 'finish',
+            usage: { inputTokens: { total: 1 }, outputTokens: { total: 1 } },
+            finishReason: 'tool-calls',
+          })
+          controller.close()
+        },
+      }),
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({ doStream }))
+    const earlier = [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'z',
+            providerOptions: {
+              [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+            },
+          },
+        ],
+      },
+    ]
+    const result = await new EnvLanguageModel(SPEC).doStream({
+      prompt: earlier,
+    })
+    const parts: any[] = []
+    const reader = result.stream.getReader()
+    for (let r = await reader.read(); !r.done; r = await reader.read())
+      parts.push(r.value)
+    expect(parts.map((part) => part.type)).toEqual([
+      'tool-call',
+      'tool-call',
+      'finish',
+    ])
+    expect(parts[0].providerMetadata).toEqual({
+      [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+    })
+    expect(parts[1].providerMetadata).toBeUndefined()
+    const sent = doStream.mock.calls[0][0]
+    expect(sent.includeRawChunks).toBe(true)
+    expect(sent.prompt[0].providerOptions.openaiCompatible).toEqual({
+      reasoning_details: [encrypted],
+    })
+  })
+
+  test('a generated call puts the response’s details on its first tool call', async () => {
+    const doGenerate = jest.fn().mockResolvedValue({
+      content: [{ type: 'tool-call', toolCallId: 'a', input: '{}' }],
+      response: {
+        body: { choices: [{ message: { reasoning_details: [encrypted] } }] },
+      },
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({
+      doGenerate,
+    }))
+    const result = await new EnvLanguageModel(SPEC).doGenerate({})
+    expect(result.content[0].providerMetadata).toEqual({
+      [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+    })
   })
 })

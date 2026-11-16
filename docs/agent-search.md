@@ -299,6 +299,7 @@ resolved headers, including the API key, into the event log.
 | Variable                                                                                                        | Default                                          | Purpose                                                                                                                                                                           |
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AGENT_SEARCH_MODEL`                                                                                            | `openrouter:deepseek/deepseek-v4.1-flash`        | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative                                                                                                |
+| `AGENT_SEARCH_REASONING_EFFORT`                                                                                 | per model (`MODEL_REASONING_EFFORT`)             | Planner effort: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`; `default` sends none. Unlisted models get their provider's default                                  |
 | `AGENT_SEARCH_TOOLS`                                                                                            | `bash`                                           | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with                                                                        |
 | `AGENT_SEARCH_PROMPT`                                                                                           | `v2-examples`                                    | `v1` (numbered procedure) or `v2` (goal and definition of done, no examples) instead of the default. The route passes it to the run, which keeps it                               |
 | `AGENT_SEARCH_KEEP_REASONING`                                                                                   | on                                               | `off` stops putting each step's reasoning back on its tool call (the workflow agent drops it between steps; DeepSeek expects it back)                                             |
@@ -388,6 +389,19 @@ Set it to `false` (or `0`, `off`, `no`) to pause without a deploy:
 The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_URL`,
 `CLICKHOUSE_ANALYTICS_API_TOKEN`) are the site's existing ones. The route sets
 `maxDuration = 300`; the repository default is 15 seconds.
+
+## Planner reasoning
+
+Each planner model runs at a reasoning effort set in `MODEL_REASONING_EFFORT`
+(`model.ts`), or at `AGENT_SEARCH_REASONING_EFFORT`. A model with no entry runs
+at its provider's default, which can be far from what was meant: on OpenRouter
+Gemini 3.5 Flash-Lite defaults to `minimal`.
+
+OpenRouter returns a model's reasoning as `reasoning_details` and expects it
+back on the assistant message that made the tool calls. `EnvLanguageModel`
+carries each step's details on its first tool call and puts them back on the
+message before the next call. Without them, Gemini models lose their thought
+signatures between tool calls.
 
 ## Data handling and retention
 

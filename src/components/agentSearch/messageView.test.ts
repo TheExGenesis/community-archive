@@ -1025,6 +1025,46 @@ describe('workspace steps and the folded log line', () => {
     )
   })
 
+  test('names a loop’s steps by their first value, never by the shell variable', () => {
+    const loop = `for w in sensemaking coordination "collective intelligence"; do search "$w" --from @maskys_ --sort oldest > s_$w.jsonl; done`
+    expect(describeCommand(loop)).toBe('Searching “sensemaking”, then 2 more')
+    expect(commandKind(loop)).toBe('search')
+    expect(bashSearchHref(loop)).toBe(
+      '/search?q=sensemaking&fromUser=maskys_&sort=oldest',
+    )
+    expect(
+      describeCommand(
+        'cd /work; for h in @a @b; do echo "== $h"; timeline $h --limit 50 > t.jsonl; done',
+      ),
+    ).toBe("Reading @a's tweets, then 1 more")
+    // A variable set earlier on the line is filled in.
+    expect(describeCommand(`q=roam; search "$q" --limit 200 > s.jsonl`)).toBe(
+      'Searching “roam”',
+    )
+    expect(bashSearchHref(`q=roam; search "$q" > s.jsonl`)).toBe(
+      '/search?q=roam',
+    )
+    // One the line cannot know is left out, and gets no link.
+    const fromFile =
+      'jq -r .author a.jsonl | while read h; do timeline $h > t_$h.jsonl; done'
+    expect(describeCommand(fromFile)).toBe('Reading tweets')
+    expect(commandKind(fromFile)).toBe('people')
+    expect(describeCommand('search "$q" --limit 300 > s.jsonl')).toBe(
+      'Searching',
+    )
+    expect(bashSearchHref('search "$q" --limit 300 > s.jsonl')).toBeNull()
+    expect(
+      bashSearchHref('for f in *.jsonl; do search "$f" > o.jsonl; done'),
+    ).toBeNull()
+    expect(describeCommand('score $f "Does this tweet praise Roam?"')).toBe(
+      'Checking tweets against “Does this tweet praise Roam?”',
+    )
+    // A search on a later line of a multi-line command is still found.
+    expect(describeCommand('wc -l a.jsonl\nsearch zig > z.jsonl')).toBe(
+      'Searching “zig”',
+    )
+  })
+
   test('sums up steps, what the answer rests on, and what else was found', () => {
     const search = toolPart(
       'search_tweets',

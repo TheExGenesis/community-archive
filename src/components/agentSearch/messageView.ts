@@ -553,28 +553,111 @@ const isArchiveCommand = (name: string | undefined): name is string =>
   Boolean(name && Object.hasOwn(ARCHIVE_COMMANDS, name))
 
 /**
- * The first archive command in a shell command line, with its words. Under
- * par, it is the first line par runs, and `alongside` counts the others.
+ * One command a shell line runs, as the shell would see it: a loop's body
+ * with the loop's first value, a par line, or a plain segment. `more` counts
+ * the other runs of the same line: par's other lines, which run together, or
+ * the loop's other values, which run in turn.
+ */
+interface ShellLine {
+  text: string
+  more: number
+  together: boolean
+}
+
+const SEGMENT = /;|&&|\|\||\||\n/
+const SHELL_WORD = /"([^"]*)"|'([^']*)'|(\S+)/g
+// for VAR in WORDS; do BODY; done (newlines may stand for the semicolons)
+const FOR_LOOP =
+  /\bfor\s+([A-Za-z_]\w*)\s+in\s+([^;\n]*?)\s*[;\n]\s*do\b([\s\S]*?)\bdone\b/
+const ASSIGNMENT = /^(?:export\s+)?([A-Za-z_]\w*)=(\S*|"[^"]*"|'[^']*')$/
+/** A shell variable or command substitution the line could not resolve. */
+const UNRESOLVED = /\$(?:\{?[A-Za-z_]|\()|`/
+
+const shellWords = (text: string) =>
+  Array.from(text.matchAll(SHELL_WORD)).map(
+    (match) => match[1] ?? match[2] ?? match[3],
+  )
+
+/** Puts known variables in; unknown ones stay, so they read as unresolved. */
+const substitute = (text: string, vars: Map<string, string>) =>
+  text.replace(
+    /\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)/g,
+    (match, braced, bare) => vars.get(braced ?? bare) ?? match,
+  )
+
+function segmentLines(
+  text: string,
+  vars: Map<string, string>,
+  loop?: { name: string; values: string[] },
+): ShellLine[] {
+  const lines: ShellLine[] = []
+  for (const raw of text.split(SEGMENT)) {
+    // `while read h; do timeline $h` runs timeline: drop the shell keyword.
+    const segment = raw.trim().replace(/^(?:(?:do|then|else|\{|\()\s+)+/, '')
+    if (!segment) continue
+    const assigned = ASSIGNMENT.exec(segment)
+    if (assigned && !loop) {
+      const value = shellWords(assigned[2])[0] ?? ''
+      if (UNRESOLVED.test(value)) vars.delete(assigned[1])
+      else vars.set(assigned[1], value)
+      continue
+    }
+    const scope = new Map(vars)
+    if (loop?.values[0] !== undefined) scope.set(loop.name, loop.values[0])
+    const resolved = substitute(segment, scope)
+    const [name, ...args] = shellWords(resolved)
+    if (name === 'par' && args[0]) {
+      // par 'template {}' word... or par 'line' 'line'...
+      const runs = args[0].includes('{}')
+        ? args.slice(1).map((word) => args[0].replaceAll('{}', word))
+        : args
+      for (const run of runs) {
+        lines.push({ text: run, more: runs.length - 1, together: true })
+      }
+      continue
+    }
+    lines.push({
+      text: resolved,
+      more: loop ? Math.max(0, loop.values.length - 1) : 0,
+      together: false,
+    })
+  }
+  return lines
+}
+
+/** The commands a shell command line runs, in order (see ShellLine). */
+function shellLines(command: string): ShellLine[] {
+  const vars = new Map<string, string>()
+  const lines: ShellLine[] = []
+  let rest = command
+  for (let loop = FOR_LOOP.exec(rest); loop; loop = FOR_LOOP.exec(rest)) {
+    lines.push(...segmentLines(rest.slice(0, loop.index), vars))
+    const values = shellWords(substitute(loop[2], vars))
+    // A loop over a file's lines or a glob has no values to show.
+    const known = values.every((value) => !/[*?`]|\$/.test(value))
+    lines.push(
+      ...segmentLines(loop[3], vars, {
+        name: loop[1],
+        values: known ? values : [],
+      }),
+    )
+    rest = rest.slice(loop.index + loop[0].length)
+  }
+  lines.push(...segmentLines(rest, vars))
+  return lines
+}
+
+/**
+ * The first archive command a shell command line runs, with its words, and
+ * how many more runs of it there are (par lines, or a loop's other values).
  */
 function firstArchiveCommand(
   command: string,
-): { name: string; rest: string[]; alongside: number } | null {
-  for (const segment of command.split(/;|&&|\|\||\|/)) {
-    const [name, ...rest] = commandWords(segment.trim())
-    if (isArchiveCommand(name)) return { name, rest, alongside: 0 }
-    if (name === 'par' && rest[0]) {
-      // par 'template {}' word... or par 'line' 'line'...
-      const lines = rest[0].includes('{}')
-        ? rest.slice(1).map((word) => rest[0].replaceAll('{}', word))
-        : rest
-      const [inner, ...innerRest] = commandWords(lines[0] ?? '')
-      if (isArchiveCommand(inner)) {
-        return {
-          name: inner,
-          rest: innerRest,
-          alongside: Math.max(0, lines.length - 1),
-        }
-      }
+): { name: string; rest: string[]; more: number; together: boolean } | null {
+  for (const line of shellLines(command)) {
+    const [name, ...rest] = commandWords(line.text)
+    if (isArchiveCommand(name)) {
+      return { name, rest, more: line.more, together: line.together }
     }
   }
   return null
@@ -594,11 +677,17 @@ export function describeCommand(command: string): string {
   const found = firstArchiveCommand(command)
   if (!found) return 'Looking through the results'
   const text = describeArchiveCommand(found.name, found.rest)
-  return found.alongside ? `${text}, and ${found.alongside} more at once` : text
+  if (!found.more) return text
+  return found.together
+    ? `${text}, and ${found.more} more at once`
+    : `${text}, then ${found.more} more`
 }
 
-function describeArchiveCommand(name: string, rest: string[]): string {
-  const text = rest.join(' ').trim()
+function describeArchiveCommand(name: string, words: string[]): string {
+  // A word the shell would have filled in, unknown here, is left blank rather
+  // than shown as `$q`; blanking keeps the other words in their places.
+  const rest = words.map((word) => (UNRESOLVED.test(word) ? '' : word))
+  const text = rest.filter(Boolean).join(' ').trim()
   switch (name) {
     case 'search':
       return text ? `Searching ${quote(text)}` : 'Searching'
@@ -705,13 +794,15 @@ const SEARCH_VALUE_FLAGS = new Set([
 
 const MULTI_SEARCH_FLAGS = new Set(['or', 'with', 'any'])
 
-/** The first `search` in a shell command the search page can express. */
+/**
+ * The first `search` in a shell command the search page can express: for a
+ * loop, its first value; never a search with a word the shell fills in.
+ */
 export function bashSearchHref(command: string): string | null {
-  for (const segment of command.split(/;|&&|\|\||\|/)) {
-    const words = Array.from(
-      segment.trim().matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g),
-    ).map((match) => match[1] ?? match[2] ?? match[3])
+  for (const line of shellLines(command)) {
+    const words = shellWords(line.text)
     if (words[0] !== 'search') continue
+    if (words.some((word) => UNRESOLVED.test(word))) continue
     const terms: string[] = []
     const flags: Record<string, string> = {}
     let expressible = true

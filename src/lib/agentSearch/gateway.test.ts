@@ -11,9 +11,12 @@ import {
   ApiV1Error,
   apiV1BaseUrl,
   getAccountTweets,
+  getInteractionTies,
+  getInteractions,
   getTweetsByIdsBatched,
   retryWhileBusy,
 } from './gateway'
+import { startTrace } from './trace'
 
 const v1Row = {
   tweet_id: '11',
@@ -283,6 +286,21 @@ describe('getTweetsByIdsBatched', () => {
     expect(found.map((t) => t.id).sort()).toEqual([...ids].sort())
     expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(10)
     expect(most).toBe(4)
+  })
+})
+
+describe('interaction lookups', () => {
+  test('time their gateway calls on the run trace', async () => {
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockResolvedValue({})
+    const trace = startTrace()
+    await getInteractions({ a: '@focus' }, { trace })
+    await getInteractionTies({ accounts: ['a'], before: '2024-06' }, { trace })
+    expect(
+      trace.spans.map(({ kind, label, ok }) => ({ kind, label, ok })),
+    ).toEqual([
+      { kind: 'gateway', label: 'interactions', ok: true },
+      { kind: 'gateway', label: 'interaction-ties', ok: true },
+    ])
   })
 })
 

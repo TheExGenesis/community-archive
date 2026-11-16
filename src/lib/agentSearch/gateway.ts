@@ -579,7 +579,8 @@ export async function getInteractions(
     params.set('limit', String(Math.min(Math.max(input.limit, 1), 100)))
   }
   return retryWhileBusy(limits, () =>
-    fetchAnalyticsGatewayJson<InteractionPeers | InteractionPair>(
+    gatewayJson<InteractionPeers | InteractionPair>(
+      limits,
       ['interactions'],
       params,
       { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -616,7 +617,7 @@ export async function getInteractionTies(
     params.set('peers', String(Math.min(Math.max(input.peers, 0), 10)))
   }
   return retryWhileBusy(limits, () =>
-    fetchAnalyticsGatewayJson<InteractionTies>(['interaction-ties'], params, {
+    gatewayJson<InteractionTies>(limits, ['interaction-ties'], params, {
       timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
     }),
   )

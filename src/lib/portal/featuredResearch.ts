@@ -25,7 +25,7 @@ export const ALIGNMENT_BENCHMARKS_VS_TWITTER: ResearchPost = {
   author: 'Haoxing Du',
 }
 
-/** In-depth investigations, listed under Journal on the Research page. */
+/** Quick, purposeful investigations, listed under Journal on the Research page. */
 export const JOURNAL_POSTS: ResearchPost[] = [
   YOU_CAN_JUST_DO_THINGS,
   ALIGNMENT_BENCHMARKS_VS_TWITTER,

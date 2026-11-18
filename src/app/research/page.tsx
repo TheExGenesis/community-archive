@@ -108,7 +108,7 @@ function Section({
   posts: ResearchPost[]
 }) {
   return (
-    <section className="mb-9" aria-labelledby={`research-${title}`}>
+    <section className="min-w-0" aria-labelledby={`research-${title}`}>
       <h2
         id={`research-${title}`}
         className="mb-1 text-[20px] font-semibold"
@@ -117,7 +117,7 @@ function Section({
         {title}
       </h2>
       <div className={`mb-3.5 text-[13px] ${MUTED}`}>{blurb}</div>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+      <div className="flex flex-col gap-3.5">
         {posts.map((post) => (
           <ResearchCard key={post.url} post={post} />
         ))}
@@ -151,7 +151,7 @@ export default async function ResearchPage() {
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
-      <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-6">
         <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
           Research
         </h1>
@@ -159,18 +159,22 @@ export default async function ResearchPage() {
           Research and projects built on the archive.
         </div>
 
-        <Section
-          title="Journal"
-          blurb="In-depth investigations using the archive."
-          posts={JOURNAL_POSTS}
-        />
-        <Section
-          title="Blog"
-          blurb={<>Projects, papers, and lab notes from {LAB_NOTES_LINK}.</>}
-          posts={blogPosts}
-        />
+        <div className="grid grid-cols-1 items-start gap-9 md:grid-cols-2 md:gap-6">
+          <Section
+            title="Journal"
+            blurb="Quick, purposeful investigations, from agent-driven checks to lab notes."
+            posts={JOURNAL_POSTS}
+          />
+          <Section
+            title="Blog"
+            blurb={
+              <>Open-ended writing, as deep as it goes, and {LAB_NOTES_LINK}.</>
+            }
+            posts={blogPosts}
+          />
+        </div>
         {feedPosts.length === 0 && (
-          <div className={`text-[13px] ${MUTED}`}>
+          <div className={`mt-6 text-[13px] ${MUTED}`}>
             The lab notes feed isn&apos;t available right now. Read it directly
             at {LAB_NOTES_LINK}.
           </div>

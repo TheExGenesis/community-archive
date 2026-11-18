@@ -291,6 +291,27 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-08-16',
   },
   {
+    // Listed ahead of Followle so it takes Followle's homepage slot.
+    slug: 'meet-your-neighbors',
+    name: 'Meet Your Neighbors',
+    creator: 'Joe Weisenthal & khaled',
+    creatorHandle: 'TheStalwart',
+    summary: 'A political map that shows who on X thinks most like you.',
+    description:
+      'A new kind of political map with no ideology labels: it finds the ten accounts that agree with you most often across about 600 contested issues, laid out as a city of like-minded buildings. Upload your own posts to move in.',
+    archiveUse:
+      'Built from the 2,187 Community Archive accounts with at least 300 of their own tweets since January 2025, whose stances on each issue are extracted and compared pair by pair.',
+    category: 'Tools',
+    tags: ['Politics', 'Social graph', 'Maps'],
+    projectUrl: 'https://meetyourneighbors.ai/',
+    sourceTweetId: '2122772024934515183',
+    sourceUrl: 'https://x.com/TheStalwart/status/2122772024934515183',
+    image: '/images/community/meet-your-neighbors-card.webp',
+    coverClass: 'from-[#f1f4f7] via-[#d7e4ef] to-[#163a5f]',
+    featured: true,
+    publishedAt: '2026-11-17',
+  },
+  {
     slug: 'followle',
     name: 'Followle',
     creator: 'Loopy',

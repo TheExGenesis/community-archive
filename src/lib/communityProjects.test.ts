@@ -7,7 +7,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(15)
+    expect(COMMUNITY_PROJECTS).toHaveLength(16)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -85,6 +85,36 @@ describe('community project catalog', () => {
     ).toBe(true)
   })
 
+  it('puts Meet Your Neighbors in Followle’s home page slot', () => {
+    // The live admin flags: these six were the featured home page apps.
+    const liveFeatured = new Set([
+      'pairwise',
+      'birdseye',
+      'bangers-page',
+      'model-behavior-reports',
+      'distill',
+      'followle',
+    ])
+    const published = COMMUNITY_PROJECTS.filter(
+      (project) => project.slug !== 'meet-your-neighbors',
+    ).map((project) => ({
+      ...project,
+      featured: liveFeatured.has(project.slug),
+    }))
+    expect(
+      homepageFeaturedProjects(mergeCommunityCatalog(published)).map(
+        (project) => project.slug,
+      ),
+    ).toEqual([
+      'pairwise',
+      'birdseye',
+      'bangers-page',
+      'model-behavior-reports',
+      'distill',
+      'meet-your-neighbors',
+    ])
+  })
+
   it('fills two rows when admins have featured fewer than six projects', () => {
     const catalog = COMMUNITY_PROJECTS.map((project, index) => ({
       ...project,
@@ -121,7 +151,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Common Tongue')
+    expect(newest[0].name).toBe('Meet Your Neighbors')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,
@@ -193,6 +223,7 @@ describe('community project catalog', () => {
       'Birdseye',
       'Bangers.page',
       'Tweet Harvest',
+      'Meet Your Neighbors',
       'Semantic Search',
       "Malcolm Ocean's Links",
       'Distill',

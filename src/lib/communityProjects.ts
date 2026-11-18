@@ -177,27 +177,6 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-09-24',
   },
   {
-    slug: 'alignment-benchmarks-vs-twitter-reports',
-    name: 'Alignment Benchmarks vs. Twitter Reports',
-    creator: 'Haoxing Du',
-    creatorHandle: 'haoxingdu',
-    summary:
-      'Do labs’ alignment scores match how models misbehave in the wild?',
-    description:
-      'Compares the misaligned-behavior scores in Anthropic system cards, and other alignment benchmarks, with the share of tweets about each model that report it misbehaving. Across 14 models the two rankings barely agree.',
-    archiveUse:
-      'Classifies Community Archive tweets that mention each model as first-hand reports of misbehavior or not, excluding retweets, jokes, rumors, and reactions to benchmarks.',
-    category: 'Research',
-    tags: ['LLM behavior', 'Alignment', 'Benchmarks'],
-    projectUrl: 'https://x.com/haoxingdu/status/2122837542336913913',
-    sourceTweetId: '2122837542336913913',
-    sourceUrl: 'https://x.com/haoxingdu/status/2122837542336913913',
-    image: '/images/community/alignment-benchmarks-vs-twitter-card.webp',
-    coverClass: 'from-[#f8f5ef] via-[#e3e7f0] to-[#5b6fa6]',
-    featured: false,
-    publishedAt: '2026-11-17',
-  },
-  {
     slug: 'tpot-trust',
     name: 'Tpot-Trust',
     creator: 'UpTrust HQ',

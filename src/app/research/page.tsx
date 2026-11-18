@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react'
 import { FaExternalLinkAlt } from 'react-icons/fa'
 import { getResearchPosts, pinResearchPost } from '@/lib/portal/research'
-import { YOU_CAN_JUST_DO_THINGS } from '@/lib/portal/featuredResearch'
+import { JOURNAL_POSTS } from '@/lib/portal/featuredResearch'
 import { RESEARCH_SOURCE, type ResearchPost } from '@/lib/portal/types'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
@@ -36,17 +37,117 @@ const COMMUNITY_ARCHIVE_PAPER: ResearchPost = {
 const byNewest = (a: ResearchPost, b: ResearchPost) =>
   (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)
 
+function ResearchCard({ post }: { post: ResearchPost }) {
+  return (
+    <a
+      href={post.url}
+      // Pieces published on this site open in place.
+      {...(post.url.startsWith('/')
+        ? {}
+        : { target: '_blank', rel: 'noopener noreferrer' })}
+      className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-white transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
+    >
+      {post.imageLight && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={post.imageLight}
+          alt=""
+          loading="lazy"
+          className="h-36 w-full border-b border-zinc-200 object-cover dark:hidden"
+        />
+      )}
+      {post.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={post.image}
+          alt=""
+          loading="lazy"
+          className={`h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a] ${
+            post.imageLight ? 'hidden dark:block' : ''
+          }`}
+        />
+      )}
+      <div className="p-[18px]">
+        <div
+          className="flex items-baseline gap-2 text-[19px] font-semibold leading-snug"
+          style={SERIF}
+        >
+          {post.title}
+          {!post.url.startsWith('/') && (
+            <FaExternalLinkAlt className="h-3 w-3 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+          )}
+        </div>
+        {post.excerpt && (
+          <div
+            className={`mt-2 line-clamp-3 text-[13px] leading-normal ${MUTED}`}
+          >
+            {post.excerpt}
+          </div>
+        )}
+        <div className={`mt-2.5 text-[12px] ${MUTED}`}>
+          {post.author ?? RESEARCH_SOURCE.name}
+          {post.date &&
+            ` · ${new Date(post.date).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}`}
+        </div>
+      </div>
+    </a>
+  )
+}
+
+function Section({
+  title,
+  blurb,
+  posts,
+}: {
+  title: string
+  blurb: ReactNode
+  posts: ResearchPost[]
+}) {
+  return (
+    <section className="mb-9" aria-labelledby={`research-${title}`}>
+      <h2
+        id={`research-${title}`}
+        className="mb-1 text-[20px] font-semibold"
+        style={SERIF}
+      >
+        {title}
+      </h2>
+      <div className={`mb-3.5 text-[13px] ${MUTED}`}>{blurb}</div>
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        {posts.map((post) => (
+          <ResearchCard key={post.url} post={post} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const LAB_NOTES_LINK = (
+  <a
+    href={RESEARCH_SOURCE.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="font-semibold text-brand"
+  >
+    {RESEARCH_SOURCE.name}
+  </a>
+)
+
 // Public: research built on the archive is useful to visitors and members.
 export default async function ResearchPage() {
   const feedPosts = await getResearchPosts(24)
-  // The two pinned pieces lead; everything else is newest first.
-  const [lead, pinned, ...rest] = pinResearchPost([
-    YOU_CAN_JUST_DO_THINGS,
-    MODEL_BEHAVIOR_REPORTS,
-    COMMUNITY_ARCHIVE_PAPER,
-    ...feedPosts,
-  ])
-  const posts = [lead, pinned, ...rest.sort(byNewest)]
+  const journalUrls = new Set(JOURNAL_POSTS.map((post) => post.url))
+  // The pinned lab note leads the Blog; everything else is newest first.
+  const [lead, ...rest] = pinResearchPost(
+    [MODEL_BEHAVIOR_REPORTS, COMMUNITY_ARCHIVE_PAPER, ...feedPosts].filter(
+      (post) => !journalUrls.has(post.url),
+    ),
+  )
+  const blogPosts = [lead, ...rest.sort(byNewest)]
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
@@ -54,93 +155,24 @@ export default async function ResearchPage() {
         <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
           Research
         </h1>
-        <div className={`mb-[18px] text-[13px] ${MUTED}`}>
-          Research and projects built on the archive, including lab notes from{' '}
-          <a
-            href={RESEARCH_SOURCE.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-brand"
-          >
-            {RESEARCH_SOURCE.name}
-          </a>
-          .
+        <div className={`mb-7 text-[13px] ${MUTED}`}>
+          Research and projects built on the archive.
         </div>
 
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          {posts.map((post) => (
-            <a
-              key={post.url}
-              href={post.url}
-              // Pieces published on this site open in place.
-              {...(post.url.startsWith('/')
-                ? {}
-                : { target: '_blank', rel: 'noopener noreferrer' })}
-              className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-white transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
-            >
-              {post.imageLight && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={post.imageLight}
-                  alt=""
-                  loading="lazy"
-                  className="h-36 w-full border-b border-zinc-200 object-cover dark:hidden"
-                />
-              )}
-              {post.image && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={post.image}
-                  alt=""
-                  loading="lazy"
-                  className={`h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a] ${
-                    post.imageLight ? 'hidden dark:block' : ''
-                  }`}
-                />
-              )}
-              <div className="p-[18px]">
-                <div
-                  className="flex items-baseline gap-2 text-[19px] font-semibold leading-snug"
-                  style={SERIF}
-                >
-                  {post.title}
-                  {!post.url.startsWith('/') && (
-                    <FaExternalLinkAlt className="h-3 w-3 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                  )}
-                </div>
-                {post.excerpt && (
-                  <div
-                    className={`mt-2 line-clamp-3 text-[13px] leading-normal ${MUTED}`}
-                  >
-                    {post.excerpt}
-                  </div>
-                )}
-                <div className={`mt-2.5 text-[12px] ${MUTED}`}>
-                  {post.author ?? RESEARCH_SOURCE.name}
-                  {post.date &&
-                    ` · ${new Date(post.date).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}`}
-                </div>
-              </div>
-            </a>
-          ))}
-        </div>
+        <Section
+          title="Journal"
+          blurb="In-depth investigations using the archive."
+          posts={JOURNAL_POSTS}
+        />
+        <Section
+          title="Blog"
+          blurb={<>Projects, papers, and lab notes from {LAB_NOTES_LINK}.</>}
+          posts={blogPosts}
+        />
         {feedPosts.length === 0 && (
-          <div className={`mt-4 text-[13px] ${MUTED}`}>
+          <div className={`text-[13px] ${MUTED}`}>
             The lab notes feed isn&apos;t available right now. Read it directly
-            at{' '}
-            <a
-              href={RESEARCH_SOURCE.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-brand"
-            >
-              {RESEARCH_SOURCE.name}
-            </a>
-            .
+            at {LAB_NOTES_LINK}.
           </div>
         )}
       </div>

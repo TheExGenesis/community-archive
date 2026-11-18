@@ -34,7 +34,6 @@ import {
   CommunityProject,
   CommunityProjectSort,
   filterCommunityProjects,
-  HOMEPAGE_FEATURED_PROJECT_COUNT,
   mergeCommunityCatalog,
 } from '@/lib/communityProjects'
 import { cn } from '@/utils/tailwind'
@@ -363,7 +362,7 @@ function ProjectCover({
           </div>
           <div
             className={cn(
-              'text-balance mt-auto max-w-[13ch] font-serif font-bold leading-[1.05]',
+              'mt-auto max-w-[13ch] text-balance font-serif font-bold leading-[1.05]',
               modal ? 'text-[44px]' : 'text-[32px]',
             )}
           >
@@ -519,8 +518,8 @@ function ProjectEditForm({
           <span>
             Featured
             <span className="block text-muted-foreground">
-              Featured projects are listed first in the gallery, and the first{' '}
-              {HOMEPAGE_FEATURED_PROJECT_COUNT} appear on the home page.
+              Featured projects are listed first in the gallery and fill any
+              open home page slot.
             </span>
           </span>
         </label>
@@ -824,7 +823,7 @@ export default function CommunityGallery({
           <div className="text-center">
             <h1
               aria-label="Discover community-made tools, bots, visualizations, and more"
-              className="text-balance mx-auto max-w-[840px] text-[38px] font-bold leading-[1.06] tracking-[-0.02em]"
+              className="mx-auto max-w-[840px] text-balance text-[38px] font-bold leading-[1.06] tracking-[-0.02em]"
             >
               Discover community-made{' '}
               <span className="text-brand-icon">tools,</span>

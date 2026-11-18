@@ -158,6 +158,21 @@ export const listPublishedWeeks = (limit = 26): Promise<string[]> =>
   )()
 
 /**
+ * Mondays that have a weekly edition to open: every published week the
+ * calendar can reach plus the running week's in-progress edition. Both reads
+ * are shared across requests, so pages that show it stay cacheable.
+ */
+export async function listWeeklyEditionWeeks(): Promise<string[]> {
+  const [published, soFar] = await Promise.all([
+    listPublishedWeeks(104),
+    getWeekSoFar(),
+  ])
+  return soFar && !published.includes(soFar.weekStart)
+    ? [soFar.weekStart, ...published]
+    : published
+}
+
+/**
  * How many of the newest published weeks each deploy renders ahead of time, so
  * no reader waits for a cold render after a release. Older weeks still render
  * on their first visit.
@@ -216,9 +231,10 @@ export async function loadWeeklyRefPreviews(
     story.dailyStories.forEach((ref) => dailyDates.add(ref.digestDate))
     story.continuesFrom.forEach((ref) => priorWeeks.add(ref.weekStart))
   }
-  content.alsoNotable.forEach((item) =>
-    dailyDates.add(item.dailyStory.digestDate),
-  )
+  content.alsoNotable.forEach((item) => {
+    dailyDates.add(item.dailyStory.digestDate)
+    item.continuesFrom?.forEach((ref) => priorWeeks.add(ref.weekStart))
+  })
 
   const previews: Record<string, WeeklyRefPreview> = {}
   await Promise.all([

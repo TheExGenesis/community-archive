@@ -18,6 +18,7 @@ import {
   dailyPreviewKey,
   weeklyPeople,
   weeklyPreviewKey,
+  type WeeklyContinuityRef,
   type WeeklyDigestContent,
   type WeeklyDigestStory,
   type WeeklyRefPreview,
@@ -107,17 +108,17 @@ function DailyRef({
 }
 
 function ContinuesFrom({
-  story,
+  refs,
   previews,
 }: {
-  story: WeeklyDigestStory
+  refs: WeeklyContinuityRef[]
   previews: Previews
 }) {
-  if (story.continuesFrom.length === 0) return null
+  if (refs.length === 0) return null
   return (
     <>
       Continues from{' '}
-      {story.continuesFrom.map((ref, index) => {
+      {refs.map((ref, index) => {
         const preview = previews[weeklyPreviewKey(ref.weekStart, ref.slug)]
         return (
           <span key={`${ref.weekStart}-${ref.slug}`}>
@@ -468,33 +469,67 @@ function DailyStoryLinks({
   )
 }
 
+/**
+ * Last week's final stories that no main story of the running week
+ * continues; the continued ones are already linked from those stories.
+ */
+export function moreFromLastWeek(
+  lastWeek: WeeklyDigestEdition,
+  current: WeeklyDigestContent,
+): WeeklyDigestStory[] {
+  const continued = new Set(
+    current.stories
+      .flatMap((story) => story.continuesFrom)
+      .filter((ref) => ref.weekStart === lastWeek.weekStart)
+      .map((ref) => ref.slug),
+  )
+  return lastWeek.content.stories.filter((story) => !continued.has(story.slug))
+}
+
 /** Points the week-so-far reader at last week's final edition. */
-function LastWeek({ edition }: { edition: WeeklyDigestEdition }) {
-  const { content } = edition
+function LastWeek({
+  edition,
+  current,
+}: {
+  edition: WeeklyDigestEdition
+  current: WeeklyDigestContent
+}) {
+  const stories = moreFromLastWeek(edition, current)
   return (
     <section className="mt-10 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
-      <h2 className={sectionLabel}>Last week in review</h2>
+      <h2 className={sectionLabel}>More from last week</h2>
+      {stories.length > 0 ? (
+        <ul className="mt-4 space-y-5">
+          {stories.map((story) => (
+            <li key={story.slug}>
+              <Link
+                href={weeklyStoryPath(edition.weekStart, story.slug)}
+                className="group block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <span
+                  className="block text-[22px] font-semibold leading-[1.2] group-hover:text-brand sm:text-[24px]"
+                  style={SERIF}
+                >
+                  {displayTitle(story)}
+                </span>
+                {story.subtitle ? (
+                  <span
+                    className="mt-2 block max-w-[60ch] text-[17px] italic leading-[1.45] text-zinc-700 dark:text-zinc-300"
+                    style={SERIF}
+                  >
+                    {plain(story.subtitle)}
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <Link
         href={`/digest/week/${edition.weekStart}`}
-        className="group mt-4 block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        className={`${stories.length > 0 ? 'mt-5' : 'mt-4'} inline-block text-sm font-semibold ${navLink}`}
       >
-        <span
-          className="block text-[24px] font-semibold leading-[1.15] group-hover:text-brand sm:text-[28px]"
-          style={SERIF}
-        >
-          {weekRangeLabel(content.weekStart, content.weekEnd)}
-        </span>
-        {content.dek ? (
-          <span
-            className="mt-2 block max-w-[60ch] text-[17px] italic leading-[1.45] text-zinc-700 dark:text-zinc-300"
-            style={SERIF}
-          >
-            {content.dek}
-          </span>
-        ) : null}
-        <span className={`mt-3 inline-block text-sm font-semibold ${navLink}`}>
-          Read last week&apos;s Week in Review →
-        </span>
+        Read last week&apos;s Week in Review →
       </Link>
     </section>
   )
@@ -642,7 +677,10 @@ export function WeeklyDigestView({
                         <WeeklyText>{story.subtitle}</WeeklyText>
                         {story.continuesFrom.length > 0 ? (
                           <span className="mt-1.5 block text-[13px] leading-[1.6]">
-                            <ContinuesFrom story={story} previews={previews} />
+                            <ContinuesFrom
+                              refs={story.continuesFrom}
+                              previews={previews}
+                            />
                           </span>
                         ) : null}
                       </p>
@@ -691,12 +729,24 @@ export function WeeklyDigestView({
                       >
                         {shortDay(item.dailyStory.digestDate)} →
                       </DailyRef>
+                      {item.continuesFrom?.length ? (
+                        <span
+                          className={`mt-0.5 block text-[13px] leading-[1.6] ${MUTED}`}
+                        >
+                          <ContinuesFrom
+                            refs={item.continuesFrom}
+                            previews={previews}
+                          />
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
               </section>
             ) : null}
-            {soFar?.lastWeek ? <LastWeek edition={soFar.lastWeek} /> : null}
+            {soFar?.lastWeek ? (
+              <LastWeek edition={soFar.lastWeek} current={content} />
+            ) : null}
           </div>
 
           <WeekSidebar
@@ -809,7 +859,11 @@ export function WeeklyStoryView({
             {story.continuesFrom.length > 0 ? (
               <p className={`mt-3 text-[15px] leading-[1.6] ${MUTED}`}>
                 <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                  <ContinuesFrom story={story} previews={previews} />.{' '}
+                  <ContinuesFrom
+                    refs={story.continuesFrom}
+                    previews={previews}
+                  />
+                  .{' '}
                 </span>
                 {story.continuityNote ? (
                   <WeeklyText>{story.continuityNote}</WeeklyText>

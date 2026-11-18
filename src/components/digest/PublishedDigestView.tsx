@@ -17,7 +17,11 @@ import { DigestSubscriberCount } from './DigestSubscriberCount'
 import { DigestViewCount } from './DigestViewCount'
 import { DigestTopTerms } from './DigestTopTerms'
 import { DigestBulletinCards } from './DigestBulletinCards'
-import { getPublishedWeeklyDigest, getWeekSoFar } from '@/lib/digest/weeklyData'
+import {
+  getPublishedWeeklyDigest,
+  getWeekSoFar,
+  listWeeklyEditionWeeks,
+} from '@/lib/digest/weeklyData'
 import { weekStartFor } from '@/lib/digest/weekly'
 import {
   loadDigestBulletinItemsForViewer,
@@ -159,12 +163,16 @@ async function Calendar({
   archive: Promise<DigestCalendarDay[]>
   date: string
 }) {
-  const days = await archive
+  const [days, weeks] = await Promise.all([
+    archive,
+    listWeeklyEditionWeeks().catch(() => []),
+  ])
   return (
     <DigestDaySelector
       currentDate={date}
       availableDays={days}
       variant="editorial"
+      weekLinks={{ weeks }}
     />
   )
 }

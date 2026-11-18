@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import {
   WeeklyDigestView,
   weekRangeLabel,
@@ -64,7 +64,11 @@ export default async function WeeklyDigestPage({
     listPublishedWeeks(),
     getWeekSoFar(),
   ])
-  if (!edition) notFound()
+  if (!edition) {
+    // The running week has no final edition yet; its page is /digest/week.
+    if (soFar?.weekStart === weekStart) redirect('/digest/week')
+    notFound()
+  }
   const previews = await getCachedWeeklyRefPreviews(edition.weekStart)
   return (
     <WeeklyDigestView

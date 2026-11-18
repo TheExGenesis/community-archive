@@ -458,11 +458,32 @@ export function communityMenu(catalog: CommunityProject[]): CommunityMenu {
 
 export const HOMEPAGE_FEATURED_PROJECT_COUNT = 6
 
-/** Featured projects lead; fill the second row from the existing gallery. */
+/** The home page's Community Apps, in order. */
+export const HOMEPAGE_PICKS = [
+  'model-behavior-reports',
+  'cuties-b9b5e204',
+  'meet-your-neighbors',
+  'followle',
+  'common-tongue',
+  'distill',
+] as const
+
+/**
+ * The picked apps lead in order; featured projects fill any slot a pick
+ * leaves empty (for example before the published rows have loaded).
+ */
 export function homepageFeaturedProjects(catalog: CommunityProject[]) {
-  return filterCommunityProjects(catalog, '', 'All', 'Featured')
-    .filter((project) => project.projectUrl)
-    .slice(0, HOMEPAGE_FEATURED_PROJECT_COUNT)
+  const launchable = catalog.filter((project) => project.projectUrl)
+  const bySlug = new Map(launchable.map((project) => [project.slug, project]))
+  const picked = HOMEPAGE_PICKS.flatMap((slug) => bySlug.get(slug) ?? [])
+  const pickedSlugs = new Set(picked.map((project) => project.slug))
+  const fill = filterCommunityProjects(
+    launchable,
+    '',
+    'All',
+    'Featured',
+  ).filter((project) => !pickedSlugs.has(project.slug))
+  return [...picked, ...fill].slice(0, HOMEPAGE_FEATURED_PROJECT_COUNT)
 }
 
 export function filterCommunityProjects(

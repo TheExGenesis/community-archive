@@ -2,7 +2,10 @@ import { Suspense } from 'react'
 import { unstable_cache } from 'next/cache'
 import { loadWeeklyBulletinItems } from '@/lib/digest/bulletin'
 import { listPublishedDigestDays } from '@/lib/digest/data'
-import type { WeeklyDigestEdition } from '@/lib/digest/weeklyData'
+import {
+  listWeeklyEditionWeeks,
+  type WeeklyDigestEdition,
+} from '@/lib/digest/weeklyData'
 import { BulletinItems } from './PublishedDigestView'
 import { DigestDaySelector } from './DigestDaySelector'
 import { getActiveDigestSubscriberCount } from '@/lib/digest/emailSubscriptions'
@@ -53,7 +56,10 @@ const cachedDigestDays = unstable_cache(
 )
 
 async function Calendar({ edition }: { edition: WeeklyDigestEdition }) {
-  const days = await cachedDigestDays()
+  const [days, weeks] = await Promise.all([
+    cachedDigestDays(),
+    listWeeklyEditionWeeks().catch(() => []),
+  ])
   const { weekStart, weekEnd, throughDate } = edition.content
   return (
     <DigestDaySelector
@@ -61,12 +67,14 @@ async function Calendar({ edition }: { edition: WeeklyDigestEdition }) {
       availableDays={days}
       variant="editorial"
       week={{ start: weekStart, end: weekEnd }}
+      weekLinks={{ weeks }}
       title="Daily editions"
     />
   )
 }
 
-/** A month calendar of daily editions with this week's days tinted. */
+/** A month calendar of daily editions with this week's row tinted and a
+ *  link to each week that has an edition. */
 export function WeeklyCalendar({ edition }: { edition: WeeklyDigestEdition }) {
   return (
     <Suspense

@@ -104,6 +104,11 @@ export interface WeeklyDigestStory {
 export interface WeeklyAlsoNotable {
   line: string
   dailyStory: WeeklyDailyStoryRef
+  /**
+   * Earlier weekly stories this entry continues. Absent on editions written
+   * before also-notable entries could carry a continuation.
+   */
+  continuesFrom?: WeeklyContinuityRef[]
 }
 
 export interface WeeklyDigestContent {
@@ -845,8 +850,11 @@ export function weeklyDigestToMarkdown(
   if (content.alsoNotable.length > 0) {
     lines.push('## Also this week', '')
     for (const item of content.alsoNotable) {
+      const continues = (item.continuesFrom ?? [])
+        .map((ref) => `continues “${ref.title}” (week of ${ref.weekStart})`)
+        .join('; ')
       lines.push(
-        `- ${item.line} ([${item.dailyStory.digestDate}](${siteUrl}/digest/${item.dailyStory.digestDate}/${item.dailyStory.slug}))`,
+        `- ${item.line} ([${item.dailyStory.digestDate}](${siteUrl}/digest/${item.dailyStory.digestDate}/${item.dailyStory.slug}))${continues ? ` — ${continues}` : ''}`,
       )
     }
     lines.push('')

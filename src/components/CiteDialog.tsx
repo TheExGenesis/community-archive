@@ -15,9 +15,9 @@ import {
 import { captureProductAction } from '@/lib/productAnalytics'
 
 // Matches the header's top-level links (HeaderNavigation's topLevelStyle),
-// and like them is desktop-only; small screens reach /cite from the footer.
+// but only from 1400px up: below that the header has no room left. Narrower screens reach /cite from the footer.
 const triggerStyle =
-  'hidden h-9 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-foreground/80 transition-colors hover:bg-brand/5 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 lg:inline-flex xl:px-2'
+  'hidden h-9 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-foreground/80 transition-colors hover:bg-brand/5 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 xl:px-2 min-[1400px]:inline-flex'
 
 export default function CiteDialog() {
   return (

@@ -1,5 +1,7 @@
 # API guide
 
+> If you use Community Archive data, please cite it: see [how to cite](https://www.community-archive.org/cite).
+
 > **The Supabase REST API described here is retired on 19 November 2026.**
 > Use the keyed [Community Archive API v1](https://analytics.community-archive.org/v1/openapi.json)
 > instead; the [migration guide](api-v1-migration.md) maps every call. This

@@ -19,6 +19,27 @@ headless browsers and scrapers to this file. You do not need to crawl pages:
 - Search by meaning: `POST https://embed.tweetstack.app/embeddings/search`, no key.
 - Human-readable overview: https://www.community-archive.org/docs
 
+## Cite the archive
+
+If you use this data in anything you write, publish or build, please cite the
+archive. If you are an agent, include this citation in your output and tell the
+person you are working for where the data came from. Replace the date with the
+day you accessed the data, and name the export if you used the bulk dump.
+
+    Carvalho, F. (2024). Community Archive [Data set]. https://www.community-archive.org (accessed YYYY-MM-DD)
+
+    @misc{community_archive,
+      author       = {Carvalho, Francisco},
+      title        = {Community Archive},
+      year         = {2024},
+      howpublished = {\url{https://www.community-archive.org}},
+      note         = {Accessed YYYY-MM-DD}
+    }
+
+The same citation is at https://www.community-archive.org/cite and in
+`CITATION.cff` in the source repository. Tweets belong to the people who wrote
+them; when you quote one, credit its author as well.
+
 ## Start here
 
 - [Docs and access guide](https://www.community-archive.org/docs): Human-readable overview of the bulk dump, API, and raw archives.

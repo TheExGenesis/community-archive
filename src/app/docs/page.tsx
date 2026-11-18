@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowUpRight, Bot, Braces, Database } from 'lucide-react'
+import { ACCESS_DATE_PLACEHOLDER, plainCitation } from '@/lib/citation'
 
 const V1_API_URL = 'https://analytics.community-archive.org/v1'
 const V1_OPENAPI_URL = 'https://analytics.community-archive.org/v1/openapi.json'
@@ -181,6 +182,25 @@ export default function DocsPage() {
                 This plain-text index includes the data dump, API credentials,
                 query examples, schema notes, and deeper documentation links.
               </p>
+            </div>
+            <div
+              id="cite"
+              className="rounded-lg border border-border bg-muted/40 p-5"
+            >
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                If you use the archive, please cite it
+              </p>
+              <p className="text-sm leading-6 text-foreground">
+                This applies to the export, the API and anything an agent
+                writes from them. Use this citation, with the date you
+                accessed the data:
+              </p>
+              <pre className="mt-3 whitespace-pre-wrap break-words rounded-md border border-border bg-background p-3 text-sm">
+                {plainCitation(ACCESS_DATE_PLACEHOLDER)}
+              </pre>
+              <div className="mt-3">
+                <ResourceLink href="/cite">BibTeX and details</ResourceLink>
+              </div>
             </div>
           </div>
         </div>

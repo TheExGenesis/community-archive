@@ -15,6 +15,16 @@ with tweets, profiles, and a manifest. Check the manifest timestamp for freshnes
 and resolve the latest pointer each time; older download links expire. See the
 [data access guide](docs/api-doc.md) for downloads and targeted API queries.
 
+## Citing
+
+If you use the archive in a paper, post or project, please cite it and include
+the date you accessed it:
+
+> Carvalho, F. (2024). Community Archive [Data set]. https://www.community-archive.org (accessed YYYY-MM-DD)
+
+BibTeX is at [community-archive.org/cite](https://www.community-archive.org/cite)
+and in [`CITATION.cff`](CITATION.cff).
+
 ## How to use the API (from your own app)
 
 See [API docs](docs/api-doc.md) for the keyed API v1, the bulk Parquet export, the open [semantic search API](docs/api-doc.md#semantic-search-api), and the legacy Supabase REST API.

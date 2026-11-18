@@ -14,6 +14,8 @@ import {
   overflowLabel,
 } from '@/components/MediaOverflowBadge'
 import { TweetAvatar } from '@/components/TweetAvatar'
+import { ProfileHoverCard } from '@/components/agentSearch/ProfilePreview'
+import { personOfTweet } from '@/components/agentSearch/profileLinks'
 export { TweetAvatar, avatarHue } from '@/components/TweetAvatar'
 import {
   tweetPermalinkHref,
@@ -303,25 +305,37 @@ function QuotedTweet({
   return (
     <div className="mt-2 rounded-[4px] border border-zinc-200 bg-white p-2.5 dark:border-[#303036] dark:bg-[#18181b]">
       <div className="flex items-center gap-2">
-        <Link
-          {...linkTarget}
+        <ProfileHoverCard
+          person={personOfTweet(tweet)}
           href={profileHref}
-          aria-label={`View @${tweet.username}'s profile`}
-          className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          newTab={Boolean(linkTarget.target)}
         >
-          <TweetAvatar tweet={tweet} size={condensed ? 24 : 28} />
-        </Link>
-        <div className="min-w-0 text-[12px] leading-tight">
           <Link
             {...linkTarget}
             href={profileHref}
-            className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label={`View @${tweet.username}'s profile`}
+            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
-            <span className="font-bold">{tweet.name}</span>{' '}
-            <span className="text-zinc-500 dark:text-[#a7a7b4]">
-              @{tweet.username}
-            </span>
-          </Link>{' '}
+            <TweetAvatar tweet={tweet} size={condensed ? 24 : 28} />
+          </Link>
+        </ProfileHoverCard>
+        <div className="min-w-0 text-[12px] leading-tight">
+          <ProfileHoverCard
+            person={personOfTweet(tweet)}
+            href={profileHref}
+            newTab={Boolean(linkTarget.target)}
+          >
+            <Link
+              {...linkTarget}
+              href={profileHref}
+              className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <span className="font-bold">{tweet.name}</span>{' '}
+              <span className="text-zinc-500 dark:text-[#a7a7b4]">
+                @{tweet.username}
+              </span>
+            </Link>
+          </ProfileHoverCard>{' '}
           <span
             suppressHydrationWarning
             className="text-zinc-500 dark:text-[#a7a7b4]"
@@ -635,12 +649,18 @@ export function TweetRow({
 
   const byline = isMap ? (
     <div className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-[11px] text-muted-foreground">
-      <Link
+      <ProfileHoverCard
+        person={personOfTweet(tweet)}
         href={profileHref}
-        className="min-w-0 flex-1 truncate font-semibold text-foreground"
+        newTab={Boolean(linkTarget.target)}
       >
-        @{tweet.username}
-      </Link>
+        <Link
+          href={profileHref}
+          className="min-w-0 flex-1 truncate font-semibold text-foreground"
+        >
+          @{tweet.username}
+        </Link>
+      </ProfileHoverCard>
       <span className="shrink-0" suppressHydrationWarning>
         {shortDate(tweet.createdAt)}
       </span>
@@ -657,13 +677,19 @@ export function TweetRow({
     </div>
   ) : stacked ? (
     <div className="min-w-0 leading-tight">
-      <Link
-        {...linkTarget}
+      <ProfileHoverCard
+        person={personOfTweet(tweet)}
         href={profileHref}
-        className="block max-w-full truncate rounded-sm text-[13.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        newTab={Boolean(linkTarget.target)}
       >
-        {tweet.name}
-      </Link>
+        <Link
+          {...linkTarget}
+          href={profileHref}
+          className="block max-w-full truncate rounded-sm text-[13.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          {tweet.name}
+        </Link>
+      </ProfileHoverCard>
       <div className="truncate text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
         @{tweet.username}
         <span suppressHydrationWarning>
@@ -676,26 +702,32 @@ export function TweetRow({
     </div>
   ) : (
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <Link
-        {...linkTarget}
+      <ProfileHoverCard
+        person={personOfTweet(tweet)}
         href={profileHref}
-        className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        newTab={Boolean(linkTarget.target)}
       >
-        <span
-          className={`block max-w-full truncate font-bold ${
-            isEditorial
-              ? 'text-[14px]'
-              : compact
-                ? 'text-[13px]'
-                : 'text-[13.5px]'
-          }`}
+        <Link
+          {...linkTarget}
+          href={profileHref}
+          className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
-          {tweet.name}
-        </span>{' '}
-        <span className="block max-w-full truncate text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
-          @{tweet.username}
-        </span>
-      </Link>
+          <span
+            className={`block max-w-full truncate font-bold ${
+              isEditorial
+                ? 'text-[14px]'
+                : compact
+                  ? 'text-[13px]'
+                  : 'text-[13.5px]'
+            }`}
+          >
+            {tweet.name}
+          </span>{' '}
+          <span className="block max-w-full truncate text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+            @{tweet.username}
+          </span>
+        </Link>
+      </ProfileHoverCard>
       <span
         suppressHydrationWarning
         className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]"
@@ -825,26 +857,38 @@ export function TweetRow({
     >
       {stacked ? (
         <div className="flex items-center gap-2">
+          <ProfileHoverCard
+            person={personOfTweet(tweet)}
+            href={profileHref}
+            newTab={Boolean(linkTarget.target)}
+          >
+            <Link
+              {...linkTarget}
+              href={profileHref}
+              aria-label={`View @${tweet.username}'s profile`}
+            >
+              <TweetAvatar tweet={tweet} size={28} />
+            </Link>
+          </ProfileHoverCard>
+          {byline}
+        </div>
+      ) : (
+        <ProfileHoverCard
+          person={personOfTweet(tweet)}
+          href={profileHref}
+          newTab={Boolean(linkTarget.target)}
+        >
           <Link
             {...linkTarget}
             href={profileHref}
             aria-label={`View @${tweet.username}'s profile`}
           >
-            <TweetAvatar tweet={tweet} size={28} />
+            <TweetAvatar
+              tweet={tweet}
+              size={isEditorial ? 44 : isFeatured ? 38 : 34}
+            />
           </Link>
-          {byline}
-        </div>
-      ) : (
-        <Link
-          {...linkTarget}
-          href={profileHref}
-          aria-label={`View @${tweet.username}'s profile`}
-        >
-          <TweetAvatar
-            tweet={tweet}
-            size={isEditorial ? 44 : isFeatured ? 38 : 34}
-          />
-        </Link>
+        </ProfileHoverCard>
       )}
       {details}
       {compact && showEngagement && !isMap && (

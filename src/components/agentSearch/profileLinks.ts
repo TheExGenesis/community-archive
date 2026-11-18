@@ -13,6 +13,17 @@ export interface Person {
   tweets?: number
 }
 
+/** The author of a tweet, as a hover card needs them. */
+export const personOfTweet = (
+  tweet: Pick<PortalTweet, 'id' | 'username' | 'accountId' | 'name' | 'avatar'>,
+): Person => ({
+  username: tweet.username,
+  accountId: tweet.accountId,
+  name: tweet.name,
+  avatar: tweet.avatar,
+  tweetId: tweet.id,
+})
+
 /** The people behind a run's tweets, each tweet counted once. */
 export function peopleFromTweets(
   groups: readonly (readonly PortalTweet[])[],

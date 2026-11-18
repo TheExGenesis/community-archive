@@ -18,9 +18,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
+import { ProfileHoverCard } from '@/components/agentSearch/ProfilePreview'
 import { formatNumber } from '@/lib/formatNumber'
 import { formatDirectoryDate as formatJoinedDate } from '@/lib/directoryDate'
-import { fetchUsers, getDirectoryProfileHref } from '@/lib/queries/fetchUsers'
+import {
+  directoryPerson,
+  fetchUsers,
+  getDirectoryProfileHref,
+} from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
 import { capturePostHogEvent } from '@/lib/posthog'
 import {
@@ -526,21 +531,26 @@ export default function UserDirectoryClient({
                       className="group border-border hover:bg-accent dark:border-border dark:hover:bg-accent"
                     >
                       <TableCell className="py-4">
-                        <Link
+                        <ProfileHoverCard
+                          person={directoryPerson(user)}
                           href={getDirectoryProfileHref(user)}
-                          onClick={() =>
-                            capturePostHogEvent('user_directory_action', {
-                              action: 'profile_opened',
-                              has_query: Boolean(debouncedSearch),
-                              sort_by: sortKey,
-                              sort_order: sortOrder,
-                              visible_result_count: users.length,
-                            })
-                          }
-                          className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
                         >
-                          {identity}
-                        </Link>
+                          <Link
+                            href={getDirectoryProfileHref(user)}
+                            onClick={() =>
+                              capturePostHogEvent('user_directory_action', {
+                                action: 'profile_opened',
+                                has_query: Boolean(debouncedSearch),
+                                sort_by: sortKey,
+                                sort_order: sortOrder,
+                                visible_result_count: users.length,
+                              })
+                            }
+                            className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
+                          >
+                            {identity}
+                          </Link>
+                        </ProfileHoverCard>
                       </TableCell>
                       <TableCell className="hidden whitespace-nowrap text-right text-sm font-medium tabular-nums text-muted-foreground sm:table-cell">
                         {user.num_followers == null

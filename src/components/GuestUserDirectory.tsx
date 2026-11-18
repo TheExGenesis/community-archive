@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import BrowsingSignInPrompt from '@/components/BrowsingSignInPrompt'
 import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
+import { ProfileHoverCard } from '@/components/agentSearch/ProfilePreview'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Table,
@@ -12,7 +13,10 @@ import {
 } from '@/components/ui/table'
 import { formatDirectoryDate as formatJoinedDate } from '@/lib/directoryDate'
 import { formatNumber } from '@/lib/formatNumber'
-import { getDirectoryProfileHref } from '@/lib/queries/fetchUsers'
+import {
+  directoryPerson,
+  getDirectoryProfileHref,
+} from '@/lib/queries/fetchUsers'
 import type { DirectoryUser } from '@/lib/types'
 
 /**
@@ -75,30 +79,35 @@ export default function GuestUserDirectory({
                     className="group border-border hover:bg-accent dark:border-border dark:hover:bg-accent"
                   >
                     <TableCell className="py-4">
-                      <Link
+                      <ProfileHoverCard
+                        person={directoryPerson(user)}
                         href={getDirectoryProfileHref(user)}
-                        className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
                       >
-                        <Avatar className="h-11 w-11 border border-border">
-                          <AvatarImage
-                            src={user.avatar_media_url || undefined}
-                            alt={`${user.account_display_name}'s avatar`}
-                          />
-                          <AvatarFallback>
-                            {Array.from(
-                              user.account_display_name,
-                            )[0]?.toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold text-foreground">
-                            {user.account_display_name}
+                        <Link
+                          href={getDirectoryProfileHref(user)}
+                          className="flex min-w-0 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
+                        >
+                          <Avatar className="h-11 w-11 border border-border">
+                            <AvatarImage
+                              src={user.avatar_media_url || undefined}
+                              alt={`${user.account_display_name}'s avatar`}
+                            />
+                            <AvatarFallback>
+                              {Array.from(
+                                user.account_display_name,
+                              )[0]?.toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-foreground">
+                              {user.account_display_name}
+                            </div>
+                            <div className="truncate text-sm text-muted-foreground">
+                              @{user.username}
+                            </div>
                           </div>
-                          <div className="truncate text-sm text-muted-foreground">
-                            @{user.username}
-                          </div>
-                        </div>
-                      </Link>
+                        </Link>
+                      </ProfileHoverCard>
                     </TableCell>
                     <TableCell className="hidden whitespace-nowrap text-right text-sm font-medium tabular-nums text-muted-foreground sm:table-cell">
                       {user.num_followers == null

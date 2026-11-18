@@ -1,6 +1,8 @@
+import Link from 'next/link'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import {
   ProfileCard,
+  ProfileHoverCard,
   ProfileLink,
   ProfilePeopleContext,
   clearProfilePreviews,
@@ -97,6 +99,88 @@ test('hovering a known handle opens the card after a pause', async () => {
     jest.advanceTimersByTime(300)
   })
   expect(screen.getByText('Open profile')).toBeInTheDocument()
+  jest.useRealTimers()
+})
+
+test('any avatar or name can open the card, without its row seeing clicks', () => {
+  jest.useFakeTimers()
+  window.matchMedia = jest.fn().mockReturnValue({ matches: true })
+  primeProfilePreviews([preview])
+  const rowClick = jest.fn()
+  render(
+    <div onClick={rowClick}>
+      <ProfileHoverCard person={{ username: 'csgbwk' }} href="/user/csgbwk">
+        <Link href="/user/csgbwk">avatar</Link>
+      </ProfileHoverCard>
+    </div>,
+  )
+  fireEvent.mouseEnter(screen.getByRole('link', { name: 'avatar' }))
+  act(() => {
+    jest.advanceTimersByTime(300)
+  })
+  const bio = screen.getByText('building robots')
+  expect(
+    screen.getByRole('link', { name: 'Open profile' }),
+  ).not.toHaveAttribute('target')
+  fireEvent.click(bio)
+  expect(rowClick).not.toHaveBeenCalled()
+  jest.useRealTimers()
+})
+
+test('a card with no bio to add stays shut, and a signed-out page stops asking', async () => {
+  window.matchMedia = jest.fn().mockReturnValue({ matches: true })
+  fetchMock.mockResolvedValue({ ok: false, status: 401 })
+  render(
+    <>
+      <ProfileHoverCard person={person} href="/user/csgbwk">
+        <Link href="/user/csgbwk">first</Link>
+      </ProfileHoverCard>
+      <ProfileHoverCard person={{ username: 'other' }} href="/user/other">
+        <Link href="/user/other">second</Link>
+      </ProfileHoverCard>
+    </>,
+  )
+  fireEvent.mouseEnter(screen.getByRole('link', { name: 'first' }))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 350))
+  })
+  expect(screen.queryByText('Open profile')).toBeNull()
+  fireEvent.mouseEnter(screen.getByRole('link', { name: 'second' }))
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 350))
+  })
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(screen.queryByText('Open profile')).toBeNull()
+})
+
+test('a fetched bio opens the card while the pointer stays', async () => {
+  window.matchMedia = jest.fn().mockReturnValue({ matches: true })
+  render(
+    <ProfileHoverCard person={person} href="/user/csgbwk">
+      <Link href="/user/csgbwk">avatar</Link>
+    </ProfileHoverCard>,
+  )
+  fireEvent.mouseEnter(screen.getByRole('link', { name: 'avatar' }))
+  expect(
+    await screen.findByText('building robots', {}, { timeout: 1000 }),
+  ).toBeInTheDocument()
+  expect(screen.queryByTestId('profile-loading')).toBeNull()
+})
+
+test('touch screens get no card, just the link', () => {
+  jest.useFakeTimers()
+  window.matchMedia = jest.fn().mockReturnValue({ matches: false })
+  render(
+    <ProfileHoverCard person={person} href="/user/csgbwk">
+      <Link href="/user/csgbwk">avatar</Link>
+    </ProfileHoverCard>,
+  )
+  fireEvent.mouseEnter(screen.getByRole('link', { name: 'avatar' }))
+  act(() => {
+    jest.advanceTimersByTime(1000)
+  })
+  expect(screen.queryByText('Open profile')).toBeNull()
   jest.useRealTimers()
 })
 

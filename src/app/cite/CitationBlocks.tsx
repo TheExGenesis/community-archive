@@ -27,7 +27,7 @@ function CitationBlock({ label, text }: { label: string; text: string }) {
   return (
     <section className="mb-6">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">{label}</h2>
+        <h2 className="text-base font-semibold">{label}</h2>
         <Button variant="outline" size="sm" onClick={copy}>
           {copied ? (
             <Check className="mr-2 h-4 w-4" />
@@ -44,7 +44,11 @@ function CitationBlock({ label, text }: { label: string; text: string }) {
   )
 }
 
-export default function CitationBlocks() {
+export default function CitationBlocks({
+  order = 'plain-first',
+}: {
+  order?: 'plain-first' | 'bibtex-first'
+}) {
   // The page is static, so today's date is filled in by the browser after
   // load; until then the citation shows a placeholder.
   const [accessDate, setAccessDate] = useState(ACCESS_DATE_PLACEHOLDER)
@@ -56,10 +60,21 @@ export default function CitationBlocks() {
     )
   }, [])
 
-  return (
+  const plain = (
+    <CitationBlock label="Plain text" text={plainCitation(accessDate)} />
+  )
+  const bibtex = (
+    <CitationBlock label="BibTeX" text={bibtexCitation(accessDate)} />
+  )
+  return order === 'bibtex-first' ? (
     <>
-      <CitationBlock label="Plain text" text={plainCitation(accessDate)} />
-      <CitationBlock label="BibTeX" text={bibtexCitation(accessDate)} />
+      {bibtex}
+      {plain}
+    </>
+  ) : (
+    <>
+      {plain}
+      {bibtex}
     </>
   )
 }

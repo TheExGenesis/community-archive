@@ -27,6 +27,7 @@ import {
 } from '@/components/NavigationAudience'
 import HeaderNavigation from '@/components/HeaderNavigation'
 import MobileNavigation from '@/components/MobileNavigation'
+import CiteDialog from '@/components/CiteDialog'
 import { getMobileNav, getPrimaryNav, getUtilityNav } from '@/lib/navigation'
 
 // Headings use Petrona (serif); body uses Manrope (sans).
@@ -132,6 +133,7 @@ export default function RootLayout({
                               entries={getUtilityNav()}
                               label="Utility"
                             />
+                            <CiteDialog />
                             <HeaderSearch />
                             <div className="text-sm">
                               <PreviewAccount>

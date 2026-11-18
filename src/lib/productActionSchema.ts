@@ -38,6 +38,7 @@ export const productActions = [
   'shared',
   'unshared',
   'citation_copied',
+  'citation_opened',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]

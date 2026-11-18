@@ -3,9 +3,11 @@ Description=Weave the current week's dailies so far into the week-so-far digest
 
 [Timer]
 # The daily edition publishes around 07:30 UTC; 09:30 UTC leaves margin and
-# runs after Monday's 09:00 weekly publisher. Runs before Wednesday find fewer
-# than three dailies and skip. Health expects a fresh run once three dailies
-# are three hours old (see community_archive_monitoring_weekly_digest).
+# runs after Monday's 09:00 weekly publisher, so Monday's run weaves the new
+# week's first daily with last week's final edition as continuity context. A
+# run with no daily of the week yet skips. Health expects a fresh run once one
+# of the week's dailies is three hours old (see
+# community_archive_monitoring_weekly_digest).
 OnCalendar=*-*-* 09:30:00 UTC
 Persistent=true
 AccuracySec=1min

@@ -22,6 +22,7 @@ import {
   getPublishedWeeklyDigest,
   getWeekSoFar,
   listPublishedWeeks,
+  runningWeekSoFar,
   type WeeklyDigestEdition,
 } from '@/lib/digest/weeklyData'
 
@@ -37,9 +38,7 @@ async function loadCurrent() {
     getWeekSoFar(),
     listPublishedWeeks(),
   ])
-  const running =
-    soFar && (!latest || soFar.weekStart > latest.weekStart) ? soFar : null
-  return { latest, running, weeks }
+  return { latest, running: runningWeekSoFar(latest, soFar), weeks }
 }
 
 export async function generateMetadata(): Promise<Metadata> {

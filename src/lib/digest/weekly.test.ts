@@ -160,7 +160,11 @@ const validOutput = {
       continuity_note: '',
     },
   ],
-  also_notable: [] as { daily_ref: string; line: string }[],
+  also_notable: [] as {
+    daily_ref: string
+    line: string
+    continues_from?: string[]
+  }[],
 }
 
 const assemble = (modelOutput: unknown) =>
@@ -442,5 +446,162 @@ describe('week so far', () => {
     })
     expect(content.throughDate).toBe('2026-10-30')
     expect(content.source.missingDates).toEqual(['2026-10-27', '2026-10-29'])
+  })
+  it("weaves Monday's single daily, with last week as continuity context", () => {
+    const monday = edition('2026-10-26', [
+      story('green-neuron', 'I found a green neuron', '1'),
+      story('swarm', 'A good guy with a swarm', '2'),
+      story('binance', 'Binance hacked', '4'),
+    ])
+    const lastWeek = {
+      ...priorWeek,
+      weekStart: '2026-10-19',
+      weekEnd: '2026-10-25',
+    }
+    const prompt = renderWeeklyDigestPrompt({
+      weekStart: WEEK,
+      editions: [monday],
+      priorWeeks: [lastWeek],
+      throughDate: '2026-10-26',
+    })
+    expect(prompt).toContain('Only one daily digest exists so far')
+    expect(prompt).toContain('Last week is among the previous weekly digests')
+    expect(prompt).toContain('W2026-10-19#1')
+    expect(prompt).toContain(
+      'A daily digest was published for every day so far.',
+    )
+
+    // A daily has at least three stories, so one daily already meets the
+    // three-story, three-bullet minimum when every story is "major".
+    const output = {
+      ...structuredClone(validOutput),
+      stories: [
+        {
+          ...structuredClone(validOutput.stories[2]),
+          continues_from: ['W2026-10-19#1'],
+          continuity_note:
+            'Last week neurons were argued over; this week a defender joins in.',
+        },
+        {
+          ...structuredClone(validOutput.stories[0]),
+          kind: 'major',
+          featured_tweet_ids: ['1'],
+          segments: [
+            { commentary: 'It started with a joke.', tweet_ids: ['1'] },
+          ],
+          daily_refs: ['2026-10-26#1'],
+          continues_from: [],
+          continuity_note: '',
+        },
+        {
+          ...structuredClone(validOutput.stories[1]),
+          daily_refs: ['2026-10-26#3'],
+        },
+      ],
+    }
+    const content = assembleWeeklyDigestContent({
+      weekStart: WEEK,
+      editions: [monday],
+      priorWeeks: [lastWeek],
+      throughDate: '2026-10-26',
+      modelOutput: output,
+    })
+    expect(content.stories).toHaveLength(3)
+    expect(content.stories[0].continuesFrom).toEqual([
+      {
+        weekStart: '2026-10-19',
+        slug: 'neurons-are-clean',
+        title: 'Neurons are already clean',
+      },
+    ])
+    expect(content.source).toMatchObject({
+      editionDates: ['2026-10-26'],
+      missingDates: [],
+      priorWeekStarts: ['2026-10-19'],
+    })
+
+    // "ongoing" still needs two dates.
+    const ongoing = structuredClone(output)
+    ongoing.stories[1].kind = 'ongoing'
+    expect(() =>
+      assembleWeeklyDigestContent({
+        weekStart: WEEK,
+        editions: [monday],
+        priorWeeks: [lastWeek],
+        throughDate: '2026-10-26',
+        modelOutput: ongoing,
+      }),
+    ).toThrow('cites daily stories from only one date')
+  })
+
+  it('tells the model which stories can be ongoing with two dailies', () => {
+    const prompt = renderWeeklyDigestPrompt({
+      weekStart: WEEK,
+      editions,
+      priorWeeks: [],
+      throughDate: '2026-10-28',
+    })
+    expect(prompt).toContain('Only two daily digests exist so far')
+    expect(prompt).not.toContain('Last week is among')
+  })
+})
+
+describe('also-notable continuations', () => {
+  it('resolves continues_from on an also-notable entry', () => {
+    const output = structuredClone(validOutput)
+    output.stories[0].continues_from = []
+    output.stories[0].continuity_note = ''
+    const fifth = edition('2026-10-31', [
+      story('qwen-probe', 'Qwen probe', '5'),
+    ])
+    output.also_notable = [
+      {
+        daily_ref: '2026-10-31#1',
+        line: 'A Qwen model tried to upload a probe.',
+        continues_from: ['W2026-10-12#1'],
+      },
+    ]
+    const content = assembleWeeklyDigestContent({
+      weekStart: WEEK,
+      editions: [...editions, fifth],
+      priorWeeks: [priorWeek],
+      modelOutput: output,
+    })
+    expect(content.alsoNotable[0].continuesFrom).toEqual([
+      {
+        weekStart: '2026-10-12',
+        slug: 'neurons-are-clean',
+        title: 'Neurons are already clean',
+      },
+    ])
+    expect(weeklyDigestToMarkdown(content)).toContain(
+      'continues “Neurons are already clean” (week of 2026-10-12)',
+    )
+  })
+
+  it('omits the field when empty and rejects unknown weekly refs', () => {
+    const fifth = edition('2026-10-31', [
+      story('qwen-probe', 'Qwen probe', '5'),
+    ])
+    const output = structuredClone(validOutput)
+    output.also_notable = [
+      {
+        daily_ref: '2026-10-31#1',
+        line: 'A Qwen model tried to upload a probe.',
+        continues_from: [],
+      },
+    ]
+    const run = () =>
+      assembleWeeklyDigestContent({
+        weekStart: WEEK,
+        editions: [...editions, fifth],
+        priorWeeks: [priorWeek],
+        modelOutput: output,
+      })
+    expect(run().alsoNotable[0]).not.toHaveProperty('continuesFrom')
+    output.also_notable[0].continues_from = ['W2026-10-19#1']
+    expect(run).toThrow(
+      'also_notable[0].continues_from contains unknown weekly ref W2026-10-19#1',
+    )
   })
 })

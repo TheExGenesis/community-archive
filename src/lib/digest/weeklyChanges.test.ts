@@ -1,5 +1,6 @@
 import type { WeeklyDigestStory } from './weekly'
 import { changeDayLabel, weeklyStoryChanges } from './weeklyChanges'
+import { runningWeekSoFar } from './weeklyData'
 
 const story = (
   slug: string,
@@ -75,5 +76,30 @@ describe('changeDayLabel', () => {
     expect(changeDayLabel('2026-11-13', '2026-11-14')).toBe('yesterday')
     expect(changeDayLabel('2026-11-11', '2026-11-14')).toBe('Wednesday')
     expect(changeDayLabel('2026-11-14')).toBe('Saturday')
+  })
+})
+
+describe('running week selection', () => {
+  // Beside the change badges: both decide what /digest/week shows.
+  const edition = (weekStart: string) =>
+    ({ id: weekStart, weekStart, publishedAt: null, content: {} }) as never
+
+  test("leads with the new week from Monday's first week-so-far run", () => {
+    // Monday 09:30: last week's final edition and this week's first so-far.
+    expect(
+      runningWeekSoFar(edition('2026-11-02'), edition('2026-11-09')),
+    ).toMatchObject({ weekStart: '2026-11-09' })
+  })
+
+  test("keeps last week's final edition until then", () => {
+    // Monday 09:00–09:30: the newest so-far row is last week's (archived by
+    // the final run, but a failed archive must not win).
+    expect(
+      runningWeekSoFar(edition('2026-11-02'), edition('2026-11-02')),
+    ).toBeNull()
+    expect(runningWeekSoFar(edition('2026-11-02'), null)).toBeNull()
+    expect(runningWeekSoFar(null, edition('2026-11-09'))).toMatchObject({
+      weekStart: '2026-11-09',
+    })
   })
 })

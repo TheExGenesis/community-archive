@@ -164,8 +164,13 @@ host, release and environment. `publishWeekly.ts --week-so-far` weaves the
 current week's published dailies so far into a provisional weekly edition
 (status `in_progress`, public) and archives the previous morning's one.
 
-- It starts once the week has three dailies (Wednesday); earlier runs skip, and
-  `/digest/week` keeps showing last week's final edition until then.
+- It starts with the week's first daily: Monday's run (09:30, after last
+  week's final edition at 09:00) weaves Monday's daily, with last week's final
+  edition as continuity context, and `/digest/week` moves to the new week. If
+  the week has no published daily yet (Monday's daily late), the run skips and
+  the page keeps last week's final edition until the next morning's run. If
+  last week's final edition is not published by 09:30, Monday's run has only
+  the week before it as context.
 - Each run is one row with workflow ID `systemd:week-so-far:<monday>:<last
   daily date>`. A run whose ID already exists (any status) skips without a
   model call, so a late daily is picked up by the next morning's run. There is
@@ -175,12 +180,14 @@ current week's published dailies so far into a provisional weekly edition
   one is restored. A failed generation leaves the previous edition live.
 - Monday's final weekly edition archives that week's `in_progress` edition.
   `/digest/week` shows the week-so-far edition only while it is newer than the
-  latest final week. It has no story pages or comments: stories link to their
-  daily stories, and the page ends with a link to last week's edition.
+  latest final week. It has no story pages: stories link to their daily
+  stories, and the page ends with "More from last week" (last week's stories
+  no story this week continues) and a link to last week's edition.
 - Health: the same `community_archive_weekly_digest_healthy` series. A failed
   automated week-so-far run sets `automated_run_failed` until a later run for
-  the week succeeds, and once three of the week's dailies are three hours old
-  a successful run must exist within the last 36 hours.
+  the week succeeds, and once one of the week's dailies is three hours old a
+  successful run must exist within the last 36 hours (migration
+  `20261118150000_weekly_digest_monitoring_first_daily`; before it, three).
 
 Manual run (for example after fixing a failure, same day):
 

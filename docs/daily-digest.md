@@ -376,6 +376,15 @@ analytics read publishes without trends.
 - Publisher: `services/nightly-digest/publishWeekly.ts` on the
   `community-archive-weekly-digest.timer` (Mondays 09:00 UTC). Runbook:
   `ops/nightly-digest/README.md`.
+- Week so far: `publishWeekly.ts --week-so-far` (daily 09:30 UTC) weaves the
+  running week's dailies into a provisional `in_progress` edition from the
+  week's first daily (Monday) on, replacing the previous morning's. With one
+  daily every story is "major"; last week's final edition (published 09:00)
+  is continuity context. `/digest/week` shows it while it is newer than the
+  latest final week, marks stories "New"/"Updated" against the previous
+  morning's edition, and ends with "More from last week" (last week's stories
+  that no story this week continues). Also-notable entries may carry
+  `continuesFrom` like stories do.
 - Pages: `/digest/week` (latest, also in the "Explore archive" menu) and
   `/digest/week/YYYY-MM-DD` (Monday) show the week's `dek` (one sentence built
   from short quoted phrases of the week's tweets; it may not open with "A week",
@@ -396,7 +405,9 @@ analytics read publishes without trends.
   the server because the profile preview API requires sign-in; they stream in
   after the stories (`WeeklyProfiles`) and are cached for a day, and the day and
   week previews are cached for an hour, so the stories never wait on either. Each daily edition's sidebar links its week, or the latest
-  week.
+  week. The "Daily editions" calendar on the week and daily pages has a → per
+  week row that opens that week's edition (`/digest/week/<monday>`, which
+  redirects to `/digest/week` for the running week).
 - Email: one `digest_email_subscriptions` row per address carries
   `daily_enabled` (on for existing subscribers) and `weekly_enabled` (off until
   chosen). The week page's subscribe box turns the weekly list on; settings

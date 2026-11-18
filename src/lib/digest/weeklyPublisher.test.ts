@@ -198,16 +198,74 @@ describe('publishWeekSoFar', () => {
   const NOW = new Date('2026-10-29T09:30:00Z')
   const soFar = dates.slice(0, 4)
 
-  it('waits until the week has three daily digests', async () => {
+  it("waits for the week's first daily digest", async () => {
     const generate = jest.fn()
     await expect(
       publishWeekSoFar({
-        now: NOW,
-        db: fakeDb({ dailyDates: dates.slice(0, 2) }).db,
+        now: new Date('2026-10-26T09:30:00Z'),
+        db: fakeDb({ dailyDates: [] }).db,
         generate,
       }),
     ).resolves.toMatchObject({ status: 'too-few-days' })
     expect(generate).not.toHaveBeenCalled()
+  })
+
+  it("starts on Monday from one daily, with last week's final edition as context", async () => {
+    const lastWeek = {
+      ...content,
+      weekStart: '2026-10-19',
+    } as WeeklyDigestContent
+    const twoWeeksAgo = {
+      ...content,
+      weekStart: '2026-10-12',
+    } as WeeklyDigestContent
+    const { db, weekly } = fakeDb({
+      dailyDates: ['2026-10-26'],
+      weekly: [
+        // Published at 09:00 by the final run, half an hour earlier.
+        {
+          id: 'final-last-week',
+          week_start: '2026-10-19',
+          status: 'published',
+          content: lastWeek,
+        },
+        {
+          id: 'final-two-weeks-ago',
+          week_start: '2026-10-12',
+          status: 'published',
+          content: twoWeeksAgo,
+        },
+        // Last week's provisional edition, archived by that final run.
+        { id: 'old-so-far', week_start: '2026-10-19', status: 'archived' },
+      ],
+    })
+    const generate = jest.fn().mockResolvedValue(generated)
+    const result = await publishWeekSoFar({
+      now: new Date('2026-10-26T09:30:00Z'),
+      db,
+      generate,
+    })
+    expect(result.status).toBe('published')
+    const input = generate.mock.calls[0][0]
+    expect(input).toMatchObject({ weekStart: WEEK, throughDate: '2026-10-26' })
+    expect(
+      input.editions.map((e: { digestDate: string }) => e.digestDate),
+    ).toEqual(['2026-10-26'])
+    expect(
+      input.priorWeeks.map((w: WeeklyDigestContent) => w.weekStart),
+    ).toEqual(['2026-10-19', '2026-10-12'])
+    const row = weekly.find(
+      ({ workflow_run_id }) =>
+        workflow_run_id === weekSoFarWorkflowId(WEEK, '2026-10-26'),
+    )
+    expect(row).toMatchObject({
+      status: 'in_progress',
+      prior_week_edition_ids: ['final-last-week', 'final-two-weeks-ago'],
+    })
+    // Last week's final edition is untouched.
+    expect(weekly.find(({ id }) => id === 'final-last-week')?.status).toBe(
+      'published',
+    )
   })
 
   it("replaces the previous night's edition with the new one", async () => {

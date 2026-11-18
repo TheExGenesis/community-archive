@@ -9,6 +9,7 @@ import { devLog } from '@/lib/devLog'
 import { rankUserSuggestions } from '@/lib/searchSuggestions'
 import type { UserSuggestion } from '@/lib/searchSuggestions'
 import { userProfileHref } from '@/lib/navigation'
+import type { Person } from '@/components/agentSearch/profileLinks'
 import { isTwitterUsername } from '@/lib/apiInputValidation'
 
 export interface FetchUsersOptions {
@@ -28,6 +29,14 @@ export const buildDirectorySearchFilter = (search: string) => {
 
 export const getDirectoryProfileHref = (user: DirectoryUser) =>
   userProfileHref(user.username, user.account_id || user.directory_id)
+
+/** A directory member, as their profile hover card needs them. */
+export const directoryPerson = (user: DirectoryUser): Person => ({
+  username: user.username,
+  accountId: user.account_id ?? undefined,
+  name: user.account_display_name,
+  avatar: user.avatar_media_url,
+})
 
 export const fetchUsers = async (
   options?: FetchUsersOptions,

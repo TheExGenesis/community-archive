@@ -19,6 +19,8 @@ jest.mock('./actions', () => ({
 jest.mock('@/lib/queries/fetchUsers', () => ({
   fetchUsers: jest.fn(),
   getDirectoryProfileHref: (user: DirectoryUser) => `/user/${user.username}`,
+  directoryPerson: jest.requireActual('@/lib/queries/fetchUsers')
+    .directoryPerson,
 }))
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 

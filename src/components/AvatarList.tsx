@@ -5,6 +5,7 @@ import RecoverableAvatar from '@/components/RecoverableAvatar'
 import { AvatarType } from '@/lib/types'
 import { formatNumber } from '@/lib/formatNumber'
 import Link from '@/components/IntentLink'
+import { ProfileHoverCard } from '@/components/agentSearch/ProfilePreview'
 import { userProfileHref } from '@/lib/navigation'
 
 type AvatarListProps = {
@@ -36,40 +37,49 @@ const AvatarList = ({
           }`}
         >
           {avatars.map((avatar) => (
-            <Link
+            <ProfileHoverCard
               key={avatar.account_id}
+              person={{
+                username: avatar.username,
+                accountId: avatar.account_id,
+                avatar: avatar.avatar_media_url,
+              }}
               href={userProfileHref(avatar.username, avatar.account_id)}
-              className={`flex flex-col items-center text-center ${
-                compact ? 'w-20' : 'w-24'
-              }`}
             >
-              <RecoverableAvatar
-                accountId={avatar.account_id}
-                avatarUrl={avatar.avatar_media_url}
-                displayName={avatar.username}
-                alt={`${avatar.username}'s avatar`}
-                className={compact ? 'h-10 w-10' : 'h-12 w-12'}
-                imageClassName="home-fade-in"
-              />
-              <span
-                className={`mt-1 w-full min-w-0 leading-tight [overflow-wrap:anywhere] ${
-                  compact ? 'min-h-7 text-[11px]' : 'text-xs'
+              <Link
+                href={userProfileHref(avatar.username, avatar.account_id)}
+                className={`flex flex-col items-center text-center ${
+                  compact ? 'w-20' : 'w-24'
                 }`}
               >
-                {avatar.username}
-              </span>
-              <span
-                className={`mt-0.5 text-muted-foreground ${
-                  compact ? 'text-[9px]' : 'text-[10px]'
-                }`}
-              >
-                {avatar.num_tweets === undefined
-                  ? null
-                  : `${formatNumber(avatar.num_tweets)} ${
-                      avatar.num_tweets === 1 ? 'tweet' : 'tweets'
-                    }`}
-              </span>
-            </Link>
+                <RecoverableAvatar
+                  accountId={avatar.account_id}
+                  avatarUrl={avatar.avatar_media_url}
+                  displayName={avatar.username}
+                  alt={`${avatar.username}'s avatar`}
+                  className={compact ? 'h-10 w-10' : 'h-12 w-12'}
+                  imageClassName="home-fade-in"
+                />
+                <span
+                  className={`mt-1 w-full min-w-0 leading-tight [overflow-wrap:anywhere] ${
+                    compact ? 'min-h-7 text-[11px]' : 'text-xs'
+                  }`}
+                >
+                  {avatar.username}
+                </span>
+                <span
+                  className={`mt-0.5 text-muted-foreground ${
+                    compact ? 'text-[9px]' : 'text-[10px]'
+                  }`}
+                >
+                  {avatar.num_tweets === undefined
+                    ? null
+                    : `${formatNumber(avatar.num_tweets)} ${
+                        avatar.num_tweets === 1 ? 'tweet' : 'tweets'
+                      }`}
+                </span>
+              </Link>
+            </ProfileHoverCard>
           ))}
         </div>
       </div>

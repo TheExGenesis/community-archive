@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: >-
+  If you use Community Archive data or code, please cite it as below and
+  include the date you accessed it. The same citation is at
+  https://www.community-archive.org/cite.
+title: Community Archive
+type: dataset
+authors:
+  - family-names: Carvalho
+    given-names: Francisco
+url: https://www.community-archive.org
+repository-code: https://github.com/TheExGenesis/community-archive
+abstract: >-
+  A public, searchable collection of Twitter/X archives contributed by their
+  authors, with a daily bulk export and a keyed API.
+keywords:
+  - twitter
+  - social media
+  - archive
+  - dataset
+license: MIT
+date-released: 2024-07-25

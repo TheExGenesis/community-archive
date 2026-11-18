@@ -58,6 +58,7 @@ export const analyticsRoutes = {
   '/opt-in': ['opt_in', 'product'],
   '/about': ['about', 'information'],
   '/data-policy': ['data_policy', 'information'],
+  '/cite': ['cite', 'information'],
   '/docs': ['docs', 'product'],
   '/supporters': ['supporters', 'information'],
   '/remove-dms': ['remove_dms', 'utility'],

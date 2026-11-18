@@ -9,6 +9,8 @@ const Footer = () => {
       <span className="mx-2">•</span>
       <Link href="/data-policy">Data Policy</Link>
       <span className="mx-2">•</span>
+      <Link href="/cite">Cite</Link>
+      <span className="mx-2">•</span>
       <Link href="/supporters">Supporters</Link>
       <span className="mx-2">•</span>
       <Link href="/stream-monitor">Stream Monitor</Link>

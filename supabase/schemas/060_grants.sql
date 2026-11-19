@@ -51,26 +51,28 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_link_previews" FROM "anon", "auth
 GRANT SELECT ON TABLE "public"."profile_settings" TO "anon", "authenticated";
 GRANT SELECT ON TABLE "public"."profile_curation" TO "anon", "authenticated";
 
--- Link metadata is populated only by trusted server enrichment code.
-GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "anon", "authenticated";
+-- Link metadata is populated only by trusted server enrichment code. Not
+-- anonymous since the 2026-11-19 corpus retirement.
+GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "authenticated";
 GRANT ALL ON TABLE "public"."profile_settings" TO "service_role";
 GRANT ALL ON TABLE "public"."profile_curation" TO "service_role";
 GRANT ALL ON TABLE "public"."tweet_link_previews" TO "service_role";
 
--- quote_tweets / retweets: read-only for anon/authenticated; writes via service_role
+-- quote_tweets / retweets: read-only for authenticated (anonymous corpus access
+-- was retired on 2026-11-19); writes via service_role
 -- only (firehose + worker). See #369. The blanket "GRANT ALL ON TABLE ... TO anon"
 -- previously applied to these tables (via ALTER DEFAULT PRIVILEGES in prod.sql) is
 -- intentionally NOT reproduced here.
 REVOKE ALL PRIVILEGES ON TABLE "public"."quote_tweets" FROM "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."retweets"     FROM "anon", "authenticated";
-GRANT SELECT ON TABLE "public"."quote_tweets" TO "anon", "authenticated";
-GRANT SELECT ON TABLE "public"."retweets"     TO "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."quote_tweets" TO "authenticated";
+GRANT SELECT ON TABLE "public"."retweets"     TO "authenticated";
 
 -- liked_tweets / mentioned_users: global dedup tables, read-only for clients (#370).
 REVOKE ALL PRIVILEGES ON TABLE "public"."liked_tweets"    FROM "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."mentioned_users" FROM "anon", "authenticated";
-GRANT SELECT ON TABLE "public"."liked_tweets"    TO "anon", "authenticated";
-GRANT SELECT ON TABLE "public"."mentioned_users" TO "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."liked_tweets"    TO "authenticated";
+GRANT SELECT ON TABLE "public"."mentioned_users" TO "authenticated";
 
 -- Secure-by-default privileges for future app-owned objects. Public API access
 -- must be granted explicitly by the migration that creates the object.
@@ -110,7 +112,7 @@ GRANT ALL PRIVILEGES ON TABLE "public"."ca_tweet_likes" TO "service_role";
 
 REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" TO "service_role";
-GRANT SELECT ON TABLE "public"."tweet_page_summaries" TO "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."tweet_page_summaries" TO "authenticated";
 
 -- Agentic search runs are private to the asker and read only by server code.
 REVOKE ALL PRIVILEGES ON TABLE "public"."agent_search_runs" FROM "anon", "authenticated";

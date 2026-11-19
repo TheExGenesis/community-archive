@@ -1,16 +1,12 @@
 import type { TweetData } from '@/lib/tweets/types'
-import { cookies } from 'next/headers'
 import { createServerAnonClient } from '@/utils/supabase'
-import { isClickHouseReadsEnabled } from './clickhouseGateway'
+import { AnalyticsGatewayError } from './clickhouseGateway'
 import { fetchClickHouseTweetThreadPageData } from './clickhouseTweetPage'
 import { fetchClickHouseQuotePosts } from './clickhouseQuotePosts'
 import { getTweetPageData } from './getTweetPageData'
 
-jest.mock('next/headers', () => ({ cookies: jest.fn() }))
+// Kept only to prove the retired Supabase corpus fallback is never reached.
 jest.mock('@/utils/supabase', () => ({ createServerAnonClient: jest.fn() }))
-jest.mock('./clickhouseGateway', () => ({
-  isClickHouseReadsEnabled: jest.fn(),
-}))
 jest.mock('./clickhouseTweetPage', () => ({
   fetchClickHouseTweetThreadPageData: jest.fn(),
 }))
@@ -21,9 +17,6 @@ jest.mock('./twitterSyndication', () => ({
   fetchSyndicatedTweets: jest.fn().mockResolvedValue(new Map()),
 }))
 
-const clickHouseEnabledMock = isClickHouseReadsEnabled as jest.MockedFunction<
-  typeof isClickHouseReadsEnabled
->
 const fetchClickHouseTweetThreadPageDataMock =
   fetchClickHouseTweetThreadPageData as jest.MockedFunction<
     typeof fetchClickHouseTweetThreadPageData
@@ -32,9 +25,8 @@ const fetchClickHouseQuotePostsMock =
   fetchClickHouseQuotePosts as jest.MockedFunction<
     typeof fetchClickHouseQuotePosts
   >
-const createServerAnonClientMock = createServerAnonClient as jest.MockedFunction<
-  typeof createServerAnonClient
->
+const createServerAnonClientMock =
+  createServerAnonClient as jest.MockedFunction<typeof createServerAnonClient>
 
 const mainTweet = {
   tweet_id: 'original-1',
@@ -54,35 +46,17 @@ const mainTweet = {
   archive_upload_id: 1,
 }
 
-const emptyRpcResult = {
-  tweet: null,
-  media: [],
-  mentioned_users: [],
-  conversation_tweets: [],
-  conversation_media: [],
-  quoted_tweets: [],
-  quoting_tweet_count: 0,
-  quoting_tweets: [],
-}
-
 describe('getTweetPageData', () => {
-  const rpc = jest.fn()
-
   beforeEach(() => {
     jest.clearAllMocks()
-    clickHouseEnabledMock.mockReturnValue(false)
     fetchClickHouseTweetThreadPageDataMock.mockResolvedValue(null)
     fetchClickHouseQuotePostsMock.mockResolvedValue({
       tweets: [],
       totalCount: 0,
     })
-    ;(cookies as jest.Mock).mockResolvedValue({})
-    createServerAnonClientMock.mockReturnValue({ rpc } as never)
-    rpc.mockResolvedValue({ data: emptyRpcResult, error: null })
   })
 
   test('skips the optional quote query for a guest preview', async () => {
-    clickHouseEnabledMock.mockReturnValue(true)
     fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
       tweet: mainTweet,
       threadTree: null,
@@ -131,7 +105,6 @@ describe('getTweetPageData', () => {
         '2085473085399150818': [tweet.tweet_id, '2085473085399150818'],
       },
     }
-    clickHouseEnabledMock.mockReturnValue(true)
     fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
       tweet,
       threadTree: threadTree as never,
@@ -164,51 +137,45 @@ describe('getTweetPageData', () => {
     )
     expect(fetchClickHouseQuotePostsMock).toHaveBeenCalledWith(tweet.tweet_id)
     expect(createServerAnonClientMock).not.toHaveBeenCalled()
-    expect(rpc).not.toHaveBeenCalled()
   })
 
-  test.each([false, true])(
-    'returns the permalink while quotes are pending (ClickHouse-only: %s)',
-    async (clickhouseOnly) => {
-      clickHouseEnabledMock.mockReturnValue(true)
-      const tweet = {
-        ...mainTweet,
-        reply_to_username: undefined,
-        quote_tweet_id: null,
-        retweeted_tweet_id: null,
-        media: [],
-        urls: [],
-      } satisfies TweetData
-      fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
-        tweet,
-        threadTree: null,
-      })
-      let resolveQuotes!: (value: {
-        tweets: TweetData[]
-        totalCount: number
-      }) => void
-      fetchClickHouseQuotePostsMock.mockReturnValue(
-        new Promise((resolve) => {
-          resolveQuotes = resolve
-        }),
-      )
+  test('returns the permalink while quotes are pending', async () => {
+    const tweet = {
+      ...mainTweet,
+      reply_to_username: undefined,
+      quote_tweet_id: null,
+      retweeted_tweet_id: null,
+      media: [],
+      urls: [],
+    } satisfies TweetData
+    fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
+      tweet,
+      threadTree: null,
+    })
+    let resolveQuotes!: (value: {
+      tweets: TweetData[]
+      totalCount: number
+    }) => void
+    fetchClickHouseQuotePostsMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveQuotes = resolve
+      }),
+    )
 
-      // This await would hang if optional quotes moved back onto the hot path.
-      const page = await getTweetPageData(tweet.tweet_id, {
-        clickhouseOnly,
-        deferQuotePosts: true,
-      })
-      expect(page.tweet).toBe(tweet)
-      expect(page.quotePosts).toBeDefined()
-      expect(createServerAnonClientMock).not.toHaveBeenCalled()
-      const quotes = {
-        tweets: [{ ...tweet, tweet_id: 'quote-1' }],
-        totalCount: 17,
-      }
-      resolveQuotes(quotes)
-      await expect(page.quotePosts).resolves.toEqual(quotes)
-    },
-  )
+    // This await would hang if optional quotes moved back onto the hot path.
+    const page = await getTweetPageData(tweet.tweet_id, {
+      deferQuotePosts: true,
+    })
+    expect(page.tweet).toBe(tweet)
+    expect(page.quotePosts).toBeDefined()
+    expect(createServerAnonClientMock).not.toHaveBeenCalled()
+    const quotes = {
+      tweets: [{ ...tweet, tweet_id: 'quote-1' }],
+      totalCount: 17,
+    }
+    resolveQuotes(quotes)
+    await expect(page.quotePosts).resolves.toEqual(quotes)
+  })
 
   test('isolates a deferred quote failure from a strict permalink', async () => {
     const tweet = {
@@ -232,7 +199,6 @@ describe('getTweetPageData', () => {
     const log = jest.spyOn(console, 'error').mockImplementation(() => undefined)
     try {
       const page = await getTweetPageData(tweet.tweet_id, {
-        clickhouseOnly: true,
         deferQuotePosts: true,
       })
       rejectQuotes(new Error('quotes unavailable'))
@@ -264,7 +230,6 @@ describe('getTweetPageData', () => {
       media: [],
       urls: [],
     } satisfies TweetData
-    clickHouseEnabledMock.mockReturnValue(true)
     fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
       tweet,
       threadTree: null,
@@ -292,103 +257,30 @@ describe('getTweetPageData', () => {
     consoleError.mockRestore()
   })
 
-  test('maps reverse quote results into sidebar-ready tweet data', async () => {
-    rpc.mockResolvedValue({
-      data: {
-        tweet: mainTweet,
-        media: [],
-        mentioned_users: [],
-        conversation_tweets: [mainTweet],
-        conversation_media: [],
-        quoted_tweets: [],
-        quoting_tweet_count: 17,
-        quoting_tweets: [
-          {
-            tweet_id: 'quote-1',
-            account_id: 'account-quote',
-            username: 'quote_author',
-            account_display_name: 'Quote Author',
-            created_at: '2026-08-02T10:00:00Z',
-            full_text: 'My comment',
-            retweet_count: 3,
-            favorite_count: 13,
-            reply_to_tweet_id: null,
-            reply_to_username: null,
-            quoted_tweet_id: 'original-1',
-            avatar_media_url: 'https://example.com/avatar.jpg',
-            media: [
-              {
-                tweet_id: 'quote-1',
-                media_url: 'https://example.com/photo.jpg',
-                media_type: 'photo',
-                width: 800,
-                height: 600,
-              },
-            ],
-          },
-        ],
-      },
-      error: null,
+  test('a tweet ClickHouse does not hold is a miss, never a Supabase read', async () => {
+    fetchClickHouseTweetThreadPageDataMock.mockResolvedValueOnce(null)
+    await expect(getTweetPageData('123')).resolves.toMatchObject({
+      tweet: null,
+      threadTree: null,
     })
-
-    const result = await getTweetPageData('original-1', {
-      deferQuotePosts: true,
+    fetchClickHouseTweetThreadPageDataMock.mockRejectedValueOnce(
+      new AnalyticsGatewayError(404, 'Not found'),
+    )
+    await expect(getTweetPageData('124')).resolves.toMatchObject({
+      tweet: null,
     })
-
-    expect(result.quotePosts).toBeUndefined()
-    expect(result.quotingTweetCount).toBe(17)
-    expect(result.quotingTweets).toEqual([
-      expect.objectContaining({
-        tweet_id: 'quote-1',
-        quote_tweet_id: 'original-1',
-        username: 'quote_author',
-        media: [
-          {
-            media_url: 'https://example.com/photo.jpg',
-            media_type: 'photo',
-            width: 800,
-            height: 600,
-          },
-        ],
-      }),
-    ])
+    expect(createServerAnonClient).not.toHaveBeenCalled()
   })
 
-  test('defaults reverse quote data when an older RPC response omits it', async () => {
-    rpc.mockResolvedValue({
-      data: {
-        tweet: mainTweet,
-        media: [],
-        mentioned_users: [],
-        conversation_tweets: [mainTweet],
-        conversation_media: [],
-        quoted_tweets: [],
-      },
-      error: null,
-    })
-
-    const result = await getTweetPageData('original-1', {
-      deferQuotePosts: true,
-    })
-
-    expect(result.quotingTweets).toEqual([])
-    expect(result.quotingTweetCount).toBe(0)
+  test('a failed thread read throws so the route is not cached as empty', async () => {
+    fetchClickHouseTweetThreadPageDataMock.mockRejectedValue(
+      new Error('source unavailable'),
+    )
+    await expect(getTweetPageData('123')).rejects.toThrow('source unavailable')
+    fetchClickHouseTweetThreadPageDataMock.mockRejectedValue(
+      new AnalyticsGatewayError(502, 'bad gateway'),
+    )
+    await expect(getTweetPageData('123')).rejects.toThrow('(502)')
+    expect(createServerAnonClient).not.toHaveBeenCalled()
   })
-})
-
-test('Bulletin permalinks never fall back to PostgreSQL, even with the general flag off', async () => {
-  jest.clearAllMocks()
-  clickHouseEnabledMock.mockReturnValue(false)
-  fetchClickHouseQuotePostsMock.mockResolvedValue({ tweets: [], totalCount: 0 })
-  fetchClickHouseTweetThreadPageDataMock.mockResolvedValue(null)
-  const missing = await getTweetPageData('123', { clickhouseOnly: true })
-  expect(missing.tweet).toBeNull()
-  expect(createServerAnonClient).not.toHaveBeenCalled()
-  fetchClickHouseTweetThreadPageDataMock.mockRejectedValue(
-    new Error('source unavailable'),
-  )
-  await expect(
-    getTweetPageData('123', { clickhouseOnly: true }),
-  ).rejects.toThrow('source unavailable')
-  expect(createServerAnonClient).not.toHaveBeenCalled()
 })

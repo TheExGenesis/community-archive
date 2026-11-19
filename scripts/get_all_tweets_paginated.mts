@@ -1,40 +1,46 @@
-import { createClient } from '@supabase/supabase-js'
-const supabaseUrl = 'https://fabxmporizzqflnftavs.supabase.co'
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseKey!)
+// Fetch every archived tweet of one account through the keyed API v1.
+//
+//   CA_API_KEY=cak_... pnpm script scripts/get_all_tweets_paginated.mts <username or account id>
+//
+// Create a key at https://www.community-archive.org/settings/api-keys. The
+// anonymous Supabase REST API this script used before was retired on
+// 2026-11-19. Pages follow next_cursor until it is null; a short page is not
+// the end.
 
-const allTweets = await getTweetsPaginated('1680757426889342977')
-console.log("Total tweets fetched:", allTweets.length);
-console.log(allTweets);
+const API = 'https://analytics.community-archive.org/v1'
+const key = process.env.CA_API_KEY
+const account = process.argv[2] ?? 'exgenesis'
+if (!key) {
+  console.error('Set CA_API_KEY to a personal API v1 key.')
+  process.exit(2)
+}
 
-async function getTweetsPaginated(accountId:string) {
-    let allTweets:any = [];
-    let batchSize = 1000;
-    let offset = 0;
-    let done = false;
-  
-    while (!done) {
-      const { data, error } = await supabase
-        .schema('public')
-        .from('tweets')
-        .select('*')
-        .eq('account_id', accountId)
-        .range(offset, offset + batchSize - 1); // Fetch a batch of 1000
-  
-      if (error) {
-        console.error("Error fetching tweets:", error);
-        return { error };
-      }
-  
-      if (data.length === 0) {
-        done = true; // If no data is returned, we are done
-      } else {
-        console.log(`Got ${data.length} tweets, fetching another page...`)
-        allTweets = allTweets.concat(data); // Accumulate tweets
-        offset += batchSize; // Move to the next batch
-      }
-    }
-  
-    return allTweets; // Return the accumulated results
+const tweets: unknown[] = []
+let cursor: string | null = null
+do {
+  const url = new URL(`${API}/accounts/${encodeURIComponent(account)}/tweets`)
+  url.searchParams.set('order', 'asc')
+  url.searchParams.set('limit', '200')
+  if (cursor) url.searchParams.set('cursor', cursor)
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${key}` },
+  })
+  if (response.status === 429 || response.status === 503) {
+    const wait = Number(response.headers.get('Retry-After') ?? '5')
+    await new Promise((resolve) => setTimeout(resolve, wait * 1000))
+    continue
   }
-  
+  if (!response.ok)
+    throw new Error(`${response.status} ${await response.text()}`)
+
+  const page = (await response.json()) as {
+    data: unknown[]
+    next_cursor: string | null
+  }
+  tweets.push(...page.data)
+  cursor = page.next_cursor
+} while (cursor)
+
+console.log('Total tweets fetched:', tweets.length)
+console.log(JSON.stringify(tweets, null, 2))

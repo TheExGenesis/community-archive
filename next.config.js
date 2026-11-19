@@ -68,6 +68,10 @@ const nextConfig = {
         permanent: true,
       },
       { source: '/opportunities', destination: '/bulletin', permanent: true },
+      // The unlinked "Recent Tweets" list read the Supabase corpus directly
+      // from the browser; its content is the live stream, served from
+      // ClickHouse at /stream. Permalinks under /tweets/:id are unaffected.
+      { source: '/tweets', destination: '/stream', permanent: true },
       // The spread explorer began as an admin page; shared links keep working.
       {
         source: '/admin/spread-explorer',

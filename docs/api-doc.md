@@ -2,23 +2,27 @@
 
 > If you use Community Archive data, please cite it: see [how to cite](https://www.community-archive.org/cite).
 
-> **The Supabase REST API described here is retired on 19 November 2026.**
-> Use the keyed [Community Archive API v1](https://analytics.community-archive.org/v1/openapi.json)
-> instead; the [migration guide](api-v1-migration.md) maps every call. This
-> page stays for integrations that have not moved yet.
+> **The public Supabase REST API was retired on 19 November 2026.** The tweet
+> corpus (tweets, likes, follows, mentions, media, quotes, retweets and the
+> views and RPCs over them) no longer answers the public `anon` key. Use the
+> keyed [Community Archive API v1](https://analytics.community-archive.org/v1/openapi.json)
+> for filtered queries (the [migration guide](api-v1-migration.md) maps every
+> old call) and the daily export for bulk data. Agents should start at
+> [`community-archive.org/llms.txt`](https://www.community-archive.org/llms.txt).
 
-There are four currently supported ways to access Community Archive data:
+There are four supported ways to access Community Archive data:
 
 1. Download the consent-safe bulk Parquet package.
-2. Query filtered records through the read-only Supabase REST API.
+2. Query filtered records through the keyed
+   [API v1](https://analytics.community-archive.org/v1/openapi.json) with a
+   personal key from
+   [`/settings/api-keys`](https://www.community-archive.org/settings/api-keys).
 3. Search tweets by meaning through the [semantic search API](#semantic-search-api).
 4. Authenticated owners may download their own processed archive through the
    policy-aware web endpoint.
 
 The website version of this guide is at
-[`community-archive.org/docs`](https://www.community-archive.org/docs). Agents
-should start at
-[`community-archive.org/llms.txt`](https://www.community-archive.org/llms.txt).
+[`community-archive.org/docs`](https://www.community-archive.org/docs).
 
 ## Bulk Parquet export
 
@@ -39,110 +43,47 @@ the release date alone is not a freshness guarantee. Follow `publication.urls`
 for the download URLs, and verify sizes and SHA-256 checksums against `files`.
 Join tweets to profiles on `account_id`; keep all IDs as strings.
 
-## REST API
+## API v1
 
-- API URL: `https://fabxmporizzqflnftavs.supabase.co`
-- REST URL: `https://fabxmporizzqflnftavs.supabase.co/rest/v1`
-- [Interactive API reference](https://www.community-archive.org/api/reference)
-- [OpenAPI JSON](https://www.community-archive.org/openapi.json)
-- Public anon key:
-  `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8`
-
-The anon key is intentionally public. Send it as both the `apikey` header and
-the bearer token. Never expose or request a service-role key.
-
-### Fetch recent tweets for a username with cURL
+Base URL `https://analytics.community-archive.org/v1`, described by its
+[OpenAPI document](https://analytics.community-archive.org/v1/openapi.json).
+Sign in, create a personal key at
+[`/settings/api-keys`](https://www.community-archive.org/settings/api-keys),
+and send it as `Authorization: Bearer cak_...`. Keep the key on your server or
+in your script, never in browser code. Page by passing `next_cursor` back as
+`cursor` until it is `null`. Routes, limits and examples are in
+[`llms.txt`](https://www.community-archive.org/llms.txt) and the
+[migration guide](api-v1-migration.md).
 
 ```bash
-export CA_API_URL='https://fabxmporizzqflnftavs.supabase.co'
-export CA_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
+export CA_API_KEY='cak_...'
 
-curl --get "$CA_API_URL/rest/v1/enriched_tweets" \
-  -H "apikey: $CA_ANON_KEY" \
-  -H "Authorization: Bearer $CA_ANON_KEY" \
-  --data-urlencode "select=tweet_id,username,created_at,full_text" \
-  --data-urlencode "username=ilike.defenderofbasic" \
-  --data-urlencode "order=created_at.desc" \
+curl --get "https://analytics.community-archive.org/v1/accounts/defenderofbasic/tweets" \
+  -H "Authorization: Bearer $CA_API_KEY" \
+  --data-urlencode "order=desc" \
   --data-urlencode "limit=5"
 ```
 
-`enriched_tweets` is convenient because it joins tweet records with username,
-display name, conversation, quote, and avatar fields.
-
-### JavaScript with `@supabase/supabase-js`
-
-```js
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  'https://fabxmporizzqflnftavs.supabase.co',
-  process.env.CA_ANON_KEY,
-)
-
-const { data, error } = await supabase
-  .from('enriched_tweets')
-  .select('tweet_id, username, created_at, full_text')
-  .ilike('username', 'defenderofbasic')
-  .order('created_at', { ascending: false })
-  .limit(5)
-
-if (error) throw error
-console.log(data)
-```
-
-### Look up an account ID
-
-```js
-const { data, error } = await supabase
-  .from('all_account')
-  .select('account_id')
-  .ilike('username', username)
-  .single()
-
-if (error) throw error
-const accountId = data.account_id
-```
-
-Twitter IDs must remain strings. JavaScript numbers cannot safely represent
-every Twitter ID.
-
-### Fetch tweets for an account ID
-
-```js
-const { data, error } = await supabase
-  .from('tweets')
-  .select('tweet_id, created_at, full_text, favorite_count, retweet_count')
-  .eq('account_id', accountId)
-  .order('created_at', { ascending: false })
-  .limit(100)
-```
-
-## Filters and pagination
-
-The API uses [PostgREST query syntax](https://postgrest.org/en/stable/references/api/tables_views.html):
-
-- Case-insensitive equality: `username=ilike.defenderofbasic`
-- At least: `created_at=gte.2025-01-01`
-- Ordering: `order=created_at.desc`
-- Columns: `select=tweet_id,username,full_text`
-- Page size and offset: `limit=1000&offset=0`
-
-Responses are capped at 1,000 rows. For reliable pagination:
-
-1. Apply a stable order using a unique or indexed column.
-2. Request at most 1,000 rows.
-3. Increment the offset until a page contains fewer rows than requested.
-
-See
 [`scripts/get_all_tweets_paginated.mts`](../scripts/get_all_tweets_paginated.mts)
-for a complete example. Run it from the repository root with:
+pages through one account's whole timeline. Run it from the repository root
+with `CA_API_KEY` set:
 
 ```bash
-pnpm script scripts/get_all_tweets_paginated.mts
+pnpm script scripts/get_all_tweets_paginated.mts exgenesis
 ```
 
-For full-corpus access, prefer the bulk Parquet package instead of paginating
-the REST API.
+For full-corpus work, prefer the bulk Parquet package instead of paging the
+API.
+
+## Retired: the Supabase REST API
+
+Until 19 November 2026 the corpus tables were readable through Supabase
+PostgREST at `https://fabxmporizzqflnftavs.supabase.co/rest/v1` with a shared
+public `anon` key. That access has ended: corpus tables, views and RPCs now
+refuse the anon key. The key still exists because the website's own sign-in,
+directory, digest and gallery features use it; it is not a data API, and
+nothing outside the website should depend on it. The
+[migration guide](api-v1-migration.md) maps each old call to API v1.
 
 ## Semantic search API
 

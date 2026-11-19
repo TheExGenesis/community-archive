@@ -40,7 +40,6 @@ export const analyticsRoutes = {
   '/guest/trends': ['trends', 'product'],
   '/guest/home': ['home', 'product'],
   '/guest/user-dir': ['user_directory', 'product'],
-  '/tweets': ['tweets', 'product'],
   '/tweets/[tweet_id]': ['tweet', 'product'],
   '/social-graph': ['social_graph', 'product'],
   '/conversation-map': ['conversation_map', 'product'],

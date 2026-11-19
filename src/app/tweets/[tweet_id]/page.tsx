@@ -17,16 +17,8 @@ type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-const loadFromProps = async ({ params, searchParams }: PageProps) => {
-  const [resolvedParams, resolvedSearchParams] = await Promise.all([
-    params,
-    searchParams,
-  ])
-  return loadTweetPage(
-    resolvedParams.tweet_id,
-    resolvedSearchParams?.from === 'opportunities',
-  )
-}
+const loadFromProps = async ({ params }: PageProps) =>
+  loadTweetPage((await params).tweet_id)
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
   return tweetPageMetadata(await loadFromProps(props))

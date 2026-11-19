@@ -17,6 +17,15 @@ const TESTIMONIALS = [
   },
   {
     quote:
+      'Community Archive is a great resource that a lot of people don’t know about it. Very glad our project can help it expand.',
+    name: 'Joe Weisenthal',
+    handle: 'TheStalwart',
+    tweetId: '2123168196932813047',
+    // Not in the archive, so link to the tweet on X.
+    externalUrl: 'https://x.com/TheStalwart/status/2123168196932813047',
+  },
+  {
+    quote:
       'I’ve uploaded my X data… I recommend doing so to nudge models towards improved mental health, self-modeling and situational awareness — all which promote voluntary alignment.',
     name: 'j⧉nus',
     handle: 'repligate',
@@ -112,7 +121,13 @@ const TESTIMONIALS = [
     handle: 'IvanVendrov',
     tweetId: '1883941813083595247',
   },
-] as const
+] as const satisfies readonly {
+  quote: string
+  name: string
+  handle: string
+  tweetId: string
+  externalUrl?: string
+}[]
 
 export default function Testimonials() {
   return (
@@ -125,7 +140,11 @@ export default function Testimonials() {
           {TESTIMONIALS.map((testimonial) => (
             <Link
               key={testimonial.tweetId}
-              href={`/tweets/${testimonial.tweetId}`}
+              href={
+                'externalUrl' in testimonial
+                  ? testimonial.externalUrl
+                  : `/tweets/${testimonial.tweetId}`
+              }
               className="group rounded-lg border border-border bg-background p-5 transition-colors hover:border-brand-deep/60"
             >
               <blockquote className="text-[15px] leading-7 text-foreground">

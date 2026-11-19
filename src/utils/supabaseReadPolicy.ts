@@ -11,7 +11,6 @@ const READ_RPCS = new Set([
   'admin_activity_page',
   'admin_list_blocked_scraping_users',
   'get_unique_scraper_count',
-  'get_top_mentioned_users',
   'search_user_suggestions',
   'ca_tweet_like_summary',
 ])

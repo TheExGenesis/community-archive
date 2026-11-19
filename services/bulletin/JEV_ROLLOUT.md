@@ -26,9 +26,14 @@ The existing admin refresh queue is a legacy worker path and must be disabled
 during Jev cutover until a Jev-aware refresh flow is implemented. Admin prompt
 versions continue to guide new Jev batches and are pinned per run.
 
-Daily runs revisit every ready notice whose author reply context has not
-been checked that UTC day, oldest check first, until the run's time or call
+Daily runs revisit every active ready notice whose author reply context has
+not been checked that UTC day, oldest check first, until the run's time or call
 budget is spent; a remainder exits `resolution_backlog` for the unit's retry.
+Active follows the board's `expiry()`: an explicit date, standing notices, and
+otherwise 14 days for asks and 60 for offers from the post or its latest
+self-quote renewal. Past notices keep their last evidenced status and are not
+rechecked; `resolution_past` counts them. If the renewal lookup fails, those
+notices are checked rather than skipped.
 Jev marks a notice open or resolved only from an explicit descendant reply by
 the same author; the exact reply ID and current
 source hash are stored and reverified on board reads. Unknown or incomplete

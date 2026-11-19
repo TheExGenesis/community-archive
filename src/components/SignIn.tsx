@@ -36,10 +36,14 @@ export default function SignIn({ fullPage = false }: { fullPage?: boolean }) {
     (process.env.NODE_ENV === 'development' ||
       process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true') &&
     !isProductionSupabaseUrl(activeSupabaseUrl)
+  // Staging mock users (pick one) on previews, and in local dev pointed at the
+  // staging project (`pnpm dev:staging`).
   const isStagingLogin =
     isDevLoginEnabled &&
-    process.env.NODE_ENV !== 'development' &&
     process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
+  // The preview switch only changes what the browser shows; server-gated pages
+  // still send you here, so keep the real button visible while it is on.
+  const simulated = preview.enabled && preview.view !== 'actual'
 
   // ?as=<username> lets you deep-link to a specific staging user, otherwise default to first.
   const asParam = searchParams.get('as')
@@ -49,11 +53,14 @@ export default function SignIn({ fullPage = false }: { fullPage?: boolean }) {
     useState<(typeof STAGING_USERS)[number]>(initialUser)
 
   const signIn = async () => {
-    if (preview.enabled) {
+    // Simulate only where no real mock login exists (e.g. production Supabase).
+    // Otherwise sign in for real so the server sees the session.
+    if (preview.enabled && !isDevLoginEnabled) {
       preview.setView('signed-in')
       router.push(redirectTo || '/')
       return
     }
+    if (preview.enabled) preview.setView('actual')
     const supabase = createBrowserClient()
     devLog('sign in', {
       userMetadata,
@@ -128,7 +135,8 @@ export default function SignIn({ fullPage = false }: { fullPage?: boolean }) {
     }
   }
 
-  return userMetadata || localPreview === 'admin' ? null : (
+  return (userMetadata && !(fullPage && simulated)) ||
+    localPreview === 'admin' ? null : (
     <div
       className={`${fullPage ? 'inline-flex' : isStagingLogin ? 'hidden lg:inline-flex' : 'hidden sm:inline-flex'} items-center gap-2`}
     >

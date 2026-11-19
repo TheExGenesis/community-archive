@@ -12,6 +12,9 @@ import { getLatestDigestPreview } from '@/lib/digest/data'
 import { formatNumber } from '@/lib/formatNumber'
 import type { HomepageData } from '@/lib/portal/data'
 import { measureServerRead } from '@/lib/performance/server'
+import { loadHomepageBulletinItems } from '@/lib/bulletin/homepage'
+import { getCurrentUser } from '@/lib/portal/auth'
+import { HomeBulletinPanel } from './HomeBulletinPanel'
 
 export async function HomepageStats({
   data,
@@ -93,6 +96,33 @@ export async function HomepageDigest() {
   )
 }
 
+/**
+ * Bulletin offers and asks below the digest. Signed-in readers get picks
+ * ranked by who they interact with, minus notices they dismissed; the cached
+ * signed-out render gets the shared ranking. Renders nothing on failure.
+ */
+export async function HomepageBulletin({ isMember }: { isMember: boolean }) {
+  const user = isMember ? await getCurrentUser().catch(() => null) : null
+  const providerId = user?.app_metadata?.provider_id
+  const accountId =
+    typeof providerId === 'string' && /^\d{1,20}$/.test(providerId)
+      ? providerId
+      : null
+  const items = await measureServerRead('homepage.bulletin', () =>
+    loadHomepageBulletinItems({
+      accountId,
+      userId: user && !user.is_anonymous ? user.id : null,
+    }),
+  ).catch(() => [])
+  if (!items.length) return null
+  return (
+    <>
+      <SectionReady section="homepage_bulletin" />
+      <HomeBulletinPanel items={items} personalized={accountId !== null} />
+    </>
+  )
+}
+
 export async function HomepageTrends({
   data,
   isMember,
@@ -155,6 +185,11 @@ export function HomepagePortal({
       digest={
         <Suspense fallback={<SectionLoading label="daily digest" />}>
           <HomepageDigest />
+        </Suspense>
+      }
+      bulletin={
+        <Suspense fallback={null}>
+          <HomepageBulletin isMember={isMember} />
         </Suspense>
       }
       trends={

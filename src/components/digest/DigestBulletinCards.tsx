@@ -17,7 +17,11 @@ import { TweetAvatar } from '@/components/TweetAvatar'
 import TweetCard from '@/components/TweetCard'
 import { KIND_ICONS } from '@/lib/bulletin/types'
 import type { DigestBulletinItem } from '@/lib/digest/bulletin'
-import { tweetPermalinkHref, userProfileHref } from '@/lib/navigation'
+import {
+  tweetPermalinkHref,
+  userProfileHref,
+  type TweetOrigin,
+} from '@/lib/navigation'
 import styles from '@/components/bulletin/BulletinBoard.module.css'
 
 const ICONS: Record<string, IconType> = {
@@ -29,13 +33,17 @@ const ICONS: Record<string, IconType> = {
   chats: PiChatsCircle,
 }
 
+type CardPlacement = { origin: TweetOrigin; returnTo: string }
+
 function DigestBulletinCard({
   item,
   preview,
+  origin,
+  returnTo,
 }: {
   item: DigestBulletinItem
   preview: boolean
-}) {
+} & CardPlacement) {
   const [open, setOpen] = useState(false)
   const { tweet } = item
   const Icon = ICONS[KIND_ICONS[item.kind]]
@@ -85,8 +93,8 @@ function DigestBulletinCard({
                 clickable={false}
                 showDate
                 stacked
-                origin="digest"
-                returnTo="/digest"
+                origin={origin}
+                returnTo={returnTo}
               />
             )}
           </div>
@@ -101,7 +109,7 @@ function DigestBulletinCard({
                 >
                   Open on X <PiArrowSquareOut size={12} aria-hidden />
                 </a>
-                <Link href={tweetPermalinkHref(tweet.id, 'digest', '/digest')}>
+                <Link href={tweetPermalinkHref(tweet.id, origin, returnTo)}>
                   See on CA
                 </Link>
               </p>
@@ -161,14 +169,24 @@ function DigestBulletinCard({
 export function DigestBulletinCards({
   items,
   preview = false,
+  origin = 'digest',
+  returnTo = '/digest',
+  className,
 }: {
   items: DigestBulletinItem[]
   preview?: boolean
-}) {
+  className?: string
+} & Partial<CardPlacement>) {
   return (
-    <div className={styles.digestCards}>
+    <div className={`${styles.digestCards} ${className ?? ''}`}>
       {items.map((item) => (
-        <DigestBulletinCard key={item.tweet.id} item={item} preview={preview} />
+        <DigestBulletinCard
+          key={item.tweet.id}
+          item={item}
+          preview={preview}
+          origin={origin}
+          returnTo={returnTo}
+        />
       ))}
     </div>
   )

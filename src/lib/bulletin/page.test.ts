@@ -1,21 +1,21 @@
 import { loadBulletinPage, BulletinCursorExpired } from './page'
 import {
-  hydrateBulletinNotices,
-  loadBulletinBoardState,
   loadBulletinDismissals,
   loadBulletinRelationships,
   loadBulletinViewer,
-  verifyBulletinResolutions,
+  loadVerifiedBulletinBoard,
   type StoredNotice,
 } from './data'
-import { BULLETIN_PAGE_SIZE, DEFAULT_BULLETIN_FILTERS } from './types'
+import {
+  BULLETIN_PAGE_SIZE,
+  DEFAULT_BULLETIN_FILTERS,
+  type Notice,
+} from './types'
 jest.mock('./data', () => ({
-  hydrateBulletinNotices: jest.fn(),
-  loadBulletinBoardState: jest.fn(),
   loadBulletinDismissals: jest.fn(),
   loadBulletinRelationships: jest.fn(),
   loadBulletinViewer: jest.fn(),
-  verifyBulletinResolutions: jest.fn(),
+  loadVerifiedBulletinBoard: jest.fn(),
 }))
 const filters = { ...DEFAULT_BULLETIN_FILTERS, kind: 'help' }
 const notice = (i: number): StoredNotice => ({
@@ -39,16 +39,29 @@ const notice = (i: number): StoredNotice => ({
   p_opportunity: 0.9,
   p_joke: 0.3,
 })
+const current = ({ content_hash, ...o }: StoredNotice): Notice => ({
+  ...o,
+  preview_text: `Current text ${o.tweet_id}`,
+})
+/** The shared board as the page receives it: stored notices plus checked cards. */
+function setBoard(
+  notices: StoredNotice[],
+  check: (o: StoredNotice) => Notice | null = current,
+) {
+  const sources = new Map<string, Notice>()
+  for (const o of notices) {
+    const card = check(o)
+    if (card) sources.set(o.tweet_id, card)
+  }
+  jest.mocked(loadVerifiedBulletinBoard).mockResolvedValue({ notices, sources })
+}
 const ids = (from: number, to: number) =>
   Array.from({ length: from - to + 1 }, (_, i) => String(from - i))
 beforeEach(() => {
   jest.clearAllMocks()
-  jest.mocked(verifyBulletinResolutions).mockResolvedValue(undefined)
   jest.mocked(loadBulletinDismissals).mockResolvedValue([])
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-09T00:00:00Z'))
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: Array.from({ length: 40 }, (_, i) => notice(i + 1)),
-  })
+  setBoard(Array.from({ length: 40 }, (_, i) => notice(i + 1)))
   jest.mocked(loadBulletinRelationships).mockResolvedValue({
     account_id: '',
     username: '',
@@ -61,95 +74,67 @@ beforeEach(() => {
     outgoing: {},
     available: false,
   })
-  jest.mocked(hydrateBulletinNotices).mockImplementation(async ({ notices }) =>
-    notices.map(({ content_hash, ...o }) => ({
-      ...o,
-      preview_text: `Current text ${o.tweet_id}`,
-    })),
-  )
 })
 afterEach(() => jest.restoreAllMocks())
-test.each([false, true])(
-  'source hydration overlaps resolution checks and uses their final result (show resolved: %s)',
-  async (resolved) => {
-    const reopened = {
-      ...notice(2),
-      resolution_state: 'resolved' as const,
-      resolution_tweet_id: '3',
-    }
-    jest.mocked(loadBulletinBoardState).mockResolvedValue({
-      notices: [notice(1), reopened],
-    })
-    let finish!: () => void
-    jest.mocked(verifyBulletinResolutions).mockImplementationOnce(
-      (notices) =>
-        new Promise<void>((resolve) => {
-          finish = () => {
-            notices[1].resolution_state = 'unknown'
-            notices[1].resolution_tweet_id = null
-            resolve()
-          }
-        }),
-    )
-    let completed = false
-    const pending = loadBulletinPage({ ...filters, resolved }).then((page) => {
-      completed = true
-      return page
-    })
-    await new Promise<void>((resolve) => setImmediate(resolve))
-    expect(hydrateBulletinNotices).toHaveBeenCalledTimes(1)
-    expect(completed).toBe(false)
-    finish()
-    const page = await pending
-    expect(page.notices.map((o) => o.tweet_id)).toEqual(['2', '1'])
-    expect(page.notices[0]).toMatchObject({
-      resolution_state: 'unknown',
-      resolution_tweet_id: null,
-    })
-    expect(page.counts.help).toBe(2)
-  },
-)
+test('uses the checked resolution state, not the stored one', async () => {
+  // Resolution evidence that no longer verifies reopens the notice.
+  const reopened = {
+    ...notice(2),
+    resolution_state: 'resolved' as const,
+    resolution_tweet_id: '3',
+  }
+  setBoard([notice(1), reopened], (o) => ({
+    ...current(o),
+    resolution_state: 'unknown',
+    resolution_tweet_id: null,
+  }))
+  const page = await loadBulletinPage(filters)
+  expect(page.notices.map((o) => o.tweet_id)).toEqual(['2', '1'])
+  expect(page.notices[0]).toMatchObject({
+    resolution_state: 'unknown',
+    resolution_tweet_id: null,
+  })
+  expect(page.counts.help).toBe(2)
+})
 
-test('resolution verification outages still fail the page', async () => {
+test('board outages still fail the page', async () => {
   jest
-    .mocked(verifyBulletinResolutions)
+    .mocked(loadVerifiedBulletinBoard)
     .mockRejectedValueOnce(new Error('source unavailable'))
   await expect(loadBulletinPage(filters)).rejects.toThrow('source unavailable')
 })
 
 test('Jev controls filter and rank before pagination and counts', async () => {
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: [
-      {
-        ...notice(1),
-        value_score: 2.5,
-        p_opportunity: 0.9,
-        p_joke: 0.1,
-        topics: ['arts'],
-      },
-      {
-        ...notice(2),
-        value_score: 3.5,
-        p_opportunity: 0.85,
-        p_joke: 0.15,
-        topics: ['arts'],
-      },
-      {
-        ...notice(3),
-        value_score: 4,
-        p_opportunity: 0.9,
-        p_joke: 0.4,
-        topics: ['arts'],
-      },
-      {
-        ...notice(4),
-        value_score: 4,
-        p_opportunity: 0.9,
-        p_joke: 0.1,
-        topics: ['ai'],
-      },
-    ],
-  })
+  setBoard([
+    {
+      ...notice(1),
+      value_score: 2.5,
+      p_opportunity: 0.9,
+      p_joke: 0.1,
+      topics: ['arts'],
+    },
+    {
+      ...notice(2),
+      value_score: 3.5,
+      p_opportunity: 0.85,
+      p_joke: 0.15,
+      topics: ['arts'],
+    },
+    {
+      ...notice(3),
+      value_score: 4,
+      p_opportunity: 0.9,
+      p_joke: 0.4,
+      topics: ['arts'],
+    },
+    {
+      ...notice(4),
+      value_score: 4,
+      p_opportunity: 0.9,
+      p_joke: 0.1,
+      topics: ['ai'],
+    },
+  ])
   const page = await loadBulletinPage({
     ...filters,
     minValue: 2,
@@ -164,14 +149,12 @@ test('Jev controls filter and rank before pagination and counts', async () => {
 })
 
 test('default score thresholds filter the first page and counts', async () => {
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: [
-      notice(1),
-      { ...notice(2), value_score: 0.9 },
-      { ...notice(3), p_opportunity: 0.89 },
-      { ...notice(4), p_joke: 0.31 },
-    ],
-  })
+  setBoard([
+    notice(1),
+    { ...notice(2), value_score: 0.9 },
+    { ...notice(3), p_opportunity: 0.89 },
+    { ...notice(4), p_joke: 0.31 },
+  ])
   const page = await loadBulletinPage(filters)
   expect(page.notices.map((o) => o.tweet_id)).toEqual(['1'])
   expect(page.counts.help).toBe(1)
@@ -179,17 +162,15 @@ test('default score thresholds filter the first page and counts', async () => {
 })
 
 test('resolved notices are hidden by default and independently included even when expired', async () => {
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: [
-      notice(1),
-      {
-        ...notice(2),
-        resolution_state: 'resolved',
-        resolution_tweet_id: '3',
-        expires_at: '2026-01-01',
-      },
-    ],
-  })
+  setBoard([
+    notice(1),
+    {
+      ...notice(2),
+      resolution_state: 'resolved',
+      resolution_tweet_id: '3',
+      expires_at: '2026-01-01',
+    },
+  ])
   const normal = await loadBulletinPage(filters)
   expect(normal.notices.map((o) => o.tweet_id)).toEqual(['1'])
   expect(normal.counts.help).toBe(1)
@@ -199,14 +180,10 @@ test('resolved notices are hidden by default and independently included even whe
   expect(resolved.notices.map((o) => o.tweet_id)).toEqual(['1', '2'])
   expect(resolved.counts.help).toBe(2)
 })
-test('hydrates only one page of sources, keeps metadata private, and advances a single cursor', async () => {
+test('keeps metadata private and advances a single cursor', async () => {
   expect(BULLETIN_PAGE_SIZE).toBe(18)
   const first = await loadBulletinPage(filters)
   expect(first.notices.map((o) => o.tweet_id)).toEqual(ids(40, 23))
-  expect(hydrateBulletinNotices).toHaveBeenCalledTimes(1)
-  expect(
-    jest.mocked(hydrateBulletinNotices).mock.calls[0][0].notices,
-  ).toHaveLength(18)
   expect(JSON.stringify(first)).not.toContain('content_hash')
   expect(first.cursors).toEqual({ help: '23' })
   const second = await loadBulletinPage(filters, first.cursors.help!)
@@ -227,12 +204,12 @@ test('pages the all-categories stream under one cursor with side and category co
   })
 })
 test('recommended pages and counts exclude own notices; newest keeps them', async () => {
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: Array.from({ length: 22 }, (_, i) => ({
+  setBoard(
+    Array.from({ length: 22 }, (_, i) => ({
       ...notice(i + 1),
       account_id: i >= 14 ? '42' : '123',
     })),
-  })
+  )
   jest.mocked(loadBulletinRelationships).mockResolvedValue({
     account_id: '42',
     username: 'viewer',
@@ -253,12 +230,11 @@ test('recommended pages and counts exclude own notices; newest keeps them', asyn
   expect(newest.notices.map((o) => o.tweet_id)).toEqual(ids(22, 5))
   expect(newest.counts).toMatchObject({ help: 22, offer: 22 })
 })
-test('refills holes from removed sources and rejects missing cursors', async () => {
-  jest
-    .mocked(hydrateBulletinNotices)
-    .mockImplementation(async ({ notices }) =>
-      notices.filter((o) => o.tweet_id !== '40'),
-    )
+test('never shows a notice whose source check failed, and rejects missing cursors', async () => {
+  setBoard(
+    Array.from({ length: 40 }, (_, i) => notice(i + 1)),
+    (o) => (o.tweet_id === '40' ? null : current(o)),
+  )
   const first = await loadBulletinPage(filters)
   expect(first.notices.map((o) => o.tweet_id)).toEqual(ids(39, 22))
   expect(first.counts.help).toBe(39)
@@ -272,22 +248,17 @@ test('preserves self-quote renewal and full-text search beyond the first page', 
     side: 'ask',
     posted_at: '2026-08-01T00:00:00Z',
   }
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: [expired, ...Array.from({ length: 30 }, (_, i) => notice(i + 2))],
-  })
-  jest.mocked(hydrateBulletinNotices).mockImplementation(async ({ notices }) =>
-    notices.map((o) => ({
-      ...o,
+  setBoard(
+    [expired, ...Array.from({ length: 30 }, (_, i) => notice(i + 2))],
+    (o) => ({
+      ...current(o),
       preview_text: o.tweet_id === '1' ? 'Hidden needle' : 'other text',
       renewed_at: o.tweet_id === '1' ? '2026-09-08T00:00:00Z' : null,
-    })),
+    }),
   )
   const first = await loadBulletinPage(filters)
+  // The expired-by-metadata ask was renewed by a self-quote.
   expect(first.counts.help).toBe(31)
-  // The expired-by-metadata ask is checked alongside the first page.
-  expect(
-    jest.mocked(hydrateBulletinNotices).mock.calls[0][0].notices,
-  ).toHaveLength(19)
   const result = await loadBulletinPage({ ...filters, search: 'needle' })
   expect(result.notices.map((o) => o.tweet_id)).toEqual(['1'])
 })
@@ -301,21 +272,12 @@ test('accepts a set of kinds and keys the cursor by that set', async () => {
   expect(page.counts.help).toBe(40)
 })
 
-// Reply counts only exist for hydrated sources. Ranking a partial subset by
-// those counts must not move the pagination cursor over unvisited notices.
-test('partial uptake enrichment never repeats notices or adds source round trips', async () => {
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: Array.from({ length: 40 }, (_, i) => ({
-      ...notice(i + 1),
-      side: 'ask',
-    })),
-  })
-  jest.mocked(hydrateBulletinNotices).mockImplementation(async ({ notices }) =>
-    notices.map(({ content_hash, ...o }) => ({
-      ...o,
-      replies: Number(o.tweet_id) % 2,
-      quotes: 0,
-    })),
+// Uptake ranks loaded cards in the client; the server cursor must still
+// page every notice exactly once.
+test('uptake counts never repeat or skip notices across pages', async () => {
+  setBoard(
+    Array.from({ length: 40 }, (_, i) => ({ ...notice(i + 1), side: 'ask' })),
+    (o) => ({ ...current(o), replies: Number(o.tweet_id) % 2, quotes: 0 }),
   )
   const first = await loadBulletinPage(filters)
   const second = await loadBulletinPage(filters, first.cursors.help!)
@@ -325,7 +287,6 @@ test('partial uptake enrichment never repeats notices or adds source round trips
   )
   expect(new Set(all).size).toBe(40)
   expect(all).toHaveLength(40)
-  expect(hydrateBulletinNotices).toHaveBeenCalledTimes(3)
 })
 
 test('first paint and newest sorting never wait for interactions', async () => {
@@ -342,13 +303,13 @@ test('first paint and newest sorting never wait for interactions', async () => {
 })
 
 test('freshness and personal relevance page every notice exactly once', async () => {
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: Array.from({ length: 40 }, (_, i) => ({
+  setBoard(
+    Array.from({ length: 40 }, (_, i) => ({
       ...notice(i + 1),
       account_id: i % 2 ? 'contact' : 'other',
       posted_at: new Date(Date.now() - i * 86400000).toISOString(),
     })),
-  })
+  )
   jest.mocked(loadBulletinRelationships).mockResolvedValue({
     account_id: '',
     username: '',
@@ -369,9 +330,7 @@ test('freshness and personal relevance page every notice exactly once', async ()
   expect(third.cursors.help).toBeNull()
 })
 test('leaves out notices the reader dismissed, and survives a failed read', async () => {
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({
-    notices: [notice(1), notice(2), notice(3)],
-  })
+  setBoard([notice(1), notice(2), notice(3)])
   jest.mocked(loadBulletinDismissals).mockResolvedValue(['2', '99'])
   const page = await loadBulletinPage(filters)
   expect(page.notices.map((o) => o.tweet_id)).toEqual(['3', '1'])

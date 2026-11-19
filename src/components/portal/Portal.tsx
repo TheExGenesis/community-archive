@@ -711,14 +711,18 @@ export function PortalNotes({
 
 export function HomepageHighlightsLayout({
   digest,
+  bulletin,
   trends,
   research,
-}: Record<'digest' | 'trends' | 'research', ReactNode>) {
+}: Record<'digest' | 'trends' | 'research', ReactNode> & {
+  bulletin?: ReactNode
+}) {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-5 py-6 sm:px-7">
       <div id="daily-digest" className="scroll-mt-20">
         {digest}
       </div>
+      {bulletin}
       <div className="grid items-start gap-6 md:grid-cols-2">
         <div className="space-y-6">
           {trends}

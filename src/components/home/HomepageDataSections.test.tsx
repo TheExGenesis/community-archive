@@ -6,10 +6,30 @@ import {
   HomepageTrends,
   HomepageDigest,
   HomepageGrowthCounter,
+  HomepageBulletin,
 } from './HomepageDataSections'
 import { getLatestDigestPreview } from '@/lib/digest/data'
+import { loadHomepageBulletinItems } from '@/lib/bulletin/homepage'
+import { getCurrentUser } from '@/lib/portal/auth'
 
 jest.mock('@/lib/digest/data', () => ({ getLatestDigestPreview: jest.fn() }))
+jest.mock('@/lib/bulletin/homepage', () => ({
+  loadHomepageBulletinItems: jest.fn(),
+}))
+jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
+jest.mock('./HomeBulletinPanel', () => ({
+  HomeBulletinPanel: ({
+    items,
+    personalized,
+  }: {
+    items: unknown[]
+    personalized: boolean
+  }) => (
+    <div>
+      {items.length} bulletin picks{personalized ? ' for you' : ''}
+    </div>
+  ),
+}))
 jest.mock('@/components/portal/Portal', () => ({
   HomeResearchPanel: () => <div>Research</div>,
   HomeTrendsPanel: () => <div>Weekly trends</div>,
@@ -95,4 +115,35 @@ test('growth counter omits missing deltas and hides on failure', async () => {
   expect(
     await HomepageGrowthCounter({ data: growthStats({}, true) }),
   ).toBeNull()
+})
+
+test('bulletin picks are personal for members and hidden when empty or failing', async () => {
+  jest.mocked(getCurrentUser).mockResolvedValue({
+    id: 'user-uuid',
+    is_anonymous: false,
+    app_metadata: { provider_id: '42' },
+  } as unknown as Awaited<ReturnType<typeof getCurrentUser>>)
+  jest
+    .mocked(loadHomepageBulletinItems)
+    .mockResolvedValue([{}, {}] as Awaited<
+      ReturnType<typeof loadHomepageBulletinItems>
+    >)
+  const { rerender } = render(await HomepageBulletin({ isMember: true }))
+  expect(screen.getByText('2 bulletin picks for you')).toBeInTheDocument()
+  expect(loadHomepageBulletinItems).toHaveBeenCalledWith({
+    accountId: '42',
+    userId: 'user-uuid',
+  })
+
+  jest.mocked(getCurrentUser).mockClear()
+  rerender(await HomepageBulletin({ isMember: false }))
+  expect(screen.getByText('2 bulletin picks')).toBeInTheDocument()
+  expect(getCurrentUser).not.toHaveBeenCalled()
+  expect(loadHomepageBulletinItems).toHaveBeenLastCalledWith({
+    accountId: null,
+    userId: null,
+  })
+
+  jest.mocked(loadHomepageBulletinItems).mockRejectedValue(new Error('down'))
+  expect(await HomepageBulletin({ isMember: false })).toBeNull()
 })

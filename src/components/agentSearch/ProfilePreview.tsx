@@ -13,6 +13,7 @@ import {
 import Link from 'next/link'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { TweetAvatar } from '@/components/TweetAvatar'
+import { loadedAvatar } from '@/lib/loadedAvatars'
 import { Popover, PopoverContent } from '@/components/ui/popover'
 import type { ProfilePreview as Preview } from '@/app/api/profile/[account_id]/preview/route'
 import type { Person } from './profileLinks'
@@ -130,7 +131,9 @@ export function ProfileCard({
           tweet={{
             id: person.tweetId ?? person.username,
             username: person.username,
-            avatar: person.avatar ?? preview?.avatar ?? null,
+            // The photo the page already shows for them, when it has one.
+            avatar:
+              loadedAvatar(person) ?? person.avatar ?? preview?.avatar ?? null,
           }}
           size={40}
         />

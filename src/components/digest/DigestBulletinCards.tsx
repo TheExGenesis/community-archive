@@ -118,12 +118,7 @@ function DigestBulletinCard({
         </>
       ) : (
         <>
-          <div className={styles.stickerRow}>
-            {sticker}
-            <span className={styles.readHint} aria-hidden>
-              click to read more
-            </span>
-          </div>
+          <div className={styles.stickerRow}>{sticker}</div>
           <span className={styles.corner}>
             <time dateTime={tweet.createdAt} className={styles.age}>
               {new Date(tweet.createdAt).toLocaleDateString('en-US', {

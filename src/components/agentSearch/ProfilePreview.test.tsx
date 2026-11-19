@@ -8,10 +8,13 @@ import {
   clearProfilePreviews,
   primeProfilePreviews,
 } from './ProfilePreview'
+import { clearLoadedAvatars, rememberLoadedAvatar } from '@/lib/loadedAvatars'
 import { peopleFromTweets, type Person } from './profileLinks'
 
 jest.mock('@/components/TweetAvatar', () => ({
-  TweetAvatar: () => <span data-testid="avatar" />,
+  TweetAvatar: ({ tweet }: { tweet: { avatar: string | null } }) => (
+    <span data-testid="avatar" data-src={tweet.avatar ?? ''} />
+  ),
 }))
 
 const person: Person = {
@@ -39,6 +42,7 @@ let fetchMock: jest.Mock
 
 beforeEach(() => {
   clearProfilePreviews()
+  clearLoadedAvatars()
   fetchMock = jest.fn(async () => ({ ok: true, json: async () => preview }))
   global.fetch = fetchMock as unknown as typeof fetch
 })
@@ -66,6 +70,20 @@ test('a profile the page already loaded shows complete, with no request', () => 
   expect(screen.getByText('building robots')).toBeInTheDocument()
   expect(screen.queryByTestId('profile-loading')).toBeNull()
   expect(fetchMock).not.toHaveBeenCalled()
+})
+
+test('the card reuses the avatar the page already loaded for them', () => {
+  rememberLoadedAvatar({ accountId: '42' }, 'https://pbs.twimg.com/fresh.jpg')
+  render(
+    <ProfileCard
+      person={{ ...person, avatar: 'https://pbs.twimg.com/stale.jpg' }}
+      href="/user/csgbwk"
+    />,
+  )
+  expect(screen.getByTestId('avatar')).toHaveAttribute(
+    'data-src',
+    'https://pbs.twimg.com/fresh.jpg',
+  )
 })
 
 test('a failed lookup leaves the instant part, and is not retried', async () => {

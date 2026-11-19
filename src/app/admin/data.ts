@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getTwitterProviderId, getTwitterUsername } from '@/lib/twitterIdentity'
+import { fetchAccountTweetCounts } from '@/lib/clickhouseCorpusReads'
 
 export const ADMIN_USERNAME = 'exgenesis'
 export const ADMIN_USERNAMES = [ADMIN_USERNAME, 'christineist'] as const
@@ -258,39 +259,23 @@ async function fetchUploadCounts(
   }, new Map())
 }
 
-// Actual `COUNT(*)` of rows in public.tweets per account. We need this
-// alongside all_account.num_tweets because the latter is the Twitter
-// public-profile counter (what the scraper saw at ingest), not what we
-// have stored — they can differ by 10–1000x for scrape-sourced accounts.
-// Done as N parallel `head:true` counts (one per account) rather than a
-// SELECT-then-aggregate, because:
-//   - SELECT account_id would be capped at 1000 rows by PostgREST and we
-//     could be summing across millions of tweet rows
-//   - GROUP BY isn't expressible from supabase-js without an RPC
-//   - 50 accounts × 10 concurrency = 5 batches, ~250ms end-to-end —
-//     fine for a per-page admin view, no RPC migration needed
+// Archived (non-deleted) tweets per account, from the ClickHouse corpus. We
+// need this alongside all_account.num_tweets because the latter is the
+// Twitter public-profile counter (what the scraper saw at ingest), not what
+// we have stored; they can differ by 10–1000x for scrape-sourced accounts.
+// The gateway answers 100 accounts per request. A gateway failure leaves the
+// counts at 0 rather than failing the admin page, as the per-account
+// PostgreSQL counts did.
 async function fetchArchivedTweetCounts(
-  admin: AdminClient,
   accountIds: string[],
 ): Promise<Map<string, number>> {
   if (!accountIds.length) return new Map()
-  const CONCURRENCY = 10
-  const result = new Map<string, number>()
-  for (let i = 0; i < accountIds.length; i += CONCURRENCY) {
-    const batch = accountIds.slice(i, i + CONCURRENCY)
-    const counts = await Promise.all(
-      batch.map(async (id) => {
-        const { count, error } = await admin
-          .from('tweets')
-          .select('tweet_id', { count: 'exact', head: true })
-          .eq('account_id', id)
-          .eq('is_tombstone', false)
-        return { id, count: error ? 0 : (count ?? 0) }
-      }),
-    )
-    for (const c of counts) result.set(c.id, c.count)
+  try {
+    return await fetchAccountTweetCounts(accountIds)
+  } catch (error) {
+    console.error('Archived tweet counts are unavailable:', error)
+    return new Map()
   }
-  return result
 }
 
 export async function fetchOptInPage(
@@ -527,7 +512,7 @@ async function hydrateOptInRows(
   const [uploadCounts, archivedTweetCounts, scrapeBlocklist] =
     await Promise.all([
       fetchUploadCounts(admin, accountIdsForCounts),
-      fetchArchivedTweetCounts(admin, accountIdsForCounts),
+      fetchArchivedTweetCounts(accountIdsForCounts),
       fetchScrapeBlocklist(admin, accountIdsForCounts),
     ])
 
@@ -557,7 +542,7 @@ async function hydrateAccountRows(
   const [uploadCounts, archivedTweetCounts, scrapeBlocklist] =
     await Promise.all([
       fetchUploadCounts(admin, accountIds),
-      fetchArchivedTweetCounts(admin, accountIds),
+      fetchArchivedTweetCounts(accountIds),
       fetchScrapeBlocklist(admin, accountIds),
     ])
 

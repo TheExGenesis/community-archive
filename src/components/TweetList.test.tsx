@@ -8,10 +8,6 @@ import {
   searchTweetPreviewsWithClickHouse,
 } from '@/lib/clickhouseSearch'
 
-jest.mock('@/utils/supabase', () => ({
-  createBrowserClient: () => ({}),
-}))
-
 jest.mock('@/lib/queries/tweetQueries', () => ({
   fetchTweets: jest.fn(),
 }))
@@ -101,7 +97,6 @@ describe('TweetList progressive search', () => {
     render(
       <TweetList
         filterCriteria={{
-          searchQuery: 'open & source',
           rawSearchQuery: 'open source',
           excludeRetweets: true,
         }}
@@ -142,7 +137,6 @@ describe('TweetList progressive search', () => {
     render(
       <TweetList
         filterCriteria={{
-          searchQuery: 'open & source',
           rawSearchQuery: 'open source',
           excludeRetweets: true,
         }}
@@ -170,7 +164,6 @@ describe('TweetList progressive search', () => {
     render(
       <TweetList
         filterCriteria={{
-          searchQuery: 'open & source',
           rawSearchQuery: 'open source',
           excludeRetweets: true,
         }}
@@ -193,7 +186,6 @@ describe('TweetList progressive search', () => {
     render(
       <TweetList
         filterCriteria={{
-          searchQuery: 'nothing',
           rawSearchQuery: 'no results anywhere',
           excludeRetweets: true,
         }}
@@ -250,7 +242,7 @@ describe('search request scheduling and cancellation', () => {
   it('shows the canonical page while quote bodies are still loading', async () => {
     const enriched = deferred<any>()
     ;(fetchTweets as jest.Mock).mockImplementation(
-      (_client, _criteria, _page, _size, options) => {
+      (_criteria, _page, _size, options) => {
         options.onBaseTweets([{ ...previewTweet, tweet_id: 'canonical' }])
         return enriched.promise
       },
@@ -285,7 +277,7 @@ describe('search request scheduling and cancellation', () => {
     const { rerender, unmount } = render(
       <TweetList filterCriteria={{ rawSearchQuery: 'old' }} />,
     )
-    const oldOptions = (fetchTweets as jest.Mock).mock.calls[0][4]
+    const oldOptions = (fetchTweets as jest.Mock).mock.calls[0][3]
     rerender(<TweetList filterCriteria={{ rawSearchQuery: 'new' }} />)
     expect(oldOptions.signal.aborted).toBe(true)
     await act(async () => {
@@ -300,7 +292,7 @@ describe('search request scheduling and cancellation', () => {
       old.resolve({ tweets: previewTweets, totalCount: null, error: null })
     })
     expect(screen.getByTestId('tweet-ids')).toHaveTextContent('current')
-    const currentSignal = (fetchTweets as jest.Mock).mock.calls[1][4].signal
+    const currentSignal = (fetchTweets as jest.Mock).mock.calls[1][3].signal
     unmount()
     expect(currentSignal.aborted).toBe(true)
   })
@@ -342,7 +334,7 @@ test('retries a failed search explicitly without changing its filters', async ()
   )
   fireEvent.click(await screen.findByRole('button', { name: 'Retry search' }))
   expect(await screen.findByTestId('tweet-ids')).toHaveTextContent('preview-1')
-  expect((fetchTweets as jest.Mock).mock.calls[1][1]).toEqual({
+  expect((fetchTweets as jest.Mock).mock.calls[1][0]).toEqual({
     rawSearchQuery: 'archive',
     fromUsername: 'alice',
   })

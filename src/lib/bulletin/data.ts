@@ -11,6 +11,8 @@ import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { createHash } from 'crypto'
 import { measureServerRead } from '@/lib/performance/server'
 import { after } from 'next/server'
+import { unstable_cache } from 'next/cache'
+import { gunzipSync, gzipSync } from 'zlib'
 import { createSharedCache } from './sharedCache'
 import type { Notice, RunDashboard } from './types'
 
@@ -435,9 +437,15 @@ async function readBulletinBoardSource(): Promise<StoredNotice[]> {
   return notices
 }
 
+/** What the board keeps of each stored notice once its card is built. */
+export type BoardNotice = Pick<
+  StoredNotice,
+  'tweet_id' | 'account_id' | 'content_hash' | 'kind' | 'side'
+>
+
 export type VerifiedBulletinBoard = {
-  /** Stored notices with resolution evidence already checked. */
-  notices: StoredNotice[]
+  /** Every stored notice, in stored order, including ones whose check failed. */
+  notices: BoardNotice[]
   /** Source-checked cards by tweet ID; a notice missing here failed its check. */
   sources: Map<string, Notice>
   allowedAccounts?: string[]
@@ -462,33 +470,109 @@ async function verifyBoard(
       resolution_tweet_id: stored?.resolution_tweet_id,
     })
   }
-  return { notices, sources, allowedAccounts }
+  return {
+    notices: notices.map(
+      ({ tweet_id, account_id, content_hash, kind, side }) => ({
+        tweet_id,
+        account_id,
+        content_hash,
+        kind,
+        side,
+      }),
+    ),
+    sources,
+    allowedAccounts,
+  }
 }
 
 /**
- * Every reader sees the same notices and the same source checks, so one
- * instance rebuilds them in the background instead of once per page view.
- * Rechecking ~2,000 sources took 5–12 s per view. A card can therefore lag a
- * deletion, edit or opt-out by at most BOARD_MAX_STALE_MS; the stored board
- * itself already applies membership and opt-out policy.
+ * Every reader sees the same notices and the same source checks, so the
+ * verified board is built once and shared, never per page view (building it
+ * reads ~2,000 stored notices and rechecks every source: several seconds).
+ *
+ * Two layers keep a page view under a second, even on a fresh server:
+ * - Vercel's Data Cache holds the built board, gzip-compressed to fit its
+ *   2 MB item limit, for every server and deployment. Past BOARD_REBUILD_S
+ *   it is rebuilt in the background while readers get the previous copy.
+ * - Each server keeps the decoded board in memory for BOARD_MEMORY_FRESH_MS.
+ *
+ * A card can lag a deletion, edit or opt-out by at most BOARD_MAX_STALE_MS:
+ * an older shared copy is refused and rebuilt in the request. The stored
+ * board itself already applies membership and opt-out policy.
  */
-export const BOARD_FRESH_MS = 2 * 60_000
+export const BOARD_REBUILD_S = 120
 export const BOARD_MAX_STALE_MS = 10 * 60_000
-const sharedBoard = createSharedCache(
-  async () => verifyBoard(await readBulletinBoardSource()),
+const BOARD_MEMORY_FRESH_MS = 30_000
+const BOARD_MEMORY_STALE_MS = 60_000
+
+type EncodedBoard = { builtAt: number; data: string }
+
+export function encodeBoard(
+  board: VerifiedBulletinBoard,
+  builtAt: number,
+): EncodedBoard {
+  const json = JSON.stringify({
+    notices: board.notices,
+    cards: Array.from(board.sources.values()),
+  })
+  return { builtAt, data: gzipSync(json).toString('base64') }
+}
+
+export function decodeBoard(encoded: EncodedBoard): VerifiedBulletinBoard {
+  const { notices, cards } = JSON.parse(
+    gunzipSync(Buffer.from(encoded.data, 'base64')).toString('utf8'),
+  ) as { notices: BoardNotice[]; cards: Notice[] }
+  return { notices, sources: new Map(cards.map((o) => [o.tweet_id, o])) }
+}
+
+async function buildEncodedBoard(): Promise<EncodedBoard> {
+  const builtAt = Date.now()
+  const board = await verifyBoard(await readBulletinBoardSource())
+  const encoded = encodeBoard(board, builtAt)
+  // Sizes only: the encoded copy must stay under the Data Cache's 2 MB limit.
+  if (process.env.NODE_ENV !== 'test')
+    console.info(
+      JSON.stringify({
+        message: 'Bulletin board built',
+        notices: board.notices.length,
+        cards: board.sources.size,
+        encodedBytes: encoded.data.length,
+        durationMs: Date.now() - builtAt,
+      }),
+    )
+  return encoded
+}
+
+const persistedBoard = unstable_cache(
+  buildEncodedBoard,
+  ['bulletin-board-v1'],
   {
-    freshMs: BOARD_FRESH_MS,
-    maxStaleMs: BOARD_MAX_STALE_MS,
-    background(work) {
-      const quiet = work.catch(() => {})
-      try {
-        after(() => quiet)
-      } catch {
-        // Outside a request (tests, static generation) the promise just runs.
-      }
-    },
+    revalidate: BOARD_REBUILD_S,
+    tags: ['bulletin-board'],
   },
 )
+
+async function loadPersistedBoard(): Promise<VerifiedBulletinBoard> {
+  let encoded = await measureServerRead('bulletin.board-cache', persistedBoard)
+  // The Data Cache keeps serving its last copy while rebuilds fail. Past the
+  // staleness bound, rebuild here instead of showing it.
+  if (Date.now() - encoded.builtAt > BOARD_MAX_STALE_MS - BOARD_MEMORY_STALE_MS)
+    encoded = await measureServerRead('bulletin.board-build', buildEncodedBoard)
+  return decodeBoard(encoded)
+}
+
+const sharedBoard = createSharedCache(loadPersistedBoard, {
+  freshMs: BOARD_MEMORY_FRESH_MS,
+  maxStaleMs: BOARD_MEMORY_STALE_MS,
+  background(work) {
+    const quiet = work.catch(() => {})
+    try {
+      after(() => quiet)
+    } catch {
+      // Outside a request (tests, static generation) the promise just runs.
+    }
+  },
+})
 
 /** Tests only: forget instance-level caches between cases. */
 export function clearBulletinCaches() {

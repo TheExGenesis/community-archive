@@ -1,19 +1,14 @@
 import { getSourceTweets } from './source-tweets'
 import { createServerServiceRoleClient } from '@/utils/supabase'
-import { isClickHouseReadsEnabled } from '@/lib/clickhouseGateway'
 import { fetchClickHouseTweetPageData } from '@/lib/clickhouseTweetPage'
-import { enrichPortalTweets } from '@/lib/portal/data'
 import { getAppPolicy } from './data'
+// Kept only to prove the retired Supabase fallback is never reached.
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
-}))
-jest.mock('@/lib/clickhouseGateway', () => ({
-  isClickHouseReadsEnabled: jest.fn(),
 }))
 jest.mock('@/lib/clickhouseTweetPage', () => ({
   fetchClickHouseTweetPageData: jest.fn(),
 }))
-jest.mock('@/lib/portal/data', () => ({ enrichPortalTweets: jest.fn() }))
 jest.mock('./data', () => ({ getAppPolicy: jest.fn() }))
 beforeEach(() => {
   jest.clearAllMocks()
@@ -23,50 +18,49 @@ beforeEach(() => {
     members: new Set(),
   })
 })
-test('current opt-outs filter both authors and quoted authors after full enrichment', async () => {
-  jest.mocked(isClickHouseReadsEnabled).mockReturnValue(false)
-  const query = {
-    select: jest.fn().mockReturnThis(),
-    in: jest.fn().mockResolvedValue({
-      data: [
-        {
-          tweet_id: '123',
-          username: 'member',
-          created_at: '2020-01-01',
-          full_text: 'complete source',
-        },
-      ],
-      error: null,
-    }),
-  }
-  jest
-    .mocked(createServerServiceRoleClient)
-    .mockReturnValue({ from: () => query } as never)
-  const media = [{ url: 'https://example.org/photo.jpg', type: 'photo' }]
-  jest.mocked(enrichPortalTweets).mockImplementation(async (tweets) => [
-    {
-      ...tweets[0],
-      media,
-      quotedTweet: {
-        id: '234',
-        username: 'WITHDRAWN',
-        name: 'removed',
-        text: 'hidden',
-      } as never,
+test('current opt-outs filter both authors and quoted authors', async () => {
+  const record = (id: string, username: string, accountId: string) => ({
+    tweet_id: id,
+    account_id: accountId,
+    username,
+    account_display_name: username,
+    full_text: 'complete source',
+    created_at: '2020-01-01',
+    favorite_count: 1,
+    retweet_count: 0,
+    avatar_media_url: null,
+    media: [
+      { media_url: 'https://example.org/photo.jpg', media_type: 'photo' },
+    ],
+    quoted_tweet: {
+      tweet_id: '234',
+      account_id: 'withdrawn-id',
+      username: 'WITHDRAWN',
+      account_display_name: 'removed',
+      full_text: 'hidden',
+      created_at: '2020-01-01',
+      favorite_count: 0,
+      retweet_count: 0,
     },
-    { ...tweets[0], id: '345', username: 'renamed', accountId: 'blocked-id' },
-  ])
-  const result = await getSourceTweets(['123', '123', '../bad'])
-  expect(query.in).toHaveBeenCalledWith('tweet_id', ['123'])
+  })
+  jest
+    .mocked(fetchClickHouseTweetPageData)
+    .mockImplementation(async (id: string) =>
+      id === '123'
+        ? (record('123', 'member', 'member-id') as never)
+        : (record('345', 'renamed', 'blocked-id') as never),
+    )
+  const result = await getSourceTweets(['123', '123', '345', '../bad'])
+  expect(fetchClickHouseTweetPageData).toHaveBeenCalledTimes(2)
   expect(Array.from(result.keys())).toEqual(['123'])
   expect(result.get('123')).toMatchObject({
     text: 'complete source',
-    media,
+    media: [{ url: 'https://example.org/photo.jpg', type: 'photo' }],
     quotedTweet: undefined,
   })
+  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })
 test('ClickHouse failures propagate without querying another record source', async () => {
-  jest.mocked(isClickHouseReadsEnabled).mockReturnValue(true)
   jest
     .mocked(fetchClickHouseTweetPageData)
     .mockRejectedValue(new Error('offline'))
@@ -80,7 +74,6 @@ test('oversized reads are rejected before querying', async () => {
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })
 test('an absent ClickHouse post stays absent without breaking source loading', async () => {
-  jest.mocked(isClickHouseReadsEnabled).mockReturnValue(true)
   jest
     .mocked(fetchClickHouseTweetPageData)
     .mockRejectedValue(

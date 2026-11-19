@@ -7,7 +7,6 @@ import {
   createPublicReadClient,
   publicDataConfig,
 } from '@/lib/publicDataSource'
-import { devLog } from '@/lib/devLog'
 import { isTwitterUsername } from '@/lib/apiInputValidation'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type {
@@ -70,142 +69,6 @@ async function fetchProfileHeader(
     has_archive: membership?.has_archive === true,
     is_opted_in: membership?.is_opted_in === true,
   }
-}
-
-interface SidebarScope {
-  accountId: string
-  year?: number
-}
-
-const applyScope = (query: any, scope: SidebarScope) => {
-  let scoped = query.eq('account_id', scope.accountId)
-  if (scope.year) {
-    scoped = scoped
-      .gte('created_at', `${scope.year}-01-01`)
-      .lt('created_at', `${scope.year + 1}-01-01`)
-  }
-  return scoped
-}
-
-async function fetchMedia(
-  scope: SidebarScope,
-  limit: number,
-): Promise<ArchiveMediaItem[]> {
-  const supabase = getMetaClient()
-  const { data, error } = await applyScope(
-    supabase
-      .from('tweets')
-      .select(
-        'tweet_id, created_at, favorite_count, media:tweet_media!inner ( media_url, media_type, width, height )',
-      ),
-    scope,
-  )
-    .not('full_text', 'ilike', 'RT @%')
-    .order('favorite_count', { ascending: false })
-    .limit(limit)
-  if (error) {
-    devLog('metaTwitter fetchMedia error', { error, scope })
-    return []
-  }
-  const items: ArchiveMediaItem[] = []
-  for (const row of (data ?? []) as any[]) {
-    for (const media of row.media ?? []) {
-      if (media.media_type !== 'photo') continue
-      items.push({
-        ...media,
-        tweet_id: row.tweet_id,
-        created_at: row.created_at,
-        favorite_count: row.favorite_count,
-      })
-    }
-  }
-  return items
-}
-
-async function fetchTopPeople(
-  scope: SidebarScope,
-  limit: number,
-): Promise<ArchivePerson[]> {
-  const supabase = getMetaClient()
-  const { data, error } = await applyScope(
-    supabase.from('tweets').select('reply_to_username, reply_to_user_id'),
-    scope,
-  )
-    .not('reply_to_username', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1000)
-  if (error) {
-    devLog('metaTwitter fetchTopPeople error', { error, scope })
-    return []
-  }
-
-  const counts = new Map<string, ArchivePerson>()
-  for (const row of data ?? []) {
-    const screenName = row.reply_to_username as string
-    if (!screenName || row.reply_to_user_id === scope.accountId) continue
-    const key = screenName.toLowerCase()
-    const existing = counts.get(key)
-    if (existing) {
-      existing.interactions += 1
-    } else {
-      counts.set(key, {
-        user_id: (row.reply_to_user_id as string) ?? screenName,
-        screen_name: screenName,
-        name: null,
-        interactions: 1,
-      })
-    }
-  }
-  const top = Array.from(counts.values())
-    .sort((left, right) => right.interactions - left.interactions)
-    .slice(0, limit)
-
-  const ids = top.map((person) => person.user_id).filter(Boolean)
-  if (ids.length === 0) return top
-
-  const [{ data: profiles }, { data: accounts }] = await Promise.all([
-    supabase
-      .from('all_profile')
-      .select('account_id, avatar_media_url')
-      .in('account_id', ids)
-      .order('archive_upload_id', { ascending: false }),
-    supabase
-      .from('all_account')
-      .select('account_id, account_display_name')
-      .in('account_id', ids),
-  ])
-  const avatarByAccount = new Map<string, string>()
-  for (const profile of profiles ?? []) {
-    if (profile.avatar_media_url && !avatarByAccount.has(profile.account_id)) {
-      avatarByAccount.set(profile.account_id, profile.avatar_media_url)
-    }
-  }
-  const nameByAccount = new Map<string, string>(
-    (accounts ?? []).map((account) => [
-      account.account_id,
-      account.account_display_name ?? '',
-    ]),
-  )
-  for (const person of top) {
-    person.avatar_media_url = avatarByAccount.get(person.user_id) ?? null
-    person.in_archive = nameByAccount.has(person.user_id)
-    person.name = nameByAccount.get(person.user_id) || null
-  }
-  return top
-}
-
-async function fetchMediaCount(scope: SidebarScope): Promise<number> {
-  const supabase = getMetaClient()
-  const { count } = await applyScope(
-    supabase
-      .from('tweets')
-      .select('tweet_id, media:tweet_media!inner(media_id)', {
-        count: 'exact',
-        head: true,
-      }),
-    scope,
-  )
-  return count ?? 0
 }
 
 const cachedProfileHeader = unstable_cache(
@@ -327,25 +190,7 @@ const cachedArchivedAt = unstable_cache(
   { revalidate: DAY },
 )
 
-const cachedProfileSidebarData = unstable_cache(
-  async (accountId: string, year: number | undefined, _source: string) => {
-    const scope: SidebarScope = { accountId, year }
-    const [media, people, mediaCount] = await Promise.all([
-      fetchMedia(scope, 6),
-      fetchTopPeople(scope, 8),
-      fetchMediaCount(scope),
-    ])
-    return { media, people, mediaCount }
-  },
-  ['meta-twitter-profile-sidebar-v2'],
-  { revalidate: DAY },
-)
-
 export const getCachedProfileHeader = (accountId: string) =>
   cachedProfileHeader(accountId, publicDataConfig().sourceId)
 export const getCachedArchivedAt = (accountId: string) =>
   cachedArchivedAt(accountId, publicDataConfig().sourceId)
-export const getCachedProfileSidebarData = (
-  accountId: string,
-  year: number | undefined,
-) => cachedProfileSidebarData(accountId, year, publicDataConfig().sourceId)

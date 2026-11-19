@@ -161,22 +161,3 @@ export function parseDigestReplies(
     totalCount: replies.length,
   }
 }
-
-export async function fetchDigestReplies(
-  client: SupabaseClient<Database>,
-  input: {
-    bangerTweetId: string
-    windowStart: string
-    windowEnd: string
-    limit?: number
-  },
-): Promise<DigestReplies> {
-  const { data, error } = await client.rpc('get_tweet_page_data', {
-    p_tweet_id: input.bangerTweetId,
-  })
-  if (error) throw error
-  return parseDigestReplies(data, {
-    ...input,
-    limit: input.limit ?? 8,
-  })
-}

@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createBrowserClient } from '@/utils/supabase'
 import {
   ChartContainer,
   ChartTooltip,
@@ -21,36 +20,15 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import getLatestTweets from '@/lib/queries/getLatestTweets'
+import {
+  getLatestStreamTweets,
+  type StreamMonitorTweet,
+  type StreamTweetsCursor,
+} from '@/lib/queries/getLatestStreamTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 
-interface TweetMedia {
-  media_url: string
-  media_type: string
-}
-
-interface TweetUrl {
-  expanded_url: string | null
-  display_url: string
-}
-
-interface Tweet {
-  tweet_id: string
-  account_id: string
-  created_at: string
-  full_text: string
-  retweet_count: number | null
-  favorite_count: number
-  reply_to_tweet_id: string | null
-  quote_tweet_id: string | null
-  retweeted_tweet_id: string | null
-  avatar_media_url: string | null
-  username: string
-  account_display_name: string
-  media: TweetMedia[]
-  urls: TweetUrl[]
-}
+type Tweet = StreamMonitorTweet
 
 type ViewMode = '24h' | '7d' | '1y'
 
@@ -98,10 +76,14 @@ const StreamMonitor = () => {
   const [timeOffset, setTimeOffset] = useState(0)
   const [showStreamedOnly, setShowStreamedOnly] = useState(true)
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
-  const [tweetOffset, setTweetOffset] = useState(0)
-  const tweetsPerPage = 20
-
-  const supabase = createBrowserClient()
+  // null is the newest page; later pages continue from the last tweet shown.
+  const [tweetCursor, setTweetCursor] = useState<StreamTweetsCursor | null>(
+    null,
+  )
+  const firstPage = tweetCursor === null
+  const cursorKey = tweetCursor
+    ? `${tweetCursor.createdAt}:${tweetCursor.id}`
+    : 0
 
   // Query for scraping stats based on view mode and offset
   const {
@@ -183,39 +165,32 @@ const StreamMonitor = () => {
     error: tweetsError,
     refetch: refetchTweets,
   } = useQuery({
-    queryKey: ['streamMonitorTweets', tweetOffset],
-    queryFn: async () => {
-      return await getLatestTweets(
-        supabase,
-        tweetsPerPage,
-        undefined,
-        tweetOffset,
-        {
-          includeEnrichments: false,
-        },
-      )
-    },
-    refetchInterval: tweetOffset === 0 ? 60000 : 0, // Only auto-refresh latest tweets
+    queryKey: ['streamMonitorTweets', cursorKey],
+    queryFn: () => getLatestStreamTweets(tweetCursor),
+    refetchInterval: firstPage ? 60000 : 0, // Only auto-refresh latest tweets
   })
 
   // Update loaded tweets when new data arrives
   React.useEffect(() => {
     if (tweetsData) {
-      if (tweetOffset === 0) {
+      if (firstPage) {
         // Fresh load or refresh - replace all tweets
-        setLoadedTweets(tweetsData)
+        setLoadedTweets(tweetsData.tweets)
       } else {
-        // Pages can overlap as new tweets arrive or the current page refetches.
+        // Pages can overlap as the current page refetches.
         setLoadedTweets((prev) =>
           Array.from(
             new Map(
-              [...prev, ...tweetsData].map((tweet) => [tweet.tweet_id, tweet]),
+              [...prev, ...tweetsData.tweets].map((tweet) => [
+                tweet.tweet_id,
+                tweet,
+              ]),
             ).values(),
           ),
         )
       }
     }
-  }, [tweetsData, tweetOffset])
+  }, [tweetsData, firstPage])
 
   const chartConfig = {
     tweet_count: {
@@ -280,21 +255,21 @@ const StreamMonitor = () => {
     viewMode === '24h' ? 'hour' : viewMode === '7d' ? 'day' : 'week'
 
   const loadMoreTweets = () => {
-    setTweetOffset((prev) => prev + tweetsPerPage)
+    if (tweetsData?.nextCursor) setTweetCursor(tweetsData.nextCursor)
   }
 
   const refreshLatestTweets = async () => {
-    if (tweetOffset === 0) {
+    if (firstPage) {
       await refetchTweets()
     } else {
       // Mark the first page stale before switching back to it. Refetching here
-      // would use the old offset and request another later page instead.
+      // would use the old cursor and request another later page instead.
       await queryClient.invalidateQueries({
         queryKey: ['streamMonitorTweets', 0],
         exact: true,
         refetchType: 'none',
       })
-      setTweetOffset(0)
+      setTweetCursor(null)
     }
   }
 
@@ -493,14 +468,12 @@ const StreamMonitor = () => {
               size="sm"
               disabled={tweetsFetching}
             >
-              {tweetsFetching && tweetOffset === 0
-                ? 'Refreshing...'
-                : 'Refresh'}
+              {tweetsFetching && firstPage ? 'Refreshing...' : 'Refresh'}
             </Button>
           </CardTitle>
           <CardDescription>
-            Recently streamed top-level tweets (no replies) - refreshes
-            automatically
+            Recently streamed top-level tweets by archive members (no replies or
+            retweets) - refreshes automatically
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -528,9 +501,7 @@ const StreamMonitor = () => {
                   Could not load tweets. Please try again.
                 </p>
               )}
-              {(tweetsError ||
-                tweetsLoading ||
-                tweetsData?.length === tweetsPerPage) && (
+              {(tweetsError || tweetsLoading || tweetsData?.hasMore) && (
                 <div className="flex justify-center pt-4">
                   <Button
                     onClick={

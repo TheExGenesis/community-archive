@@ -1,12 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import StreamMonitor from './page'
-import getLatestTweets from '@/lib/queries/getLatestTweets'
+import { getLatestStreamTweets } from '@/lib/queries/getLatestStreamTweets'
 
-jest.mock('@/utils/supabase', () => ({ createBrowserClient: () => ({}) }))
-jest.mock('@/lib/queries/getLatestTweets', () => ({
-  __esModule: true,
-  default: jest.fn(),
+jest.mock('@/lib/queries/getLatestStreamTweets', () => ({
+  getLatestStreamTweets: jest.fn(),
 }))
 jest.mock('@/components/ExtensionInstallPrompt', () => () => null)
 jest.mock(
@@ -32,12 +30,23 @@ jest.mock('@/components/ui/chart', () => ({
   ChartTooltipContent: () => null,
 }))
 
-const latest = jest.mocked(getLatestTweets)
-const tweets = (start: number, count: number) =>
-  Array.from({ length: count }, (_, i) => ({
+type Page = Awaited<ReturnType<typeof getLatestStreamTweets>>
+const latest = jest.mocked(getLatestStreamTweets)
+// A page of tweets; hasMore and the cursor point past its last tweet.
+const tweets = (
+  start: number,
+  count: number,
+  hasMore = count === 30,
+): Page => ({
+  tweets: Array.from({ length: count }, (_, i) => ({
     tweet_id: String(start + i),
     full_text: `Tweet ${start + i}`,
-  })) as Awaited<ReturnType<typeof getLatestTweets>>
+  })) as Page['tweets'],
+  nextCursor: count
+    ? { createdAt: `t${start + count - 1}`, id: String(start + count - 1) }
+    : null,
+  hasMore,
+})
 
 const clients: QueryClient[] = []
 function setup() {
@@ -70,8 +79,8 @@ afterEach(() => {
 })
 
 test('keeps loaded tweets while loading more, deduplicates overlapping pages, and stops at the end', async () => {
-  latest.mockResolvedValueOnce(tweets(0, 20))
-  let resolvePage!: (value: Awaited<ReturnType<typeof getLatestTweets>>) => void
+  latest.mockResolvedValueOnce(tweets(0, 30))
+  let resolvePage!: (value: Page) => void
   latest.mockImplementationOnce(
     () =>
       new Promise((resolve) => {
@@ -81,41 +90,42 @@ test('keeps loaded tweets while loading more, deduplicates overlapping pages, an
   setup()
   fireEvent.click(await screen.findByRole('button', { name: 'Load More' }))
   expect(screen.getByText('Tweet 0')).toBeInTheDocument()
-  await act(async () => resolvePage(tweets(19, 2)))
-  expect(await screen.findByText('Tweet 20')).toBeInTheDocument()
-  expect(screen.getAllByText('Tweet 19')).toHaveLength(1)
+  await act(async () => resolvePage(tweets(29, 2)))
+  expect(await screen.findByText('Tweet 30')).toBeInTheDocument()
+  expect(screen.getAllByText('Tweet 29')).toHaveLength(1)
+  expect(latest.mock.calls[1][0]).toEqual({ createdAt: 't29', id: '29' })
   expect(
     screen.queryByRole('button', { name: 'Load More' }),
   ).not.toBeInTheDocument()
 })
 
-test('refetching a later page does not duplicate it, and Refresh requests page zero', async () => {
+test('refetching a later page does not duplicate it, and Refresh requests the newest page', async () => {
   latest
-    .mockResolvedValueOnce(tweets(0, 20))
-    .mockResolvedValueOnce(tweets(20, 20))
+    .mockResolvedValueOnce(tweets(0, 30))
+    .mockResolvedValueOnce(tweets(30, 30))
   const client = setup()
   fireEvent.click(await screen.findByRole('button', { name: 'Load More' }))
-  await screen.findByText('Tweet 39')
-  latest.mockResolvedValueOnce(tweets(21, 20))
+  await screen.findByText('Tweet 59')
+  latest.mockResolvedValueOnce(tweets(31, 30))
   await act(async () => {
-    await client.refetchQueries({ queryKey: ['streamMonitorTweets', 20] })
+    await client.refetchQueries({
+      queryKey: ['streamMonitorTweets', 't29:29'],
+    })
   })
-  expect(await screen.findByText('Tweet 40')).toBeInTheDocument()
-  expect(screen.getAllByText('Tweet 21')).toHaveLength(1)
+  expect(await screen.findByText('Tweet 60')).toBeInTheDocument()
+  expect(screen.getAllByText('Tweet 31')).toHaveLength(1)
   latest.mockResolvedValueOnce(tweets(100, 3))
   fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
   expect(await screen.findByText('Tweet 100')).toBeInTheDocument()
-  expect(latest).toHaveBeenLastCalledWith(expect.anything(), 20, undefined, 0, {
-    includeEnrichments: false,
-  })
-  expect(screen.queryByText('Tweet 39')).not.toBeInTheDocument()
+  expect(latest).toHaveBeenLastCalledWith(null)
+  expect(screen.queryByText('Tweet 59')).not.toBeInTheDocument()
 })
 
-test('a failed later page preserves existing tweets and retries the same offset', async () => {
+test('a failed later page preserves existing tweets and retries the same cursor', async () => {
   latest
-    .mockResolvedValueOnce(tweets(0, 20))
+    .mockResolvedValueOnce(tweets(0, 30))
     .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValueOnce(tweets(20, 1))
+    .mockResolvedValueOnce(tweets(30, 1))
   setup()
   fireEvent.click(await screen.findByRole('button', { name: 'Load More' }))
   const retry = await screen.findByRole('button', {
@@ -123,15 +133,20 @@ test('a failed later page preserves existing tweets and retries the same offset'
   })
   expect(screen.getByText('Tweet 0')).toBeInTheDocument()
   fireEvent.click(retry)
-  expect(await screen.findByText('Tweet 20')).toBeInTheDocument()
-  expect(latest.mock.calls.map((call) => call[3])).toEqual([0, 20, 20])
+  expect(await screen.findByText('Tweet 30')).toBeInTheDocument()
+  const cursor = { createdAt: 't29', id: '29' }
+  expect(latest.mock.calls.map((call) => call[0])).toEqual([
+    null,
+    cursor,
+    cursor,
+  ])
 })
 
 test('failed statistics show unavailable rather than zero activity', async () => {
   jest
     .mocked(fetch)
     .mockResolvedValue({ ok: false, json: async () => ({}) } as Response)
-  latest.mockResolvedValue([])
+  latest.mockResolvedValue(tweets(0, 0))
   setup()
   await waitFor(() =>
     expect(screen.getAllByText('Unavailable')).toHaveLength(4),

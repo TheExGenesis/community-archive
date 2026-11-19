@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash } from 'crypto'
-import { loadVerifiedBulletinBoard, type StoredNotice } from './data'
+import { loadVerifiedBulletinBoard, type BoardNotice } from './data'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import {
   fetchClickHouseTweetThreadPageData,
@@ -104,7 +104,7 @@ function card(tweet: TweetData): PortalTweet {
 }
 
 type BulletinSourceState = {
-  notices: StoredNotice[]
+  notices: BoardNotice[]
   allowedAccounts?: string[]
 }
 

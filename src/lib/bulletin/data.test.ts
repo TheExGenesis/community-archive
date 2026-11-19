@@ -42,9 +42,20 @@ const rpc = jest.fn()
 const loadNotices = async () =>
   hydrateBulletinNotices(await loadBulletinBoardState())
 jest.mock('next/server', () => ({ after: jest.fn() }))
+// Stands in for Vercel's Data Cache: the first result is kept until cleared.
+const mockDataCache = new Map<unknown, unknown>()
+jest.mock('next/cache', () => ({
+  unstable_cache:
+    <T>(build: () => Promise<T>) =>
+    async () => {
+      if (!mockDataCache.has(build)) mockDataCache.set(build, await build())
+      return mockDataCache.get(build) as T
+    },
+}))
 beforeEach(() => {
   jest.clearAllMocks()
   clearBulletinCaches()
+  mockDataCache.clear()
   jest.mocked(getOptInStatus).mockResolvedValue({
     data: { opted_in: true, explicit_optout: false },
     error: null,
@@ -479,6 +490,37 @@ describe('shared verified board', () => {
     await loadVerifiedBulletinBoard()
     await loadPublicBulletinBoard()
     expect(rpc).toHaveBeenCalledTimes(1)
+  })
+
+  test('a fresh server reads the shared copy instead of rebuilding', async () => {
+    await loadVerifiedBulletinBoard()
+    clearBulletinCaches() // a new server: empty memory, same Data Cache
+    const board = await loadPublicBulletinBoard()
+    expect(Array.from(board.sources.keys())).toEqual(['1', '3'])
+    expect(board.notices).toHaveLength(3)
+    expect(board.notices[0]).toEqual({
+      tweet_id: '1',
+      account_id: '10',
+      content_hash: hash('Offer: help'),
+      kind: undefined,
+      side: undefined,
+    })
+    expect(rpc).toHaveBeenCalledTimes(1)
+  })
+
+  test('a shared copy past the staleness bound is rebuilt, not shown', async () => {
+    const start = Date.now()
+    await loadVerifiedBulletinBoard()
+    clearBulletinCaches()
+    const later = jest.spyOn(Date, 'now')
+    later.mockReturnValue(start + 8 * 60_000)
+    await loadPublicBulletinBoard()
+    expect(rpc).toHaveBeenCalledTimes(1)
+    clearBulletinCaches()
+    later.mockReturnValue(start + 10 * 60_000)
+    await loadPublicBulletinBoard()
+    expect(rpc).toHaveBeenCalledTimes(2)
+    later.mockRestore()
   })
 
   test('readers still need active consent before the shared board is returned', async () => {

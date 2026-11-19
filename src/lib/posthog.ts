@@ -265,6 +265,7 @@ export const allowedEventProperties = {
       'homepage_stats',
       'homepage_hex_map',
       'homepage_digest',
+      'homepage_bulletin',
       'homepage_stream',
       'bangers_results',
       'stream_feed',

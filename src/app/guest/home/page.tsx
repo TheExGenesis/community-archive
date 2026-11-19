@@ -9,8 +9,9 @@ import { startHomepageData } from '@/lib/portal/data'
  *
  * The window is short on purpose: a section whose read fails renders its own
  * failure state, and that render is what visitors see until the next
- * regeneration succeeds. The page names no account that an opt-out would
- * need to remove sooner; the featured people are a curated static list.
+ * regeneration succeeds. The featured people are a curated static list. The
+ * Bulletin picks name members, but come from the policy-applied board, which
+ * an opt-out clears within its own ten-minute bound plus this window.
  */
 export const dynamic = 'force-static'
 export const revalidate = 60

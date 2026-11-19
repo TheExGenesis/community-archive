@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash } from 'crypto'
-import { loadBulletinBoardState, type StoredNotice } from './data'
+import { loadVerifiedBulletinBoard, type StoredNotice } from './data'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import {
   fetchClickHouseTweetThreadPageData,
@@ -186,5 +186,5 @@ export async function hydrateBulletinTweets(
 }
 
 export async function loadBulletinTweets(ids: string[]) {
-  return hydrateBulletinTweets(ids, loadBulletinBoardState())
+  return hydrateBulletinTweets(ids, loadVerifiedBulletinBoard())
 }

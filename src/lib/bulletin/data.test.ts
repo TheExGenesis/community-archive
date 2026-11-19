@@ -8,7 +8,10 @@ import {
   loadBulletinRelationships,
   loadBulletinRelationshipsForAccount,
   loadBulletinViewer,
+  loadPublicBulletinBoard,
+  loadVerifiedBulletinBoard,
   requireBulletinUser,
+  clearBulletinCaches,
 } from './data'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
@@ -38,8 +41,10 @@ const rpc = jest.fn()
 // The board page composes these two steps; exercise them the same way.
 const loadNotices = async () =>
   hydrateBulletinNotices(await loadBulletinBoardState())
+jest.mock('next/server', () => ({ after: jest.fn() }))
 beforeEach(() => {
   jest.clearAllMocks()
+  clearBulletinCaches()
   jest.mocked(getOptInStatus).mockResolvedValue({
     data: { opted_in: true, explicit_optout: false },
     error: null,
@@ -418,3 +423,69 @@ test.each([null, { is_anonymous: true }])(
     expect(rpc).not.toHaveBeenCalled()
   },
 )
+
+describe('shared verified board', () => {
+  const hash = (text: string) => createHash('sha256').update(text).digest('hex')
+  const stored = [
+    { tweet_id: '1', account_id: '10', content_hash: hash('Offer: help') },
+    { tweet_id: '2', account_id: '10', content_hash: hash('Offer: old') },
+    {
+      tweet_id: '3',
+      account_id: '10',
+      content_hash: hash('Ask: rides'),
+      resolution_state: 'resolved',
+      resolution_tweet_id: '9',
+      resolution_content_hash: hash('Found one'),
+    },
+  ]
+  const source = (tweet_id: string, full_text: string) => ({
+    tweet_id,
+    account_id: '10',
+    full_text,
+    reply_to_tweet_id: null,
+    retweet: false,
+    created_at: '2026-09-01 00:00:00',
+  })
+  beforeEach(() => {
+    jest
+      .mocked(getCurrentUser)
+      .mockResolvedValue({ id: 'member', is_anonymous: false } as User)
+    rpc.mockResolvedValue({ data: stored, error: null })
+    jest
+      .mocked(fetchAnalyticsGatewayJson)
+      .mockImplementation(async (_path, params) =>
+        params?.get('enrich')
+          ? {
+              data: [
+                source('1', 'Offer: help'),
+                source('2', 'Offer: edited'),
+                source('3', 'Ask: rides'),
+              ],
+            }
+          : {
+              data: [{ tweet_id: '9', account_id: '10', full_text: 'Deleted' }],
+            },
+      )
+  })
+
+  test('one read serves later page views, with failed sources and stale resolutions removed', async () => {
+    const board = await loadVerifiedBulletinBoard()
+    expect(Array.from(board.sources.keys())).toEqual(['1', '3'])
+    // The resolution post changed, so the ask is open again.
+    expect(board.sources.get('3')).toMatchObject({
+      resolution_state: 'unknown',
+      resolution_tweet_id: null,
+    })
+    await loadVerifiedBulletinBoard()
+    await loadPublicBulletinBoard()
+    expect(rpc).toHaveBeenCalledTimes(1)
+  })
+
+  test('readers still need active consent before the shared board is returned', async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null)
+    await expect(loadVerifiedBulletinBoard()).rejects.toThrow(
+      'redirect:/login?redirect=/bulletin',
+    )
+    expect(rpc).not.toHaveBeenCalled()
+  })
+})

@@ -1,28 +1,15 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import {
-  TimelineTweet,
-  RawSupabaseTweet,
-  RawSupabaseAccount,
-  RawSupabaseProfile,
-} from '@/lib/types'
-import {
-  searchTweets as rpcSearchTweets,
-  searchTweetsExactPhrase as rpcSearchExactPhrase,
-} from '../pgSearch'
+import { TimelineTweet } from '@/lib/types'
+import { searchTweets as rpcSearchTweets } from '../pgSearch'
 import { type SearchParams } from '../types'
-import { getLatestAvatarMediaUrl } from '@/lib/avatar'
 import { searchTweetsWithClickHouse } from '../clickhouseSearch'
 import { enrichSearchTweets } from '../searchTweetEnrichments'
 
 export interface FilterCriteria {
-  userId?: string // For fetching tweets by a specific user
   searchQuery?: string // For text search in tweets (tsquery-formatted)
-  rawSearchQuery?: string // Original unformatted search text (for two-query exact-match-first logic)
-  mentionedUser?: string // For tweets mentioning a specific user
+  rawSearchQuery?: string // Original unformatted search text, sent to ClickHouse search
   fromUsername?: string // For tweets from a specific username
   replyToUsername?: string // For tweets in reply to a specific username
-  isRootTweet?: boolean // To fetch only root-level tweets (no replies)
-  hashtags?: string[] // For tweets containing specific hashtags
   startDate?: string // For tweets created after this date
   endDate?: string // For tweets created before this date
   excludeRetweets?: boolean // Exclude native archive retweets that start with "RT @"
@@ -38,61 +25,27 @@ export function isRetweetText(text: string): boolean {
   return /^RT @[A-Za-z0-9_]+/.test(text)
 }
 
-// Helper to transform data from either source
-function transformRawTweetsToTimelineTweets(
-  rawData: any[],
-  isRpcResult: boolean = false,
-): TimelineTweet[] {
-  return (rawData as any[]).map((rawTweet) => {
+// Map flat search_tweets RPC rows (filter-only searches) to timeline tweets.
+function transformRpcTweetsToTimelineTweets(rawData: any[]): TimelineTweet[] {
+  return rawData.map((rawTweet) => {
     let timelineAccount: TimelineTweet['account'] = {
       username: 'unknown_user',
       account_display_name: 'Unknown User',
       profile: undefined,
     }
-
-    if (isRpcResult) {
-      // RPC result likely has flat account data on rawTweet itself
-      if (rawTweet.username) {
-        timelineAccount = {
-          username: rawTweet.username,
-          account_display_name:
-            rawTweet.account_display_name || rawTweet.username,
-          profile: rawTweet.avatar_media_url
-            ? {
-                avatar_media_url:
-                  rawTweet.avatar_media_url === null
-                    ? undefined
-                    : rawTweet.avatar_media_url,
-              }
-            : undefined,
-        }
-      } else {
-        console.error(
-          `RPC Tweet ${rawTweet.tweet_id} is missing account username. Using fallback.`,
-        )
+    if (rawTweet.username) {
+      timelineAccount = {
+        username: rawTweet.username,
+        account_display_name:
+          rawTweet.account_display_name || rawTweet.username,
+        profile: rawTweet.avatar_media_url
+          ? { avatar_media_url: rawTweet.avatar_media_url }
+          : undefined,
       }
     } else {
-      // Direct query result has nested account data
-      const accountData = rawTweet.account as RawSupabaseAccount | undefined
-      if (accountData && accountData.username) {
-        const profileData = accountData.profile as
-          | RawSupabaseProfile
-          | RawSupabaseProfile[]
-          | null
-          | undefined
-        const avatarMediaUrl = getLatestAvatarMediaUrl(profileData)
-        timelineAccount = {
-          username: accountData.username,
-          account_display_name: accountData.account_display_name,
-          profile: avatarMediaUrl
-            ? { avatar_media_url: avatarMediaUrl }
-            : undefined,
-        }
-      } else {
-        console.error(
-          `Direct Query Tweet ${rawTweet.tweet_id} is missing account data. Using fallback.`,
-        )
-      }
+      console.error(
+        `RPC Tweet ${rawTweet.tweet_id} is missing account username. Using fallback.`,
+      )
     }
 
     return {
@@ -151,38 +104,24 @@ export function buildAndTsQuery(raw: string): string {
   return words.join(' & ')
 }
 
-/**
- * Exact phrase search using FTS 'simple' config via RPC function.
- *
- * Uses phraseto_tsquery('simple', ...) which matches exact word order
- * without dropping stop words. Backed by a GIN index on
- * to_tsvector('simple', full_text) for fast lookups.
- */
-async function searchExactPhrase(
-  supabase: SupabaseClient,
-  phrase: string,
-  criteria: FilterCriteria,
-  pageSize: number,
-  offset: number,
-  signal?: AbortSignal,
-): Promise<TimelineTweet[]> {
-  const data = await rpcSearchExactPhrase(
-    supabase,
-    {
-      exact_phrase: phrase,
-      from_user: criteria.fromUsername || null,
-      to_user: criteria.replyToUsername || null,
-      since_date: criteria.startDate || null,
-      until_date: criteria.endDate || null,
-    },
-    pageSize,
-    offset,
-    signal,
-  )
-
-  return data ? transformRawTweetsToTimelineTweets(data, true) : []
+function searchError(error: any) {
+  if (error?.message && error.message.includes('statement timeout')) {
+    return {
+      message: 'Search query timed out. Please try a more specific search.',
+      details: error,
+    }
+  }
+  return error
 }
 
+/**
+ * Archive search for /search and trend stories.
+ *
+ * Text searches always read ClickHouse through /api/tweet-search; a failure
+ * is reported rather than retried against PostgreSQL. Filter-only searches
+ * (author, reply target or dates with no text) still use the signed-in
+ * search_tweets RPC until the gateway serves filter-only search.
+ */
 export async function fetchTweets(
   supabase: SupabaseClient,
   criteria: FilterCriteria,
@@ -191,235 +130,74 @@ export async function fetchTweets(
   options: TweetFetchOptions = {},
 ): Promise<{ tweets: TimelineTweet[]; totalCount: number | null; error: any }> {
   options.signal?.throwIfAborted()
-  // Use RPC if a text search query is provided OR if any filters supported by the RPC are used.
-  if (
-    criteria.searchQuery || // Main keyword search
-    criteria.fromUsername || // Filter by author username
-    criteria.replyToUsername || // Filter by replied-to username
-    criteria.startDate || // Filter by start date
-    criteria.endDate // Filter by end date
-  ) {
-    const baseParams = {
+  const rawText = criteria.rawSearchQuery?.trim()
+  const hasFilters = Boolean(
+    criteria.fromUsername ||
+      criteria.replyToUsername ||
+      criteria.startDate ||
+      criteria.endDate,
+  )
+  if (!rawText && !criteria.searchQuery && !hasFilters) {
+    return { tweets: [], totalCount: 0, error: null }
+  }
+
+  try {
+    if (rawText) {
+      // Do not start a second corpus scan against PostgreSQL when the
+      // analytical service fails or the reader has cancelled this search.
+      const clickHouseTweets = await searchClickHousePage(
+        criteria,
+        page,
+        pageSize,
+        options.signal,
+      )
+      const finalizedTweets = await finalizeTweets(
+        supabase,
+        clickHouseTweets,
+        criteria,
+        options,
+      )
+      return {
+        tweets: finalizedTweets,
+        totalCount: finalizedTweets.length === 0 ? 0 : null,
+        error: null,
+      }
+    }
+
+    if (criteria.sort && criteria.sort !== 'newest') {
+      throw new Error('Search ordering requires a text query.')
+    }
+
+    const searchParams: SearchParams = {
+      search_query: criteria.searchQuery || '',
       from_user: criteria.fromUsername || null,
       to_user: criteria.replyToUsername || null,
       since_date: criteria.startDate || null,
       until_date: criteria.endDate || null,
     }
-
-    try {
-      const offset = (page - 1) * pageSize
-      const rawText = criteria.rawSearchQuery
-      const clickHouseSearchEnabled =
-        process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH === 'true'
-
-      if (
-        criteria.sort &&
-        criteria.sort !== 'newest' &&
-        (!rawText || !clickHouseSearchEnabled)
-      ) {
-        throw new Error(
-          rawText
-            ? 'This search order requires the ClickHouse search service.'
-            : 'Search ordering requires a text query.',
-        )
-      }
-
-      if (rawText && clickHouseSearchEnabled) {
-        // Do not start a second corpus scan against PostgreSQL when the
-        // analytical service fails or the reader has cancelled this search.
-        const clickHouseTweets = await searchClickHousePage(
-          criteria,
-          page,
-          pageSize,
-          options.signal,
-        )
-        const finalizedTweets = await finalizeTweets(
-          supabase,
-          clickHouseTweets,
-          criteria,
-          options,
-        )
-        return {
-          tweets: finalizedTweets,
-          totalCount: finalizedTweets.length === 0 ? 0 : null,
-          error: null,
-        }
-      }
-
-      // Multi-word phrase search: use FTS 'simple' config via RPC.
-      // The 'simple' config doesn't drop stop words, so phraseto_tsquery
-      // matches exact word order for ALL words (including "you", "can", etc.).
-      // Backed by a GIN index on to_tsvector('simple', full_text).
-      if (rawText && rawText.trim().split(/\s+/).length > 1) {
-        const phraseResults = await searchExactPhrase(
-          supabase,
-          rawText,
-          criteria,
-          pageSize,
-          offset,
-          options.signal,
-        )
-        return {
-          tweets: await finalizeTweets(
-            supabase,
-            phraseResults,
-            criteria,
-            options,
-          ),
-          totalCount: null,
-          error: null,
-        }
-      }
-
-      // Single-word or pre-formatted query — single query path
-      const searchParams: SearchParams = {
-        search_query: criteria.searchQuery || '',
-        ...baseParams,
-      }
-      const rpcData = await rpcSearchTweets(
-        supabase,
-        searchParams,
-        pageSize,
-        offset,
-        options.signal,
-      )
-
-      if (!rpcData || rpcData.length === 0) {
-        return {
-          tweets: [],
-          totalCount: rpcData?.length === 0 ? 0 : null,
-          error: null,
-        }
-      }
-      return {
-        tweets: await finalizeTweets(
-          supabase,
-          transformRawTweetsToTimelineTweets(rpcData, true),
-          criteria,
-          options,
-        ),
-        totalCount: null,
-        error: null,
-      }
-    } catch (error: any) {
-      if (options.signal?.aborted) throw error
-      console.error('Error fetching search results:', error)
-      if (error.message && error.message.includes('statement timeout')) {
-        return {
-          tweets: [],
-          totalCount: 0,
-          error: {
-            message:
-              'Search query timed out. Please try a more specific search.',
-            details: error,
-          },
-        }
-      }
-      return { tweets: [], totalCount: 0, error }
-    }
-  } else {
-    // Fallback to direct Supabase query for filters not supported by the main search_tweets RPC
-    // (e.g., specific userId, isRootTweet, mentionedUser, hashtags without other search terms)
-    let query = supabase.from('tweets').select(
-      `
-        tweet_id,
-        created_at,
-        full_text,
-        favorite_count,
-        retweet_count,
-        reply_to_tweet_id,
-        reply_to_username,
-        account:all_account!inner (
-          username,
-          account_display_name,
-          profile:profile!left (
-            avatar_media_url,
-            archive_upload_id
-          )
-        ),
-        media:tweet_media (
-          media_url,
-          media_type,
-          width,
-          height
-        )
-      `,
-      { count: 'estimated' },
+    const rpcData = await rpcSearchTweets(
+      supabase,
+      searchParams,
+      pageSize,
+      (page - 1) * pageSize,
+      options.signal,
     )
-
-    if (criteria.userId) {
-      query = query.eq('account_id', criteria.userId)
-    }
-
-    // Note: fromUsername is handled by RPC path. If it reaches here, it means no other RPC criteria were met.
-    // However, if we wanted to support fromUsername directly here (e.g. if RPC path was removed),
-    // it would need to be: query = query.eq('all_account.username', criteria.fromUsername);
-    // Same for replyToUsername: query = query.eq('reply_to_username', criteria.replyToUsername);
-
-    if (criteria.mentionedUser) {
-      // Ensure 'all_account' is the correct alias if filtering on joined table.
-      // Here, mentionedUser is likely in 'full_text' of the 'tweets' table.
-      query = query.ilike('full_text', `%@${criteria.mentionedUser}%`)
-    }
-
-    if (criteria.isRootTweet) {
-      query = query.is('reply_to_tweet_id', null)
-    }
-
-    if (criteria.hashtags && criteria.hashtags.length > 0) {
-      criteria.hashtags.forEach((tag) => {
-        query = query.ilike('full_text', `%#${tag}%`)
-      })
-    }
-
-    if (criteria.excludeRetweets) {
-      query = query.not('full_text', 'like', 'RT @%')
-    }
-
-    // Date filters are handled by RPC path if present.
-    // If they were to be handled here, they would be:
-    // if (criteria.startDate) {
-    //   query = query.gte('created_at', criteria.startDate);
-    // }
-    // if (criteria.endDate) {
-    //   query = query.lte('created_at', criteria.endDate);
-    // }
-
-    query = query.order('created_at', { ascending: false })
-    query = query.range((page - 1) * pageSize, page * pageSize - 1)
-
-    if (options.signal) query = query.abortSignal(options.signal)
-    const { data: rawData, error, count } = await query
-    options.signal?.throwIfAborted()
-
-    if (error) {
-      console.error('Error fetching tweets directly:', error) // Clarified error source
-      if (error.message && error.message.includes('statement timeout')) {
-        return {
-          tweets: [],
-          totalCount: 0,
-          error: {
-            message: 'Query timed out. Please try a more specific query.',
-            details: error,
-          },
-        }
-      }
-      return { tweets: [], totalCount: 0, error }
-    }
-    if (!rawData) {
+    if (!rpcData || rpcData.length === 0) {
       return { tweets: [], totalCount: 0, error: null }
     }
-
-    const transformedTweets = transformRawTweetsToTimelineTweets(rawData, false)
     return {
       tweets: await finalizeTweets(
         supabase,
-        transformedTweets,
+        transformRpcTweetsToTimelineTweets(rpcData),
         criteria,
         options,
       ),
-      totalCount: count,
+      totalCount: null,
       error: null,
     }
+  } catch (error: any) {
+    if (options.signal?.aborted) throw error
+    console.error('Error fetching search results:', error)
+    return { tweets: [], totalCount: 0, error: searchError(error) }
   }
 }

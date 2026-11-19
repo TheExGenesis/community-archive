@@ -7,6 +7,7 @@ import type {
   MapStory,
   WeeklyMapPage,
   WeeklyMapStory,
+  WeeklyMapWeek,
 } from '@/lib/hexMap/stories'
 import { captureHomepageMapAction } from '@/lib/posthog'
 import StoryCard from './StoryCard'
@@ -133,31 +134,32 @@ function WeeklyCard({
 }
 
 export default function WeeklyStories({
-  page,
+  week,
+  heading,
+  href,
   expanded,
   onExpand,
   onOpen,
   onHover,
 }: {
-  page: WeeklyMapPage
+  week: WeeklyMapWeek
+  heading: string
+  href: string
   expanded: string | null
   onExpand: (id: string | null) => void
   onOpen: (story: MapStory) => void
   onHover: (story: MapStory | null) => void
 }) {
-  if (!page.stories.length) return null
+  if (!week.stories.length) return null
   return (
-    <section
-      className={`${styles.edition} ${styles.weeklySection}`}
-      aria-label="This week"
-    >
-      <h2>This week</h2>
+    <section className={styles.edition} aria-label={heading}>
+      <h2>{heading}</h2>
       <p className={styles.lead}>
-        {page.soFar ? 'The Week So Far' : 'The Week in Review'},{' '}
-        {range(page.weekStart, page.throughDate ?? page.weekEnd)}.{' '}
-        <Link href="/digest/week">Read it all ↗</Link>
+        {week.soFar ? 'The Week So Far' : 'The Week in Review'},{' '}
+        {range(week.weekStart, week.throughDate ?? week.weekEnd)}.{' '}
+        <Link href={href}>Read it all ↗</Link>
       </p>
-      {page.stories.map((story, index) => (
+      {week.stories.map((story, index) => (
         <WeeklyCard
           key={story.id}
           story={story}

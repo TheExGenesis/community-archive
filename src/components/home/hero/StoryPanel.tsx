@@ -10,15 +10,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { HexSnapshot } from '@/lib/hexMap/types'
 import { coverageSummary } from '@/lib/hexMap/types'
 import { safeTerm } from '@/lib/hexMap/geometry'
-import type { MapStory, StoryPage } from '@/lib/hexMap/stories'
+import type { MapStory } from '@/lib/hexMap/stories'
 import { captureHomepageMapAction } from '@/lib/posthog'
 import { homepageMapTabs } from '@/lib/productActionSchema'
 import { selectionPeopleOptions } from './useSelectionPreview'
 import SelectionPeople from './SelectionPeople'
-import { useMapFeed, prefetchMapFeed, selectionFeedPath } from './useMapFeed'
+import { prefetchMapFeed, selectionFeedPath } from './useMapFeed'
 import styles from './hero.module.css'
 import useMobileMapLayout from './useMobileMapLayout'
 const TweetCard = dynamic(() => import('@/components/TweetCard'))
+
+const todayHeading = (date: string) =>
+  date === new Date().toISOString().slice(0, 10) ? 'Today' : longDate(date)
 
 const longDate = (value: string) =>
   new Date(value.slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-GB', {
@@ -54,7 +57,6 @@ export default function StoryPanel({
 }) {
   const mobile = useMobileMapLayout()
   const panel = useRef<HTMLDivElement>(null)
-  const sentinel = useRef<HTMLButtonElement>(null)
   const header = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const element = header.current
@@ -69,12 +71,9 @@ export default function StoryPanel({
     return () => observer.disconnect()
   }, [open, selected.length])
   const queryClient = useQueryClient()
-  const query = useMapFeed<StoryPage>(
-    'stories?kind=digest',
-    !open && !selected.length,
-  )
-  // This week leads browse. Its expanded story survives opening a daily
-  // story and coming back, because the panel stays mounted.
+  // Browse is today's stories the week has not woven in yet, this week and
+  // last week. The expanded weekly story survives opening a daily story and
+  // coming back, because the panel stays mounted.
   const weekly = useQuery({
     ...weeklyStoriesOptions,
     enabled: !open && !selected.length,
@@ -110,41 +109,6 @@ export default function StoryPanel({
   useEffect(() => {
     if (!mobile) panel.current?.scrollTo?.(0, 0)
   }, [selectionTab, open?.id, selected, mobile])
-  const {
-    hasNextPage,
-    isFetchingNextPage,
-    isFetchNextPageError,
-    fetchNextPage,
-    data: pages,
-  } = query
-  useEffect(() => {
-    const button = sentinel.current
-    if (
-      mobile ||
-      !button ||
-      !hasNextPage ||
-      isFetchingNextPage ||
-      isFetchNextPageError
-    )
-      return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) void fetchNextPage()
-      },
-      { root: mobile ? null : panel.current, rootMargin: '800px' },
-    )
-    observer.observe(button)
-    return () => observer.disconnect()
-  }, [
-    hasNextPage,
-    isFetchingNextPage,
-    isFetchNextPageError,
-    fetchNextPage,
-    pages,
-    open,
-    selected.length,
-    mobile,
-  ])
   const active =
     snapshot && selected.length
       ? coverageSummary(selected.map((id) => snapshot.cells[id]))
@@ -154,15 +118,6 @@ export default function StoryPanel({
         (id) => snapshot.regions.find((r) => r.id === id)!,
       )
     : []
-  // The homepage flows into the rest of the page on mobile. Keep browse to
-  // the latest edition even if desktop history is already in the query cache.
-  const browsePages = mobile
-    ? pages?.pages.slice(0, 1).map((page) => ({
-        ...page,
-        editions: page.editions.slice(0, 1),
-      }))
-    : pages?.pages
-
   return (
     <aside
       ref={panel}
@@ -350,51 +305,35 @@ export default function StoryPanel({
         </>
       ) : (
         <>
-          {weekly.data ? (
-            <WeeklyStories
-              page={weekly.data}
-              expanded={expandedWeekly}
-              onExpand={setExpandedWeekly}
-              onOpen={onOpen}
-              onHover={onHover}
-            />
-          ) : weekly.isError ? (
-            <p className={styles.message}>
-              This week’s stories could not load.{' '}
-              <button onClick={() => weekly.refetch()}>Try again</button>
-            </p>
-          ) : null}
-          <div aria-label="Digest">
-            {query.isPending ? (
-              <p className={styles.message} role="status">
-                Loading digest…
-              </p>
-            ) : query.isError && !query.data ? (
-              <div className={styles.message}>
+          {!weekly.data ? (
+            weekly.isError ? (
+              <p className={styles.message}>
                 Stories could not load.{' '}
-                <button onClick={() => query.refetch()}>Try again</button>
-              </div>
+                <button onClick={() => weekly.refetch()}>Try again</button>
+              </p>
             ) : (
-              browsePages?.map((page, i) => (
-                <div key={i} className={styles.editionPage}>
-                  {page.editions.map((edition) => (
-                    <section className={styles.edition} key={edition.date}>
-                      <h2>{longDate(edition.date)}</h2>
-                      {edition.isPreview && (
-                        <p className={styles.meta}>Sample edition</p>
-                      )}
-                      <p className={styles.lead}>{edition.headline}</p>
-                      {edition.stories.map((story) => (
-                        <StoryCard
-                          key={story.id}
-                          story={story}
-                          onOpen={onOpen}
-                          onHover={onHover}
-                        />
-                      ))}
-                    </section>
-                  ))}
-                  {page.stories.map((story) => (
+              <p className={styles.message} role="status">
+                Loading stories…
+              </p>
+            )
+          ) : (
+            <>
+              {weekly.data.today && (
+                <section
+                  className={styles.edition}
+                  aria-label={todayHeading(weekly.data.today.date)}
+                >
+                  <h2>{todayHeading(weekly.data.today.date)}</h2>
+                  <p className={styles.lead}>
+                    {weekly.data.today.stories.length === 1
+                      ? 'One story'
+                      : `${weekly.data.today.stories.length} stories`}{' '}
+                    from the daily digest not yet in the week.{' '}
+                    <Link href={`/digest/${weekly.data.today.date}`}>
+                      Read the day ↗
+                    </Link>
+                  </p>
+                  {weekly.data.today.stories.map((story) => (
                     <StoryCard
                       key={story.id}
                       story={story}
@@ -402,28 +341,30 @@ export default function StoryPanel({
                       onHover={onHover}
                     />
                   ))}
-                </div>
-              ))
-            )}
-            {query.data &&
-              !query.data.pages.some(
-                (p) => p.editions.length || p.stories.length,
-              ) && <p className={styles.message}>No published stories yet.</p>}
-            {!mobile && query.hasNextPage && (
-              <button
-                ref={sentinel}
-                className={styles.load}
-                onClick={() => query.fetchNextPage()}
-                disabled={query.isFetchingNextPage}
-              >
-                {query.isFetchingNextPage
-                  ? 'Loading…'
-                  : query.isFetchNextPageError
-                    ? 'Try loading more again'
-                    : 'Load more'}
-              </button>
-            )}
-          </div>
+                </section>
+              )}
+              <WeeklyStories
+                week={weekly.data}
+                heading={weekly.data.soFar ? 'This week' : 'Last week'}
+                href="/digest/week"
+                expanded={expandedWeekly}
+                onExpand={setExpandedWeekly}
+                onOpen={onOpen}
+                onHover={onHover}
+              />
+              {weekly.data.previous && (
+                <WeeklyStories
+                  week={weekly.data.previous}
+                  heading={weekly.data.soFar ? 'Last week' : 'The week before'}
+                  href={`/digest/week/${weekly.data.previous.weekStart}`}
+                  expanded={expandedWeekly}
+                  onExpand={setExpandedWeekly}
+                  onOpen={onOpen}
+                  onHover={onHover}
+                />
+              )}
+            </>
+          )}
         </>
       )}
     </aside>

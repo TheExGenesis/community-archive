@@ -343,3 +343,76 @@ it('serves the final week when no newer week is running, and fails rather than s
     .mockRejectedValue(new Error('Published digest is temporarily unavailable'))
   await expect(weeklyMapPage()).rejects.toThrow('temporarily unavailable')
 })
+
+it('leads with today’s stories the week has not woven in, then this week and last week', async () => {
+  jest.mocked(getPublishedDigest).mockClear()
+  jest
+    .mocked(getPublishedWeeklyDigest)
+    .mockResolvedValue(week('2026-11-09', [['2026-11-10', 'old']]))
+  jest
+    .mocked(getWeekSoFar)
+    .mockResolvedValue(week('2026-11-16', [['2026-11-19', 'woven']]))
+  const today = daily('2026-11-19', 'woven', 'alice')
+  today.content.stories.push(
+    ...daily('2026-11-19', 'fresh', 'bob').content.stories,
+  )
+  jest
+    .mocked(getPublishedDigest)
+    .mockImplementation(async (date?: string) =>
+      date === '2026-11-10' ? daily('2026-11-10', 'old', 'carol') : today,
+    )
+  jest.mocked(readMembers).mockResolvedValue(members(['alice', 'bob', 'carol']))
+  jest.mocked(locate).mockResolvedValue({
+    version: snapshot.version,
+    counts: {},
+    people: [
+      { account_id: 'alice', username: 'alice', cell: 0 },
+      { account_id: 'bob', username: 'bob', cell: 1 },
+      { account_id: 'carol', username: 'carol', cell: 2 },
+    ],
+  })
+  const page = await weeklyMapPage()
+  // Today is read once, not again for the week that cites it.
+  expect(getPublishedDigest).toHaveBeenCalledTimes(2)
+  expect(page.today).toEqual({
+    date: '2026-11-19',
+    stories: [expect.objectContaining({ id: '2026-11-19/fresh', cells: [1] })],
+  })
+  expect(page.weekStart).toBe('2026-11-16')
+  expect(page.stories[0].stories.map((s) => [s.id, s.cells])).toEqual([
+    ['2026-11-19/woven', [0]],
+  ])
+  expect(page.previous).toMatchObject({ weekStart: '2026-11-09', soFar: false })
+  expect(page.previous?.stories[0].href).toBe(
+    '/digest/week/2026-11-09/big-week',
+  )
+  expect(page.previous?.stories[0].stories.map((s) => [s.id, s.cells])).toEqual(
+    [['2026-11-10/old', [2]]],
+  )
+})
+
+it('reads the week before a final week as last week, and omits today when the week has it all', async () => {
+  jest
+    .mocked(getPublishedWeeklyDigest)
+    .mockImplementation(async (weekStart?: string) =>
+      weekStart === '2026-11-02'
+        ? week('2026-11-02', [['2026-11-04', 'older']])
+        : week('2026-11-09', [['2026-11-10', 'one']]),
+    )
+  jest.mocked(getWeekSoFar).mockResolvedValue(null)
+  jest
+    .mocked(getPublishedDigest)
+    .mockImplementation(async (date?: string) =>
+      date === '2026-11-04'
+        ? daily('2026-11-04', 'older', 'alice')
+        : daily('2026-11-10', 'one', 'alice'),
+    )
+  jest.mocked(readMembers).mockResolvedValue(members(['alice']))
+  jest.mocked(locate).mockRejectedValue(new Error('Offline'))
+  const page = await weeklyMapPage()
+  expect(getPublishedWeeklyDigest).toHaveBeenCalledWith('2026-11-02')
+  expect(page.soFar).toBe(false)
+  expect(page.today).toBeUndefined()
+  expect(page.previous?.weekStart).toBe('2026-11-02')
+  expect(page.previous?.stories[0].stories[0].id).toBe('2026-11-04/older')
+})

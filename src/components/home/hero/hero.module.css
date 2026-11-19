@@ -451,10 +451,6 @@
   }
 }
 
-.editionPage + .editionPage {
-  margin-top: 28px;
-  padding-top: 24px;
-}
 @media (max-width: 979px) {
   .mapSurface {
     touch-action: pan-y;
@@ -805,10 +801,7 @@
   }
 }
 
-/* This week: Week in Review stories that open into their daily stories. */
-.weeklySection {
-  margin-bottom: 28px;
-}
+/* Week in Review stories that open into their daily stories. */
 .weeklyStory {
   border-bottom: 1px solid hsl(var(--border));
 }

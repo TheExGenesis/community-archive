@@ -44,7 +44,8 @@ export async function HomepageStats({
  * New tweets and members in the last 24 hours, pinned to the hero's top-left
  * corner. Reads the same cached summary as the hero line. Renders nothing when
  * the gateway omits both deltas, so a failed read never shows an invented zero.
- * Hidden below sm, where the title needs the hero's top padding.
+ * Below sm it sits centered in the flow above the title instead, since the
+ * corner would collide with the title on a phone.
  */
 export async function HomepageGrowthCounter({
   data,
@@ -67,7 +68,7 @@ export async function HomepageGrowthCounter({
   return (
     <span
       title="Added to the archive in the last 24 hours"
-      className="absolute left-4 top-3 hidden items-center gap-[7px] whitespace-nowrap rounded-full border border-border bg-background/70 px-2.5 py-1 text-[12px] text-muted-foreground backdrop-blur sm:left-6 sm:inline-flex"
+      className="relative z-10 mx-auto -mt-6 mb-5 flex w-fit items-center gap-[7px] whitespace-nowrap rounded-full border border-border bg-background/70 px-2.5 py-1 text-[12px] text-muted-foreground backdrop-blur sm:absolute sm:left-6 sm:top-3 sm:m-0 sm:inline-flex"
     >
       <span
         aria-hidden

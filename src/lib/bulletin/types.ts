@@ -7,6 +7,8 @@ export type Notice = Omit<
 > & {
   /** Current, policy-checked ClickHouse text for immediate card rendering. */
   preview_text?: string
+  /** AI title from the tweet's archive page, the card headline when present. */
+  title?: string | null
   expires_at: string | null
   place: string | null
   account_created_at?: string | null

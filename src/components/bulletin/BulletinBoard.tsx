@@ -420,12 +420,14 @@ function NoticeCard({
             type="button"
             className={`${styles.summaryButton} ${flags ? '' : isNew ? styles.clearNew : styles.clearDismiss}`}
             aria-label={`Read full tweet by @${notice.username}`}
-            title={notice.summary}
+            title={notice.title ? notice.summary : undefined}
             aria-expanded={false}
             aria-controls={`original-${notice.tweet_id}`}
             onClick={() => setOpen(true)}
           >
-            <span className={styles.summary}>{notice.summary}</span>
+            <span className={styles.summary}>
+              {notice.title || notice.summary}
+            </span>
           </button>
           <div className={styles.who}>
             <Link
@@ -620,7 +622,7 @@ export function BulletinBoard({
   const matchesFilters = (o: Notice) =>
     visibleStatus(o, now, past, resolved) &&
     matchesJevFilters(o, jevFilters) &&
-    [o.summary, o.preview_text, o.username, o.place, ...o.topics]
+    [o.title, o.summary, o.preview_text, o.username, o.place, ...o.topics]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()

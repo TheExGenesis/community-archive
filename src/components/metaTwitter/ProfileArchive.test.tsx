@@ -1314,3 +1314,50 @@ test('stops scrolling into more bangers after a full page on the overall view', 
     screen.getByRole('button', { name: 'Load more bangers' }),
   ).toBeEnabled()
 })
+
+test('retries a failed timeline page once before offering Retry', async () => {
+  let timelineCalls = 0
+  jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    if (String(input).includes('/timeline')) {
+      timelineCalls += 1
+      return Promise.resolve(
+        timelineCalls === 1
+          ? ({ ok: false, json: async () => ({}) } as Response)
+          : jsonResponse({
+              tweets: [timelineTweet('903')],
+              nextOffset: null,
+              truncated: false,
+            }),
+      )
+    }
+    return Promise.resolve(
+      jsonResponse({ media: [], mediaCount: 0, people: [] }),
+    )
+  })
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025)],
+        yearCounts: chapters,
+        total: 1,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+  triggerAllObservers()
+  expect(
+    await screen.findByText('Latest 903', {}, { timeout: 4000 }),
+  ).toBeInTheDocument()
+  expect(timelineCalls).toBe(2)
+  expect(
+    screen.queryByRole('button', { name: 'Retry loading posts' }),
+  ).toBeNull()
+})

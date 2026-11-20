@@ -22,7 +22,7 @@ const RETWEET_PATTERN = /^RT @\w{1,15}:/
 // Opted-out tweets are removed at ingestion; five minutes is how long a newly
 // removed or deleted tweet can keep appearing in a member's timeline page.
 const PROFILE_TIMELINE_REVALIDATE_SECONDS = 300
-const PROFILE_TIMELINE_MAX_READS = 3
+const PROFILE_TIMELINE_MAX_READS = 2
 const PROFILE_TIMELINE_MIN_POSTS = 10
 
 export interface ProfileTimelinePage {

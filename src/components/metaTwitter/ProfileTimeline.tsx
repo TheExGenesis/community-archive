@@ -18,11 +18,15 @@ const KIND_LABELS: Record<ProfileTimelineKind, string> = {
 }
 
 export const PROFILE_TIMELINE_HEADING_ID = 'profile-timeline-heading'
+const LOOK_AHEAD = '2000px 0px'
+// One quiet retry covers a transient gateway hiccup before showing Retry.
+const RETRY_DELAY_MS = 1_500
 
 /**
  * Every archived post by the account, newest first, under the best-of list.
- * Nothing is requested until the section scrolls near the viewport, so a
- * profile with many bangers costs no extra read until someone reaches it.
+ * Pages load when the section is within a couple of screens of the viewport:
+ * a profile with few bangers starts its first page on arrival, while one
+ * with many costs no extra read until someone scrolls toward it.
  */
 export function ProfileTimeline({
   accountId,
@@ -45,9 +49,9 @@ export function ProfileTimeline({
   const hasMore = !feed || feed.nextOffset !== null
 
   const loadPage = useCallback(
-    (requestedKind: ProfileTimelineKind, offset: number) => {
+    (requestedKind: ProfileTimelineKind, offset: number, attempt = 0) => {
       const requestKey = `${requestedKind}:${offset}`
-      if (inFlight.current === requestKey) return
+      if (attempt === 0 && inFlight.current === requestKey) return
       inFlight.current = requestKey
       setLoading(true)
       setFailed(false)
@@ -79,8 +83,22 @@ export function ProfileTimeline({
             }
           })
         })
-        .catch(() => setFailed(true))
-        .finally(() => {
+        .then(
+          () => true,
+          () => {
+            if (attempt > 0) {
+              setFailed(true)
+              return true
+            }
+            window.setTimeout(
+              () => loadPage(requestedKind, offset, attempt + 1),
+              RETRY_DELAY_MS,
+            )
+            return false
+          },
+        )
+        .then((settled) => {
+          if (!settled) return
           if (inFlight.current === requestKey) inFlight.current = null
           setLoading(false)
         })
@@ -103,7 +121,7 @@ export function ProfileTimeline({
           loadMore()
         }
       },
-      { rootMargin: '600px 0px' },
+      { rootMargin: LOOK_AHEAD },
     )
     observer.observe(target)
     return () => observer.disconnect()

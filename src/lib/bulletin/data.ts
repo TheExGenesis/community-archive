@@ -14,6 +14,7 @@ import { after } from 'next/server'
 import { unstable_cache } from 'next/cache'
 import { gunzipSync, gzipSync } from 'zlib'
 import { createSharedCache } from './sharedCache'
+import { readBulletinTitles } from './titles'
 import type { Notice, RunDashboard } from './types'
 
 export const BULLETIN_LIMIT = 2000
@@ -455,9 +456,10 @@ async function verifyBoard(
   notices: StoredNotice[],
   allowedAccounts?: string[],
 ): Promise<VerifiedBulletinBoard> {
-  const [, rows] = await Promise.all([
+  const [, rows, titles] = await Promise.all([
     verifyBulletinResolutions(notices),
     hydrateBulletinNotices({ notices, allowedAccounts }),
+    readBulletinTitles(notices.map((o) => o.tweet_id)),
   ])
   // Resolution checks may finish after hydration; use their final state.
   const byId = new Map(notices.map((o) => [o.tweet_id, o]))
@@ -468,6 +470,7 @@ async function verifyBoard(
       ...row,
       resolution_state: stored?.resolution_state,
       resolution_tweet_id: stored?.resolution_tweet_id,
+      title: titles.get(row.tweet_id) ?? null,
     })
   }
   return {

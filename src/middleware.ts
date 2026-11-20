@@ -489,8 +489,8 @@ export async function middleware(request: NextRequest) {
   // require the CRON_SECRET bearer token (Vercel's cron caller sends a short
   // non-browser UA), and one-click unsubscribe POSTs come from mailbox
   // provider servers holding a per-subscription token. The Bulletin preview
-  // source and the public API key verifier require their own bearer secrets
-  // and are called from other servers. The signal inbox receives webhooks
+  // source, the Bulletin title hook and the public API key verifier require
+  // their own bearer secrets and are called from other servers. The signal inbox receives webhooks
   // from PostHog, Grafana, the Vercel log drain and the fleet host, each
   // with a short non-browser UA; it verifies a bearer secret or Vercel's
   // HMAC signature itself (src/lib/signals/auth.ts).
@@ -498,6 +498,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
     pathname === '/api/bulletin/preview-board' ||
+    (pathname === '/api/bulletin/titles' && request.method === 'POST') ||
     pathname === '/api/internal/public-api/keys/verify' ||
     (pathname === '/api/public-data' && request.method === 'POST') ||
     (pathname.startsWith('/api/signals/') && request.method === 'POST')

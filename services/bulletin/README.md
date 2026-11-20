@@ -53,6 +53,28 @@ restricted to currently allowed members. These are historical observations, not
 live X follow state. Without that source the UI explicitly falls back to own
 notices and newest, and does not invent social recommendations.
 
+## Card titles
+
+Cards lead with the AI title a tweet's archive page shows (its single-tweet
+summary in `public.tweet_page_summaries`), so a notice's headline is the same
+one a reader sees on its page. Titles are made the same way a signed-in
+permalink visit makes them, at the end of every Jev run: once new notices are
+published, `web_titles.py` calls the website's `POST /api/bulletin/titles`
+(bearer `BULLETIN_TITLES_SECRET`, production only), which titles live,
+untitled notices newest first, 12 per request. The worker repeats requests
+while some remain and the unit's 20-minute limit allows; the run's `titles`
+count records the outcome. A failure never changes the run's status: cards
+show the post's text until a later run titles them. A post the model judges
+unsuitable is stored as such and not asked again.
+
+The website owns the prompt and model (`src/lib/tweetSummary`), so the worker
+needs no second copy of either. Rollout: set `BULLETIN_TITLES_SECRET` in the
+Vercel production environment and deploy the website; create the same value
+as `/etc/credstore.encrypted/ca-bulletin-titles` (`systemd-creds encrypt
+--name=bulletin_titles_secret`); then deploy this directory and the unit.
+Without the credential the step reports `not_configured`. Rolling back the
+worker leaves stored titles in place; the board keeps showing them.
+
 ## Legacy method and coverage
 
 1. Page all distinct ClickHouse tweet IDs in the run's posting-date window.

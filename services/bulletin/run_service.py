@@ -15,6 +15,9 @@ if __name__=='__main__':
     env['OPENROUTER_API_KEY']=credential.read_text().strip()
     gateway_credential=Path(env['CREDENTIALS_DIRECTORY'])/'clickhouse_api_token'
     env['CLICKHOUSE_ANALYTICS_API_TOKEN']=gateway_credential.read_text().strip()
+    titles_credential=Path(env['CREDENTIALS_DIRECTORY'])/'bulletin_titles_secret'
+    if titles_credential.exists():
+        env['BULLETIN_TITLES_SECRET']=titles_credential.read_text().strip()
     raise SystemExit(subprocess.run(['uv','run','--env-file','/root/CA_autorefresh/.env.prod',
         str(Path(__file__).with_name('jev_worker.py' if processor=='jev' else 'worker.py')),
         *sys.argv[1:]],env=env).returncode)

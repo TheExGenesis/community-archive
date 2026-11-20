@@ -132,7 +132,7 @@ export async function loadHomepageBulletinItems({
           {
             side: notice.side,
             kind: notice.kind,
-            summary: notice.summary,
+            summary: notice.title || notice.summary,
             label: cardLabel(notice),
             tweet: withAuthor(tweet, notice),
           },

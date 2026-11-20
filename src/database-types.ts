@@ -1339,6 +1339,11 @@ isOneToOne: false
               "automated_run_failed": number,"expected_date_published": number,"healthy": number,"publication_age_seconds": number
             }[]
                            },
+"community_archive_monitoring_search_alerts":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "alerts_with_errors": number,"healthy": number,"live_alerts": number,"stalest_check_age_seconds": number,"unsent_email_backlog_age_seconds": number
+            }[]
+                           },
 "community_archive_monitoring_weekly_digest":
 { Args: Record<PropertyKey, never>; Returns: {
               "automated_run_failed": number,"expected_week_published": number,"healthy": number,"publication_age_seconds": number

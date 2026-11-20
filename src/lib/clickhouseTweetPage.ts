@@ -6,7 +6,7 @@ import {
   type ThreadTweet,
 } from './conversationTree'
 
-interface ClickHouseTweetDetail {
+export interface ClickHouseTweetDetail {
   tweetId: string
   accountId: string
   createdAt: string
@@ -73,7 +73,7 @@ function media(tweet: ClickHouseTweetDetail) {
   }))
 }
 
-function quotedTweet(
+export function quotedTweet(
   tweet: ClickHouseTweetDetail,
 ): NonNullable<TweetData['quoted_tweet']> {
   const username = tweet.username || 'unknown_user'
@@ -92,7 +92,7 @@ function quotedTweet(
   }
 }
 
-function deletedQuotedTweet(tweetId: string) {
+export function deletedQuotedTweet(tweetId: string) {
   return {
     tweet_id: tweetId,
     account_id: '',

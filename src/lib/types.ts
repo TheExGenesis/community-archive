@@ -136,14 +136,6 @@ export type ArchiveUpload = {
   archive_at: string
 }
 
-export type SearchParams = {
-  search_query: string
-  from_user: string | null
-  to_user: string | null
-  since_date: string | null
-  until_date: string | null
-}
-
 export type PopularTweet = {
   tweet_id: string
   account_id: string

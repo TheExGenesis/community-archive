@@ -1,60 +1,26 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import type { MentionedUser } from '@/components/TopMentionedMissingUsers'
-import { createServerServiceRoleClient } from '@/utils/supabase'
-import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
-import { devLog } from '../devLog'
+import { fetchTopMentionedUsers } from '@/lib/clickhouseCorpusReads'
 
 /**
  * "Most Wanted" on /mission-control: the most-mentioned accounts across the
- * archive. The page is public, so this must not run a corpus RPC as anon or
- * per request: it reads with the server's service role (anonymous corpus
- * access is revoked) and is shared from the Data Cache for an hour. An hour
- * matches the other aggregate panels; the list holds handles and counts, and
- * opt-outs are removed from the mention tables at ingestion.
+ * archive, ranked by the ClickHouse gateway's top-mentioned route (which
+ * keeps its own 6-hour ranking). The page is public, so the list is also
+ * shared from the Data Cache for an hour rather than read per request.
+ * Failures throw inside the cache and are not cached.
  */
 const cachedArchiveMostMentionedAccounts = unstable_cache(
-  async (): Promise<MentionedUser[]> => {
-    const supabase = createServerServiceRoleClient()
-    const { data: rawUsers, error } = await supabase.rpc(
-      'get_top_mentioned_users',
-      { limit_: 10 },
-    )
-
-    if (error || !rawUsers) {
-      // Throw so a failure is not cached as an empty list.
-      throw new Error(
-        `get_top_mentioned_users failed: ${error?.message ?? 'no data'}`,
-      )
-    }
-
-    const users = rawUsers
-    devLog('users', users)
-    const userIds = users.map((user: any) => user.user_id)
-
-    const [{ data: profiles }, { data: accounts }] = await Promise.all([
-      supabase
-        .from('profile')
-        .select('*')
-        .in('account_id', userIds)
-        .order('archive_upload_id', { ascending: false }),
-      supabase.from('account').select('*').in('account_id', userIds),
-    ])
-
-    return users.map((user: any) => {
-      const profile = profiles?.find((p) => p.account_id === user.user_id)
-      const account = accounts?.find((a) => a.account_id === user.user_id)
-      return {
-        mentioned_user_id: user.user_id,
-        screen_name: user.screen_name,
-        mention_count: user.mention_count,
-        account_display_name: user.name,
-        avatar_media_url: profile?.avatar_media_url,
-        uploaded: !!account,
-      }
-    })
-  },
-  ['archive-most-mentioned-accounts-v1', productionReadCacheKey()],
+  async (): Promise<MentionedUser[]> =>
+    (await fetchTopMentionedUsers(10)).map((user) => ({
+      mentioned_user_id: user.accountId,
+      screen_name: user.screenName,
+      mention_count: Number(user.mentionCount) || 0,
+      account_display_name: user.name ?? undefined,
+      avatar_media_url: user.avatarMediaUrl,
+      uploaded: user.hasArchive,
+    })),
+  ['archive-most-mentioned-accounts-v2'],
   { revalidate: 3600 },
 )
 

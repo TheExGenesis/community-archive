@@ -70,6 +70,22 @@ describe('ClickHouse analytics gateway requests', () => {
     )
   })
 
+  test.each([
+    ['tweet-cards', 'ids=1,2'],
+    ['quote-authors', 'ids=1,2'],
+    ['account-tweet-counts', 'ids=1,2'],
+    ['top-mentioned', 'limit=10'],
+  ])('allows the %s corpus read with only its parameter', (endpoint, query) => {
+    const target = analyticsGatewayRequestUrl(
+      [endpoint],
+      new URLSearchParams(`${query}&raw_sql=DROP`),
+      'https://analytics.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      `https://analytics.example/analytics/${endpoint}?${new URLSearchParams(query)}`,
+    )
+  })
+
   test('allows only bounded trend-evidence parameters', () => {
     const target = analyticsGatewayRequestUrl(
       ['trend-evidence'],

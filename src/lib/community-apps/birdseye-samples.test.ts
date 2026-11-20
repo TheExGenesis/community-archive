@@ -1,33 +1,26 @@
 import { getBirdseyeSamples } from './birdseye-samples'
-import { createServerServiceRoleClient } from '@/utils/supabase'
+import { fetchTweetCards } from '@/lib/clickhouseCorpusReads'
 import { getSourceTweets } from './source-tweets'
 jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
-jest.mock('@/utils/supabase', () => ({
-  createServerServiceRoleClient: jest.fn(),
-}))
+jest.mock('@/lib/clickhouseCorpusReads', () => ({ fetchTweetCards: jest.fn() }))
 jest.mock('./source-tweets', () => ({ getSourceTweets: jest.fn() }))
-const query = {
-  select: jest.fn().mockReturnThis(),
-  in: jest.fn().mockReturnThis(),
-  ilike: jest.fn().mockReturnThis(),
-  order: jest.fn().mockReturnThis(),
-  limit: jest.fn(),
-}
-beforeEach(() => {
-  jest.clearAllMocks()
-  jest
-    .mocked(createServerServiceRoleClient)
-    .mockReturnValue({ from: () => query } as never)
-})
+const cards = (rows: [string, string, number][]) =>
+  new Map(
+    rows.map(([tweetId, username, likes]) => [
+      tweetId,
+      { tweetId, username, favoriteCount: String(likes) },
+    ]),
+  ) as never
+beforeEach(() => jest.clearAllMocks())
 test('selects owner posts by likes using only cited IDs, then renders the configured source records', async () => {
-  query.limit.mockResolvedValue({
-    data: [
-      { tweet_id: '1', favorite_count: 3 },
-      { tweet_id: '2', favorite_count: 8 },
-      { tweet_id: '3', favorite_count: 5 },
-    ],
-    error: null,
-  })
+  jest.mocked(fetchTweetCards).mockResolvedValue(
+    cards([
+      ['1', 'alice', 3],
+      ['2', 'ALICE', 8],
+      ['3', 'alice', 5],
+      ['4', 'bob', 90],
+    ]),
+  )
   jest.mocked(getSourceTweets).mockResolvedValue(
     new Map([
       ['1', { id: '1', username: 'alice', likes: 3 }],
@@ -36,24 +29,20 @@ test('selects owner posts by likes using only cited IDs, then renders the config
     ] as never),
   )
   expect(
-    (await getBirdseyeSamples(['1', '2', '3', '1', 'bad'], 'alice')).map(
+    (await getBirdseyeSamples(['1', '2', '3', '4', '1', 'bad'], 'alice')).map(
       (tweet) => tweet.id,
     ),
   ).toEqual(['2', '3', '1'])
-  expect(query.in).toHaveBeenCalledWith('tweet_id', ['1', '2', '3'])
-  expect(query.ilike).toHaveBeenCalledWith('username', 'alice')
+  expect(fetchTweetCards).toHaveBeenCalledWith(['1', '2', '3', '4', '1', 'bad'])
   expect(getSourceTweets).toHaveBeenCalledWith(['2', '3', '1'])
 })
 test('uses conversation context only when there are too few owner candidates', async () => {
-  query.limit
-    .mockResolvedValueOnce({
-      data: [{ tweet_id: '1', favorite_count: 2 }],
-      error: null,
-    })
-    .mockResolvedValueOnce({
-      data: [{ tweet_id: '2', favorite_count: 50 }],
-      error: null,
-    })
+  jest.mocked(fetchTweetCards).mockResolvedValue(
+    cards([
+      ['1', 'alice', 2],
+      ['2', 'bob', 50],
+    ]),
+  )
   jest.mocked(getSourceTweets).mockResolvedValue(
     new Map([
       ['1', { id: '1', username: 'alice', likes: 2 }],
@@ -63,20 +52,23 @@ test('uses conversation context only when there are too few owner candidates', a
   expect(
     (await getBirdseyeSamples(['1', '2'], 'alice')).map((tweet) => tweet.id),
   ).toEqual(['1', '2'])
+  expect(getSourceTweets).toHaveBeenCalledWith(['1', '2'])
 })
 test('does not silently select arbitrary posts when ranking is unavailable', async () => {
-  query.limit.mockResolvedValue({
-    data: null,
-    error: { message: 'Unavailable' },
-  })
-  await expect(getBirdseyeSamples(['1'], 'alice')).rejects.toThrow(
-    'Unable to rank',
-  )
+  jest
+    .mocked(fetchTweetCards)
+    .mockRejectedValue(new Error('ClickHouse analytics request failed (502)'))
+  await expect(getBirdseyeSamples(['1'], 'alice')).rejects.toThrow('(502)')
   expect(getSourceTweets).not.toHaveBeenCalled()
 })
 test('matches underscores in usernames literally', async () => {
-  query.limit.mockResolvedValue({ data: [], error: null })
+  jest.mocked(fetchTweetCards).mockResolvedValue(
+    cards([
+      ['1', 'alice_bob', 1],
+      ['2', 'aliceXbob', 9],
+    ]),
+  )
   jest.mocked(getSourceTweets).mockResolvedValue(new Map())
-  await getBirdseyeSamples(['1'], 'alice_bob')
-  expect(query.ilike).toHaveBeenCalledWith('username', 'alice\\_bob')
+  await getBirdseyeSamples(['1', '2'], 'alice_bob')
+  expect(getSourceTweets).toHaveBeenCalledWith(['1', '2'])
 })

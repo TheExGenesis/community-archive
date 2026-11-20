@@ -1,133 +1,49 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { getLatestAvatarMediaUrl } from '@/lib/avatar'
 import type { TimelineTweet } from '@/lib/types'
 
-type QuoteRelation = {
-  tweet_id: string
-  quoted_tweet_id: string
-}
-
-function deletedQuotedTweet(tweetId: string) {
-  return {
-    tweet_id: tweetId,
-    account_id: '',
-    created_at: '',
-    full_text: '',
-    retweet_count: 0,
-    favorite_count: 0,
-    username: '',
-    account_display_name: '',
-    is_deleted: true as const,
+/** Response of /api/tweet-search/quotes, keyed by the quoting result's id. */
+export type SearchQuotedTweets = Record<
+  string,
+  {
+    quote_tweet_id: string
+    quoted_tweet: NonNullable<TimelineTweet['quoted_tweet']>
   }
-}
+>
 
 /**
- * Batch-load quote relationships and quoted tweet bodies for search results.
- * Original tweet media is already returned by both search backends.
+ * Batch-load quoted tweet bodies for one page of search results through the
+ * ClickHouse tweet cards. Original tweet media already comes with the search
+ * results. Quote cards are optional decoration: if they cannot be loaded the
+ * page is shown without them.
  */
 export async function enrichSearchTweets(
-  supabase: SupabaseClient,
   tweets: TimelineTweet[],
   signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<TimelineTweet[]> {
   if (tweets.length === 0) return tweets
-
-  const tweetIds = tweets.map((tweet) => tweet.tweet_id)
-  signal?.throwIfAborted()
-  const quoteQuery = supabase
-    .from('quote_tweets')
-    .select('tweet_id, quoted_tweet_id')
-    .in('tweet_id', tweetIds)
-  if (signal) quoteQuery.abortSignal(signal)
-  const { data: quoteRows, error: quoteError } = await quoteQuery
   signal?.throwIfAborted()
 
-  if (quoteError) {
-    console.warn('Could not load quote relationships for search:', quoteError)
+  let quotes: SearchQuotedTweets
+  try {
+    const ids = tweets.map((tweet) => tweet.tweet_id).join(',')
+    const response = await fetchImpl(
+      `/api/tweet-search/quotes?ids=${encodeURIComponent(ids)}`,
+      { cache: 'no-store', ...(signal ? { signal } : {}) },
+    )
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const body = (await response.json()) as {
+      data?: { quotes?: SearchQuotedTweets }
+    }
+    quotes = body.data?.quotes ?? {}
+  } catch (error) {
+    signal?.throwIfAborted()
+    console.warn('Could not load quoted tweets for search:', error)
     return tweets
   }
-
-  const quoteRelations = (quoteRows || []) as QuoteRelation[]
-  if (quoteRelations.length === 0) return tweets
-
-  const quotedTweetIds = Array.from(
-    new Set(quoteRelations.map((row) => row.quoted_tweet_id)),
-  )
-  const quotedQuery = supabase
-    .from('tweets')
-    .select(
-      `
-        tweet_id,
-        account_id,
-        created_at,
-        full_text,
-        retweet_count,
-        favorite_count,
-        account:all_account!inner (
-          username,
-          account_display_name,
-          profile:all_profile (
-            avatar_media_url,
-            archive_upload_id
-          )
-        ),
-        media:tweet_media (
-          media_url,
-          media_type,
-          width,
-          height
-        )
-      `,
-    )
-    .in('tweet_id', quotedTweetIds)
-  if (signal) quotedQuery.abortSignal(signal)
-  const { data: quotedRows, error: quotedError } = await quotedQuery
   signal?.throwIfAborted()
 
-  if (quotedError) {
-    console.warn('Could not load quoted tweets for search:', quotedError)
-  }
-
-  const quotedById = new Map(
-    ((quotedRows || []) as any[]).map((quotedTweet) => {
-      const account = Array.isArray(quotedTweet.account)
-        ? quotedTweet.account[0]
-        : quotedTweet.account
-      const avatarMediaUrl = getLatestAvatarMediaUrl(account?.profile)
-
-      return [
-        quotedTweet.tweet_id,
-        {
-          tweet_id: quotedTweet.tweet_id,
-          account_id: quotedTweet.account_id,
-          created_at: quotedTweet.created_at,
-          full_text: quotedTweet.full_text,
-          retweet_count: quotedTweet.retweet_count,
-          favorite_count: quotedTweet.favorite_count,
-          avatar_media_url: avatarMediaUrl || undefined,
-          username: account?.username || 'unknown_user',
-          account_display_name:
-            account?.account_display_name ||
-            account?.username ||
-            'Unknown User',
-          media: quotedTweet.media || [],
-        },
-      ] as const
-    }),
-  )
-  const relationByTweetId = new Map(
-    quoteRelations.map((row) => [row.tweet_id, row.quoted_tweet_id]),
-  )
-
   return tweets.map((tweet) => {
-    const quotedTweetId = relationByTweetId.get(tweet.tweet_id)
-    if (!quotedTweetId) return tweet
-
-    return {
-      ...tweet,
-      quote_tweet_id: quotedTweetId,
-      quoted_tweet:
-        quotedById.get(quotedTweetId) || deletedQuotedTweet(quotedTweetId),
-    }
+    const quote = quotes[tweet.tweet_id]
+    return quote ? { ...tweet, ...quote } : tweet
   })
 }

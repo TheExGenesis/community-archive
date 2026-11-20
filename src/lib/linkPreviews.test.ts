@@ -20,10 +20,12 @@ import {
 import { xVideoFromUrl } from './xVideoUrl'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { fetchSyndicatedTweet } from './twitterSyndication'
+import { fetchTweetCards } from './clickhouseCorpusReads'
 
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
+jest.mock('./clickhouseCorpusReads', () => ({ fetchTweetCards: jest.fn() }))
 jest.mock('./twitterSyndication', () => ({ fetchSyndicatedTweet: jest.fn() }))
 
 const publicResolver = async () => [{ address: '1.1.1.1', family: 4 }]
@@ -365,26 +367,26 @@ describe('linked X videos', () => {
     'resolves a text-only video link without duplicating the source tweet’s own media (%s)',
     async (sourceId) => {
       const shortUrl = 'https://t.co/AXAuEVu3ch'
-      const readUrls = jest.fn().mockResolvedValue({ data: [], error: null })
-      const readTweets = jest.fn().mockResolvedValue({
-        data: [
-          {
-            tweet_id: sourceId,
-            full_text: `Incredible things are happening in Spanish television ${shortUrl}`,
-          },
-        ],
-      })
+      jest.mocked(fetchTweetCards).mockResolvedValue(
+        new Map([
+          [
+            sourceId,
+            {
+              tweetId: sourceId,
+              fullText: `Incredible things are happening in Spanish television ${shortUrl}`,
+              urls: [],
+            },
+          ],
+        ]) as never,
+      )
       const readCache = jest.fn().mockResolvedValue({ data: [], error: null })
       const upsert = jest.fn((row) => ({
         select: () => ({ single: async () => ({ data: row, error: null }) }),
       }))
-      const from = jest.fn((table: string): unknown =>
-        table === 'tweet_urls'
-          ? { select: () => ({ in: readUrls }) }
-          : table === 'tweets'
-            ? { select: () => ({ in: readTweets }) }
-            : { select: () => ({ in: readCache }), upsert },
-      )
+      const from = jest.fn((): unknown => ({
+        select: () => ({ in: readCache }),
+        upsert,
+      }))
       jest
         .mocked(createServerServiceRoleClient)
         .mockReturnValue({ from } as never)
@@ -398,7 +400,7 @@ describe('linked X videos', () => {
         media: [{ media_type: 'video', media_url: poster }],
       } as never)
       const previews = await getTweetLinkPreviews([sourceId])
-      expect(readTweets).toHaveBeenCalledWith('tweet_id', [sourceId])
+      expect(fetchTweetCards).toHaveBeenCalledWith([sourceId])
       if (sourceId === '1781147654623297657') {
         expect(previews.size).toBe(0)
         expect(upsert).not.toHaveBeenCalled()
@@ -469,16 +471,58 @@ describe('preview images and self links', () => {
 
 describe('preview reads that fail', () => {
   test('throw instead of returning an empty, cacheable result', async () => {
-    const from = jest.fn(() => ({
-      select: () => ({
-        in: async () => ({ data: null, error: { message: 'timeout' } }),
-      }),
-    }))
     jest
-      .mocked(createServerServiceRoleClient)
-      .mockReturnValue({ from } as never)
-    await expect(getTweetLinkPreviews(['12345'])).rejects.toThrow(
-      'Failed to load tweet URLs',
+      .mocked(fetchTweetCards)
+      .mockRejectedValue(new Error('ClickHouse analytics request failed (502)'))
+    await expect(getTweetLinkPreviews(['12345'])).rejects.toThrow('(502)')
+  })
+
+  test('use the card URLs and skip tweets the corpus does not hold', async () => {
+    jest.mocked(fetchTweetCards).mockResolvedValue(
+      new Map([
+        [
+          '1',
+          {
+            tweetId: '1',
+            fullText: 'see https://t.co/short',
+            urls: [
+              {
+                url: 'https://t.co/short',
+                expandedUrl: 'https://example.com/story',
+                displayUrl: 'example.com/story',
+              },
+            ],
+          },
+        ],
+      ]) as never,
     )
+    const readCache = jest.fn().mockResolvedValue({
+      data: [
+        {
+          url_hash: previewUrlHash('https://example.com/story'),
+          normalized_url: 'https://example.com/story',
+          canonical_url: 'https://example.com/story',
+          title: 'Story',
+          description: null,
+          image_url: null,
+          site_name: null,
+          content_type: 'text/html',
+          status: 'ready',
+          expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+        },
+      ],
+      error: null,
+    })
+    jest.mocked(createServerServiceRoleClient).mockReturnValue({
+      from: () => ({ select: () => ({ in: readCache }) }),
+    } as never)
+    const previews = await getTweetLinkPreviews(['1', '2'])
+    expect(readCache).toHaveBeenCalledWith('url_hash', [
+      previewUrlHash('https://example.com/story'),
+    ])
+    expect(previews.get('1')).toEqual([
+      expect.objectContaining({ title: 'Story' }),
+    ])
+    expect(previews.has('2')).toBe(false)
   })
 })

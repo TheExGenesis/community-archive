@@ -23,9 +23,7 @@ export default function TrendStorySearch({
 }) {
   // Ordering by likes needs ClickHouse search; otherwise fall back to newest.
   const byLikes = process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH === 'true'
-  const words = term.split(/\s+/).filter(Boolean)
   const filterCriteria: FilterCriteria = {
-    searchQuery: words.join(' & '),
     rawSearchQuery: term,
     startDate: since,
     endDate: until,

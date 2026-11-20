@@ -1,36 +1,23 @@
-import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { unstable_cache } from 'next/cache'
-import { createServerServiceRoleClient } from '@/utils/supabase'
+import { fetchQuoteAuthors } from '@/lib/clickhouseCorpusReads'
 import { getAppPolicy } from './data'
 
-// Indexed lookups of quote relations for this topic only; never load tweet text.
+// Quote relations for this topic only, with each quote's author, from the
+// ClickHouse quote-authors route; never loads tweet text. A batch over the
+// gateway's 10,000-quote cap is split and re-read, so only a single tweet
+// with more than 10,000 quotes is counted from a partial list. Its score is
+// then a lower bound, and it still ranks among the top bangers.
 const quoteAuthors = unstable_cache(
   async (ids: string[]) => {
-    const rows: {
-      tweet_id: string
-      quoted_tweet_id: string
-      enriched_tweets: { account_id: string | null; username: string | null }
-    }[] = []
-    for (let start = 0; start < ids.length; start += 100) {
-      for (let offset = 0; ; offset += 1000) {
-        const { data, error } = await createServerServiceRoleClient()
-          .from('quote_tweets')
-          .select(
-            'tweet_id,quoted_tweet_id,enriched_tweets!inner(account_id,username)',
-          )
-          .in('quoted_tweet_id', ids.slice(start, start + 100))
-          .order('tweet_id')
-          .order('quoted_tweet_id')
-          .range(offset, offset + 999)
-        if (error) throw new Error('Unable to rank Birdseye bangers')
-        rows.push(...(data ?? []))
-        if ((data ?? []).length < 1000) break
-      }
-    }
-    return rows
+    const { quotes, truncatedTweetIds } = await fetchQuoteAuthors(ids)
+    if (truncatedTweetIds.length)
+      console.warn(
+        `Birdseye banger scores are partial for ${truncatedTweetIds.join(', ')}: over 10,000 quotes`,
+      )
+    return quotes
   },
-  ['birdseye-quote-authors-v1', productionReadCacheKey()],
+  ['birdseye-quote-authors-v2'],
   { revalidate: 300 },
 )
 
@@ -39,27 +26,24 @@ export async function getBirdseyeBangerScores(
 ) {
   const rows = await quoteAuthors(Array.from(authors.keys()))
   const policy = await getAppPolicy(
-    rows.flatMap(({ enriched_tweets }) =>
-      enriched_tweets.username ? [enriched_tweets.username] : [],
-    ),
+    rows.flatMap(({ username }) => (username ? [username] : [])),
   )
   const quotes = new Map<string, Set<string>>()
   for (const row of rows) {
-    const author = row.enriched_tweets
-    const name = author.username?.toLowerCase()
+    const name = row.username?.toLowerCase()
     if (
       !name ||
-      !author.account_id ||
-      !authors.get(row.quoted_tweet_id) ||
-      author.account_id === authors.get(row.quoted_tweet_id) ||
+      !row.accountId ||
+      !authors.get(row.quotedTweetId) ||
+      row.accountId === authors.get(row.quotedTweetId) ||
       !policy.members.has(name) ||
       policy.blocked.has(name) ||
-      policy.blockedIds.has(author.account_id)
+      policy.blockedIds.has(row.accountId)
     )
       continue
-    const ids = quotes.get(row.quoted_tweet_id) ?? new Set<string>()
-    ids.add(row.tweet_id)
-    quotes.set(row.quoted_tweet_id, ids)
+    const ids = quotes.get(row.quotedTweetId) ?? new Set<string>()
+    ids.add(row.tweetId)
+    quotes.set(row.quotedTweetId, ids)
   }
   return new Map(Array.from(quotes).map(([id, quotes]) => [id, quotes.size]))
 }

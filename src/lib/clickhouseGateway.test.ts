@@ -326,7 +326,11 @@ describe('library snapshot endpoints', () => {
       'https://gateway.example/analytics/library',
     )
     expect(
-      analyticsGatewayRequestUrl(['library', 'shard', '31'], none, base).toString(),
+      analyticsGatewayRequestUrl(
+        ['library', 'shard', '31'],
+        none,
+        base,
+      ).toString(),
     ).toBe('https://gateway.example/analytics/library/shard/31')
     expect(() =>
       analyticsGatewayRequestUrl(['library', 'shard', '..'], none, base),

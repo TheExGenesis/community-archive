@@ -285,3 +285,9 @@ create policy "Trend stories are publicly readable"
   for select
   to "anon", "authenticated"
   using (true);
+
+-- No policies on the search alert and notification tables: service-role only.
+ALTER TABLE "public"."search_alerts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."search_alert_matches" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."search_alert_email_sends" ENABLE ROW LEVEL SECURITY;

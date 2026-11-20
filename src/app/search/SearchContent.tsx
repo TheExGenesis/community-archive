@@ -15,6 +15,7 @@ import { capturePostHogEvent } from '@/lib/posthog'
 import UserMatchResults from '@/components/UserMatchResults'
 import RelatedContentResults from '@/components/search/RelatedContentResults'
 import BrowsingSignInPrompt from '@/components/BrowsingSignInPrompt'
+import { CreateSearchAlert } from '@/components/searchAlerts/CreateSearchAlert'
 
 const TweetList = dynamic(() => import('@/components/TweetList'), {
   loading: () => <p role="status">Loading results…</p>,
@@ -129,6 +130,13 @@ export function SearchPageContent({ canSearch }: { canSearch: boolean }) {
             />
           ) : hasSearch ? (
             <>
+              {cleanRawText && (
+                <CreateSearchAlert
+                  className="mb-4"
+                  query={cleanRawText}
+                  fromUser={filterCriteria.fromUsername}
+                />
+              )}
               <UserMatchResults query={cleanRawText} />
               <RelatedContentResults query={cleanRawText} />
               <TweetList

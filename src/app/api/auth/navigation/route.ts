@@ -6,6 +6,7 @@ import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { NextResponse } from 'next/server'
 import { isAdminUser } from '@/app/admin/data'
 import { getCurrentUser, getIsMember } from '@/lib/portal/auth'
+import { canUseSearchAlertsUser } from '@/lib/searchAlerts/access'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,8 @@ export async function GET() {
       askVisible,
       localPreview,
       isAdmin,
+      // The notifications bell shows only for accounts that may use alerts.
+      searchAlerts: user ? canUseSearchAlertsUser(user) : false,
     },
     {
       headers: {

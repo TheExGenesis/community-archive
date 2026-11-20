@@ -12,6 +12,9 @@ import { agentSearchDailyLimits } from '@/lib/agentSearch/budget'
 import { getAgentSearchAccess } from '@/lib/agentSearch/eligibility'
 import { ownKeysEnabled } from '@/lib/agentSearch/openRouterKey'
 import { AskArchiveSettings } from './AskArchiveSettings'
+import { SearchAlertsSettings } from './SearchAlertsSettings'
+import { canUseSearchAlertsUser } from '@/lib/searchAlerts/access'
+import { listSearchAlerts } from '@/lib/searchAlerts/store'
 import {
   DigestEmailSettings,
   type DigestEmailStatus,
@@ -57,6 +60,7 @@ export default async function SettingsPage() {
     settings,
     digestSubscription,
     askAccess,
+    searchAlerts,
   ] = await Promise.all([
     optInQuery,
     twitterAccountId
@@ -89,6 +93,10 @@ export default async function SettingsPage() {
       : Promise.resolve(null),
     // Only members who may ask see Ask the archive's setting.
     ownKeysEnabled() ? getAgentSearchAccess() : Promise.resolve(null),
+    // Only accounts that may use search alerts see their section.
+    canUseSearchAlertsUser(user)
+      ? listSearchAlerts(user.id).catch(() => [])
+      : Promise.resolve(null),
   ])
   const askLimits = askAccess?.ok ? agentSearchDailyLimits() : null
 
@@ -115,6 +123,7 @@ export default async function SettingsPage() {
             digestEmailStatus === 'subscribed' && digestSubscription!.weekly
           }
         />
+        {searchAlerts && <SearchAlertsSettings initialAlerts={searchAlerts} />}
         {askLimits && (
           <AskArchiveSettings
             houseLimit={askLimits.house}

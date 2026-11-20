@@ -446,7 +446,17 @@ function requiresLogin(pathname: string): boolean {
     '/api/search',
     '/api/user-directory',
     '/api/profile',
-  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+    // Search alerts and the notifications bell: signed-out requests stop here
+    // without rendering a page or querying the database.
+    '/notifications',
+    '/api/notifications',
+    '/api/search-alerts',
+  ].some(
+    (prefix) =>
+      (pathname === prefix || pathname.startsWith(`${prefix}/`)) &&
+      // Email unsubscribe links carry their own token and work signed out.
+      pathname !== '/api/search-alerts/email/unsubscribe',
+  )
 }
 
 // ─── Main Middleware ─────────────────────────────────────────────────────────
@@ -497,6 +507,7 @@ export async function middleware(request: NextRequest) {
   const machineAuthRoute =
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
+    pathname === '/api/search-alerts/email/unsubscribe' ||
     pathname === '/api/bulletin/preview-board' ||
     (pathname === '/api/bulletin/titles' && request.method === 'POST') ||
     pathname === '/api/internal/public-api/keys/verify' ||

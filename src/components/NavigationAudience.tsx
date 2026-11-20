@@ -13,6 +13,8 @@ type NavigationAudience = {
   /** Ask the archive is shown at all (launched, or the viewer is an admin). */
   askVisible: boolean
   localPreview?: 'admin' | 'signed-out' | null
+  /** The signed-in account may use search alerts (and sees the bell). */
+  searchAlerts?: boolean
 }
 
 const PUBLIC_AUDIENCE: NavigationAudience = {
@@ -51,6 +53,7 @@ export function NavigationAudienceProvider({
           askEnabled: nextAudience.askEnabled === true,
           askVisible: nextAudience.askVisible === true,
           localPreview: nextAudience.localPreview ?? null,
+          searchAlerts: nextAudience.searchAlerts === true,
         })
       })
       .catch((error: unknown) => {
@@ -92,6 +95,7 @@ export const useNavigationAudience = () => {
         isMember: preview.optedIn,
         isAdmin: false,
         localPreview: null,
+        searchAlerts: false,
         askEnabled: audience.askEnabled,
         askVisible: audience.askVisible,
       }

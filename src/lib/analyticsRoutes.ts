@@ -15,6 +15,7 @@ export const analyticsRoutes = {
   '/search/ask': ['ask_archive', 'product'],
   '/settings': ['settings', 'product'],
   '/settings/api-keys': ['api_keys', 'product'],
+  '/notifications/[id]': ['search_alert_matches', 'product'],
   '/profile': ['settings', 'product'],
   '/trends': ['trends', 'product'],
   '/trending': ['trend_stories', 'product'],

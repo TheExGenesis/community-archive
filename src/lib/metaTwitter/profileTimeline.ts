@@ -16,9 +16,14 @@ import {
 } from './profilePagination'
 
 const ID_PATTERN = /^\d{1,20}$/
+// Archived retweets are stored as the retweeter's own "RT @user: …" text;
+// shown under the account's name they read as its words, so they are left out.
+const RETWEET_PATTERN = /^RT @\w{1,15}:/
 // Opted-out tweets are removed at ingestion; five minutes is how long a newly
 // removed or deleted tweet can keep appearing in a member's timeline page.
 const PROFILE_TIMELINE_REVALIDATE_SECONDS = 300
+const PROFILE_TIMELINE_MAX_READS = 3
+const PROFILE_TIMELINE_MIN_POSTS = 10
 
 export interface ProfileTimelinePage {
   tweets: PortalTweet[]
@@ -29,7 +34,7 @@ export interface ProfileTimelinePage {
 
 interface OwnTweetsResponse {
   data?: {
-    tweets?: Array<{ tweetId?: unknown }>
+    tweets?: Array<{ tweetId?: unknown; fullText?: unknown }>
     hasMore?: unknown
   }
   query?: {
@@ -152,7 +157,8 @@ export function timelinePortalTweet(row: GatewayCard): PortalTweet | null {
 /**
  * One page of an account's archived posts, newest first: the gateway's
  * own-tweets read picks the ids, and tweet-cards hydrates them with media
- * and quoted tweets. Cards the gateway no longer serves are left out.
+ * and quoted tweets. Retweets and cards the gateway no longer serves are
+ * left out, so a page may be short or empty while nextOffset continues.
  */
 export async function fetchProfileTimelinePage(
   accountId: string,
@@ -177,37 +183,54 @@ export async function fetchProfileTimelinePage(
   }
 
   const limit = PROFILE_TIMELINE_PAGE_LIMIT
-  const page = await fetcher<OwnTweetsResponse>(
-    ['user', accountId, 'own-tweets'],
-    new URLSearchParams({
-      sort: 'newest',
-      kind,
-      limit: String(limit),
-      offset: String(offset),
-    }),
-    { revalidate: PROFILE_TIMELINE_REVALIDATE_SECONDS, timeoutMs: 15_000 },
-  )
-  const rows = page.data?.tweets
-  if (
-    !Array.isArray(rows) ||
-    String(page.query?.accountId) !== accountId ||
-    page.query?.kind !== kind ||
-    page.query?.sort !== 'newest' ||
-    Number(page.query?.offset) !== offset ||
-    rows.length > limit
-  ) {
-    throw new Error('ClickHouse returned an invalid profile timeline page')
+  const ids: string[] = []
+  let cursor = offset
+  let nextOffset: number | null = null
+  let truncated = false
+  // Read on past retweet-only stretches, so a page is rarely empty, but
+  // never more than a few gateway reads per request.
+  for (let read = 0; read < PROFILE_TIMELINE_MAX_READS; read += 1) {
+    const page = await fetcher<OwnTweetsResponse>(
+      ['user', accountId, 'own-tweets'],
+      new URLSearchParams({
+        sort: 'newest',
+        kind,
+        limit: String(limit),
+        offset: String(cursor),
+      }),
+      { revalidate: PROFILE_TIMELINE_REVALIDATE_SECONDS, timeoutMs: 15_000 },
+    )
+    const rows = page.data?.tweets
+    if (
+      !Array.isArray(rows) ||
+      String(page.query?.accountId) !== accountId ||
+      page.query?.kind !== kind ||
+      page.query?.sort !== 'newest' ||
+      Number(page.query?.offset) !== cursor ||
+      rows.length > limit
+    ) {
+      throw new Error('ClickHouse returned an invalid profile timeline page')
+    }
+    for (const row of rows) {
+      const id = text(row?.tweetId)
+      if (!id || !ID_PATTERN.test(id)) continue
+      if (
+        typeof row.fullText === 'string' &&
+        RETWEET_PATTERN.test(row.fullText)
+      ) {
+        continue
+      }
+      ids.push(id)
+    }
+    const hasMore = page.data?.hasMore === true
+    nextOffset =
+      hasMore && cursor + limit <= PROFILE_TIMELINE_MAX_OFFSET
+        ? cursor + limit
+        : null
+    truncated = hasMore && nextOffset === null
+    if (nextOffset === null || ids.length >= PROFILE_TIMELINE_MIN_POSTS) break
+    cursor = nextOffset
   }
-  const ids = rows.flatMap((row) => {
-    const id = text(row?.tweetId)
-    return id && ID_PATTERN.test(id) ? [id] : []
-  })
-  const hasMore = page.data?.hasMore === true
-  const nextOffset =
-    hasMore && offset + limit <= PROFILE_TIMELINE_MAX_OFFSET
-      ? offset + limit
-      : null
-  const truncated = hasMore && nextOffset === null
   if (ids.length === 0) return { tweets: [], nextOffset, truncated }
 
   const cards = await fetcher<TweetCardsResponse>(

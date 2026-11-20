@@ -103,7 +103,7 @@ describe('community project catalog', () => {
       'model-behavior-reports',
       'meet-your-neighbors',
       'followle',
-      'common-tongue',
+      'threadapalooza',
       'distill',
       'pairwise',
     ])

@@ -482,7 +482,7 @@ export const HOMEPAGE_PICKS = [
   'cuties-b9b5e204',
   'meet-your-neighbors',
   'followle',
-  'common-tongue',
+  'threadapalooza',
   'distill',
 ] as const
 

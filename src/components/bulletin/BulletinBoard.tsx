@@ -6,24 +6,18 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   PiArrowSquareOut,
-  PiBriefcase,
-  PiCalendarBlank,
   PiCaretUp,
   PiChatCircle,
-  PiChatsCircle,
   PiCheck,
-  PiGift,
-  PiHandHeart,
   PiQuestion,
   PiSortAscending,
   PiSortDescending,
-  PiUsersThree,
   PiX,
 } from 'react-icons/pi'
-import type { IconType } from 'react-icons'
 import { useTweetBatch } from './useTweetBatch'
 import { useBoardPages } from './useBoardPages'
 import { useDismissed } from './useDismissed'
+import { KindIcon, KindTag } from './KindTag'
 import { TweetAvatar } from '@/components/TweetAvatar'
 import type { PortalTweet } from '@/lib/portal/types'
 import type { BulletinTweet } from '@/lib/bulletin/tweets'
@@ -73,18 +67,6 @@ export function dealStacks<T>(items: T[], stacks = STACKS): T[][] {
   const out: T[][] = Array.from({ length: stacks }, () => [])
   items.forEach((item, i) => out[i % stacks].push(item))
   return out
-}
-const ICONS: Record<string, IconType> = {
-  gift: PiGift,
-  briefcase: PiBriefcase,
-  calendar: PiCalendarBlank,
-  users: PiUsersThree,
-  'hand-heart': PiHandHeart,
-  chats: PiChatsCircle,
-}
-function KindIcon({ kind, size = 14 }: { kind: string; size?: number }) {
-  const Icon = ICONS[KIND_ICONS[kind]]
-  return Icon ? <Icon size={size} aria-hidden /> : null
 }
 const KINDS = Object.keys(KIND_LABELS)
 
@@ -251,6 +233,22 @@ function NoticeCard({
       <span>{when}</span>
     </p>
   )
+  const flags = (resolved || badge) && (
+    <>
+      {resolved && (
+        <a
+          className={styles.resolvedPill}
+          href={`https://x.com/${encodeURIComponent(notice.username)}/status/${notice.resolution_tweet_id || notice.tweet_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Resolved based on an author update. Open the evidence on X."
+        >
+          Resolved
+        </a>
+      )}
+      {badge && <span className={styles.rel}>{badge}</span>}
+    </>
+  )
   const label = (
     <>
       <span className={styles.kind}>
@@ -264,18 +262,7 @@ function NoticeCard({
           {cardLabel(notice)}
         </button>
       </span>
-      {resolved && (
-        <a
-          className={styles.resolvedPill}
-          href={`https://x.com/${encodeURIComponent(notice.username)}/status/${notice.resolution_tweet_id || notice.tweet_id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Resolved based on an author update. Open the evidence on X."
-        >
-          Resolved
-        </a>
-      )}
-      {badge && <span className={styles.rel}>{badge}</span>}
+      {flags}
     </>
   )
   return (
@@ -422,14 +409,16 @@ function NoticeCard({
         </>
       ) : (
         <>
-          <div
-            className={`${styles.stickerRow} ${isNew && !resolved ? styles.hasNew : ''}`}
-          >
-            {label}
-          </div>
+          {flags ? (
+            <div
+              className={`${styles.stickerRow} ${isNew && !resolved ? styles.hasNew : ''}`}
+            >
+              {flags}
+            </div>
+          ) : null}
           <button
             type="button"
-            className={styles.summaryButton}
+            className={`${styles.summaryButton} ${flags ? '' : isNew ? styles.clearNew : styles.clearDismiss}`}
             aria-label={`Read full tweet by @${notice.username}`}
             title={notice.summary}
             aria-expanded={false}
@@ -465,6 +454,13 @@ function NoticeCard({
               {notice.place && (
                 <span className={styles.place}>{notice.place}</span>
               )}
+              <KindTag
+                kind={notice.kind}
+                label={cardLabel(notice)}
+                tip={`${cardLabel(notice)} · click to filter`}
+                actionLabel={`Filter by ${KIND_LABELS[notice.kind] || notice.kind}`}
+                onClick={() => onKind(notice.kind)}
+              />
               <time
                 dateTime={notice.posted_at}
                 title={exactStamp(notice.posted_at)}
@@ -747,7 +743,7 @@ export function BulletinBoard({
         </div>
         <p className={styles.lede}>
           Asks and offers that members posted on Twitter, gathered from the
-          archive each day.
+          archive each day. Click a card to read the full post.
         </p>
         {isAdmin && adminControls ? (
           <details className="mt-4">

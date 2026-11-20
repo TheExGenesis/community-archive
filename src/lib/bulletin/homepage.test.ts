@@ -113,3 +113,31 @@ test('signed-out readers get the shared ranking without personal reads', async (
   expect(loadBulletinRelationshipsForAccount).not.toHaveBeenCalled()
   expect(loadBulletinDismissalsForUser).not.toHaveBeenCalled()
 })
+
+test('a card whose tweet read lacks the author uses the checked author', async () => {
+  setBoard([
+    { ...notice(31, 'offer'), username: 'realname', display_name: 'Real Name' },
+  ])
+  jest.mocked(hydrateBulletinTweets).mockResolvedValueOnce({
+    tweets: [
+      {
+        id: '31',
+        accountId: 'acct31',
+        username: 'unknown_user',
+        name: 'unknown_user',
+        avatar: null,
+        text: 'Tweet 31',
+        createdAt: '2026-11-18T00:00:00Z',
+        observedAt: '2026-11-18T00:00:00Z',
+        likes: 0,
+        rts: 0,
+      },
+    ],
+    errors: {},
+  })
+  const [item] = await loadHomepageBulletinItems({
+    accountId: null,
+    userId: null,
+  })
+  expect(item.tweet).toMatchObject({ username: 'realname', name: 'Real Name' })
+})

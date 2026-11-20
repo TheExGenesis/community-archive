@@ -1,4 +1,4 @@
-import { createSearchAlert, parseMatchedTweets } from './store'
+import { createSearchAlert } from './store'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
 jest.mock('@/utils/supabase', () => ({
@@ -95,17 +95,4 @@ test('other database errors are thrown', async () => {
   await expect(createSearchAlert('u', input)).rejects.toEqual({
     message: 'boom',
   })
-})
-
-test('parses stored tweet references defensively', () => {
-  expect(
-    parseMatchedTweets([
-      { id: '1', replyToId: '2', createdAt: 'x' },
-      { id: 'nope' },
-      { id: '3', replyToId: 'bad' },
-    ]),
-  ).toEqual([
-    { id: '1', replyToId: '2', createdAt: 'x' },
-    { id: '3', replyToId: null, createdAt: '' },
-  ])
 })

@@ -159,7 +159,8 @@ export interface SearchAlertNotification {
   fromUser: string | null
   count: number
   tweetIds: string[]
-  since: string
+  /** When the first match of this unread batch was recorded. */
+  firstMatchedAt: string
   createdAt: string
   updatedAt: string
   readAt: string | null
@@ -201,7 +202,10 @@ function mapNotification(row: NotificationRow): SearchAlertNotification | null {
           (id): id is string => typeof id === 'string' && /^\d{1,20}$/.test(id),
         )
       : [],
-    since: typeof payload.since === 'string' ? payload.since : row.created_at,
+    firstMatchedAt:
+      typeof payload.firstMatchedAt === 'string'
+        ? payload.firstMatchedAt
+        : row.created_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     readAt: row.read_at,
@@ -275,56 +279,47 @@ export interface MatchedTweetRef {
   createdAt: string
 }
 
-export const parseMatchedTweets = (value: unknown): MatchedTweetRef[] =>
-  Array.isArray(value)
-    ? value.flatMap((item): MatchedTweetRef[] => {
-        const id = typeof item?.id === 'string' ? item.id : null
-        if (!id || !/^\d{1,20}$/.test(id)) return []
-        const replyToId =
-          typeof item.replyToId === 'string' &&
-          /^\d{1,20}$/.test(item.replyToId)
-            ? item.replyToId
-            : null
-        return [
-          {
-            id,
-            replyToId,
-            createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
-          },
-        ]
-      })
-    : []
+interface MatchRow {
+  tweet_id: string
+  reply_to_tweet_id: string | null
+  tweet_created_at: string
+}
 
-/** Matches logged for an alert since a boundary, newest first. */
-export async function listAlertMatchesSince(
+const mapMatch = (row: MatchRow): MatchedTweetRef => ({
+  id: row.tweet_id,
+  replyToId: row.reply_to_tweet_id,
+  createdAt: row.tweet_created_at,
+})
+
+/** Tweets first recorded for an alert at or after a time, newest tweet first. */
+export async function listAlertMatches(
   userId: string,
   alertId: string,
-  since: string,
+  recordedSince: string,
   limit = 50,
 ): Promise<MatchedTweetRef[]> {
   const { data, error } = await db()
     .from('search_alert_matches')
-    .select('tweets, window_start')
+    .select('tweet_id, reply_to_tweet_id, tweet_created_at')
     .eq('user_id', userId)
     .eq('alert_id', alertId)
-    .gte('window_start', since)
-    .order('window_start', { ascending: false })
-    .limit(48)
+    .gte('created_at', recordedSince)
+    .order('tweet_created_at', { ascending: false })
+    .order('tweet_id', { ascending: false })
+    .limit(limit)
   if (error) throw error
-  const seen = new Set<string>()
-  const tweets: MatchedTweetRef[] = []
-  for (const row of data ?? []) {
-    for (const tweet of parseMatchedTweets(row.tweets)) {
-      if (seen.has(tweet.id)) continue
-      seen.add(tweet.id)
-      tweets.push(tweet)
-      if (tweets.length >= limit) return tweets
-    }
-  }
-  return tweets
+  return (data ?? []).map(mapMatch)
 }
 
 // ─── Matching cron ──────────────────────────────────────────────────────────
+
+/**
+ * How long the match log keeps a tweet. It must outlast the cron's lookback
+ * window (7 days, see SEARCH_ALERT_LOOKBACK_DAYS): a tweet still inside the
+ * window was recorded after it was created, so less than 8 days ago, and its
+ * row is still here to stop it from being reported again.
+ */
+export const MATCH_LOG_RETENTION_DAYS = 30
 
 export interface CheckableAlert {
   id: string
@@ -333,6 +328,8 @@ export interface CheckableAlert {
   mode: SearchAlertMode
   fromUser: string | null
   lastCheckedAt: string
+  /** History floor: tweets created before this are never reported. */
+  createdAt: string
 }
 
 /** Live alerts, least recently checked first. */
@@ -341,7 +338,7 @@ export async function listCheckableAlerts(
 ): Promise<CheckableAlert[]> {
   const { data, error } = await db()
     .from('search_alerts')
-    .select('id, user_id, query, mode, from_user, last_checked_at')
+    .select('id, user_id, query, mode, from_user, last_checked_at, created_at')
     .is('deleted_at', null)
     .order('last_checked_at', { ascending: true })
     .order('id', { ascending: true })
@@ -354,28 +351,53 @@ export async function listCheckableAlerts(
     mode: row.mode === 'phrase' ? 'phrase' : 'all',
     fromUser: row.from_user,
     lastCheckedAt: row.last_checked_at,
+    createdAt: row.created_at,
   }))
 }
 
-/** Logs matches, updates the unread notification and advances the watermark. */
-export async function recordSearchAlertCheck(input: {
-  alertId: string
-  expectedCheckedAt: string
-  checkedAt: string
-  tweets: MatchedTweetRef[]
-}): Promise<boolean> {
-  const { data, error } = await db().rpc('record_search_alert_check', {
-    p_alert_id: input.alertId,
-    p_expected_checked_at: input.expectedCheckedAt,
-    p_checked_at: input.checkedAt,
-    p_tweets: input.tweets as never,
-    p_match_count: input.tweets.length,
-  })
+export const recordedKey = (alertId: string, tweetId: string) =>
+  `${alertId}:${tweetId}`
+
+/** Which of these (alert, tweet) pairs are already in the match log. */
+export async function listRecordedTweets(
+  alertIds: string[],
+  tweetIds: string[],
+): Promise<Set<string>> {
+  const recorded = new Set<string>()
+  if (alertIds.length === 0 || tweetIds.length === 0) return recorded
+  const { data, error } = await db()
+    .from('search_alert_matches')
+    .select('alert_id, tweet_id')
+    .in('alert_id', alertIds)
+    .in('tweet_id', tweetIds)
+    .limit(alertIds.length * tweetIds.length)
   if (error) throw error
-  return data === true
+  for (const row of data ?? []) {
+    recorded.add(recordedKey(row.alert_id, row.tweet_id))
+  }
+  return recorded
 }
 
-/** Notes a failed check without moving the watermark. */
+/**
+ * Records a check: inserts the tweets not yet logged for the alert (never
+ * ones created before it), updates its unread notification, and returns how
+ * many were new (-1 when the alert was deleted meanwhile).
+ */
+export async function recordSearchAlertCheck(input: {
+  alertId: string
+  checkedAt: string
+  tweets: MatchedTweetRef[]
+}): Promise<number> {
+  const { data, error } = await db().rpc('record_search_alert_check', {
+    p_alert_id: input.alertId,
+    p_checked_at: input.checkedAt,
+    p_tweets: input.tweets as never,
+  })
+  if (error) throw error
+  return typeof data === 'number' ? data : 0
+}
+
+/** Notes a failed check; the next run searches the same window again. */
 export async function recordSearchAlertFailure(
   alertIds: string[],
   message: string,
@@ -390,8 +412,10 @@ export async function recordSearchAlertFailure(
   if (error) throw error
 }
 
-/** Drops match log rows no page or email reads any more. */
-export async function pruneSearchAlertMatches(olderThanDays = 30) {
+/** Drops match log rows older than MATCH_LOG_RETENTION_DAYS. */
+export async function pruneSearchAlertMatches(
+  olderThanDays = MATCH_LOG_RETENTION_DAYS,
+) {
   const cutoff = new Date(Date.now() - olderThanDays * 86_400_000).toISOString()
   const { error } = await db()
     .from('search_alert_matches')
@@ -450,6 +474,7 @@ export interface ClaimedAlertMatches {
   mode: SearchAlertMode
   fromUser: string | null
   count: number
+  /** Creation time of the oldest match: the search link's start date. */
   since: string
   tweets: MatchedTweetRef[]
 }
@@ -468,22 +493,22 @@ export async function loadClaimedMatches(
     client
       .from('search_alert_matches')
       .select(
-        'alert_id, match_count, tweets, window_start, search_alerts(query, mode, from_user)',
+        'alert_id, tweet_id, reply_to_tweet_id, tweet_created_at, search_alerts(query, mode, from_user)',
       )
       .eq('email_send_id', sendId)
-      .order('window_start', { ascending: false })
+      .order('tweet_created_at', { ascending: false })
+      .order('tweet_id', { ascending: false })
       .limit(1000),
   ])
   if (send.error) throw send.error
   if (matches.error) throw matches.error
   const byAlert = new Map<string, ClaimedAlertMatches>()
-  for (const row of (matches.data ?? []) as unknown as Array<{
-    alert_id: string
-    match_count: number
-    tweets: unknown
-    window_start: string
-    search_alerts: Pick<SearchAlertRow, 'query' | 'mode' | 'from_user'> | null
-  }>) {
+  for (const row of (matches.data ?? []) as unknown as Array<
+    MatchRow & {
+      alert_id: string
+      search_alerts: Pick<SearchAlertRow, 'query' | 'mode' | 'from_user'> | null
+    }
+  >) {
     if (!row.search_alerts) continue
     const entry = byAlert.get(row.alert_id) ?? {
       alertId: row.alert_id,
@@ -491,12 +516,12 @@ export async function loadClaimedMatches(
       mode: row.search_alerts.mode === 'phrase' ? 'phrase' : 'all',
       fromUser: row.search_alerts.from_user,
       count: 0,
-      since: row.window_start,
+      since: row.tweet_created_at,
       tweets: [],
     }
-    entry.count += row.match_count
-    if (row.window_start < entry.since) entry.since = row.window_start
-    entry.tweets.push(...parseMatchedTweets(row.tweets))
+    entry.count += 1
+    if (row.tweet_created_at < entry.since) entry.since = row.tweet_created_at
+    entry.tweets.push(mapMatch(row))
     byAlert.set(row.alert_id, entry)
   }
   return {

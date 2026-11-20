@@ -117,33 +117,30 @@ export type Database = {
           created_at: string
           email_send_id: string | null
           id: string
-          match_count: number
-          tweets: Json
+          reply_to_tweet_id: string | null
+          tweet_created_at: string
+          tweet_id: string
           user_id: string
-          window_end: string
-          window_start: string
         }
         Insert: {
           alert_id: string
           created_at?: string
           email_send_id?: string | null
           id?: string
-          match_count: number
-          tweets: Json
+          reply_to_tweet_id?: string | null
+          tweet_created_at: string
+          tweet_id: string
           user_id: string
-          window_end: string
-          window_start: string
         }
         Update: {
           alert_id?: string
           created_at?: string
           email_send_id?: string | null
           id?: string
-          match_count?: number
-          tweets?: Json
+          reply_to_tweet_id?: string | null
+          tweet_created_at?: string
+          tweet_id?: string
           user_id?: string
-          window_end?: string
-          window_start?: string
         }
         Relationships: [
           {
@@ -1382,14 +1379,8 @@ isOneToOne: false
         Returns: string
       }
       record_search_alert_check: {
-        Args: {
-          p_alert_id: string
-          p_checked_at: string
-          p_expected_checked_at: string
-          p_match_count: number
-          p_tweets: Json
-        }
-        Returns: boolean
+        Args: { p_alert_id: string; p_checked_at: string; p_tweets: Json }
+        Returns: number
       }
 
             "admin_activity_page":

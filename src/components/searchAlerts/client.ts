@@ -19,7 +19,7 @@ export interface ClientNotification {
   query: string
   fromUser: string | null
   count: number
-  since: string
+  firstMatchedAt: string
   updatedAt: string
   readAt: string | null
 }

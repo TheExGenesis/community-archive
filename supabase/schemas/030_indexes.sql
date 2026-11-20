@@ -241,7 +241,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "notifications_one_unread_per_alert"
 CREATE INDEX IF NOT EXISTS "notifications_user_created_idx"
   ON "public"."notifications" ("user_id", "updated_at" DESC);
 CREATE INDEX IF NOT EXISTS "search_alert_matches_alert_idx"
-  ON "public"."search_alert_matches" ("alert_id", "window_start");
+  ON "public"."search_alert_matches" ("alert_id", "created_at");
 CREATE INDEX IF NOT EXISTS "search_alert_matches_unsent_idx"
   ON "public"."search_alert_matches" ("user_id", "created_at")
   WHERE "email_send_id" IS NULL;

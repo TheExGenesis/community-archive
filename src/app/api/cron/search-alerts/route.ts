@@ -4,6 +4,7 @@ import { isClickHouseReadsEnabled } from '@/lib/clickhouseGateway'
 import { runSearchAlertChecks } from '@/lib/searchAlerts/matcher'
 import {
   listCheckableAlerts,
+  listRecordedTweets,
   pruneSearchAlertMatches,
   recordSearchAlertCheck,
   recordSearchAlertFailure,
@@ -11,7 +12,8 @@ import {
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-// Up to 40 searches, four at a time, each capped at 10 seconds.
+// Up to 40 searches of up to four pages, four searches at a time, each
+// request capped at 10 seconds.
 export const maxDuration = 300
 
 // Vercel's scheduler calls cron paths with GET; operators can POST to re-run.
@@ -36,14 +38,15 @@ async function handleRun(request: Request) {
 
   const result = await runSearchAlertChecks({
     listAlerts: () => listCheckableAlerts(),
+    listRecorded: listRecordedTweets,
     record: recordSearchAlertCheck,
     recordFailure: recordSearchAlertFailure,
   })
   await pruneSearchAlertMatches().catch((error) =>
     console.error('Search alert match pruning failed:', error),
   )
-  // Partial failures are reported in the body; the failed alerts keep their
-  // watermarks and are retried next hour.
+  // Partial failures are reported in the body; a failed search records
+  // nothing, so its tweets are still unseen next hour.
   return NextResponse.json(result, {
     status:
       result.searches > 0 && result.failedSearches === result.searches

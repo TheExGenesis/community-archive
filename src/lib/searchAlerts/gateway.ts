@@ -40,8 +40,8 @@ export function gatewayTimestamp(value: unknown): string | null {
 }
 
 /**
- * The newest tweets matching a search on or after `since`'s UTC day. The
- * gateway's `since` is a calendar date, so callers filter by exact time.
+ * One page of the newest tweets matching a search on or after `since`'s UTC
+ * day. The gateway's `since` is a calendar date, so callers filter by time.
  */
 export async function searchNewestMatches(
   search: SearchAlertQuery,
@@ -49,7 +49,12 @@ export async function searchNewestMatches(
   {
     fetcher = fetchAnalyticsGatewayJson,
     timeoutMs = 10_000,
-  }: { fetcher?: AnalyticsGatewayFetcher; timeoutMs?: number } = {},
+    offset = 0,
+  }: {
+    fetcher?: AnalyticsGatewayFetcher
+    timeoutMs?: number
+    offset?: number
+  } = {},
 ): Promise<MatchedTweetRef[]> {
   const params = new URLSearchParams({
     q: search.query,
@@ -59,6 +64,7 @@ export async function searchNewestMatches(
     limit: String(SEARCH_ALERT_PAGE_LIMIT),
     exclude_retweets: 'true',
   })
+  if (offset > 0) params.set('offset', String(offset))
   if (search.fromUser) params.set('from_user', search.fromUser)
   const response = await fetcher<SearchResponse>(['search'], params, {
     timeoutMs,

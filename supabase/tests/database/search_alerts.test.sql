@@ -27,31 +27,38 @@ SELECT lives_ok(
   'deleted alerts do not count toward the cap'
 );
 
+UPDATE public.search_alerts SET created_at = '2026-11-15T00:00:00Z'
+WHERE query = 'query 1';
 CREATE TEMP TABLE t_alert AS
-SELECT id, last_checked_at FROM public.search_alerts WHERE query = 'query 1';
+SELECT id FROM public.search_alerts WHERE query = 'query 1';
 
-SELECT ok(
+SELECT is(
   public.record_search_alert_check(
-    (SELECT id FROM t_alert), (SELECT last_checked_at FROM t_alert),
-    (SELECT last_checked_at FROM t_alert) + interval '1 hour',
-    '[{"id":"30"},{"id":"20"}]', 2),
-  'a check from the current watermark is recorded'
+    (SELECT id FROM t_alert), '2026-11-20T10:00:00Z',
+    '[{"id":"30","createdAt":"2026-11-20T09:30:00Z"},
+      {"id":"20","replyToId":"7","createdAt":"2026-11-20T08:30:00Z"},
+      {"id":"5","createdAt":"2026-11-14T08:00:00Z"}]'),
+  2,
+  'new tweets are recorded; one created before the alert is not'
 );
 
-SELECT ok(
-  NOT public.record_search_alert_check(
-    (SELECT id FROM t_alert), (SELECT last_checked_at FROM t_alert),
-    (SELECT last_checked_at FROM t_alert) + interval '2 hours',
-    '[{"id":"99"}]', 1),
-  'a check from a stale watermark writes nothing'
+SELECT is(
+  public.record_search_alert_check(
+    (SELECT id FROM t_alert), '2026-11-20T11:00:00Z',
+    '[{"id":"30","createdAt":"2026-11-20T09:30:00Z"},
+      {"id":"20","createdAt":"2026-11-20T08:30:00Z"},
+      {"id":"15","createdAt":"2026-11-19T22:00:00Z"}]'),
+  1,
+  'a late-arriving tweet created before the last check is new; seen ones are not'
 );
 
-SELECT ok(
+SELECT is(
   public.record_search_alert_check(
-    (SELECT id FROM t_alert), (SELECT last_checked_at FROM t_alert) + interval '1 hour',
-    (SELECT last_checked_at FROM t_alert) + interval '2 hours',
-    '[{"id":"50"},{"id":"45"},{"id":"44"},{"id":"43"}]', 4),
-  'the next check is recorded'
+    (SELECT id FROM t_alert), '2026-11-20T12:00:00Z',
+    '[{"id":"30","createdAt":"2026-11-20T09:30:00Z"},
+      {"id":"15","createdAt":"2026-11-19T22:00:00Z"}]'),
+  0,
+  'a re-run reports nothing'
 );
 
 SELECT is(
@@ -61,26 +68,22 @@ SELECT is(
 );
 
 SELECT is(
-  (SELECT payload FROM public.notifications WHERE alert_id = (SELECT id FROM t_alert)),
-  jsonb_build_object(
-    'count', 6,
-    'tweetIds', '["50","45","44","43","30"]'::jsonb,
-    'since', to_jsonb((SELECT last_checked_at FROM t_alert)),
-    'latestAt', to_jsonb((SELECT last_checked_at FROM t_alert) + interval '2 hours')
-  ),
-  'the payload sums counts, keeps the five newest ids and the first boundary'
+  (SELECT jsonb_build_object('count', payload -> 'count', 'tweetIds', payload -> 'tweetIds')
+   FROM public.notifications WHERE alert_id = (SELECT id FROM t_alert)),
+  '{"count": 3, "tweetIds": ["15", "30", "20"]}'::jsonb,
+  'the payload counts only inserted tweets, newest batch first'
 );
 
 SELECT is(
-  (SELECT last_seen_tweet_id FROM public.search_alerts WHERE id = (SELECT id FROM t_alert)),
-  '50',
-  'the watermark tweet is the newest match'
+  public.record_search_alert_check(gen_random_uuid(), now(), '[]'),
+  -1,
+  'a missing alert is reported as such'
 );
 
 UPDATE public.notifications SET read_at = now() WHERE alert_id = (SELECT id FROM t_alert);
 SELECT public.record_search_alert_check(
-  (SELECT id FROM t_alert), (SELECT last_checked_at FROM t_alert) + interval '2 hours',
-  (SELECT last_checked_at FROM t_alert) + interval '3 hours', '[{"id":"60"}]', 1);
+  (SELECT id FROM t_alert), '2026-11-20T13:00:00Z',
+  '[{"id":"60","createdAt":"2026-11-20T12:30:00Z"}]');
 SELECT is(
   (SELECT count(*)::int FROM public.notifications WHERE alert_id = (SELECT id FROM t_alert) AND read_at IS NULL),
   1,
@@ -105,7 +108,7 @@ SELECT ok(
   AND NOT has_table_privilege('anon', 'public.notifications', 'SELECT')
   AND NOT has_table_privilege('authenticated', 'public.search_alert_email_sends', 'SELECT')
   AND NOT has_function_privilege('authenticated', 'public.claim_search_alert_email(uuid, interval)', 'EXECUTE')
-  AND NOT has_function_privilege('anon', 'public.record_search_alert_check(uuid, timestamptz, timestamptz, jsonb, integer)', 'EXECUTE'),
+  AND NOT has_function_privilege('anon', 'public.record_search_alert_check(uuid, timestamptz, jsonb)', 'EXECUTE'),
   'alert tables and functions are service-role only'
 );
 

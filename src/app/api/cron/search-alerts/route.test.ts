@@ -15,6 +15,7 @@ jest.mock('@/lib/searchAlerts/emailRun', () => ({
 }))
 jest.mock('@/lib/searchAlerts/store', () => ({
   listCheckableAlerts: jest.fn(),
+  listRecordedTweets: jest.fn(),
   recordSearchAlertCheck: jest.fn(),
   recordSearchAlertFailure: jest.fn(),
   pruneSearchAlertMatches: jest.fn(async () => undefined),
@@ -43,6 +44,7 @@ const result = {
   alerts: 2,
   searches: 1,
   deferredSearches: 0,
+  pagesRead: 1,
   failedSearches: 0,
   alertsWithMatches: 1,
   newMatches: 4,

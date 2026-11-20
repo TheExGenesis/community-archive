@@ -10,10 +10,7 @@ import {
   searchAlertLabel,
   searchAlertSearchHref,
 } from '@/lib/searchAlerts/input'
-import {
-  getNotification,
-  listAlertMatchesSince,
-} from '@/lib/searchAlerts/store'
+import { getNotification, listAlertMatches } from '@/lib/searchAlerts/store'
 import type { PortalTweet } from '@/lib/portal/types'
 import { AlertMatches, MarkNotificationRead } from './AlertMatches'
 
@@ -25,16 +22,6 @@ export const metadata: Metadata = {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const sinceLabel = (iso: string) =>
-  new Date(iso).toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    timeZoneName: 'short',
-  })
 
 export default async function SearchAlertMatchesPage({
   params,
@@ -49,10 +36,12 @@ export default async function SearchAlertMatchesPage({
   const notification = await getNotification(user.id, id)
   if (!notification) notFound()
 
-  const matches = await listAlertMatchesSince(
+  // Tweets first recorded since this unread batch began. They can be older
+  // than the alert's last check: many reach the archive days after posting.
+  const matches = await listAlertMatches(
     user.id,
     notification.alertId,
-    notification.since,
+    notification.firstMatchedAt,
   )
   let cards = new Map<string, PortalTweet>()
   let cardsFailed = false
@@ -75,7 +64,13 @@ export default async function SearchAlertMatchesPage({
       },
     ]
   })
-  const searchHref = searchAlertSearchHref(notification, notification.since)
+  // The full search starts on the day of the oldest match shown here.
+  const oldestMatch = matches.reduce<string | undefined>(
+    (oldest, match) =>
+      !oldest || match.createdAt < oldest ? match.createdAt : oldest,
+    undefined,
+  )
+  const searchHref = searchAlertSearchHref(notification, oldestMatch)
 
   return (
     <main className="min-h-screen bg-background">
@@ -90,8 +85,7 @@ export default async function SearchAlertMatchesPage({
         </h1>
         <p className="mt-1 text-sm leading-5 text-muted-foreground">
           {notification.count.toLocaleString('en-US')} new{' '}
-          {notification.count === 1 ? 'match' : 'matches'} since{' '}
-          {sinceLabel(notification.since)}.{' '}
+          {notification.count === 1 ? 'match' : 'matches'}.{' '}
           <Link href={searchHref} className="font-semibold text-brand">
             Open the full search
           </Link>{' '}

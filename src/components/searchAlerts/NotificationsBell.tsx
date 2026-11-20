@@ -30,7 +30,8 @@ const badgeLabel = (count: number) => (count > 9 ? '9+' : String(count))
  * The header's notifications bell. Renders nothing, and fetches nothing,
  * until the client-side navigation check says this signed-in account may use
  * search alerts, so cached pages stay cached and signed-out visitors never
- * cause a request. Hidden below 640px, where the header has no room for it.
+ * cause a request. Hidden below 768px: measured with a signed-in admin's
+ * header, at 640px the bell pushed the nav into overlap; from 768px up it fits.
  */
 export function NotificationsBell() {
   const { searchAlerts } = useNavigationAudience()
@@ -110,7 +111,7 @@ function Bell_() {
             unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
           }
           title="Notifications"
-          className="relative hidden h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 sm:inline-flex"
+          className="relative hidden h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 md:inline-flex"
         >
           <Bell className="h-5 w-5" />
           {unread > 0 && (

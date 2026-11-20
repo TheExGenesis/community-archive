@@ -1158,12 +1158,14 @@ CREATE TABLE IF NOT EXISTS "public"."search_alerts" (
     "mode" text NOT NULL DEFAULT 'all',
     "from_user" text,
     "email_enabled" boolean NOT NULL DEFAULT false,
-    -- Watermark: matches are tweets created after this instant. A new alert
-    -- starts at its creation time so it does not flood with history.
+    -- Last successful check; the cron checks the stalest alerts first. Which
+    -- tweets are new is decided by search_alert_matches, not by this time.
     "last_checked_at" timestamptz NOT NULL DEFAULT now(),
     "last_seen_tweet_id" text,
     "last_error" text,
     "last_error_at" timestamptz,
+    -- Also the history floor: tweets created before the alert are never
+    -- reported, so a new alert does not flood with old matches.
     "created_at" timestamptz NOT NULL DEFAULT now(),
     "updated_at" timestamptz NOT NULL DEFAULT now(),
     "deleted_at" timestamptz,
@@ -1176,8 +1178,9 @@ ALTER TABLE "public"."search_alerts" OWNER TO "postgres";
 COMMENT ON TABLE "public"."search_alerts" IS 'Saved keyword searches checked hourly for new matching tweets. Service-role only; at most 10 live alerts per user.';
 
 -- Generic in-site notifications. kind names the producer; payload is that
--- producer's JSON. search_alert rows hold {count, tweetIds, since, latestAt}
--- and there is at most one unread row per alert.
+-- producer's JSON. search_alert rows hold {count, tweetIds, firstMatchedAt,
+-- latestAt}: firstMatchedAt is when the first match of the unread batch was
+-- recorded (not a tweet creation boundary). At most one unread row per alert.
 CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
@@ -1210,20 +1213,22 @@ CREATE TABLE IF NOT EXISTS "public"."search_alert_email_sends" (
 );
 ALTER TABLE "public"."search_alert_email_sends" OWNER TO "postgres";
 
--- Log of new matches, one row per successful check that found any. The
--- matches page and the roll-up email read it; email_send_id marks a row as
--- emailed. tweets is [{id, replyToId, createdAt}] newest first.
+-- Every tweet ever reported for an alert, one row per (alert, tweet). The
+-- unique key is what makes a tweet "new": the cron inserts what it sees and
+-- counts only the rows actually inserted. The matches page and the roll-up
+-- email read it; email_send_id marks a row as emailed.
 CREATE TABLE IF NOT EXISTS "public"."search_alert_matches" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     "alert_id" uuid NOT NULL REFERENCES "public"."search_alerts"("id") ON DELETE CASCADE,
     "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
-    "match_count" integer NOT NULL,
-    "tweets" jsonb NOT NULL,
-    "window_start" timestamptz NOT NULL,
-    "window_end" timestamptz NOT NULL,
+    "tweet_id" text NOT NULL,
+    "reply_to_tweet_id" text,
+    "tweet_created_at" timestamptz NOT NULL,
     "email_send_id" uuid REFERENCES "public"."search_alert_email_sends"("id") ON DELETE SET NULL,
+    -- When the cron first saw the tweet.
     "created_at" timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT "search_alert_matches_count_positive" CHECK ("match_count" > 0),
-    CONSTRAINT "search_alert_matches_tweets_array" CHECK (jsonb_typeof("tweets") = 'array')
+    CONSTRAINT "search_alert_matches_alert_tweet_key" UNIQUE ("alert_id", "tweet_id"),
+    CONSTRAINT "search_alert_matches_tweet_format" CHECK ("tweet_id" ~ '^[0-9]{1,20}$'),
+    CONSTRAINT "search_alert_matches_reply_format" CHECK ("reply_to_tweet_id" IS NULL OR "reply_to_tweet_id" ~ '^[0-9]{1,20}$')
 );
 ALTER TABLE "public"."search_alert_matches" OWNER TO "postgres";

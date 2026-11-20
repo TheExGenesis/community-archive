@@ -24,3 +24,11 @@ export const resolveProfileChapterYear = (
     ? candidateYear
     : null
 }
+
+/** Latest-posts timeline under the profile's best-of list. */
+export const PROFILE_TIMELINE_PAGE_LIMIT = 20
+/** The gateway's own-tweets read stops paging at this offset. */
+export const PROFILE_TIMELINE_MAX_OFFSET = 10_000
+
+/** `original` hides replies, like the Posts tab on X; `all` includes them. */
+export type ProfileTimelineKind = 'original' | 'all'

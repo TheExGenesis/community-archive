@@ -53,6 +53,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'after_id',
   ]),
   'missing-accounts': new Set(['limit']),
+  'tweet-cards': new Set(['ids']),
   'top-quotes': new Set([
     'limit',
     'offset',
@@ -118,6 +119,13 @@ export function analyticsGatewayRequestUrl(
     cleanPath[2] === 'sidebar'
   ) {
     allowedParams = new Set(['year', 'media_limit', 'people_limit'])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'user' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'own-tweets'
+  ) {
+    allowedParams = new Set(['kind', 'sort', 'limit', 'offset'])
   } else if (
     cleanPath.length === 3 &&
     cleanPath[0] === 'user' &&

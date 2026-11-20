@@ -88,8 +88,10 @@ async function mapLimit<T>(
 }
 
 function hasEnoughText(notice: Notice) {
+  // Stored notices carry the post's text as their summary; checked cards
+  // also have the current text.
   return precheckEligibility({
-    chain: [{ text: notice.preview_text ?? '' }],
+    chain: [{ text: notice.preview_text ?? notice.summary ?? '' }],
   } as Parameters<typeof precheckEligibility>[0]).eligible
 }
 
@@ -99,7 +101,12 @@ export type TitleRunResult = {
   titled: number
   untitled: number
   failed: number
+  /** Untitled notices still waiting after this run. */
+  remaining: number
 }
+
+/** Upper bound on one request, so it stays well inside a function's time. */
+export const TITLES_PER_REQUEST_MAX = 40
 
 /**
  * Generates titles for live notices that have no stored outcome yet, newest
@@ -129,6 +136,7 @@ export async function generateBulletinTitles(
     titled: 0,
     untitled: 0,
     failed: 0,
+    remaining: Math.max(0, untitled.length - tried.size - todo.length),
   }
   await mapLimit(todo, concurrency, async (notice) => {
     try {

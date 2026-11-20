@@ -129,5 +129,19 @@ test('generates the newest missing titles once, skipping thin text and stored ou
     titled: 2,
     untitled: 0,
     failed: 0,
+    remaining: 1,
   })
+})
+
+test('stored notices without checked text use their summary', async () => {
+  const stored = {
+    ...notice('7', 1),
+    preview_text: undefined,
+    summary: 'Offering design help for small nonprofits',
+  }
+  const result = await generateBulletinTitles([
+    stored,
+    { ...stored, tweet_id: '8', summary: 'ok' },
+  ])
+  expect(result).toMatchObject({ candidates: 1, attempted: 1 })
 })

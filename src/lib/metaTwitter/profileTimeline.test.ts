@@ -178,7 +178,7 @@ test('drops retweets before hydrating', async () => {
   expect(page.tweets.map((tweet) => tweet.id)).toEqual(['2', '1'])
 })
 
-test('reads past a retweet-only stretch, at most three pages per request', async () => {
+test('reads past a retweet-only stretch, at most two pages per request', async () => {
   const retweets = (offset: number) => ({
     data: {
       tweets: [{ tweetId: String(offset + 1), fullText: 'RT @bob: hi' }],
@@ -202,6 +202,6 @@ test('reads past a retweet-only stretch, at most three pages per request', async
     fetcher.mock.calls.map(([, params]) =>
       (params as URLSearchParams).get('offset'),
     ),
-  ).toEqual(['0', '50', '100'])
-  expect(page).toEqual({ tweets: [], nextOffset: 150, truncated: false })
+  ).toEqual(['0', '50'])
+  expect(page).toEqual({ tweets: [], nextOffset: 100, truncated: false })
 })

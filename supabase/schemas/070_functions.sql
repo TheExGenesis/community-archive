@@ -3977,10 +3977,75 @@ $$;
 ALTER FUNCTION private.community_archive_monitoring_activity_day(integer)
   OWNER TO postgres;
 
+-- Weekly member joins from the member directory; see the migration for why
+-- the action log is not used.
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_members_week(
+  p_weeks integer DEFAULT 26
+)
+RETURNS TABLE (
+  member_week text,
+  week_start_date text,
+  joined_with_archive double precision,
+  joined_optin_only double precision,
+  members_total double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_weeks integer := LEAST(GREATEST(COALESCE(p_weeks, 26), 1), 104);
+BEGIN
+  IF session_user <> 'archive_metrics_exporter' THEN
+    RAISE EXCEPTION 'monitoring function is restricted'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  WITH members AS MATERIALIZED (
+    SELECT
+      date_trunc('week', directory.joined_at AT TIME ZONE 'UTC') AS week_start,
+      directory.has_archive
+    FROM public.user_directory AS directory
+  ), weeks AS (
+    SELECT generate_series(
+      date_trunc('week', CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        - ((v_weeks - 1) * INTERVAL '1 week'),
+      date_trunc('week', CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+      INTERVAL '1 week'
+    ) AS week_start
+  ), weekly AS (
+    SELECT
+      members.week_start,
+      COUNT(*) FILTER (WHERE members.has_archive) AS with_archive,
+      COUNT(*) FILTER (WHERE NOT members.has_archive) AS optin_only
+    FROM members
+    GROUP BY members.week_start
+  )
+  SELECT
+    to_char(weeks.week_start, 'IYYY-"W"IW'),
+    to_char(weeks.week_start, 'YYYY-MM-DD'),
+    COALESCE(weekly.with_archive, 0)::double precision,
+    COALESCE(weekly.optin_only, 0)::double precision,
+    (
+      SELECT COUNT(*) FROM members
+      WHERE members.week_start <= weeks.week_start
+    )::double precision
+  FROM weeks
+  LEFT JOIN weekly ON weekly.week_start = weeks.week_start
+  ORDER BY weeks.week_start;
+END;
+$$;
+ALTER FUNCTION private.community_archive_monitoring_members_week(integer)
+  OWNER TO postgres;
+
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
   FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_activity_day(integer)
   FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_members_week(integer)
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_graph_purge()
   FROM PUBLIC, anon, authenticated, readclient, service_role;
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_public_api_keys()
@@ -3999,6 +4064,9 @@ BEGIN
       TO archive_metrics_exporter;
     GRANT EXECUTE
       ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_members_week(integer)
       TO archive_metrics_exporter;
     GRANT EXECUTE
       ON FUNCTION private.community_archive_monitoring_graph_purge()

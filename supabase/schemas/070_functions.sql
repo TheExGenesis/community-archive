@@ -4725,3 +4725,150 @@ END;
 $$;
 
 ALTER FUNCTION private.guard_all_account_owner_write() OWNER TO postgres;
+
+
+-- At most 10 live alerts per user. The per-user advisory lock makes the count
+-- and the insert one step, so parallel creates cannot overshoot.
+CREATE OR REPLACE FUNCTION "public"."enforce_search_alert_cap"()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
+BEGIN
+  IF NEW.deleted_at IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('search_alerts:' || NEW.user_id::text, 0));
+  IF (
+    SELECT count(*) FROM public.search_alerts
+    WHERE user_id = NEW.user_id AND deleted_at IS NULL
+      AND id IS DISTINCT FROM NEW.id
+  ) >= 10 THEN
+    RAISE EXCEPTION 'search alert limit reached' USING ERRCODE = 'P0001', HINT = 'search_alert_cap';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+ALTER FUNCTION "public"."enforce_search_alert_cap"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."enforce_search_alert_cap"() FROM PUBLIC, "anon", "authenticated";
+
+-- Records one successful check of one alert in a single transaction: logs the
+-- new matches, folds them into the alert's unread notification, and advances
+-- the watermark. p_expected_checked_at is the watermark the caller searched
+-- from; if another run moved it meanwhile, nothing is written (returns false).
+CREATE OR REPLACE FUNCTION "public"."record_search_alert_check"(
+  "p_alert_id" uuid,
+  "p_expected_checked_at" timestamptz,
+  "p_checked_at" timestamptz,
+  "p_tweets" jsonb,
+  "p_match_count" integer
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
+DECLARE
+  v_alert public.search_alerts%ROWTYPE;
+  v_newest_id text := p_tweets -> 0 ->> 'id';
+  v_new_ids jsonb;
+BEGIN
+  UPDATE public.search_alerts
+  SET last_checked_at = greatest(last_checked_at, p_checked_at),
+      last_seen_tweet_id = coalesce(v_newest_id, last_seen_tweet_id),
+      last_error = NULL,
+      last_error_at = NULL
+  WHERE id = p_alert_id
+    AND deleted_at IS NULL
+    AND last_checked_at = p_expected_checked_at
+  RETURNING * INTO v_alert;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  IF coalesce(p_match_count, 0) <= 0 THEN
+    RETURN true;
+  END IF;
+
+  INSERT INTO public.search_alert_matches
+    (alert_id, user_id, match_count, tweets, window_start, window_end)
+  VALUES
+    (v_alert.id, v_alert.user_id, p_match_count, p_tweets, p_expected_checked_at, p_checked_at);
+
+  SELECT coalesce(jsonb_agg(t.value -> 'id' ORDER BY t.ordinality), '[]'::jsonb)
+  INTO v_new_ids
+  FROM jsonb_array_elements(p_tweets) WITH ORDINALITY AS t(value, ordinality)
+  WHERE t.ordinality <= 5;
+
+  INSERT INTO public.notifications (user_id, kind, alert_id, payload)
+  VALUES (
+    v_alert.user_id,
+    'search_alert',
+    v_alert.id,
+    jsonb_build_object(
+      'count', p_match_count,
+      'tweetIds', v_new_ids,
+      'since', p_expected_checked_at,
+      'latestAt', p_checked_at
+    )
+  )
+  ON CONFLICT ("alert_id") WHERE "read_at" IS NULL DO UPDATE
+  SET payload = jsonb_build_object(
+        'count', coalesce((public.notifications.payload ->> 'count')::integer, 0) + p_match_count,
+        'tweetIds', (
+          SELECT coalesce(jsonb_agg(ids.value ORDER BY ids.ordinality), '[]'::jsonb)
+          FROM jsonb_array_elements(
+            v_new_ids || coalesce(public.notifications.payload -> 'tweetIds', '[]'::jsonb)
+          ) WITH ORDINALITY AS ids(value, ordinality)
+          WHERE ids.ordinality <= 5
+        ),
+        'since', coalesce(public.notifications.payload -> 'since', to_jsonb(p_expected_checked_at)),
+        'latestAt', p_checked_at
+      ),
+      updated_at = now();
+  RETURN true;
+END;
+$$;
+ALTER FUNCTION "public"."record_search_alert_check"(uuid, timestamptz, timestamptz, jsonb, integer) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."record_search_alert_check"(uuid, timestamptz, timestamptz, jsonb, integer) FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."record_search_alert_check"(uuid, timestamptz, timestamptz, jsonb, integer) TO "service_role";
+
+-- Claims one user's unsent matches on email-enabled live alerts from the last
+-- p_max_age for a roll-up email. Returns the send id, or NULL when there is
+-- nothing new (no row is left behind).
+CREATE OR REPLACE FUNCTION "public"."claim_search_alert_email"(
+  "p_user_id" uuid,
+  "p_max_age" interval DEFAULT interval '7 days'
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
+DECLARE
+  v_send_id uuid;
+  v_claimed integer;
+BEGIN
+  INSERT INTO public.search_alert_email_sends (user_id)
+  VALUES (p_user_id)
+  RETURNING id INTO v_send_id;
+
+  UPDATE public.search_alert_matches m
+  SET email_send_id = v_send_id
+  FROM public.search_alerts a
+  WHERE m.alert_id = a.id
+    AND m.user_id = p_user_id
+    AND m.email_send_id IS NULL
+    AND m.created_at > now() - p_max_age
+    AND a.deleted_at IS NULL
+    AND a.email_enabled;
+  GET DIAGNOSTICS v_claimed = ROW_COUNT;
+
+  IF v_claimed = 0 THEN
+    DELETE FROM public.search_alert_email_sends WHERE id = v_send_id;
+    RETURN NULL;
+  END IF;
+  RETURN v_send_id;
+END;
+$$;
+ALTER FUNCTION "public"."claim_search_alert_email"(uuid, interval) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."claim_search_alert_email"(uuid, interval) FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."claim_search_alert_email"(uuid, interval) TO "service_role";

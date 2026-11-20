@@ -18,6 +18,14 @@
     {
       "path": "/api/cron/weekly-digest-email",
       "schedule": "30 12 * * 1"
+    },
+    {
+      "path": "/api/cron/search-alerts",
+      "schedule": "17 * * * *"
+    },
+    {
+      "path": "/api/cron/search-alerts-email",
+      "schedule": "0 14 * * *"
     }
   ]
 }

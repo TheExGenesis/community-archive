@@ -1149,3 +1149,81 @@ CREATE TABLE IF NOT EXISTS "public"."trend_stories" (
   unique ("trend_date", "slug")
 );
 ALTER TABLE "public"."trend_stories" OWNER TO "postgres";
+
+-- Keyword search alerts and generic notifications (service-role only).
+CREATE TABLE IF NOT EXISTS "public"."search_alerts" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "query" text NOT NULL,
+    "mode" text NOT NULL DEFAULT 'all',
+    "from_user" text,
+    "email_enabled" boolean NOT NULL DEFAULT false,
+    -- Watermark: matches are tweets created after this instant. A new alert
+    -- starts at its creation time so it does not flood with history.
+    "last_checked_at" timestamptz NOT NULL DEFAULT now(),
+    "last_seen_tweet_id" text,
+    "last_error" text,
+    "last_error_at" timestamptz,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "search_alerts_query_length" CHECK (char_length(btrim("query")) BETWEEN 1 AND 200),
+    CONSTRAINT "search_alerts_mode_check" CHECK ("mode" IN ('phrase', 'all')),
+    CONSTRAINT "search_alerts_from_user_format" CHECK ("from_user" IS NULL OR "from_user" ~ '^[a-z0-9_]{1,15}$'),
+    CONSTRAINT "search_alerts_seen_tweet_format" CHECK ("last_seen_tweet_id" IS NULL OR "last_seen_tweet_id" ~ '^[0-9]{1,20}$')
+);
+ALTER TABLE "public"."search_alerts" OWNER TO "postgres";
+COMMENT ON TABLE "public"."search_alerts" IS 'Saved keyword searches checked hourly for new matching tweets. Service-role only; at most 10 live alerts per user.';
+
+-- Generic in-site notifications. kind names the producer; payload is that
+-- producer's JSON. search_alert rows hold {count, tweetIds, since, latestAt}
+-- and there is at most one unread row per alert.
+CREATE TABLE IF NOT EXISTS "public"."notifications" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "kind" text NOT NULL,
+    "alert_id" uuid REFERENCES "public"."search_alerts"("id") ON DELETE CASCADE,
+    "payload" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "read_at" timestamptz,
+    CONSTRAINT "notifications_kind_check" CHECK ("kind" IN ('search_alert')),
+    CONSTRAINT "notifications_payload_object" CHECK (jsonb_typeof("payload") = 'object'),
+    CONSTRAINT "notifications_search_alert_has_alert" CHECK ("kind" <> 'search_alert' OR "alert_id" IS NOT NULL)
+);
+ALTER TABLE "public"."notifications" OWNER TO "postgres";
+
+-- One row per daily roll-up email. Claiming a user's unsent matches inserts
+-- the row and stamps the matches with it in one transaction, so concurrent or
+-- repeated runs never send the same matches twice. A failed send deletes the
+-- row, which releases its matches for the next run.
+CREATE TABLE IF NOT EXISTS "public"."search_alert_email_sends" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "status" text NOT NULL DEFAULT 'sending',
+    "message_id" text,
+    -- Sole credential of the email's one-click unsubscribe link.
+    "unsubscribe_token" uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "sent_at" timestamptz,
+    CONSTRAINT "search_alert_email_sends_status_check" CHECK ("status" IN ('sending', 'sent'))
+);
+ALTER TABLE "public"."search_alert_email_sends" OWNER TO "postgres";
+
+-- Log of new matches, one row per successful check that found any. The
+-- matches page and the roll-up email read it; email_send_id marks a row as
+-- emailed. tweets is [{id, replyToId, createdAt}] newest first.
+CREATE TABLE IF NOT EXISTS "public"."search_alert_matches" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "alert_id" uuid NOT NULL REFERENCES "public"."search_alerts"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "match_count" integer NOT NULL,
+    "tweets" jsonb NOT NULL,
+    "window_start" timestamptz NOT NULL,
+    "window_end" timestamptz NOT NULL,
+    "email_send_id" uuid REFERENCES "public"."search_alert_email_sends"("id") ON DELETE SET NULL,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "search_alert_matches_count_positive" CHECK ("match_count" > 0),
+    CONSTRAINT "search_alert_matches_tweets_array" CHECK (jsonb_typeof("tweets") = 'array')
+);
+ALTER TABLE "public"."search_alert_matches" OWNER TO "postgres";

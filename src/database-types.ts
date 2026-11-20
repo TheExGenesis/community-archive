@@ -40,6 +40,177 @@ export type Database = {
           }
         },"public": {
           Tables: {
+      notifications: {
+        Row: {
+          alert_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          read_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          read_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          read_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "search_alerts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      search_alert_email_sends: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string | null
+          sent_at: string | null
+          status: string
+          unsubscribe_token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          unsubscribe_token?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          unsubscribe_token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      search_alert_matches: {
+        Row: {
+          alert_id: string
+          created_at: string
+          email_send_id: string | null
+          id: string
+          match_count: number
+          tweets: Json
+          user_id: string
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          alert_id: string
+          created_at?: string
+          email_send_id?: string | null
+          id?: string
+          match_count: number
+          tweets: Json
+          user_id: string
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          alert_id?: string
+          created_at?: string
+          email_send_id?: string | null
+          id?: string
+          match_count?: number
+          tweets?: Json
+          user_id?: string
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_alert_matches_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "search_alerts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "search_alert_matches_email_send_id_fkey"
+            columns: ["email_send_id"]
+            isOneToOne: false
+            referencedRelation: "search_alert_email_sends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      search_alerts: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          email_enabled: boolean
+          from_user: string | null
+          id: string
+          last_checked_at: string
+          last_error: string | null
+          last_error_at: string | null
+          last_seen_tweet_id: string | null
+          mode: string
+          query: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          email_enabled?: boolean
+          from_user?: string | null
+          id?: string
+          last_checked_at?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_seen_tweet_id?: string | null
+          mode?: string
+          query: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          email_enabled?: boolean
+          from_user?: string | null
+          id?: string
+          last_checked_at?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_seen_tweet_id?: string | null
+          mode?: string
+          query?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+
             "account_collection_preferences": {
                   Row: {
                     "account_id": string,"enabled": boolean,"updated_at": string
@@ -1206,6 +1377,21 @@ isOneToOne: false
                 }
           }
           Functions: {
+      claim_search_alert_email: {
+        Args: { p_max_age?: unknown; p_user_id: string }
+        Returns: string
+      }
+      record_search_alert_check: {
+        Args: {
+          p_alert_id: string
+          p_checked_at: string
+          p_expected_checked_at: string
+          p_match_count: number
+          p_tweets: Json
+        }
+        Returns: boolean
+      }
+
             "admin_activity_page":
 { Args: { "p_before_at"?: string,"p_before_id"?: string,"p_kind"?: string,"p_limit"?: number,"p_search"?: string }; Returns: {
               "account_id": string,"date_basis": string,"detail": string,"error": string,"id": string,"kind": string,"occurred_at": string,"reason": string,"status": string,"username": string

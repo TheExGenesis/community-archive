@@ -76,3 +76,8 @@ FOR EACH ROW EXECUTE FUNCTION public.fill_community_like_slug();
 CREATE OR REPLACE TRIGGER guard_all_account_owner_write
 BEFORE INSERT OR UPDATE ON public.all_account
 FOR EACH ROW EXECUTE FUNCTION private.guard_all_account_owner_write();
+
+
+CREATE TRIGGER "search_alerts_enforce_cap"
+  BEFORE INSERT ON "public"."search_alerts"
+  FOR EACH ROW EXECUTE FUNCTION "public"."enforce_search_alert_cap"();

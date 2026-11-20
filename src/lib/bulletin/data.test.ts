@@ -18,6 +18,8 @@ import { getCurrentUser } from '@/lib/portal/auth'
 import { getOptInStatus } from '@/lib/auth-utils'
 import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { readBulletinTitles } from './titles'
+jest.mock('./titles', () => ({ readBulletinTitles: jest.fn() }))
 jest.mock('@/lib/clickhouseGateway', () => ({
   fetchAnalyticsGatewayJson: jest.fn(),
 }))
@@ -56,6 +58,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   clearBulletinCaches()
   mockDataCache.clear()
+  jest.mocked(readBulletinTitles).mockResolvedValue(new Map())
   jest.mocked(getOptInStatus).mockResolvedValue({
     data: { opted_in: true, explicit_optout: false },
     error: null,
@@ -480,8 +483,14 @@ describe('shared verified board', () => {
   })
 
   test('one read serves later page views, with failed sources and stale resolutions removed', async () => {
+    jest
+      .mocked(readBulletinTitles)
+      .mockResolvedValue(new Map([['1', 'Offering help']]))
     const board = await loadVerifiedBulletinBoard()
     expect(Array.from(board.sources.keys())).toEqual(['1', '3'])
+    // Cards carry the stored AI title when one exists.
+    expect(board.sources.get('1')?.title).toBe('Offering help')
+    expect(board.sources.get('3')?.title).toBeNull()
     // The resolution post changed, so the ask is open again.
     expect(board.sources.get('3')).toMatchObject({
       resolution_state: 'unknown',

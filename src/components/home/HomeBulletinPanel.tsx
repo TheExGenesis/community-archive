@@ -29,6 +29,7 @@ export function HomeBulletinPanel({
             {personalized
               ? 'Offers and asks picked for you'
               : 'Offers and asks from community members'}
+            {' · click a card to read more'}
           </span>
         </span>
         <Link

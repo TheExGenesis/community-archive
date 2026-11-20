@@ -126,7 +126,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('16 projects')).toBeInTheDocument()
+    expect(screen.getByText('17 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -147,7 +147,7 @@ describe('CommunityGallery', () => {
     ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Research' }))
-    expect(screen.getByText('2 projects')).toBeInTheDocument()
+    expect(screen.getByText('3 projects')).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: /Model Behavior Reports by/i }),
     ).toBeInTheDocument()

@@ -272,6 +272,24 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-03-14',
   },
   {
+    slug: 'threadapalooza',
+    name: 'Threadapalooza',
+    creator: 'Kifah',
+    creatorHandle: 'maskys_',
+    summary: 'Seven years of 100-tweet Threadapalooza threads, as a book.',
+    description:
+      'In 2019 @vgr dared his “regional experts” to write 100-tweet threads, and writers have done it every December since. This reads them as an anthology: about 140 deep dives grouped into parts and topics, browsable by year or author, with starred picks.',
+    archiveUse:
+      'Finds Threadapalooza threads in public opted-in Community Archive accounts and rebuilds each one as a readable essay.',
+    category: 'Research',
+    tags: ['Threads', 'Long-form writing', 'Anthology'],
+    projectUrl: 'https://threadapalooza.maskys.com/',
+    image: '/images/community/threadapalooza-card.webp',
+    coverClass: 'from-[#f6f2ea] via-[#e9b872] to-[#7a3f8f]',
+    featured: false,
+    publishedAt: '2026-11-20',
+  },
+  {
     slug: 'community-archive-radio',
     name: 'Community Archive Radio',
     creator: 'Joshua',
@@ -464,7 +482,7 @@ export const HOMEPAGE_PICKS = [
   'cuties-b9b5e204',
   'meet-your-neighbors',
   'followle',
-  'common-tongue',
+  'threadapalooza',
   'distill',
 ] as const
 

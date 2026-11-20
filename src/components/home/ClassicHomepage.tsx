@@ -127,6 +127,17 @@ export default async function ClassicHomepage({
               >
                 Vitalik Buterin
               </Link>
+              <span className="mx-1.5" aria-hidden="true">
+                ·
+              </span>
+              <Link
+                href="https://github.com/TheExGenesis/community-archive"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium transition-colors hover:text-brand"
+              >
+                Open source on GitHub
+              </Link>
             </p>
             <ExploreArchivePill />
           </div>

@@ -89,15 +89,19 @@ const renderProfileArchive = (
 
 class TestIntersectionObserver {
   static callbacks: IntersectionObserverCallback[] = []
+  static connected = new Set<IntersectionObserverCallback>()
   readonly root = null
   readonly rootMargin = '0px'
   readonly thresholds = [0]
 
-  constructor(callback: IntersectionObserverCallback) {
+  constructor(private readonly callback: IntersectionObserverCallback) {
     TestIntersectionObserver.callbacks.push(callback)
+    TestIntersectionObserver.connected.add(callback)
   }
 
-  disconnect() {}
+  disconnect() {
+    TestIntersectionObserver.connected.delete(this.callback)
+  }
   observe() {}
   takeRecords() {
     return []
@@ -107,6 +111,7 @@ class TestIntersectionObserver {
 
 beforeEach(() => {
   TestIntersectionObserver.callbacks = []
+  TestIntersectionObserver.connected = new Set()
   window.history.replaceState(null, '', '/user/alice')
   global.IntersectionObserver =
     TestIntersectionObserver as unknown as typeof IntersectionObserver
@@ -1131,4 +1136,181 @@ test('refills the visible people list from the reserve after a dismissal', async
 
 beforeEach(() => {
   jest.mocked(capturePostHogEvent).mockClear()
+})
+
+const timelineTweet = (id: string) => ({
+  id,
+  accountId: '42',
+  username: 'alice',
+  name: 'Alice',
+  avatar: null,
+  text: `Latest ${id}`,
+  observedAt: '2026-11-19T20:00:00.000Z',
+  createdAt: '2026-11-19T20:00:00.000Z',
+  likes: 1,
+  rts: 0,
+  media: [],
+})
+
+const triggerAllObservers = () =>
+  act(() => {
+    for (const callback of Array.from(TestIntersectionObserver.connected)) {
+      callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      )
+    }
+  })
+
+test('labels the overall list as highlights and continues into the latest posts', async () => {
+  const user = userEvent.setup()
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    if (url.pathname.endsWith('/timeline')) {
+      const kind = url.searchParams.get('kind')
+      return Promise.resolve(
+        jsonResponse({
+          tweets: [timelineTweet(kind === 'all' ? '902' : '901')],
+          nextOffset: null,
+          truncated: false,
+        }),
+      )
+    }
+    return Promise.resolve(
+      jsonResponse({ media: [], mediaCount: 0, people: [] }),
+    )
+  })
+
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2024)],
+        yearCounts: chapters,
+        total: 2,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  expect(
+    screen.getByRole('region', { name: 'Best of Alice' }),
+  ).toHaveAccessibleDescription(
+    'Highlights only: 2 posts quoted by two or more Community Archive members. See all posts, newest first ↓',
+  )
+  expect(
+    screen.getByRole('link', { name: 'See all posts, newest first ↓' }),
+  ).toHaveAttribute('href', '#profile-timeline-heading')
+  expect(
+    screen.getByRole('heading', { name: 'Latest posts' }),
+  ).toBeInTheDocument()
+  // Nothing is read until the timeline scrolls near the viewport.
+  expect(
+    fetchMock.mock.calls.some(([input]) => String(input).includes('/timeline')),
+  ).toBe(false)
+
+  triggerAllObservers()
+  await screen.findByText('Latest 901')
+  expect(
+    fetchMock.mock.calls.some(([input]) =>
+      String(input).includes('/api/profile/42/timeline?kind=original&offset=0'),
+    ),
+  ).toBe(true)
+  expect(
+    screen.getByText('That’s the oldest archived post.'),
+  ).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Posts & replies' }))
+  triggerAllObservers()
+  await screen.findByText('Latest 902')
+  expect(capturePostHogEvent).toHaveBeenCalledWith('product_action', {
+    feature: 'profile_timeline',
+    action: 'filter_changed',
+  })
+})
+
+test('keeps the timeline off year chapters', () => {
+  jest
+    .spyOn(global, 'fetch')
+    .mockResolvedValue(jsonResponse({ media: [], mediaCount: 0, people: [] }))
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={2025}
+      initialPage={{
+        tweets: [banger(1, 2025)],
+        yearCounts: chapters,
+        total: 4,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+  expect(
+    screen.getByText(
+      /quoted by two or more Community Archive members in 2025\./,
+    ),
+  ).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Latest posts' })).toBeNull()
+})
+
+test('stops scrolling into more bangers after a full page on the overall view', async () => {
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) =>
+    Promise.resolve(
+      String(input).includes('/bangers?')
+        ? jsonResponse({
+            tweets: Array.from({ length: 10 }, (_, index) =>
+              banger(index + 3, 2025),
+            ),
+            yearCounts: chapters,
+            total: 30,
+            nextOffset: 12,
+            available: true,
+          })
+        : jsonResponse({ tweets: [], nextOffset: null, truncated: false }),
+    ),
+  )
+  const bangerCalls = () =>
+    fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/bangers?'),
+    )
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2025)],
+        yearCounts: chapters,
+        total: 30,
+        nextOffset: 2,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+  // The existing one-time fill to a first full page still happens.
+  await screen.findByText('Banger 12')
+  expect(bangerCalls()).toHaveLength(1)
+  triggerAllObservers()
+  await screen.findByText('No archived posts outside of replies.')
+  expect(bangerCalls()).toHaveLength(1)
+  expect(
+    screen.getByRole('button', { name: 'Load more bangers' }),
+  ).toBeEnabled()
 })

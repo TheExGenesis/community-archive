@@ -24,3 +24,14 @@ export const resolveProfileChapterYear = (
     ? candidateYear
     : null
 }
+
+/**
+ * Rows read per latest-posts page (the gateway's own-tweets maximum).
+ * Retweets are dropped after the read, so a page can show fewer.
+ */
+export const PROFILE_TIMELINE_PAGE_LIMIT = 50
+/** The gateway's own-tweets read stops paging at this offset. */
+export const PROFILE_TIMELINE_MAX_OFFSET = 10_000
+
+/** `original` hides replies, like the Posts tab on X; `all` includes them. */
+export type ProfileTimelineKind = 'original' | 'all'

@@ -323,16 +323,15 @@ export default function StoryPanel({
                   className={styles.edition}
                   aria-label={todayHeading(weekly.data.today.date)}
                 >
-                  <h2>{todayHeading(weekly.data.today.date)}</h2>
-                  <p className={styles.lead}>
-                    {weekly.data.today.stories.length === 1
-                      ? 'One story'
-                      : `${weekly.data.today.stories.length} stories`}{' '}
-                    from the daily digest not yet in the week.{' '}
-                    <Link href={`/digest/${weekly.data.today.date}`}>
+                  <div className={styles.editionHead}>
+                    <h2>{todayHeading(weekly.data.today.date)}</h2>
+                    <Link
+                      href={`/digest/${weekly.data.today.date}`}
+                      className={styles.headLink}
+                    >
                       Read the day ↗
                     </Link>
-                  </p>
+                  </div>
                   {weekly.data.today.stories.map((story) => (
                     <StoryCard
                       key={story.id}

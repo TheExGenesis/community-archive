@@ -50,13 +50,24 @@ export interface WeeklyMapStory {
   stories: MapStory[]
 }
 
-/** The current Week in Review: the running week so far, else the last final week. */
-export interface WeeklyMapPage {
+/** One Week in Review edition as the map's browse panel shows it. */
+export interface WeeklyMapWeek {
   weekStart: string
   weekEnd: string
   soFar: boolean
   /** Last digest day a week-so-far edition covers. */
   throughDate?: string
   stories: WeeklyMapStory[]
+}
+
+/**
+ * The map's browse panel: the current Week in Review (the running week so
+ * far, else the last final week), the latest daily digest's stories that week
+ * does not carry yet, and the week before.
+ */
+export interface WeeklyMapPage extends WeeklyMapWeek {
+  /** Absent when every story of the latest daily digest is in this week. */
+  today?: { date: string; stories: MapStory[] }
+  previous?: WeeklyMapWeek
   located: boolean
 }

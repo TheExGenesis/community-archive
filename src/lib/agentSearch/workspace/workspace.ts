@@ -1,6 +1,7 @@
 import { Bash, type CommandName } from 'just-bash'
 import { WORKSPACE_PATH } from '../citations'
 import { boundedTimeoutMs, type RunLimits } from '../deadline'
+import { inPhase, startTrace, summarizeTrace } from '../trace'
 import type { AgentTweet } from '../types'
 import {
   archiveCommands,
@@ -88,7 +89,9 @@ function lazyTweetFile(
     state.calls += 1
     let tweets: AgentTweet[]
     try {
-      tweets = await fetchTweets(state, uniqueIds(file.rows))
+      tweets = await inPhase(state.limits, 'rebuild', () =>
+        fetchTweets(state, uniqueIds(file.rows)),
+      )
     } catch (error) {
       state.failures += 1
       throw error
@@ -178,7 +181,9 @@ export async function runBashCommand({
   /** Semantic searches the question has already run. */
   semanticUsed?: number
 }): Promise<BashToolOutput> {
-  const state = createCommandState(limits, semanticUsed)
+  // Where this command's time goes; the caller logs it (output.timing).
+  const trace = startTrace()
+  const state = createCommandState({ ...limits, trace }, semanticUsed)
   const files: Record<string, string | (() => Promise<string>)> = {}
   for (const [path, file] of Object.entries(manifest)) {
     if (!WORKSPACE_PATH.test(path)) continue
@@ -219,9 +224,11 @@ export async function runBashCommand({
   const touched = trackWrites(bash.fs)
   // pipefail: a limit or error inside a pipe exits non-zero, so the model
   // sees the failure instead of an empty result.
+  const execStarted = Date.now()
   const result = await bash.exec(`set -o pipefail; ${command}`, {
     signal: limits.abortSignal,
   })
+  const execMs = Date.now() - execStarted
 
   // Whatever the command wrote under the workspace, as manifest changes.
   const workspace: ManifestChanges = {}
@@ -264,7 +271,13 @@ export async function runBashCommand({
       ...Object.values(changedFiles).flat(),
     ]),
   ).slice(0, MAX_PAGE_TWEETS)
-  const tweets = ids.length ? await fetchTweets(state, ids).catch(() => []) : []
+  const pageStarted = Date.now()
+  const tweets = ids.length
+    ? await inPhase(state.limits, 'page', () => fetchTweets(state, ids)).catch(
+        () => [],
+      )
+    : []
+  const pageMs = Date.now() - pageStarted
   const wrote = Object.entries(changedFiles).map(
     ([path, list]) =>
       `Wrote ${path} · ${list.length} ${list.length === 1 ? 'tweet' : 'tweets'}`,
@@ -285,5 +298,10 @@ export async function runBashCommand({
     costUsd: state.costUsd,
     semanticCalls: state.semanticCalls,
     ...(Object.keys(scores).length ? { scores } : {}),
+    timing: summarizeTrace(trace, {
+      ms: Date.now() - trace.t0,
+      execMs,
+      pageMs,
+    }),
   }
 }

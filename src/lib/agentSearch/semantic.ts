@@ -1,5 +1,6 @@
 import { callTimeoutMs, type RunLimits } from './deadline'
-import { findMembers, getTweetsByIds } from './gateway'
+import { findMembers, getTweetsByIdsBatched } from './gateway'
+import { traced } from './trace'
 import type { AgentTweet } from './types'
 
 // Semantic search over the archive through the project's own embeddings API
@@ -17,7 +18,7 @@ const USER_AGENT =
 // or under concurrent load (2026-10-14); allow for a slow one, within the
 // run's deadline.
 const SEMANTIC_TIMEOUT_MS = 20_000
-export const SEMANTIC_DEFAULT_K = 50
+export const SEMANTIC_DEFAULT_K = 100
 const MAX_K = 1000
 export const SEMANTIC_DEFAULT_THRESHOLD = 0.65
 /** Semantic searches one question may run. */
@@ -100,19 +101,24 @@ export async function semanticSearch(
   const signal = limits.abortSignal
     ? either(timeout, limits.abortSignal)
     : timeout
-  const response = await fetchImpl(semanticSearchUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
-    body: JSON.stringify(body),
-    signal,
+  const payload = await traced(limits, 'semantic', 'search', async () => {
+    const response = await fetchImpl(semanticSearchUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+    if (!response.ok) {
+      throw new Error(`Semantic search failed: HTTP ${response.status}`)
+    }
+    return (await response.json()) as {
+      success?: unknown
+      results?: Array<{ key?: unknown; distance?: unknown }>
+    }
   })
-  if (!response.ok) {
-    throw new Error(`Semantic search failed: HTTP ${response.status}`)
-  }
-  const payload = (await response.json()) as {
-    success?: unknown
-    results?: Array<{ key?: unknown; distance?: unknown }>
-  }
   if (payload.success === false || !Array.isArray(payload.results)) {
     throw new Error('Semantic search returned an invalid payload')
   }
@@ -124,13 +130,11 @@ export async function semanticSearch(
     ranked.push({ id, distance: Math.round(distance * 1000) / 1000 })
   }
   const byId = new Map<string, AgentTweet>()
-  for (let i = 0; i < ranked.length; i += 100) {
-    const batch = await getTweetsByIds(
-      ranked.slice(i, i + 100).map((r) => r.id),
-      limits,
-    )
-    for (const tweet of batch) byId.set(tweet.id, tweet)
-  }
+  const found = await getTweetsByIdsBatched(
+    ranked.map((r) => r.id),
+    limits,
+  )
+  for (const tweet of found) byId.set(tweet.id, tweet)
   const tweets = ranked.flatMap(({ id, distance }) => {
     const tweet = byId.get(id)
     return tweet ? [{ ...tweet, distance }] : []

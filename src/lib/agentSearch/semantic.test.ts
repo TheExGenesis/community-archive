@@ -8,6 +8,9 @@ jest.mock('./gateway', () => ({
       .filter((id) => id !== '2')
       .map((id) => ({ id, username: 'u', text: `gateway text ${id}` })),
   ),
+  getTweetsByIdsBatched: jest.fn(async (ids: string[], limits: unknown) =>
+    jest.requireMock('./gateway').getTweetsByIds(ids, limits),
+  ),
 }))
 
 import { RunDeadlineError } from './deadline'

@@ -118,22 +118,36 @@ export function endWithFinish(
 }
 
 /**
- * Lets a run's stream close only once the run is over. The run's readable
- * can close while the run goes on (with the local world it closed after
- * 45 to 110 s while the workflow kept calling the model), and the UI chunk
- * transform answers any close with a finish chunk, which tells the page the
- * answer is done. Failing the stream instead makes the page reconnect and
- * read on from where it was. A close seen while the run is still going fails
- * even if the run ends a moment later: the page cannot have the chunks
- * written after the close, and the reconnect replays them.
+ * Lets a run's stream close only once the agent has finished writing. The
+ * run's readable can close while the run goes on (with the local world it
+ * closed after 45 to 110 s while the workflow kept calling the model), and
+ * the UI chunk transform answers any close with a finish chunk, which tells
+ * the page the answer is done. Failing the stream instead makes the page
+ * reconnect and read on from where it was.
+ *
+ * The agent's own end is a `finish` chunk followed by the close
+ * (WorkflowAgent's closeStream); no model step writes one. The workflow then
+ * still records the run, so its status says running for a moment: a close
+ * right after that finish is the normal end, not an early one. Without the
+ * finish, a close seen while the run is still going fails even if the run
+ * ends a moment later: the page cannot have the chunks written after the
+ * close, and the reconnect replays them.
  */
 export function closeWhenRunEnds<T>(
   source: ReadableStream<T>,
   runEnded: () => Promise<boolean>,
 ): ReadableStream<T> {
+  let agentFinished = false
   return source.pipeThrough(
     new TransformStream<T, T>({
+      transform(chunk, controller) {
+        if ((chunk as { type?: unknown } | null)?.type === 'finish') {
+          agentFinished = true
+        }
+        controller.enqueue(chunk)
+      },
       async flush(controller) {
+        if (agentFinished) return
         if (await runEnded().catch(() => false)) return
         controller.error(
           new Error('The run is still going; its stream closed early'),

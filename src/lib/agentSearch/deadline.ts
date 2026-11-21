@@ -2,11 +2,15 @@
 // tool, scorer and gateway call, so a run cannot keep spending after its time
 // is up. Plain values only: this module is also part of the workflow body.
 
+import type { CallTrace } from './trace'
+
 /** Tool context: the run's deadline and, in scripts, an abort signal. */
 export interface RunLimits {
   /** Epoch ms after which no new paid or gateway call starts. */
   deadlineAt?: number
   abortSignal?: AbortSignal
+  /** Times the calls of one shell command (trace.ts); never crosses a step. */
+  trace?: CallTrace
 }
 
 export const DEFAULT_RUN_DEADLINE_MS = 300_000

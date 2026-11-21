@@ -10,6 +10,7 @@ export const productFeatures = [
   'ask_archive',
   'trend_stories',
   'cite',
+  'warm_paths',
   'profile_timeline',
   'search_alerts',
 ] as const

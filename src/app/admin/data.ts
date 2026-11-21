@@ -170,7 +170,9 @@ export async function requireAdmin(
     | '/admin'
     | '/admin/bulletin'
     | '/social-graph'
-    | '/settings' = '/admin',
+    | '/settings'
+    | '/tools/warm-paths'
+    | '/tools/forecast-track-record' = '/admin',
 ) {
   // getCurrentUser is request-cached, so the root layout, page, and streamed
   // admin sections share one Supabase Auth round trip.

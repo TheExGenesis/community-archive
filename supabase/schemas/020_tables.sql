@@ -1150,6 +1150,29 @@ CREATE TABLE IF NOT EXISTS "public"."trend_stories" (
 );
 ALTER TABLE "public"."trend_stories" OWNER TO "postgres";
 
+-- Forecast track record (admin-only research tool). One uploaded run of the
+-- control-panel track_record pipeline: aggregates in the run row, and each
+-- member's forecasts and score in an author row. Only the latest run is kept.
+CREATE TABLE IF NOT EXISTS private.forecast_track_record_runs (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  as_of date,
+  uploaded_at timestamptz NOT NULL DEFAULT now(),
+  -- Aggregate counts only: funnel, method, calibration, spread test, audits.
+  summary jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(summary) = 'object')
+);
+ALTER TABLE private.forecast_track_record_runs OWNER TO postgres;
+
+CREATE TABLE IF NOT EXISTS private.forecast_track_record_authors (
+  run_id bigint NOT NULL REFERENCES private.forecast_track_record_runs(id) ON DELETE CASCADE,
+  account_id text NOT NULL CHECK (account_id ~ '^[1-9][0-9]{0,19}$'),
+  username text NOT NULL,
+  score jsonb,
+  profile jsonb,
+  claims jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(claims) = 'array'),
+  PRIMARY KEY (run_id, account_id)
+);
+ALTER TABLE private.forecast_track_record_authors OWNER TO postgres;
+
 -- Keyword search alerts and generic notifications (service-role only).
 CREATE TABLE IF NOT EXISTS "public"."search_alerts" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

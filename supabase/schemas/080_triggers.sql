@@ -77,6 +77,9 @@ CREATE OR REPLACE TRIGGER guard_all_account_owner_write
 BEFORE INSERT OR UPDATE ON public.all_account
 FOR EACH ROW EXECUTE FUNCTION private.guard_all_account_owner_write();
 
+CREATE OR REPLACE TRIGGER purge_forecast_track_record_on_block
+AFTER INSERT OR UPDATE OF account_id, username ON tes.blocked_scraping_users
+FOR EACH ROW EXECUTE FUNCTION private.purge_forecast_track_record_on_block();
 
 CREATE TRIGGER "search_alerts_enforce_cap"
   BEFORE INSERT ON "public"."search_alerts"

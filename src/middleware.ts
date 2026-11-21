@@ -803,6 +803,9 @@ export async function middleware(request: NextRequest) {
     pathname === '/admin/bulletin' ||
     pathname === '/birdseye' ||
     pathname.startsWith('/birdseye/') ||
+    // Admin research tools: per-viewer, never cached or indexed.
+    pathname === '/tools/warm-paths' ||
+    pathname === '/tools/forecast-track-record' ||
     pathname.startsWith('/api/birdseye/')
   ) {
     response.headers.set('Cache-Control', 'private, no-store')

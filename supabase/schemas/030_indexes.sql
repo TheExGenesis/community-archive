@@ -224,3 +224,7 @@ CREATE INDEX IF NOT EXISTS "community_project_comments_project_id_created_at_idx
 
 CREATE INDEX IF NOT EXISTS "trend_stories_date_position_idx"
   on "public"."trend_stories" ("trend_date" desc, "position");
+
+-- Opt-out removal deletes by account.
+CREATE INDEX IF NOT EXISTS forecast_track_record_authors_account_idx
+  ON private.forecast_track_record_authors (account_id);

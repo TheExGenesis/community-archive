@@ -556,3 +556,9 @@ $verify_anon_corpus_access$;
 
 DROP TABLE pg_temp.retire_corpus_relations;
 DROP TABLE pg_temp.retire_corpus_functions;
+
+-- Forecast track record: service-role functions only; no client role reads the tables.
+ALTER TABLE private.forecast_track_record_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE private.forecast_track_record_authors ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.forecast_track_record_runs, private.forecast_track_record_authors
+  FROM PUBLIC, anon, authenticated, readclient, service_role;

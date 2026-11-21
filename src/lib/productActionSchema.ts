@@ -10,6 +10,7 @@ export const productFeatures = [
   'ask_archive',
   'trend_stories',
   'cite',
+  'warm_paths',
 ] as const
 export const productActions = [
   'node_selected',

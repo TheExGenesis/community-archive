@@ -2,20 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import {
-  PiArrowSquareOut,
-  PiBriefcase,
-  PiCalendarBlank,
-  PiChatsCircle,
-  PiGift,
-  PiHandHeart,
-  PiUsersThree,
-  PiX,
-} from 'react-icons/pi'
-import type { IconType } from 'react-icons'
+import { PiArrowSquareOut, PiX } from 'react-icons/pi'
 import { TweetAvatar } from '@/components/TweetAvatar'
 import TweetCard from '@/components/TweetCard'
-import { KIND_ICONS } from '@/lib/bulletin/types'
+import { KindIcon, KindTag } from '@/components/bulletin/KindTag'
 import type { DigestBulletinItem } from '@/lib/digest/bulletin'
 import {
   tweetPermalinkHref,
@@ -23,15 +13,6 @@ import {
   type TweetOrigin,
 } from '@/lib/navigation'
 import styles from '@/components/bulletin/BulletinBoard.module.css'
-
-const ICONS: Record<string, IconType> = {
-  gift: PiGift,
-  briefcase: PiBriefcase,
-  calendar: PiCalendarBlank,
-  users: PiUsersThree,
-  'hand-heart': PiHandHeart,
-  chats: PiChatsCircle,
-}
 
 type CardPlacement = { origin: TweetOrigin; returnTo: string }
 
@@ -46,14 +27,13 @@ function DigestBulletinCard({
 } & CardPlacement) {
   const [open, setOpen] = useState(false)
   const { tweet } = item
-  const Icon = ICONS[KIND_ICONS[item.kind]]
   const originalId = `digest-bulletin-${tweet.id}`
   const tweetUrl = `https://x.com/${encodeURIComponent(tweet.username)}/status/${encodeURIComponent(tweet.id)}`
   const sticker = (
     <span
       className={`${styles.kind} ${item.side === 'offer' ? styles.offer : styles.ask}`}
     >
-      {Icon ? <Icon size={13} aria-hidden /> : null}
+      <KindIcon kind={item.kind} size={13} />
       {item.label}
     </span>
   )
@@ -118,21 +98,6 @@ function DigestBulletinCard({
         </>
       ) : (
         <>
-          <div className={styles.stickerRow}>
-            {sticker}
-            <span className={styles.readHint} aria-hidden>
-              click to read more
-            </span>
-          </div>
-          <span className={styles.corner}>
-            <time dateTime={tweet.createdAt} className={styles.age}>
-              {new Date(tweet.createdAt).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                timeZone: 'UTC',
-              })}
-            </time>
-          </span>
           <button
             type="button"
             className={styles.summaryButton}
@@ -159,6 +124,16 @@ function DigestBulletinCard({
                 <span>{tweet.name || `@${tweet.username}`}</span>
               </Link>
             )}
+            <span className={styles.facts}>
+              <KindTag kind={item.kind} label={item.label} />
+              <time dateTime={tweet.createdAt} className={styles.age}>
+                {new Date(tweet.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  timeZone: 'UTC',
+                })}
+              </time>
+            </span>
           </div>
         </>
       )}

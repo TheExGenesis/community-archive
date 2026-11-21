@@ -732,6 +732,70 @@
 .age {
   flex: none;
 }
+.kindTag {
+  position: relative;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-3);
+  color: var(--muted);
+  cursor: default;
+}
+button.kindTag {
+  cursor: pointer;
+}
+button.kindTag:hover {
+  color: var(--ink);
+}
+/* A small tooltip naming the kind, shown on hover or keyboard focus. */
+.kindTag::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: -6px;
+  z-index: 5;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+.kindTag:hover::after,
+.kindTag:focus-visible::after {
+  opacity: 1;
+  transform: none;
+}
+.facts > .kindTag::before,
+.facts > .kindTag + *::before {
+  content: none;
+}
+/* Closed cards without a top row keep their first line clear of the
+   dismiss button (and the New pill) in the top-right corner. */
+.clearDismiss .summary::before,
+.clearNew .summary::before {
+  content: '';
+  float: right;
+  width: 26px;
+  height: 1.2em;
+}
+.clearNew .summary::before {
+  width: 74px;
+}
 .author span {
   color: var(--muted);
   font-weight: 500;

@@ -18,6 +18,7 @@ import jev_author
 import jev_model as model
 import resolution
 import tweet_context
+import web_titles
 import worker
 
 MAX_SECONDS = 900
@@ -27,6 +28,9 @@ BATCH = {'disposition': 16, 'enrich': 3, 'value': 1}
 WINDOW_DAYS = 2
 # Board lifetimes (src/lib/bulletin/board.ts expiry()); keep them in step.
 ACTIVE_DAYS = {'ask': dt.timedelta(days=14), 'offer': dt.timedelta(days=60)}
+# The unit's systemd start limit (ca-bulletin.service TimeoutStartSec), less a
+# margin; title requests after the run stay inside it.
+UNIT_SECONDS = 1200 - 60
 # Enriched source reads cap reply/quote evidence per call; keep chunks small.
 RENEWAL_BATCH = 100
 
@@ -503,6 +507,9 @@ def run(db, *, window=None, rescan=False, enqueue_only=False,
             counts['retryable'] = pending['retryable']
             if pending['n'] and status=='ok':
                 status = 'pending_review' if pending['retryable'] else 'classification_failed'
+            if active=='jev':
+                # New notices are published by now; titling them never changes the status.
+                counts['titles'] = web_titles.request_titles(started+UNIT_SECONDS)
         db.execute('UPDATE bulletin.runs SET status=%s,counts=%s,finished_at=now() WHERE id=%s',
             (status,Jsonb(counts),run_id))
         if active=='jev':

@@ -4,7 +4,9 @@ import { useReportSectionReady } from '@/components/PagePerformance'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArchiveNav, archiveChapterHref, type NavChapter } from './ArchiveNav'
 import { Workspace } from './Workspace'
+import { PROFILE_TIMELINE_HEADING_ID, ProfileTimeline } from './ProfileTimeline'
 import {
+  PROFILE_BANGERS_PAGE_LIMIT,
   PROFILE_BANGERS_PRELOAD_LIMIT,
   type ProfileBangerSort,
   type ProfileBangersPageState,
@@ -129,6 +131,13 @@ export function ProfileArchive({
   const activeMediaFailed = Boolean(failedMedia[activeScopeKey])
   const activePeopleFailed = Boolean(failedPeople[activeScopeKey])
   const hasMore = activeFeedLoaded && activeNextOffset !== null
+  // The overall view ends in the latest-posts timeline. Its bangers stop
+  // loading on scroll after the first page, so the timeline stays reachable;
+  // the Load more button still pages through the rest.
+  const showTimeline = activeYear === null && !activeSectionSlug && !editing
+  const autoLoadBangers =
+    !showTimeline ||
+    (activeFeed?.tweets.length ?? 0) < PROFILE_BANGERS_PAGE_LIMIT
   const activeSections =
     activeYear === null
       ? EMPTY_SECTIONS
@@ -210,7 +219,14 @@ export function ProfileArchive({
 
   useEffect(() => {
     const target = loadMoreRef.current
-    if (!target || !hasMore || activeFeedLoading || activeFeedFailed) return
+    if (
+      !target ||
+      !hasMore ||
+      !autoLoadBangers ||
+      activeFeedLoading ||
+      activeFeedFailed
+    )
+      return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -225,6 +241,7 @@ export function ProfileArchive({
     activeFeedFailed,
     activeFeedLoading,
     activeYear,
+    autoLoadBangers,
     hasMore,
     loadNextPage,
     sort,
@@ -284,6 +301,29 @@ export function ProfileArchive({
       ? `Best of ${activeYear}`
       : `Best of ${displayName}`
   const contextQuote = activeSection ? sectionQuote(activeSection) : null
+  const bangerTotal =
+    activeFeed && activeFeed.available !== false ? activeFeed.total : null
+  const contextNote = activeSection ? null : (
+    <>
+      Highlights only:{' '}
+      {bangerTotal === null
+        ? 'posts'
+        : `${bangerTotal.toLocaleString('en-US')} ${bangerTotal === 1 ? 'post' : 'posts'}`}{' '}
+      quoted by two or more Community Archive members
+      {activeYear ? ` in ${activeYear}` : ''}.
+      {showTimeline && (
+        <>
+          {' '}
+          <a
+            href={`#${PROFILE_TIMELINE_HEADING_ID}`}
+            className="font-semibold text-foreground underline-offset-2 hover:underline"
+          >
+            See all posts, newest first ↓
+          </a>
+        </>
+      )}
+    </>
+  )
 
   const returnTo = archiveChapterHref(
     basePath,
@@ -308,6 +348,16 @@ export function ProfileArchive({
         avatarUrl={avatarUrl}
         contextTitle={contextTitle}
         contextQuote={contextQuote}
+        contextNote={contextNote}
+        belowBangers={
+          showTimeline ? (
+            <ProfileTimeline
+              accountId={accountId}
+              avatarUrl={avatarUrl}
+              returnTo={returnTo}
+            />
+          ) : null
+        }
         tweets={sectionTweets}
         bangersAvailable={activeFeed?.available !== false}
         bangersLoading={activeFeedLoading || (!activeFeed && !activeFeedFailed)}

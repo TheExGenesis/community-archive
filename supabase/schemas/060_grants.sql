@@ -148,3 +148,13 @@ GRANT SELECT ON TABLE "public"."community_project_comments" TO "anon", "authenti
 REVOKE ALL PRIVILEGES ON TABLE "public"."trend_stories" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."trend_stories" TO "service_role";
 GRANT SELECT ON TABLE "public"."trend_stories" TO "anon", "authenticated";
+
+-- Search alerts and notifications: service-role only.
+REVOKE ALL PRIVILEGES ON TABLE "public"."search_alerts" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."notifications" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."search_alert_matches" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."search_alert_email_sends" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."search_alerts" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."notifications" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."search_alert_matches" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."search_alert_email_sends" TO "service_role";

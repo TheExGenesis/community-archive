@@ -1,12 +1,13 @@
 'use client'
 import Link from 'next/link'
-import { useMemo, type CSSProperties } from 'react'
+import { useMemo } from 'react'
 import { queryOptions } from '@tanstack/react-query'
 import { mapUrl } from '@/lib/hexMap/version'
 import type {
   MapStory,
   WeeklyMapPage,
   WeeklyMapStory,
+  WeeklyMapWeek,
 } from '@/lib/hexMap/stories'
 import { captureHomepageMapAction } from '@/lib/posthog'
 import StoryCard from './StoryCard'
@@ -57,23 +58,14 @@ export function weeklyHighlight(story: WeeklyMapStory): MapStory {
   }
 }
 
-/**
- * The rank bar is grey, darkest for the top story. The map's clusters carry
- * their own colours, so a coloured bar here would read as a cluster colour.
- */
-const rankShade = (index: number) =>
-  `hsl(var(--foreground) / ${Math.max(0.8 - index * 0.13, 0.2).toFixed(2)})`
-
 function WeeklyCard({
   story,
-  color,
   expanded,
   onExpand,
   onOpen,
   onHover,
 }: {
   story: WeeklyMapStory
-  color: string
   expanded: boolean
   onExpand: (id: string | null) => void
   onOpen: (story: MapStory) => void
@@ -83,10 +75,7 @@ function WeeklyCard({
   const panelId = `weekly-${story.id.replace(/[^a-z0-9-]/gi, '-')}`
   const days = story.days.length
   return (
-    <div
-      className={styles.weeklyStory}
-      style={{ '--weekly-color': color } as CSSProperties}
-    >
+    <div className={styles.weeklyStory}>
       <button
         type="button"
         className={styles.story}
@@ -133,35 +122,35 @@ function WeeklyCard({
 }
 
 export default function WeeklyStories({
-  page,
+  week,
+  heading,
+  href,
   expanded,
   onExpand,
   onOpen,
   onHover,
 }: {
-  page: WeeklyMapPage
+  week: WeeklyMapWeek
+  heading: string
+  href: string
   expanded: string | null
   onExpand: (id: string | null) => void
   onOpen: (story: MapStory) => void
   onHover: (story: MapStory | null) => void
 }) {
-  if (!page.stories.length) return null
+  if (!week.stories.length) return null
   return (
-    <section
-      className={`${styles.edition} ${styles.weeklySection}`}
-      aria-label="This week"
-    >
-      <h2>This week</h2>
+    <section className={styles.edition} aria-label={heading}>
+      <h2>{heading}</h2>
       <p className={styles.lead}>
-        {page.soFar ? 'The Week So Far' : 'The Week in Review'},{' '}
-        {range(page.weekStart, page.throughDate ?? page.weekEnd)}.{' '}
-        <Link href="/digest/week">Read it all ↗</Link>
+        {week.soFar ? 'The Week So Far' : 'The Week in Review'},{' '}
+        {range(week.weekStart, week.throughDate ?? week.weekEnd)}.{' '}
+        <Link href={href}>Read it all ↗</Link>
       </p>
-      {page.stories.map((story, index) => (
+      {week.stories.map((story) => (
         <WeeklyCard
           key={story.id}
           story={story}
-          color={rankShade(index)}
           expanded={expanded === story.id}
           onExpand={onExpand}
           onOpen={onOpen}

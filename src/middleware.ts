@@ -446,7 +446,17 @@ function requiresLogin(pathname: string): boolean {
     '/api/search',
     '/api/user-directory',
     '/api/profile',
-  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+    // Search alerts and the notifications bell: signed-out requests stop here
+    // without rendering a page or querying the database.
+    '/notifications',
+    '/api/notifications',
+    '/api/search-alerts',
+  ].some(
+    (prefix) =>
+      (pathname === prefix || pathname.startsWith(`${prefix}/`)) &&
+      // Email unsubscribe links carry their own token and work signed out.
+      pathname !== '/api/search-alerts/email/unsubscribe',
+  )
 }
 
 // ─── Main Middleware ─────────────────────────────────────────────────────────
@@ -489,15 +499,17 @@ export async function middleware(request: NextRequest) {
   // require the CRON_SECRET bearer token (Vercel's cron caller sends a short
   // non-browser UA), and one-click unsubscribe POSTs come from mailbox
   // provider servers holding a per-subscription token. The Bulletin preview
-  // source and the public API key verifier require their own bearer secrets
-  // and are called from other servers. The signal inbox receives webhooks
+  // source, the Bulletin title hook and the public API key verifier require
+  // their own bearer secrets and are called from other servers. The signal inbox receives webhooks
   // from PostHog, Grafana, the Vercel log drain and the fleet host, each
   // with a short non-browser UA; it verifies a bearer secret or Vercel's
   // HMAC signature itself (src/lib/signals/auth.ts).
   const machineAuthRoute =
     pathname.startsWith('/api/cron/') ||
     pathname === '/api/digest/email/unsubscribe' ||
+    pathname === '/api/search-alerts/email/unsubscribe' ||
     pathname === '/api/bulletin/preview-board' ||
+    (pathname === '/api/bulletin/titles' && request.method === 'POST') ||
     pathname === '/api/internal/public-api/keys/verify' ||
     (pathname === '/api/public-data' && request.method === 'POST') ||
     (pathname.startsWith('/api/signals/') && request.method === 'POST')

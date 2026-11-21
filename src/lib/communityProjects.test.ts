@@ -9,7 +9,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(16)
+    expect(COMMUNITY_PROJECTS).toHaveLength(17)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -26,6 +26,9 @@ describe('community project catalog', () => {
       } else if (project.slug === 'tpot-trust') {
         expect(project.projectUrl).toBe('https://tpot.uptrusthq.com/')
         expect(project.creator).toBe('UpTrust HQ')
+        expect(project.sourceTweetId).toBeUndefined()
+      } else if (project.slug === 'threadapalooza') {
+        expect(project.projectUrl).toBe('https://threadapalooza.maskys.com/')
         expect(project.sourceTweetId).toBeUndefined()
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
@@ -100,7 +103,7 @@ describe('community project catalog', () => {
       'model-behavior-reports',
       'meet-your-neighbors',
       'followle',
-      'common-tongue',
+      'threadapalooza',
       'distill',
       'pairwise',
     ])
@@ -130,7 +133,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Meet Your Neighbors')
+    expect(newest[0].name).toBe('Threadapalooza')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,

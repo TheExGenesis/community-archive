@@ -264,6 +264,7 @@ test.each([
   '/api/profile/42/sidebar',
   '/api/profile/42/avatar',
   '/api/profile/42/interactions',
+  '/api/profile/42/timeline',
 ])('rejects direct guest reads at %s', async (path) => {
   const response = await request(path)
   expect(response.status).toBe(401)

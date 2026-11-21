@@ -4,7 +4,9 @@ import { createHash } from 'crypto'
 import { lookup } from 'dns/promises'
 import { BlockList, isIP, type LookupFunction } from 'net'
 import { Agent, fetch as undiciFetch } from 'undici'
+import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import type { TweetLinkPreview } from './linkPreviewTypes'
 import { xVideoFromUrl } from './xVideoUrl'
 import {
@@ -690,10 +692,9 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
     .from('tweet_urls')
     .select('tweet_id, url, expanded_url')
     .in('tweet_id', safeTweetIds)
-  if (urlError) {
-    console.error('Failed to load tweet URLs for previews:', urlError)
-    return result
-  }
+  // Throw rather than return an empty map, so a failed read is never cached.
+  if (urlError)
+    throw new Error(`Failed to load tweet URLs: ${urlError.message}`)
   const candidateRows = [...(urlRows ?? [])]
 
   // Some ingestion paths saved the link only in full_text, without tweet_urls.
@@ -702,10 +703,12 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
     (id) => !candidateRows.some((row) => row.tweet_id === id),
   )
   if (missingUrlIds.length) {
-    const { data: tweets } = await supabase
+    const { data: tweets, error: tweetsError } = await supabase
       .from('tweets')
       .select('tweet_id, full_text')
       .in('tweet_id', missingUrlIds)
+    if (tweetsError)
+      throw new Error(`Failed to load tweet text: ${tweetsError.message}`)
     for (const tweet of tweets ?? []) {
       for (const url of tweet.full_text.match(/https?:\/\/[^\s<>"']+/g) ?? []) {
         candidateRows.push({ tweet_id: tweet.tweet_id, url, expanded_url: url })
@@ -745,10 +748,10 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
       'url_hash, normalized_url, canonical_url, title, description, image_url, site_name, content_type, status, expires_at',
     )
     .in('url_hash', hashes)
-  if (cacheError) {
-    console.error('Failed to read tweet link preview cache:', cacheError)
-    return result
-  }
+  if (cacheError)
+    throw new Error(
+      `Failed to read tweet link preview cache: ${cacheError.message}`,
+    )
 
   const rowsByUrl = new Map(
     (cachedRows ?? []).map((row) => [row.normalized_url, row]),
@@ -781,3 +784,17 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
   }
   return result
 }
+
+/**
+ * One tweet's previews, shared from the Data Cache for an hour. The preview
+ * route is reachable signed out; without this every uncached request read
+ * tweet_urls, tweets and tweet_link_previews. A tweet's links do not change,
+ * and preview rows refresh on their own TTLs, so an hour only delays a
+ * refreshed card. Failures throw and are not cached.
+ */
+export const getCachedTweetLinkPreviews = unstable_cache(
+  async (tweetId: string): Promise<TweetLinkPreview[]> =>
+    (await getTweetLinkPreviews([tweetId])).get(tweetId) ?? [],
+  ['tweet-link-previews-v1', productionReadCacheKey()],
+  { revalidate: 3600 },
+)

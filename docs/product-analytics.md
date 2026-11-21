@@ -141,6 +141,10 @@ interaction metrics are separate from the dashboard's qualifying-action totals.
   intent to open an app, not successful load or usage inside an external app.
   Normal clicks, keyboard activation, and middle-clicks on launch links are covered;
   browser context-menu actions cannot reliably be observed.
+  [Community apps - most clicked](https://us.posthog.com/project/546185/insights/BJXgPNQw)
+  on Product Pulse v2 ranks apps by details opened over 90 days, then all launches,
+  with launches split into front page, `/community` and `/tools`. It follows the
+  dashboard's audience variable.
 - `profile_edit_started`: entering profile edit mode. Done editing is not a save.
 - `profile_curation_saved`: emitted only after the server confirms add, dismiss,
   restore-item, feature toggle, reorder, or section restore. Includes `section`

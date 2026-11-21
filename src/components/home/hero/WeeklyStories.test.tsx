@@ -71,7 +71,9 @@ function Section({
   const [expanded, setExpanded] = useState<string | null>(null)
   return (
     <WeeklyStories
-      page={page}
+      week={page}
+      heading="This week"
+      href="/digest/week"
       expanded={expanded}
       onExpand={setExpanded}
       onOpen={onOpen}

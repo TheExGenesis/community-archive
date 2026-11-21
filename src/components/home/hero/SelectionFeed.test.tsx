@@ -19,7 +19,7 @@ jest.mock('./StoryCard', () => ({
 }))
 jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
-  useQuery: () => ({ data: undefined }),
+  useQuery: () => mockQuery,
   useQueryClient: () => ({}),
 }))
 jest.mock('./useMapFeed', () => ({
@@ -31,6 +31,7 @@ jest.mock('./useRankedFeed', () => ({
   ...jest.requireActual('./useRankedFeed'),
   useRankedFeed: jest.fn(),
 }))
+let mockQuery: { data?: unknown } = { data: undefined }
 const empty = {
   stories: [],
   editions: [],
@@ -225,74 +226,50 @@ it('tracks only deliberate tab changes, not the automatic empty-digest fallback'
   expect(captureHomepageMapAction).toHaveBeenCalledTimes(1)
 })
 
-it('limits mobile browse to the latest digest day, including cached desktop history', () => {
-  const edition = (date: string, ids: string[]) => ({
-    date,
-    headline: `Digest for ${date}`,
-    stories: ids.map((id) => ({ id })),
+it('browses today’s leftover stories, then this week, then last week', () => {
+  const today = new Date().toISOString().slice(0, 10)
+  const week = (weekStart: string, soFar: boolean, title: string) => ({
+    weekStart,
+    weekEnd: weekStart,
+    soFar,
+    stories: [
+      {
+        id: `${weekStart}/w`,
+        title,
+        subtitle: '',
+        href: '',
+        days: [],
+        stories: [],
+      },
+    ],
   })
-  result = {
-    ...base,
+  mockQuery = {
     data: {
-      pages: [
-        {
-          ...empty,
-          editions: [
-            edition('2026-10-23', ['today-first', 'today-second']),
-            edition('2026-10-22', ['yesterday']),
-          ],
-        },
-        { ...empty, editions: [edition('2026-10-21', ['older'])] },
-      ],
-    },
-  }
-  mobile = true
-  const { rerender } = render(<Panel selected={[]} />)
-  expect(screen.getByText('today-first')).toBeInTheDocument()
-  expect(screen.getByText('today-second')).toBeInTheDocument()
-  expect(screen.queryByText('yesterday')).not.toBeInTheDocument()
-  expect(screen.queryByText('older')).not.toBeInTheDocument()
-  expect(
-    screen.queryByRole('button', { name: 'Load more' }),
-  ).not.toBeInTheDocument()
-  expect(observe).not.toHaveBeenCalled()
-  expect(load).not.toHaveBeenCalled()
-
-  mobile = false
-  rerender(<Panel selected={[]} />)
-  expect(screen.getByText('yesterday')).toBeInTheDocument()
-  expect(screen.getByText('older')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
-  expect(load).toHaveBeenCalledTimes(1)
-
-  mobile = true
-  rerender(<Panel selected={[]} />)
-  expect(screen.queryByText('yesterday')).not.toBeInTheDocument()
-  expect(screen.queryByText('older')).not.toBeInTheDocument()
-})
-
-it('keeps the latest available digest on mobile when publication is delayed', () => {
-  mobile = true
-  result = {
-    ...base,
-    data: {
-      pages: [
-        {
-          ...empty,
-          editions: [
-            {
-              date: '2026-10-20',
-              headline: 'Latest available edition',
-              stories: [{ id: 'latest-available-story' }],
-            },
-          ],
-        },
-      ],
+      ...week('2026-11-16', true, 'This week story'),
+      today: { date: today, stories: [{ id: 'today-leftover' }] },
+      previous: week('2026-11-09', false, 'Last week story'),
+      located: true,
     },
   }
   render(<Panel selected={[]} />)
-  expect(screen.getByText('latest-available-story')).toBeInTheDocument()
+  const headings = screen
+    .getAllByRole('heading', { level: 2 })
+    .map((h) => h.textContent)
+  expect(headings).toEqual(['Today', 'This week', 'Last week'])
+  expect(screen.getByText('today-leftover')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Read the day ↗' })).toHaveAttribute(
+    'href',
+    `/digest/${today}`,
+  )
+  expect(screen.getByText('Last week story')).toBeInTheDocument()
+  expect(
+    screen
+      .getAllByRole('link', { name: 'Read it all ↗' })
+      .map((a) => a.getAttribute('href')),
+  ).toEqual(['/digest/week', '/digest/week/2026-11-09'])
+  mockQuery = { data: undefined }
 })
+
 it('defaults an empty digest to Best but lets the user return to Digest', () => {
   render(<Panel />)
   expect(screen.getAllByRole('tab').map((el) => el.textContent)).toEqual([

@@ -264,6 +264,30 @@
   line-height: 1.2;
   margin: 5px 0 10px;
 }
+/* A section title with a small link on the same line, at the right. */
+.editionHead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  background: hsl(var(--background));
+  margin: 5px 0 10px;
+}
+.editionHead h2 {
+  position: static;
+  margin: 0;
+}
+.headLink {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+.headLink:hover {
+  color: hsl(var(--foreground));
+}
 .lead {
   font-size: 12px;
   line-height: 1.7;
@@ -451,10 +475,6 @@
   }
 }
 
-.editionPage + .editionPage {
-  margin-top: 28px;
-  padding-top: 24px;
-}
 @media (max-width: 979px) {
   .mapSurface {
     touch-action: pan-y;
@@ -799,23 +819,19 @@
     padding-right: 0;
   }
   .panelHeader,
+  .editionHead,
   .edition h2,
   .feedControls {
     position: static;
   }
 }
 
-/* This week: Week in Review stories that open into their daily stories. */
-.weeklySection {
-  margin-bottom: 28px;
-}
+/* Week in Review stories that open into their daily stories. */
 .weeklyStory {
   border-bottom: 1px solid hsl(var(--border));
 }
 .weeklyStory > .story {
   border-bottom: 0;
-  border-left: 3px solid var(--weekly-color, hsl(var(--brand)));
-  padding-left: 10px;
 }
 .weeklyStory > .story:hover,
 .weeklyStory > .story:focus-visible {
@@ -828,7 +844,7 @@
   color: hsl(var(--brand-deep));
 }
 .weeklyDailies {
-  margin: 0 0 6px 13px;
+  margin: 0 0 6px 8px;
   border-left: 1px solid hsl(var(--border));
 }
 .weeklyDailies .story:last-of-type {

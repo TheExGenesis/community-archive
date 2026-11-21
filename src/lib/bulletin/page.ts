@@ -22,6 +22,7 @@ export class BulletinCursorExpired extends Error {}
 function matches(notice: Notice, search: string) {
   if (!search) return true
   return [
+    notice.title,
     notice.summary,
     notice.preview_text,
     notice.username,

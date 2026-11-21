@@ -36,6 +36,24 @@ function rememberDetail(id: string, tweet: PortalTweet | null) {
 }
 
 /**
+ * The full-tweet read can lack the author's profile ('unknown_user'); the
+ * source check already read it, so use that instead of a placeholder.
+ */
+function withAuthor(tweet: PortalTweet, notice: Notice): PortalTweet {
+  const unknown = !tweet.username || tweet.username === 'unknown_user'
+  if (!unknown && tweet.name && tweet.name !== 'unknown_user') return tweet
+  const username = unknown ? notice.username || tweet.username : tweet.username
+  return {
+    ...tweet,
+    username,
+    name:
+      notice.display_name ||
+      (tweet.name && tweet.name !== 'unknown_user' ? tweet.name : username),
+    avatar: tweet.avatar || notice.avatar_url || null,
+  }
+}
+
+/**
  * Homepage picks: live, unresolved notices above the Bulletin's default
  * quality bar, ranked like the board's Recommended view (personal when the
  * reader is signed in), then mixed so the first three are offers and about a
@@ -114,9 +132,9 @@ export async function loadHomepageBulletinItems({
           {
             side: notice.side,
             kind: notice.kind,
-            summary: notice.summary,
+            summary: notice.title || notice.summary,
             label: cardLabel(notice),
-            tweet,
+            tweet: withAuthor(tweet, notice),
           },
         ]
       : []

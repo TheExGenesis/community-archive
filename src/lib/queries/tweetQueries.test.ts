@@ -5,13 +5,11 @@ import {
   isRetweetText,
 } from './tweetQueries'
 
-// Mock both RPC search functions
+// Filter-only searches use the signed-in RPC; text searches use ClickHouse.
 const mockRpcSearch = jest.fn()
-const mockRpcExactPhrase = jest.fn()
 const mockClickHouseSearch = jest.fn()
 jest.mock('../pgSearch', () => ({
   searchTweets: (...args: any[]) => mockRpcSearch(...args),
-  searchTweetsExactPhrase: (...args: any[]) => mockRpcExactPhrase(...args),
 }))
 jest.mock('../clickhouseSearch', () => ({
   searchTweetsWithClickHouse: (...args: any[]) => mockClickHouseSearch(...args),
@@ -80,7 +78,6 @@ describe('buildAndTsQuery', () => {
 describe('retweet filtering', () => {
   beforeEach(() => {
     mockRpcSearch.mockReset()
-    mockRpcExactPhrase.mockReset()
     mockClickHouseSearch.mockReset()
     delete process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH
   })
@@ -91,7 +88,7 @@ describe('retweet filtering', () => {
     expect(isRetweetText('Talking about RT @alice')).toBe(false)
   })
 
-  it('removes retweets from Supabase RPC results as a deployment-safe fallback', async () => {
+  it('removes retweets from filter-only RPC results', async () => {
     mockRpcSearch.mockResolvedValueOnce([
       makeRpcTweet('rt', 'RT @alice: hello'),
       makeRpcTweet('original', 'hello from me'),
@@ -100,8 +97,7 @@ describe('retweet filtering', () => {
     const result = await fetchTweets(
       buildMockSupabase(),
       {
-        searchQuery: 'hello',
-        rawSearchQuery: 'hello',
+        fromUsername: 'alice',
         excludeRetweets: true,
       },
       1,
@@ -157,50 +153,56 @@ describe('retweet filtering', () => {
   })
 })
 
-describe('fetchTweets — exact phrase search via FTS simple', () => {
+describe('fetchTweets — text search reads ClickHouse only', () => {
   beforeEach(() => {
     mockRpcSearch.mockReset()
-    mockRpcExactPhrase.mockReset()
     mockClickHouseSearch.mockReset()
     delete process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH
   })
 
-  it('uses ClickHouse when text-search reads are enabled', async () => {
-    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
-    mockClickHouseSearch.mockResolvedValueOnce([
-      {
-        tweet_id: 'ch-1',
-        created_at: '2025-01-01T00:00:00Z',
-        full_text: 'open source',
-        favorite_count: 1,
-        retweet_count: 0,
-        reply_to_tweet_id: null,
-        account: {
-          username: 'alice',
-          account_display_name: 'Alice',
+  const clickHouseRow = {
+    tweet_id: 'ch-1',
+    created_at: '2025-01-01T00:00:00Z',
+    full_text: 'open source',
+    favorite_count: 1,
+    retweet_count: 0,
+    reply_to_tweet_id: null,
+    account: { username: 'alice', account_display_name: 'Alice' },
+    media: [],
+  }
+
+  it.each([
+    ['single word', 'open'],
+    ['multi-word phrase', 'open source'],
+  ])(
+    'sends a %s search to ClickHouse, even with the preview flag off',
+    async (_label, text) => {
+      mockClickHouseSearch.mockResolvedValueOnce([clickHouseRow])
+
+      const result = await fetchTweets(
+        buildMockSupabase(),
+        {
+          searchQuery: buildAndTsQuery(text),
+          rawSearchQuery: text,
+          fromUsername: 'alice',
+          startDate: '2024-01-01',
         },
-        media: [],
-      },
-    ])
+        1,
+        20,
+      )
 
-    const result = await fetchTweets(
-      buildMockSupabase(),
-      {
-        searchQuery: 'open & source',
-        rawSearchQuery: 'open source',
-      },
-      1,
-      20,
-    )
-
-    expect(mockClickHouseSearch).toHaveBeenCalledTimes(1)
-    expect(mockRpcSearch).not.toHaveBeenCalled()
-    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
-    expect(result.tweets[0].tweet_id).toBe('ch-1')
-  })
+      expect(mockClickHouseSearch).toHaveBeenCalledTimes(1)
+      expect(mockClickHouseSearch.mock.calls[0][0]).toMatchObject({
+        rawSearchQuery: text,
+        fromUsername: 'alice',
+        startDate: '2024-01-01',
+      })
+      expect(mockRpcSearch).not.toHaveBeenCalled()
+      expect(result.tweets[0].tweet_id).toBe('ch-1')
+    },
+  )
 
   it('fails without a second corpus scan when ClickHouse is unavailable', async () => {
-    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
     mockClickHouseSearch.mockRejectedValueOnce(new Error('gateway down'))
     mockRpcSearch.mockResolvedValueOnce([makeRpcTweet('pg-1')])
 
@@ -216,30 +218,22 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
 
     expect(mockClickHouseSearch).toHaveBeenCalledTimes(1)
     expect(mockRpcSearch).not.toHaveBeenCalled()
-    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
     expect(result.error.message).toBe('gateway down')
     expect(result.tweets).toEqual([])
   })
 
-  it('does not silently ignore a non-default sort when ClickHouse is disabled', async () => {
-    const result = await fetchTweets(
+  it('passes a non-default sort to ClickHouse', async () => {
+    mockClickHouseSearch.mockResolvedValueOnce([clickHouseRow])
+    await fetchTweets(
       buildMockSupabase(),
-      {
-        searchQuery: 'hello',
-        rawSearchQuery: 'hello',
-        sort: 'likes',
-      },
+      { searchQuery: 'hello', rawSearchQuery: 'hello', sort: 'likes' },
       1,
       20,
     )
-
-    expect(mockClickHouseSearch).not.toHaveBeenCalled()
-    expect(mockRpcSearch).not.toHaveBeenCalled()
-    expect(result.error.message).toContain('requires the ClickHouse')
+    expect(mockClickHouseSearch.mock.calls[0][0].sort).toBe('likes')
   })
 
   it('does not silently ignore a non-default sort on a filter-only search', async () => {
-    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
     const result = await fetchTweets(
       buildMockSupabase(),
       {
@@ -255,170 +249,55 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
     expect(result.error.message).toContain('requires a text query')
   })
 
-  it('returns exact phrase matches for multi-word queries', async () => {
-    mockRpcExactPhrase.mockResolvedValueOnce([
-      makeRpcTweet('1', 'cool project A'),
-      makeRpcTweet('2', 'cool project B'),
-    ])
+  it('runs filter-only searches through the signed-in RPC with every filter', async () => {
+    mockRpcSearch.mockResolvedValueOnce([makeRpcTweet('1'), makeRpcTweet('2')])
 
-    const supabase = buildMockSupabase()
-    const criteria: FilterCriteria = {
-      searchQuery: 'cool & project',
-      rawSearchQuery: 'cool project',
-    }
-    const result = await fetchTweets(supabase, criteria, 1, 5)
-
-    expect(mockRpcExactPhrase).toHaveBeenCalledTimes(1)
-    expect(mockRpcExactPhrase.mock.calls[0][1].exact_phrase).toBe(
-      'cool project',
-    )
-    // Only exact phrase RPC is called, no FTS fallback
-    expect(mockRpcSearch).not.toHaveBeenCalled()
-    expect(result.tweets).toHaveLength(2)
-    expect(result.tweets[0].tweet_id).toBe('1')
-    expect(result.tweets[1].tweet_id).toBe('2')
-    expect(result.error).toBeNull()
-  })
-
-  it('returns full page of exact phrase matches', async () => {
-    mockRpcExactPhrase.mockResolvedValueOnce(
-      Array.from({ length: 5 }, (_, i) =>
-        makeRpcTweet(`${i + 1}`, `cool project tweet ${i + 1}`),
-      ),
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      {
+        fromUsername: 'alice',
+        replyToUsername: 'bob',
+        startDate: '2024-01-01',
+        endDate: '2024-12-31',
+      },
+      2,
+      50,
     )
 
-    const supabase = buildMockSupabase()
-    const criteria: FilterCriteria = {
-      searchQuery: 'cool & project',
-      rawSearchQuery: 'cool project',
-    }
-    const result = await fetchTweets(supabase, criteria, 1, 5)
-
-    expect(mockRpcSearch).not.toHaveBeenCalled()
-    expect(result.tweets).toHaveLength(5)
-    expect(result.error).toBeNull()
-  })
-
-  it('returns empty when exact phrase has no matches', async () => {
-    mockRpcExactPhrase.mockResolvedValueOnce([])
-
-    const supabase = buildMockSupabase()
-    const criteria: FilterCriteria = {
-      searchQuery: 'cool & project',
-      rawSearchQuery: 'cool project',
-    }
-    const result = await fetchTweets(supabase, criteria, 1, 10)
-
-    // No FTS fallback — only exact phrase RPC is used
-    expect(mockRpcSearch).not.toHaveBeenCalled()
-    expect(result.tweets).toHaveLength(0)
-  })
-
-  it('passes all filters to exact phrase RPC', async () => {
-    mockRpcExactPhrase.mockResolvedValueOnce([])
-
-    const supabase = buildMockSupabase()
-    const criteria: FilterCriteria = {
-      searchQuery: 'cool & project',
-      rawSearchQuery: 'cool project',
-      fromUsername: 'alice',
-      replyToUsername: 'bob',
-      startDate: '2024-01-01',
-      endDate: '2024-12-31',
-    }
-    await fetchTweets(supabase, criteria, 1, 5)
-
-    expect(mockRpcExactPhrase.mock.calls[0][1]).toMatchObject({
-      exact_phrase: 'cool project',
+    expect(mockClickHouseSearch).not.toHaveBeenCalled()
+    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
+    expect(mockRpcSearch.mock.calls[0][1]).toMatchObject({
+      search_query: '',
       from_user: 'alice',
       to_user: 'bob',
       since_date: '2024-01-01',
       until_date: '2024-12-31',
     })
-  })
-
-  it('uses single RPC query path for single-word searches', async () => {
-    const results = [makeRpcTweet('1'), makeRpcTweet('2')]
-    mockRpcSearch.mockResolvedValueOnce(results)
-
-    const supabase = buildMockSupabase()
-    const criteria: FilterCriteria = {
-      searchQuery: 'hello',
-      rawSearchQuery: 'hello',
-    }
-    const result = await fetchTweets(supabase, criteria, 1, 50)
-
-    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('hello')
+    expect(mockRpcSearch.mock.calls[0][2]).toBe(50)
+    expect(mockRpcSearch.mock.calls[0][3]).toBe(50)
     expect(result.tweets).toHaveLength(2)
+    expect(result.tweets[0].account.username).toBe('testuser')
   })
 
-  it('uses single RPC query path when rawSearchQuery is not provided', async () => {
-    const results = [makeRpcTweet('1')]
-    mockRpcSearch.mockResolvedValueOnce(results)
-
-    const supabase = buildMockSupabase()
-    const criteria: FilterCriteria = {
-      searchQuery: 'cool & project',
-    }
-    const result = await fetchTweets(supabase, criteria, 1, 50)
-
-    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-    expect(result.tweets).toHaveLength(1)
-  })
-
-  it('returns timeout error message on statement timeout', async () => {
-    mockRpcExactPhrase.mockRejectedValueOnce(new Error('statement timeout'))
-
-    const supabase = buildMockSupabase()
-    const criteria: FilterCriteria = {
-      searchQuery: 'cool & project',
-      rawSearchQuery: 'cool project',
-    }
-    const result = await fetchTweets(supabase, criteria, 1, 50)
-
+  it('returns a timeout message when the filter-only RPC times out', async () => {
+    mockRpcSearch.mockRejectedValueOnce(new Error('statement timeout'))
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      { fromUsername: 'alice' },
+      1,
+      50,
+    )
     expect(result.tweets).toHaveLength(0)
     expect(result.error.message).toContain('timed out')
   })
-})
 
-describe('fetchTweets — direct profile embeds', () => {
-  it('preserves an avatar when PostgREST returns profile as an array', async () => {
+  it('runs no query without text or filters', async () => {
     const supabase = buildMockSupabase()
-    supabase._builder.range.mockResolvedValueOnce({
-      data: [
-        {
-          tweet_id: '1',
-          created_at: '2025-01-01T00:00:00Z',
-          full_text: 'Hello',
-          favorite_count: 1,
-          retweet_count: 0,
-          reply_to_tweet_id: null,
-          account: {
-            username: 'mahlnr',
-            account_display_name: 'mahlen',
-            profile: [
-              {
-                avatar_media_url: 'https://example.com/avatar.jpg',
-                archive_upload_id: 42,
-              },
-            ],
-          },
-          media: [],
-        },
-      ],
-      error: null,
-      count: 1,
-    })
-
-    const result = await fetchTweets(supabase, { userId: 'account-1' }, 1, 20)
-
-    expect(result.error).toBeNull()
-    expect(result.tweets[0].account.profile?.avatar_media_url).toBe(
-      'https://example.com/avatar.jpg',
-    )
+    const result = await fetchTweets(supabase, {}, 1, 50)
+    expect(result).toEqual({ tweets: [], totalCount: 0, error: null })
+    expect(mockRpcSearch).not.toHaveBeenCalled()
+    expect(mockClickHouseSearch).not.toHaveBeenCalled()
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 })
 

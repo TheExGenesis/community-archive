@@ -228,3 +228,29 @@ CREATE INDEX IF NOT EXISTS "trend_stories_date_position_idx"
 -- Opt-out removal deletes by account.
 CREATE INDEX IF NOT EXISTS forecast_track_record_authors_account_idx
   ON private.forecast_track_record_authors (account_id);
+
+-- Search alerts and notifications.
+CREATE INDEX IF NOT EXISTS "search_alerts_user_live_idx"
+  ON "public"."search_alerts" ("user_id", "created_at")
+  WHERE "deleted_at" IS NULL;
+CREATE INDEX IF NOT EXISTS "search_alerts_live_checked_idx"
+  ON "public"."search_alerts" ("last_checked_at")
+  WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS "search_alerts_user_search_key"
+  ON "public"."search_alerts" ("user_id", lower("query"), "mode", coalesce("from_user", ''))
+  WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS "notifications_one_unread_per_alert"
+  ON "public"."notifications" ("alert_id")
+  WHERE "read_at" IS NULL;
+CREATE INDEX IF NOT EXISTS "notifications_user_created_idx"
+  ON "public"."notifications" ("user_id", "updated_at" DESC);
+CREATE INDEX IF NOT EXISTS "search_alert_matches_alert_idx"
+  ON "public"."search_alert_matches" ("alert_id", "created_at");
+CREATE INDEX IF NOT EXISTS "search_alert_matches_unsent_idx"
+  ON "public"."search_alert_matches" ("user_id", "created_at")
+  WHERE "email_send_id" IS NULL;
+CREATE INDEX IF NOT EXISTS "search_alert_matches_send_idx"
+  ON "public"."search_alert_matches" ("email_send_id")
+  WHERE "email_send_id" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "search_alert_email_sends_user_idx"
+  ON "public"."search_alert_email_sends" ("user_id", "created_at");

@@ -1,5 +1,6 @@
 const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   'bulletin-sources': new Set(['ids', 'enrich']),
+  'tweet-cards': new Set(['ids']),
   // Ask the archive's `interactions` and `ties` commands
   // (src/lib/agentSearch/gateway.ts getInteractions, getInteractionTies).
   interactions: new Set(['a', 'b', 'since', 'until', 'limit']),

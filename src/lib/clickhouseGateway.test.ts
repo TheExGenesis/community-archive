@@ -23,6 +23,16 @@ describe('ClickHouse analytics gateway requests', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('allows tweet-cards with ids only', () => {
+    expect(
+      analyticsGatewayRequestUrl(
+        ['tweet-cards'],
+        new URLSearchParams('ids=3,2,1&enrich=true'),
+        'https://gw.example/analytics',
+      ).toString(),
+    ).toBe('https://gw.example/analytics/tweet-cards?ids=3%2C2%2C1')
+  })
+
   test('allows the routes behind Ask’s interactions and ties commands', () => {
     expect(
       analyticsGatewayRequestUrl(

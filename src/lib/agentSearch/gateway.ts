@@ -294,54 +294,47 @@ export async function getTweetsByIdsBatched(
   return found
 }
 
+/**
+ * Tweets by id from the gateway's tweet-cards route, at most 100 per call:
+ * text, counts, media, reply-to, the quoted tweet and the conversation id.
+ * Ids the corpus lacks, and deleted or opted-out tweets, are left out
+ * (control-panel gateway contract, "Website corpus reads"). Returned in the
+ * order the ids were given. Replaced bulletin-sources, which had no counts,
+ * media or quotes and served members only.
+ */
+async function getTweetCards(
+  ids: string[],
+  limits: RunLimits,
+): Promise<AgentTweet[]> {
+  const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
+    0,
+    ID_BATCH,
+  )
+  if (valid.length === 0) return []
+  const response = await gatewayJson<{
+    data?: { tweets?: GatewayTweet[] }
+  }>(limits, ['tweet-cards'], new URLSearchParams({ ids: valid.join(',') }), {
+    timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
+  })
+  if (!Array.isArray(response.data?.tweets)) {
+    throw new Error('Gateway tweet-cards returned an invalid payload')
+  }
+  const byId = new Map(
+    response.data.tweets
+      .filter((row) => row && typeof row.tweetId === 'string')
+      .map((row) => [row.tweetId, row]),
+  )
+  return valid.flatMap((id) => {
+    const row = byId.get(id)
+    return row ? [toAgentTweet(row)] : []
+  })
+}
+
 export async function getTweetsByIds(
   ids: string[],
   limits: RunLimits = {},
 ): Promise<AgentTweet[]> {
-  const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
-    0,
-    100,
-  )
-  if (valid.length === 0) return []
-  const response = await gatewayJson<{
-    data: Array<{
-      tweet_id: string
-      account_id: string
-      created_at: string
-      full_text: string
-      reply_to_tweet_id: string | null
-      username: string
-      display_name?: string
-      avatar_url?: string | null
-      is_tombstone?: boolean
-    }>
-  }>(
-    limits,
-    ['bulletin-sources'],
-    new URLSearchParams({ ids: valid.join(','), enrich: 'true' }),
-    { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
-  )
-  if (!Array.isArray(response.data)) {
-    throw new Error('Gateway bulletin-sources returned an invalid payload')
-  }
-  // A deleted tweet's latest version is a tombstone; the Bulletin worker drops
-  // these rows from the same endpoint.
-  return response.data
-    .filter((row) => !row.is_tombstone)
-    .map((row) =>
-      toAgentTweet({
-        tweetId: row.tweet_id,
-        accountId: row.account_id,
-        createdAt: row.created_at,
-        fullText: row.full_text,
-        replyToTweetId: row.reply_to_tweet_id,
-        favoriteCount: 0,
-        retweetCount: null,
-        username: row.username,
-        accountDisplayName: row.display_name ?? row.username,
-        avatarMediaUrl: row.avatar_url ?? null,
-      }),
-    )
+  return getTweetCards(ids, limits)
 }
 
 export interface AgentUser {
@@ -431,37 +424,18 @@ export async function findMembers(
   }))
 }
 
-/** Full detail (counts, media, quoted tweet) for a few ids, in parallel. */
+/**
+ * Full detail (counts, media, quoted tweet) for up to 30 ids, in one
+ * tweet-cards call (it was one tweet/:id call per id).
+ */
 export async function getTweetDetails(
   ids: string[],
   limits: RunLimits = {},
 ): Promise<AgentTweet[]> {
-  const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
-    0,
-    30,
+  return getTweetCards(
+    Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(0, 30),
+    limits,
   )
-  const tweets: AgentTweet[] = []
-  for (let i = 0; i < valid.length; i += 8) {
-    const batch = await Promise.all(
-      valid.slice(i, i + 8).map(async (id) => {
-        const response = await gatewayJson<{
-          data?: { tweet: GatewayTweet; quotedTweet: GatewayTweet | null }
-        }>(limits, ['tweet', id], new URLSearchParams(), {
-          timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
-        }).catch((error: { status?: number }) => {
-          if (error?.status === 404) return { data: undefined }
-          throw error
-        })
-        if (!response.data?.tweet) return null
-        return toAgentTweet({
-          ...response.data.tweet,
-          quotedTweet: response.data.quotedTweet,
-        })
-      }),
-    )
-    for (const tweet of batch) if (tweet) tweets.push(tweet)
-  }
-  return tweets
 }
 
 /** Distinct tweets of each kind one account sent another (a tweet counts once in tweets). */

@@ -13,6 +13,8 @@ import {
   getAccountTweets,
   getInteractionTies,
   getInteractions,
+  getTweetDetails,
+  getTweetsByIds,
   getTweetsByIdsBatched,
   retryWhileBusy,
 } from './gateway'
@@ -322,6 +324,99 @@ describe('API v1 timeline', () => {
   })
 })
 
+// A tweet-cards row, as the gateway's "Website corpus reads" contract sends it.
+const card = (id: string, extra: Record<string, unknown> = {}) => ({
+  tweetId: id,
+  accountId: '1',
+  createdAt: '2025-01-01 00:00:00',
+  fullText: `t${id}`,
+  replyToTweetId: null,
+  replyToUsername: null,
+  favoriteCount: 3,
+  retweetCount: 1,
+  username: 'u',
+  accountDisplayName: 'U',
+  avatarMediaUrl: null,
+  media: [],
+  conversationId: id,
+  quoteTweetId: null,
+  quotedTweet: null,
+  urls: [],
+  ...extra,
+})
+
+describe('tweet-cards hydration', () => {
+  beforeEach(() => (fetchAnalyticsGatewayJson as jest.Mock).mockReset())
+  afterEach(() => (fetchAnalyticsGatewayJson as jest.Mock).mockReset())
+
+  test('reads ids in one call, keeps their order, and keeps counts, media and quotes', async () => {
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockResolvedValue({
+      data: {
+        tweets: [
+          card('2', {
+            replyToTweetId: '9',
+            replyToUsername: 'bob',
+            media: [
+              {
+                mediaUrl: 'https://x/m.jpg',
+                mediaType: 'photo',
+                width: 1,
+                height: 2,
+              },
+            ],
+          }),
+          card('1', {
+            quoteTweetId: '7',
+            quotedTweet: card('7', { username: 'q', fullText: 'quoted' }),
+          }),
+        ],
+      },
+    })
+    const tweets = await getTweetsByIds(['1', '2', '3', '1', 'bad'])
+    const [path, params] = (fetchAnalyticsGatewayJson as jest.Mock).mock
+      .calls[0]
+    expect(path).toEqual(['tweet-cards'])
+    expect(params.get('ids')).toBe('1,2,3')
+    // Id 3 is absent from the corpus, so it is left out; order follows the request.
+    expect(tweets.map((t) => t.id)).toEqual(['1', '2'])
+    expect(tweets[0]).toMatchObject({
+      likes: 3,
+      rts: 1,
+      quoteTweetId: '7',
+      quotedTweet: { id: '7', username: 'q', text: 'quoted' },
+    })
+    expect(tweets[1]).toMatchObject({
+      replyToTweetId: '9',
+      replyToUsername: 'bob',
+      media: [{ url: 'https://x/m.jpg', type: 'photo', width: 1, height: 2 }],
+    })
+  })
+
+  test('details are one call for up to 30 ids', async () => {
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockImplementation(
+      async (_path: string[], params: URLSearchParams) => ({
+        data: {
+          tweets: params
+            .get('ids')!
+            .split(',')
+            .map((id) => card(id)),
+        },
+      }),
+    )
+    const ids = Array.from({ length: 40 }, (_, i) => String(i + 1))
+    const tweets = await getTweetDetails(ids)
+    expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(1)
+    expect(tweets).toHaveLength(30)
+  })
+
+  test('an invalid payload is an error, not an empty result', async () => {
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockResolvedValue({ data: {} })
+    await expect(getTweetsByIds(['1'])).rejects.toThrow(
+      'Gateway tweet-cards returned an invalid payload',
+    )
+  })
+})
+
 describe('getTweetsByIdsBatched', () => {
   test('looks up every id, 100 per call and a few calls at once', async () => {
     let inFlight = 0
@@ -332,17 +427,12 @@ describe('getTweetsByIdsBatched', () => {
         await new Promise((resolve) => setTimeout(resolve, 5))
         inFlight--
         return {
-          data: params
-            .get('ids')!
-            .split(',')
-            .map((id) => ({
-              tweet_id: id,
-              account_id: '1',
-              created_at: '2025-01-01 00:00:00',
-              full_text: `t${id}`,
-              reply_to_tweet_id: null,
-              username: 'u',
-            })),
+          data: {
+            tweets: params
+              .get('ids')!
+              .split(',')
+              .map((id) => card(id)),
+          },
         }
       },
     )

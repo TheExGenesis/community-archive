@@ -253,6 +253,23 @@ export interface PlannerRouting {
 /** Seconds; per-call median time to first output is 0.7-1.8 s by host. */
 export const DEFAULT_PROVIDER_MAX_LATENCY_P90 = 2
 
+/**
+ * OpenRouter's server-side web search tool (openrouter.ai/docs, server tools).
+ * Passed in `body.tools` alongside our own tools only when the member turns
+ * Web on, and never on the final answer-only step. `engine: 'auto'` uses a
+ * provider's native search when available and falls back to Exa (compatible
+ * with ZDR, unlike Firecrawl); `low` context keeps augmentation lean.
+ */
+export const OPENROUTER_WEB_SEARCH_TOOL = {
+  type: 'openrouter:web_search',
+  parameters: {
+    engine: 'auto',
+    max_results: 5,
+    max_uses: 3,
+    search_context_size: 'low',
+  },
+} as const
+
 function providerSlugs(value: string | undefined): string[] | undefined {
   const slugs = value
     ?.split(',')
@@ -305,6 +322,7 @@ export function createProviderModel(
   ownKey: string | null = null,
   routing: PlannerRouting = {},
   runEffort: ReasoningEffort | null = null,
+  webSearch = false,
 ): ProviderModel {
   const { provider, modelId } = parseModelSpec(spec)
   if (provider === 'openai') {
@@ -344,6 +362,18 @@ export function createProviderModel(
         }
         if (routing.sessionId) body.session_id = routing.sessionId
         if (effort) body.reasoning = { ...body.reasoning, effort }
+        if (
+          webSearch &&
+          Array.isArray(body.tools) &&
+          body.tools.length > 0 &&
+          body.tool_choice !== 'none' &&
+          !body.tools.some(
+            (item: { type?: unknown } | null) =>
+              item?.type === OPENROUTER_WEB_SEARCH_TOOL.type,
+          )
+        ) {
+          body.tools = [...body.tools, OPENROUTER_WEB_SEARCH_TOOL]
+        }
         init = { ...init, body: JSON.stringify(body) }
       }
       return fetch(input, init)
@@ -628,6 +658,8 @@ export class EnvLanguageModel {
     readonly sessionId: string | null = null,
     /** The run's own reasoning effort (a fast run's), or null for the model's. */
     readonly reasoningEffort: ReasoningEffort | null = null,
+    /** Allow OpenRouter's server-side web search tool on tool-calling steps. */
+    readonly webSearch = false,
   ) {
     parseModelSpec(spec)
   }
@@ -642,6 +674,7 @@ export class EnvLanguageModel {
       null,
       this.routing(),
       this.reasoningEffort,
+      this.webSearch,
     )
     return this.resolved
   }
@@ -659,6 +692,7 @@ export class EnvLanguageModel {
       key,
       this.routing(),
       this.reasoningEffort,
+      this.webSearch,
     )
     return this.resolved
   }
@@ -841,6 +875,7 @@ export class EnvLanguageModel {
       ...(model.reasoningEffort
         ? { reasoningEffort: model.reasoningEffort }
         : {}),
+      ...(model.webSearch ? { webSearch: true } : {}),
     }
   }
 
@@ -850,6 +885,7 @@ export class EnvLanguageModel {
     sealedKey?: string
     sessionId?: string
     reasoningEffort?: ReasoningEffort
+    webSearch?: boolean
   }) {
     return new EnvLanguageModel(
       data.spec,
@@ -857,6 +893,7 @@ export class EnvLanguageModel {
       data.sealedKey ?? null,
       data.sessionId ?? null,
       data.reasoningEffort ?? null,
+      Boolean(data.webSearch),
     )
   }
 }
@@ -864,8 +901,8 @@ export class EnvLanguageModel {
 /**
  * The planner model; pass the run id to record usage on that run (it is also
  * OpenRouter's session id), a sealed key to call on the member's own
- * OpenRouter key, a session id when there is no run (the eval), and the
- * run's reasoning effort when its depth sets one.
+ * OpenRouter key, a session id when there is no run (the eval), the run's
+ * reasoning effort when its depth sets one, and whether web search is enabled.
  */
 export function agentSearchModel(
   spec: string,
@@ -874,6 +911,7 @@ export function agentSearchModel(
   sessionId: string | null = null,
   reasoningEffort: ReasoningEffort | null = null,
   onCall?: (detail: ModelCallDetail) => void,
+  webSearch = false,
 ): LanguageModel {
   const model = new EnvLanguageModel(
     spec,
@@ -881,6 +919,7 @@ export function agentSearchModel(
     sealedKey,
     sessionId,
     reasoningEffort,
+    webSearch,
   )
   if (onCall) model.onCall = onCall
   return model as unknown as LanguageModel

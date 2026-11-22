@@ -9,6 +9,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import {
   EnvLanguageModel,
   MODEL_PRICES_USD_PER_MTOK,
+  OPENROUTER_WEB_SEARCH_TOOL,
   REASONING_DETAILS_KEY,
   agentSearchReasoningEffort,
   createProviderModel,
@@ -867,5 +868,93 @@ describe('planner provider routing', () => {
       expect(MODEL_PRICES_USD_PER_MTOK[spec]).toBeDefined()
       expect(agentSearchReasoningEffort(spec, undefined)).toBe('high')
     }
+  })
+
+  test('webSearch adds openrouter:web_search on tool-calling steps only', async () => {
+    const bashTool = {
+      type: 'function',
+      function: { name: 'bash', parameters: {} },
+    }
+    const withWeb = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+          null,
+          null,
+          null,
+          null,
+          true,
+        ).doGenerate({}),
+      { tools: [bashTool] },
+    )
+    expect(withWeb.tools).toEqual([bashTool, OPENROUTER_WEB_SEARCH_TOOL])
+
+    // Off by default.
+    const withoutWeb = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+        ).doGenerate({}),
+      { tools: [bashTool] },
+    )
+    expect(withoutWeb.tools).toEqual([bashTool])
+
+    // Never injected on answer-only steps (tool_choice: 'none' or no tools).
+    const finalStep = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+          null,
+          null,
+          null,
+          null,
+          true,
+        ).doGenerate({}),
+      { tools: [bashTool], tool_choice: 'none' },
+    )
+    expect(finalStep.tools).toEqual([bashTool])
+
+    const noTools = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+          null,
+          null,
+          null,
+          null,
+          true,
+        ).doGenerate({}),
+      {},
+    )
+    expect(noTools.tools).toBeUndefined()
+  })
+
+  test('webSearch survives the workflow step boundary, and is omitted when off', () => {
+    const SERIALIZE = Symbol.for('workflow-serialize')
+    const DESERIALIZE = Symbol.for('workflow-deserialize')
+    const enabled = new EnvLanguageModel(
+      'openrouter:x/y',
+      'asr_1',
+      null,
+      null,
+      null,
+      true,
+    )
+    const data = (EnvLanguageModel as any)[SERIALIZE](enabled)
+    expect(data).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+      webSearch: true,
+    })
+    expect((EnvLanguageModel as any)[DESERIALIZE](data).webSearch).toBe(true)
+    const disabled = new EnvLanguageModel('openrouter:x/y', 'asr_1')
+    expect((EnvLanguageModel as any)[SERIALIZE](disabled)).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+    })
+    expect(
+      (EnvLanguageModel as any)[DESERIALIZE]({ spec: 'openrouter:x/y' })
+        .webSearch,
+    ).toBe(false)
   })
 })

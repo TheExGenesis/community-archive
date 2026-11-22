@@ -9,21 +9,24 @@ export const MAX_QUESTION_CHARS = 1000
 export const CONVERSATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,100}$/
 
 /**
- * The start route's body is `{ id, question, depth? }`: the conversation id,
- * the new question, and how hard to search (`fast` or `deep`; fast when left
- * out). Earlier turns are never taken from the browser; the workflow rebuilds
- * them from the run store (context.ts).
+ * The start route's body is `{ id, question, depth?, webSearch? }`: the
+ * conversation id, the new question, how hard to search (`fast` or `deep`;
+ * fast when left out), and whether the model may also search the web (off
+ * when left out). Earlier turns are never taken from the browser; the
+ * workflow rebuilds them from the run store (context.ts).
  */
 export function parseAgentSearchRequest(body: unknown): {
   conversationId: string
   question: string
   depth: AgentSearchDepth
+  webSearch: boolean
 } | null {
   if (!body || typeof body !== 'object') return null
-  const { id, question, depth } = body as {
+  const { id, question, depth, webSearch } = body as {
     id?: unknown
     question?: unknown
     depth?: unknown
+    webSearch?: unknown
   }
   if (typeof id !== 'string' || !CONVERSATION_ID_PATTERN.test(id)) return null
   if (typeof question !== 'string') return null
@@ -34,5 +37,11 @@ export function parseAgentSearchRequest(body: unknown): {
       ? DEFAULT_AGENT_SEARCH_DEPTH
       : parseAgentSearchDepth(depth)
   if (!parsedDepth) return null
-  return { conversationId: id, question: trimmed, depth: parsedDepth }
+  if (webSearch !== undefined && typeof webSearch !== 'boolean') return null
+  return {
+    conversationId: id,
+    question: trimmed,
+    depth: parsedDepth,
+    webSearch: webSearch ?? false,
+  }
 }

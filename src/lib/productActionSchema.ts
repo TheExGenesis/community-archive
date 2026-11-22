@@ -47,6 +47,7 @@ export const productActions = [
   'notification_opened',
   'depth_changed',
   'searched_deeper',
+  'web_search_toggled',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]

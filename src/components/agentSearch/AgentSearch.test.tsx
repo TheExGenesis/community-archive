@@ -900,3 +900,102 @@ describe('how hard a question is searched', () => {
     expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
   })
 })
+
+describe('auto-growing composer', () => {
+  test('grows with long text and folds Try asking away until shortened', () => {
+    render(<AgentSearch />)
+    const box = screen.getByLabelText('Your question') as HTMLTextAreaElement
+    const suggestions = screen
+      .getByRole('heading', { name: 'Try asking' })
+      .closest('section')!.parentElement!
+    const firstSuggestion = screen.getByRole('button', {
+      name: EXAMPLE_QUESTIONS[0],
+    })
+
+    // Resting height: Try asking stays visible and focusable.
+    expect(box.style.height).toBe('68px')
+    expect(suggestions).not.toHaveAttribute('aria-hidden')
+    expect(firstSuggestion).not.toHaveAttribute('tabindex', '-1')
+
+    // Simulate multi-line text wrapping beyond the resting height.
+    let measured = 142
+    Object.defineProperty(box, 'scrollHeight', {
+      configurable: true,
+      get: () => measured,
+    })
+    fireEvent.change(box, { target: { value: 'A long multi-line question' } })
+    expect(box.style.height).toBe('142px')
+    expect(box.style.overflowY).toBe('hidden')
+    expect(suggestions).toHaveAttribute('aria-hidden', 'true')
+    expect(firstSuggestion).toHaveAttribute('tabindex', '-1')
+
+    // Clearing restores resting height and Try asking.
+    measured = 46
+    fireEvent.change(box, { target: { value: '' } })
+    expect(box.style.height).toBe('68px')
+    expect(suggestions).not.toHaveAttribute('aria-hidden')
+    expect(firstSuggestion).not.toHaveAttribute('tabindex', '-1')
+  })
+
+  test('caps height and enables scrolling when content exceeds the max', () => {
+    render(<AgentSearch />)
+    const box = screen.getByLabelText('Your question') as HTMLTextAreaElement
+    Object.defineProperty(box, 'scrollHeight', {
+      configurable: true,
+      get: () => 900,
+    })
+    fireEvent.change(box, { target: { value: 'Very long paste' } })
+    expect(Number.parseInt(box.style.height, 10)).toBeLessThanOrEqual(360)
+    expect(box.style.overflowY).toBe('auto')
+  })
+})
+
+describe('web search toggle', () => {
+  beforeEach(() => {
+    window.localStorage.removeItem('ask-archive-web-search')
+    jest.mocked(capturePostHogEvent).mockClear()
+  })
+
+  test('starts off, remembers when turned on, and sends webSearch: true', () => {
+    const { unmount } = render(<AgentSearch />)
+    const web = screen.getByRole('button', { name: 'Web search' })
+    expect(web).toHaveAttribute('aria-pressed', 'false')
+
+    const sendBody = () =>
+      (
+        mockTransport.options as unknown as {
+          prepareSendMessagesRequest: (input: {
+            id: string
+            messages: UIMessage[]
+          }) => { body: Record<string, unknown> }
+        }
+      ).prepareSendMessagesRequest({
+        id: 'conv_web',
+        messages: [
+          {
+            id: 'u1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Who is Eugene Tssui?' }],
+          },
+        ],
+      }).body
+
+    expect(sendBody().webSearch).toBeUndefined()
+
+    fireEvent.click(web)
+    expect(web).toHaveAttribute('aria-pressed', 'true')
+    expect(sendBody().webSearch).toBe(true)
+    expect(capturePostHogEvent).toHaveBeenCalledWith('product_action', {
+      feature: 'ask_archive',
+      action: 'web_search_toggled',
+    })
+
+    // Persists across visits.
+    unmount()
+    render(<AgentSearch />)
+    expect(screen.getByRole('button', { name: 'Web search' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+})

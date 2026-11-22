@@ -522,6 +522,15 @@ plain words; keep the two in step.
 - **Semantic search** sends the agent's own search phrase (its wording of the
   idea, not necessarily the question verbatim) to the Community Archive's
   embeddings API.
+- **Web search (opt-in)** lets the member toggle **Web search** in the composer
+  (`webSearch: true`). When on, planner calls on OpenRouter include OpenRouter's
+  `openrouter:web_search` server tool (`engine: 'auto'`, up to 3 searches of 5
+  results with `low` context) alongside the archive tools (never on the final
+  answer-only step). OpenRouter runs the search server-side (falling back to
+  Exa for models without native search, compatible with ZDR) and reports its
+  charge in `usage.cost`, which `usage.ts` counts against house spend or the
+  member's own OpenRouter key. Search queries the agent writes go to
+  OpenRouter's search backend.
 - **The relevance check** sends tweet text and the agent's yes-or-no criterion
   to OpenAI's Decisions API (or the configured scorer). When that scorer
   fails and the other's key is set, the same text goes to the other: Jev

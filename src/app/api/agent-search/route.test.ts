@@ -150,6 +150,32 @@ test('a question runs fast unless it asks for deep; an unknown depth is refused'
   expect(start).not.toHaveBeenCalled()
 })
 
+test('webSearch is off unless requested, forwarded when true, and refused if invalid', async () => {
+  expect((await ask()).status).toBe(200)
+  const [, [plainInput]] = jest.mocked(start).mock.calls[0] as unknown as [
+    unknown,
+    [{ webSearch?: boolean }],
+  ]
+  expect(plainInput).not.toHaveProperty('webSearch')
+
+  jest.mocked(start).mockResolvedValueOnce({
+    runId: 'wrun_web',
+    readable: new ReadableStream(),
+    status: Promise.resolve('running'),
+    cancel: jest.fn(),
+  } as never)
+  expect((await ask({}, { webSearch: true })).status).toBe(200)
+  const [, [webInput]] = jest.mocked(start).mock.calls[1] as unknown as [
+    unknown,
+    [{ webSearch?: boolean }],
+  ]
+  expect(webInput.webSearch).toBe(true)
+
+  jest.mocked(start).mockClear()
+  expect((await ask({}, { webSearch: 'yes' })).status).toBe(400)
+  expect(start).not.toHaveBeenCalled()
+})
+
 test('an own key is checked, admitted as own, and reaches the workflow only sealed', async () => {
   const response = await ask({ 'x-openrouter-key': KEY })
   expect(response.status).toBe(200)

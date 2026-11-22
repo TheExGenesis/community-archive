@@ -11,7 +11,15 @@ import {
   Plus,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -35,6 +43,7 @@ import { ownKeyRefusalMessage } from './OwnKeyControl'
 import { readOwnKey, useOwnKey } from './ownKeyStore'
 import { QuestionsLeft, type QuestionsToday } from './QuestionsLeft'
 import { DepthToggle } from './DepthToggle'
+import { WebSearchToggle } from './WebSearchToggle'
 import { QuestionHandling } from './QuestionHandling'
 import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
@@ -77,8 +86,19 @@ export const EXAMPLE_QUESTIONS = [
 ]
 
 const MAX_QUESTION_LENGTH = 1000
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect
+// Auto-grow bounds (px) for the composer textarea. The start composer folds
+// "Try asking" away once text wraps past its two-line resting height.
+const START_COMPOSER_MIN_PX = 68
+const START_COMPOSER_MAX_PX = 360
+const START_COMPOSER_EXPAND_PX = 84
+const THREAD_COMPOSER_MIN_PX = 36
+const THREAD_COMPOSER_MAX_PX = 180
 /** Where the composer's Fast or Deep choice is kept between visits. */
 const DEPTH_STORAGE_KEY = 'ask-archive-depth'
+/** Where the composer's Web search toggle is kept between visits. */
+const WEB_SEARCH_STORAGE_KEY = 'ask-archive-web-search'
 /** The follow-up a fast answer's "Search deeper" sends, as a deep search. */
 const deeperQuestion = (question: string) =>
   `Search deeper: ${question}`.slice(0, MAX_QUESTION_LENGTH)
@@ -359,8 +379,10 @@ export default function AgentSearch({
   const [answerDepth, setAnswerDepth] = useState<
     Record<string, AgentSearchDepth>
   >({})
-  // The depth of the question being sent; the transport reads it.
+  // The depth and web-search flag of the question being sent; the transport reads them.
   const sendDepthRef = useRef<AgentSearchDepth>(DEFAULT_AGENT_SEARCH_DEPTH)
+  const [webSearch, setWebSearch] = useState(false)
+  const sendWebSearchRef = useRef(false)
   // What goes back in the box if the server refuses the question being sent,
   // when that is not the question's own text (Search deeper).
   const restoreAsRef = useRef<string | null>(null)
@@ -370,6 +392,10 @@ export default function AgentSearch({
         window.localStorage.getItem(DEPTH_STORAGE_KEY),
       )
       if (kept) setDepth(kept)
+      if (window.localStorage.getItem(WEB_SEARCH_STORAGE_KEY) === '1') {
+        setWebSearch(true)
+        sendWebSearchRef.current = true
+      }
     } catch {
       // No storage (private mode): the choice lasts for this visit.
     }
@@ -380,6 +406,17 @@ export default function AgentSearch({
     captureProductAction('ask_archive', 'depth_changed')
     try {
       window.localStorage.setItem(DEPTH_STORAGE_KEY, next)
+    } catch {
+      // As above.
+    }
+  }
+  const changeWebSearch = (next: boolean) => {
+    if (next === webSearch) return
+    setWebSearch(next)
+    sendWebSearchRef.current = next
+    captureProductAction('ask_archive', 'web_search_toggled')
+    try {
+      window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, next ? '1' : '0')
     } catch {
       // As above.
     }
@@ -458,6 +495,7 @@ export default function AgentSearch({
             id,
             question: last ? messageText(last) : '',
             depth: sendDepthRef.current,
+            ...(sendWebSearchRef.current ? { webSearch: true } : {}),
           }
           // The member's own key, if this browser holds one, pays for the
           // question; it travels in a header and the server never stores it.
@@ -953,6 +991,7 @@ export default function AgentSearch({
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
     if (!text || busy || loading) return
     sendDepthRef.current = askDepth
+    sendWebSearchRef.current = webSearch
     restoreAsRef.current = restoreAs
     if (error) clearError()
     setLoadError(null)
@@ -1014,9 +1053,13 @@ export default function AgentSearch({
     const last = messages[messages.length - 1]
     if (last?.role !== 'user') return
     scrollToQuestionRef.current = false
-    document
-      .getElementById(questionAnchor(last.id))
-      ?.scrollIntoView({ block: 'start' })
+    const reduceMotion = window.matchMedia?.(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    document.getElementById(questionAnchor(last.id))?.scrollIntoView({
+      block: 'start',
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    })
   }, [messages])
 
   // How the address bar follows: a new entry when the reader starts one, the
@@ -1263,6 +1306,56 @@ export default function AgentSearch({
       : `You’ve used today’s ${quota.limit} questions. You can ask again at ${resetLabel(quota)}.`
     : null
   const canAskAgain = !busy && !loading && !outOfQuestions && !paused
+  const inThread = hasThread || loading
+  const composerShown = inThread
+    ? hasThread && !loading && !busy && !readOnly && !paused && !outOfQuestions
+    : !paused && !outOfQuestions
+  const [composerExpanded, setComposerExpanded] = useState(false)
+
+  const syncTextareaHeight = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    const minPx = inThread ? THREAD_COMPOSER_MIN_PX : START_COMPOSER_MIN_PX
+    const maxPx = inThread
+      ? THREAD_COMPOSER_MAX_PX
+      : Math.min(
+          START_COMPOSER_MAX_PX,
+          Math.max(180, Math.round(window.innerHeight * 0.45)),
+        )
+    // Measure natural content height synchronously before paint so wrapped
+    // lines appear immediately with no scroll bounce or clipping.
+    el.style.height = '0px'
+    const contentPx = el.scrollHeight
+    const nextPx = Math.min(Math.max(contentPx, minPx), maxPx)
+    el.style.height = `${nextPx}px`
+    el.style.overflowY = contentPx > maxPx ? 'auto' : 'hidden'
+    if (contentPx <= maxPx) el.scrollTop = 0
+    if (!inThread) {
+      setComposerExpanded(contentPx > START_COMPOSER_EXPAND_PX)
+    }
+  }, [inThread])
+
+  useIsomorphicLayoutEffect(() => {
+    if (!composerShown) {
+      setComposerExpanded(false)
+      return
+    }
+    syncTextareaHeight()
+  }, [input, composerShown, askFilters.length, syncTextareaHeight])
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!composerShown || !el || typeof ResizeObserver === 'undefined') return
+    let lastWidth = el.clientWidth
+    const observer = new ResizeObserver(() => {
+      const width = el.clientWidth
+      if (width === lastWidth) return
+      lastWidth = width
+      syncTextareaHeight()
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [composerShown, syncTextareaHeight])
 
   const errorNote = errorMessage && (
     <p
@@ -1302,8 +1395,9 @@ export default function AgentSearch({
           `block min-h-[4.25rem] w-full px-4 pb-2 ${filterChips ? 'pt-2' : 'pt-3.5'}`,
         )}
         <div className="flex items-center justify-end gap-3 px-4 pb-3 pt-1 text-xs text-muted-foreground">
-          <div className="mr-auto">
+          <div className="mr-auto flex items-center gap-1.5">
             <DepthToggle value={depth} onChange={changeDepth} />
+            <WebSearchToggle value={webSearch} onChange={changeWebSearch} />
           </div>
           {today ? (
             <QuestionsLeft today={today} />
@@ -1339,12 +1433,9 @@ export default function AgentSearch({
       </label>
       {filterChips && <div className="mb-1.5">{filterChips}</div>}
       <div className="flex items-end gap-2 rounded-xl border border-border/80 bg-card p-1.5 pl-3.5 shadow-sm transition-shadow focus-within:border-foreground/25 focus-within:shadow-md focus-within:ring-1 focus-within:ring-foreground/15">
-        {textarea(
-          input.includes('\n') ? 3 : 1,
-          'Ask a follow-up',
-          'min-h-[2.25rem] flex-1 py-1.5',
-        )}
+        {textarea(1, 'Ask a follow-up', 'min-h-[2.25rem] flex-1 py-1.5')}
         <DepthToggle value={depth} onChange={changeDepth} />
+        <WebSearchToggle value={webSearch} onChange={changeWebSearch} compact />
         <button
           type="submit"
           aria-label="Ask"
@@ -1425,7 +1516,6 @@ export default function AgentSearch({
     </p>
   )
 
-  const inThread = hasThread || loading
   // The citation sidebar sits beside the page, so the page makes room for it.
   const sidebarOpen = useCitationSidebar() !== null
 
@@ -1553,38 +1643,52 @@ export default function AgentSearch({
             <>
               {paused ? pausedNote : outOfQuestions ? limitNote : startForm}
               {/* Suggestions, not history: mirrored with Recent via the same
-                quiet eyebrow heading; tapping fills the box rather than sending. */}
-              <section aria-labelledby="try-asking" className="mt-7">
-                <h2
-                  id="try-asking"
-                  className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground [font-family:inherit]"
+                quiet eyebrow heading; tapping fills the box rather than sending.
+                Folds smoothly away once a multi-line query expands the box. */}
+              <div
+                aria-hidden={composerExpanded || undefined}
+                className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out motion-reduce:transition-none ${
+                  composerExpanded
+                    ? 'pointer-events-none mt-0 grid-rows-[0fr] opacity-0'
+                    : 'mt-7 grid-rows-[1fr] opacity-100'
+                }`}
+              >
+                <section
+                  aria-labelledby="try-asking"
+                  className="min-h-0 overflow-hidden"
                 >
-                  Try asking
-                </h2>
-                <ul
-                  aria-label="Questions to try"
-                  className="grid grid-cols-1 gap-2 sm:grid-cols-2"
-                >
-                  {EXAMPLE_QUESTIONS.map((question) => (
-                    <li key={question}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInput(question)
-                          textareaRef.current?.focus()
-                        }}
-                        className="group flex h-full w-full items-start justify-between gap-2.5 rounded-lg bg-muted/40 px-3.5 py-2.5 text-left text-[13px] leading-snug text-muted-foreground transition-colors hover:bg-muted/75 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <span>{question}</span>
-                        <ArrowUpRight
-                          aria-hidden="true"
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60 motion-reduce:transition-none"
-                        />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+                  <h2
+                    id="try-asking"
+                    className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground [font-family:inherit]"
+                  >
+                    Try asking
+                  </h2>
+                  <ul
+                    aria-label="Questions to try"
+                    className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                  >
+                    {EXAMPLE_QUESTIONS.map((question) => (
+                      <li key={question}>
+                        <button
+                          type="button"
+                          tabIndex={composerExpanded ? -1 : undefined}
+                          onClick={() => {
+                            setInput(question)
+                            textareaRef.current?.focus()
+                          }}
+                          className="group flex h-full w-full items-start justify-between gap-2.5 rounded-lg bg-muted/40 px-3.5 py-2.5 text-left text-[13px] leading-snug text-muted-foreground transition-colors hover:bg-muted/75 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <span>{question}</span>
+                          <ArrowUpRight
+                            aria-hidden="true"
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60 motion-reduce:transition-none"
+                          />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </div>
               <RecentConversations
                 conversations={recent}
                 loading={!recentLoaded}
@@ -1595,9 +1699,22 @@ export default function AgentSearch({
             </>
           )}
 
-          {hasThread && !loading && (
-            <div className="space-y-10">
-              {messages.map((message, index) => {
+          {hasThread &&
+            !loading &&
+            (() => {
+              // Give the latest follow-up turn enough height for it to scroll
+              // cleanly to the top of the viewport when asked, instead of
+              // sitting jammed against the bottom of the page.
+              let lastUserIndex = -1
+              let userTurns = 0
+              for (let i = 0; i < messages.length; i++) {
+                if (messages[i].role === 'user') {
+                  lastUserIndex = i
+                  userTurns += 1
+                }
+              }
+              const splitAt = userTurns > 1 ? lastUserIndex : messages.length
+              const renderMessage = (message: UIMessage, index: number) => {
                 if (message.role === 'user') {
                   const reply =
                     messages[index + 1]?.role === 'assistant' ? index + 1 : null
@@ -1757,9 +1874,24 @@ export default function AgentSearch({
                     </EvidenceBoundary>
                   </div>
                 )
-              })}
-            </div>
-          )}
+              }
+              return (
+                <div className="space-y-10">
+                  {messages
+                    .slice(0, splitAt)
+                    .map((message, index) => renderMessage(message, index))}
+                  {splitAt < messages.length && (
+                    <div className="min-h-[calc(100dvh-15rem)] space-y-10 border-t border-border/60 pt-6">
+                      {messages
+                        .slice(splitAt)
+                        .map((message, offset) =>
+                          renderMessage(message, splitAt + offset),
+                        )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
           {/* Pinned to the bottom of the screen while reading a thread; it
             settles into place below the last turn with a soft fade scrim so

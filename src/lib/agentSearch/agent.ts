@@ -270,12 +270,18 @@ export function askerInstructions(asker: AskerProfile): string {
   ].join('\n')
 }
 
+export const WEB_SEARCH_INSTRUCTIONS = `Web search is enabled for this question:
+- You also have a web search tool alongside the archive shell. Use it sparingly for background on people, books, terms, or recent events outside the archive, or to learn the terms that help you search members' tweets better.
+- The archive is still the primary source for what members said and did: always search the archive for member claims rather than substituting web results.
+- Keep web context clearly apart from what members tweeted, and never attribute web facts to an archive member. Cite web sources as plain markdown links [title](https://…); reserve [[t:id]], [[q:id | …]], and [[posts: …]] strictly for archived tweets.`
+
 export const agentSearchInstructions = (
   date: string = today(),
   mode: AgentSearchToolMode = 'bash',
   variant: AgentSearchPromptVariant = agentSearchPromptVariant(),
   asker: AskerProfile | null = null,
   depth: AgentSearchDepth = 'deep',
+  webSearch = false,
 ) => {
   // The v2 prompts carry the fast run's one-round working text; v1 and the
   // typed tools only get its lower counts.
@@ -285,7 +291,10 @@ export const agentSearchInstructions = (
       : variant === 'v1'
         ? bashInstructions(date, depth)
         : bashInstructionsV2(date, variant === 'v2-examples', depth)
-  return asker ? `${base}\n\n${askerInstructions(asker)}` : base
+  const parts = [base]
+  if (webSearch) parts.push(WEB_SEARCH_INSTRUCTIONS)
+  if (asker) parts.push(askerInstructions(asker))
+  return parts.join('\n\n')
 }
 
 export const AGENT_SEARCH_INSTRUCTIONS = agentSearchInstructions()

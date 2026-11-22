@@ -469,4 +469,25 @@ describe('tool modes', () => {
       'Q?\n\n(Files in /work from earlier questions: s1.jsonl · 3 tweets)',
     )
   })
+
+  test('web search instructions are appended only when enabled', () => {
+    const withoutWeb = agentSearchInstructions(
+      '2026-11-22',
+      'bash',
+      'v2-examples',
+      null,
+      'fast',
+    )
+    const withWeb = agentSearchInstructions(
+      '2026-11-22',
+      'bash',
+      'v2-examples',
+      null,
+      'fast',
+      true,
+    )
+    expect(withoutWeb).not.toContain('Web search is enabled')
+    expect(withWeb).toContain('Web search is enabled')
+    expect(withWeb).toContain('plain markdown links')
+  })
 })

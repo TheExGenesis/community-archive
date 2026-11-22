@@ -314,6 +314,8 @@ export interface AgentSearchWorkflowInput {
    * none and searched deep, so a replay of one keeps its steps and effort.
    */
   depth?: AgentSearchDepth
+  /** Allow OpenRouter's server-side web search tool for this question. */
+  webSearch?: boolean
   /**
    * The member's own OpenRouter key, sealed for this run (ownKey.ts). The
    * workflow's inputs are kept in its event log, so the key never enters it
@@ -388,6 +390,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
           profile.maxSemanticCalls,
         )
   // Built once the context step says who is asking.
+  const webSearch = Boolean(input.webSearch)
   const createAgent = (asker: AskerProfile | null) =>
     new WorkflowAgent({
       // Each planner call records its own usage on this run.
@@ -397,6 +400,8 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
         input.sealedKey ?? null,
         null,
         profile.reasoningEffort,
+        undefined,
+        webSearch,
       ),
       instructions: agentSearchInstructions(
         input.date,
@@ -404,6 +409,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
         input.promptVariant ?? 'v1',
         asker,
         depth,
+        webSearch,
       ),
       tools,
     })

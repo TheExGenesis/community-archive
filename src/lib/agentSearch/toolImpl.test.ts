@@ -477,6 +477,17 @@ describe('collectAcrossTerms when a term fails', () => {
     await expect(
       searchTweetsImpl({ query: 'book', anyOf: ['recommend'] }),
     ).rejects.toThrow('timed out')
+
+    // Stop after every term answered still fails, with the stop's reason.
+    serve({ book: ['1'], recommend: ['2'] })
+    const stop = new AbortController()
+    stop.abort(new Error('stopped'))
+    await expect(
+      searchTweetsImpl(
+        { query: 'book', anyOf: ['recommend'] },
+        { abortSignal: stop.signal },
+      ),
+    ).rejects.toThrow('stopped')
   })
 })
 

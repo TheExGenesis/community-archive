@@ -663,6 +663,8 @@ export function createAgentSearchTools(
               query: output.query,
               count: output.tweets.length,
               tweets: compactList(output.tweets),
+              // Matches whose lookup failed, when any did.
+              ...(output.unfetched ? { unfetched: output.unfetched } : {}),
             }),
     }),
     collect_and_score: tool({

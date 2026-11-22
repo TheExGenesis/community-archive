@@ -132,7 +132,8 @@ export async function fetchTweetsSettled(
   state: CommandState,
   ids: string[],
 ): Promise<SettledTweets & { requested: number }> {
-  const missing = ids.filter((id) => !state.cache.has(id))
+  // Unique, so `requested` matches what the lookup counts as failed.
+  const missing = Array.from(new Set(ids.filter((id) => !state.cache.has(id))))
   const found: SettledTweets = missing.length
     ? await getTweetsByIdsSettled(missing, state.limits)
     : { tweets: [], failedIds: [] }
@@ -520,7 +521,7 @@ async function semantic(
   remember(state, result.tweets)
   const what = `${quote(query)}${fromUser ? ` from @${fromUser}` : ''}`
   state.summaries.push(
-    `Searched by meaning for ${what} · ${plural(result.tweets.length, 'tweet')}`,
+    `Searched by meaning for ${what} · ${plural(result.tweets.length, 'tweet')}${result.unfetched ? ', partial' : ''}`,
   )
   return {
     stdout: formatRows(

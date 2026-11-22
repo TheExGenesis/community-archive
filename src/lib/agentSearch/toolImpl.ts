@@ -232,9 +232,11 @@ export async function searchTweetsImpl(
         failedTerms.push({ term: terms[i], error: errorText(page.reason) })
       }
     })
-    // Every term failed, or Stop: the search fails.
-    if (failedTerms.length === terms.length || limits.abortSignal?.aborted)
-      throw firstError
+    // Stop fails the search, even when every term answered first.
+    if (limits.abortSignal?.aborted)
+      throw limits.abortSignal.reason ?? firstError
+    // Every term failed: the search fails.
+    if (failedTerms.length === terms.length) throw firstError
     return {
       query: terms.join(' OR '),
       tweets: Array.from(merged.values())

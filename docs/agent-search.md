@@ -63,8 +63,16 @@ preview's `dev` account, the question runs without it.
    candidates (up to 1,000) and scores each one against a yes/no criterion
    (`classifier.ts`). The default scorer is OpenAI's Decisions API (one
    `predicate` question per post, 100 requests at a time); Jev through
-   OpenRouter and an LLM with structured output are alternatives. Replies are
-   scored with their parent's text.
+   OpenRouter and an LLM with structured output are alternatives. Jev takes
+   up to 50 posts a request (kept under about 30 KB, where OpenRouter would
+   switch it to a slower long-context mode), 8 requests at a time. Both make
+   up to three attempts on rate limits, server errors and dropped
+   connections, waiting as long as `Retry-After` asks (10 seconds at most)
+   and never past the run's deadline. A rejected key stops the scorer at
+   once; for Jev so do spent credits and a missing endpoint. A score that
+   loses fewer than a tenth of its posts returns the rest.
+   When Decisions or Jev fails and the other's key is set, the other scores
+   every post instead. Replies are scored with their parent's text.
 4. The answer cites single tweets as `[[t:<id>]]` (alone on a line, the tweet
    shows whole), quotes them as `[[q:<id> | exact words]]` (checked word for
    word), and shows sets of tweets as lists,
@@ -204,9 +212,10 @@ progress and a stopped or failed run keeps what it spent (`usage.ts`):
 - The shell's `score` (and the typed `collect_and_score` and `score_tweets`)
   add their scorer cost before they return or throw. A scorer that fails
   part-way throws a `ScoringError` carrying the cost of the calls that
-  succeeded. Shell commands and these two tools are never retried, since a
-  retry pays for all the scoring again; gateway-only tools retry once.
-  Semantic search has no charge.
+  succeeded; when the other scorer takes over, that cost is added to its own.
+  Shell commands and these two tools are never retried, since a retry pays
+  for all the scoring again; gateway-only tools retry once. Semantic search
+  has no charge.
 - Writes are increments (`agent_search_add_usage`), so concurrent steps of one
   run never overwrite each other, and status updates never touch spend.
 - A run does not start when the planner, or the `llm` scorer, has no price or
@@ -317,7 +326,7 @@ resolved headers, including the API key, into the event log.
 | `COMMUNITY_ARCHIVE_API_V1_URL`, `COMMUNITY_ARCHIVE_API_KEY`                                                     | `/v1` on the gateway host; the gateway token     | Where `timeline` reads API v1, and with which key                                                                                                                                 |
 | `SEMANTIC_SEARCH_URL`                                                                                           | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint                                                                                                                                                          |
 | `OPENROUTER_API_BASE_URL`                                                                                       | `https://openrouter.ai/api/v1`                   | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default                                                                              |
-| `AGENT_SEARCH_SCORER`                                                                                           | unset                                            | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM                                                                   |
+| `AGENT_SEARCH_SCORER`                                                                                           | unset                                            | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM. Decisions and Jev fall back to each other when both keys are set |
 | `AGENT_SEARCH_SCORER_MODEL`                                                                                     | `openai:gpt-6-luna`                              | Model for the `llm` scorer                                                                                                                                                        |
 | `AGENT_SEARCH_SCORER_REASONING`                                                                                 | `low`                                            | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`)                                                                                                                   |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY`                                                                         |                                                  | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true`                                                                                                           |
@@ -440,7 +449,10 @@ plain words; keep the two in step.
   idea, not necessarily the question verbatim) to the Community Archive's
   embeddings API.
 - **The relevance check** sends tweet text and the agent's yes-or-no criterion
-  to OpenAI's Decisions API (or the configured scorer).
+  to OpenAI's Decisions API (or the configured scorer). When that scorer
+  fails and the other's key is set, the same text goes to the other: Jev
+  through OpenRouter, with `zdr: true` and `data_collection: deny`, or
+  OpenAI's Decisions API.
 - **Run records** (`agent_search_runs`) keep the question, the answer as message
   parts with tweets reduced to ids, the workspace manifest (ids and scores),
   tool calls and usage. Deleting a conversation clears the content and sets

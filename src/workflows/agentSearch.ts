@@ -335,27 +335,31 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   let semanticUsed = 0
   // Tweets already sent to the page in this run (streamedBashOutput).
   const sentTweetIds = new Set<string>()
+  const runBash = async (args: BashInput) => {
+    const output = await bashStep(
+      args,
+      workspace,
+      semanticUsed,
+      runId,
+      deadlineAt,
+      profile.maxSemanticCalls,
+    )
+    workspace = applyChanges(workspace, output.workspace)
+    semanticUsed += output.semanticCalls ?? 0
+    return streamedBashOutput(output, sentTweetIds)
+  }
   // The agent starts the tool calls of one turn together. Two shell commands
   // at once would both begin from the same files and the same count of
   // semantic searches, and each would get its own search slots, so they run
-  // one at a time, in the order the model called them.
-  const bashTurn = createSlots(1)
+  // one at a time, in the order the model called them. Only runs started
+  // with a depth do this: an earlier run's log has its parallel shell steps
+  // created together, and holding the second back while it replays would
+  // read as a divergence from that log (step events cannot be passed over).
+  const bashTurn = input.depth ? createSlots(1) : null
   const tools =
     toolMode === 'bash'
       ? createBashAgentTools((args) =>
-          bashTurn.run(async () => {
-            const output = await bashStep(
-              args,
-              workspace,
-              semanticUsed,
-              runId,
-              deadlineAt,
-              profile.maxSemanticCalls,
-            )
-            workspace = applyChanges(workspace, output.workspace)
-            semanticUsed += output.semanticCalls ?? 0
-            return streamedBashOutput(output, sentTweetIds)
-          }),
+          bashTurn ? bashTurn.run(() => runBash(args)) : runBash(args),
         )
       : createAgentSearchTools(
           {

@@ -45,7 +45,8 @@ export function createSlots(size: number): Slots {
         settle()
         reject(reason)
       }
-      const onAbort = () => leave(limits.abortSignal?.reason)
+      const onAbort = () =>
+        leave(limits.abortSignal?.reason ?? new RunDeadlineError())
       if (limits.deadlineAt !== undefined) {
         timer = setTimeout(
           () => leave(new RunDeadlineError()),

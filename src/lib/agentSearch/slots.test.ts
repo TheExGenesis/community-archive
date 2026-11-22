@@ -63,6 +63,25 @@ describe('a task waiting for its turn', () => {
     await expect(slots.run(async () => 'after')).resolves.toBe('after')
   })
 
+  test('a stop with no reason still rejects with an error', async () => {
+    const slots = createSlots(1)
+    const first = slots.run(hold(30))
+    // A signal whose reason is undefined, as a hand-made one can be.
+    let abort = () => {}
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener: (_type: string, listener: () => void) => {
+        abort = listener
+      },
+      removeEventListener: () => {},
+    } as unknown as AbortSignal
+    const waiting = slots.run(async () => 'never', { abortSignal: signal })
+    abort()
+    await expect(waiting).rejects.toBeInstanceOf(RunDeadlineError)
+    await expect(first).resolves.toBe('held')
+  })
+
   test('gives up as soon as the run is stopped', async () => {
     const slots = createSlots(1)
     const first = slots.run(hold(60))

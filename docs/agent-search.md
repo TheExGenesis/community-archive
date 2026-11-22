@@ -165,19 +165,22 @@ its own three, so a `par` of searches can still pass the gateway's limit. just-b
 a page, so a short or empty page does not end a search; a null `nextOffset`
 does, and no page past offset 5,000 is asked for.
 
-`timeline` reads `GET /v1/accounts/{account}/tweets` on the internal gateway
-(200 per page, keyset cursor) using `CLICKHOUSE_ANALYTICS_API_TOKEN`, like
-every other Ask gateway read. It follows `next_cursor` through short and empty
+`timeline` reads `GET /v1/accounts/{account}/tweets` on the gateway host
+(200 per page, keyset cursor). Production `/v1` accepts only personal `cak_`
+keys, so it sends `COMMUNITY_ARCHIVE_API_KEY` first when that is set and moves
+to `CLICKHOUSE_ANALYTICS_API_TOKEN` once on a `401` or `403`; the local
+stand-in takes the gateway token. It follows `next_cursor` through short and empty
 pages until the cursor is null or it has `--limit` tweets, and stops early,
 saying so, on a cursor it already followed or after `ceil(limit / 200) + 10`
 pages. A `429` or `503` is retried after `Retry-After` (at most 10 s, 1 s when
 absent), up to three attempts, never past the run's deadline or after Stop. A
 `422` (too broad for the API's query budget) prints the tweets already read,
 marked partial, and tells the agent to narrow with `--since`/`--until`.
-`COMMUNITY_ARCHIVE_API_KEY` is only preferred when
-`COMMUNITY_ARCHIVE_API_V1_URL` explicitly points outside the internal gateway.
-(Gateway-first check: verify production `/v1/accounts/{account}/tweets` accepts
-`CLICKHOUSE_ANALYTICS_API_TOKEN` without the public 60 rpm / 2-in-flight cap.)
+When `COMMUNITY_ARCHIVE_API_V1_URL` names another host, that host gets one key
+(the public key, else the gateway token) and no fallback. The keyed API allows
+60 requests a minute and two in flight per account, so a `par` of several
+timelines leans on the `429` retry; a budget of Ask's own on `/v1` is a gateway
+change (control-panel).
 
 The prompt steers semantic search to paraphrased ideas, surveys and
 investigative questions, and keyword search to names, handles, exact phrases

@@ -53,12 +53,11 @@ test('names the phase, starts collapsed by default, and keeps tweets in place on
   const latest: FoundPhase = { kind: 'latest', source: 'Searched “singapore”' }
   const { rerender } = render(rail([item('1'), item('2')], latest, 300))
   const aside = screen.getByRole('complementary', { name: 'Latest matches' })
-  expect(aside).toHaveTextContent(
-    '300 found · newest from searched “singapore”',
-  )
-  // Collapsed by default while searching.
+  // Collapsed pill stays compact (count only; source detail shows inside once opened).
+  expect(aside).toHaveTextContent('Latest matches · 300 found')
   expect(within(aside).queryByText('Tweet 1')).toBeNull()
   openPreview()
+  expect(aside).toHaveTextContent('Newest from searched “singapore”')
   expect(shown()).toEqual(['Tweet 1', 'Tweet 2'])
 
   // A new set: the newcomer enters at the top, tweet 2 moves down instead of

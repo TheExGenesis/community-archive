@@ -1255,9 +1255,13 @@ describe('opening a step in archive search', () => {
     expect(bashSearchHref('people visakanv')).toBeNull()
   })
 
-  test('several words link only as a phrase, which is what the search page runs', () => {
-    expect(bashSearchHref('search "community archive" > s1.jsonl')).toBeNull()
-    expect(bashSearchHref('search community archive --all')).toBeNull()
+  test('several words link as the command matched them: any order unless --phrase', () => {
+    expect(bashSearchHref('search "community archive" > s1.jsonl')).toBe(
+      '/search?q=community+archive&match=all',
+    )
+    expect(bashSearchHref('search community archive --all')).toBe(
+      '/search?q=community+archive&match=all',
+    )
     expect(bashSearchHref('search "community archive" --phrase')).toBe(
       '/search?q=community+archive',
     )
@@ -1295,6 +1299,48 @@ describe('opening a step in archive search', () => {
       output: { tweets: [] },
     })
     expect(orList.searchHref).toBeUndefined()
+  })
+
+  test('a batch of searches carries no single link while it runs; each search gets its own once done', () => {
+    const command =
+      "par 'search \"comm archive\" > k2.jsonl' 'search exgenesis > k5.jsonl' 'search archive --with opt,consent > k3.jsonl'"
+    const running = progressLine({
+      id: 'p',
+      name: 'bash',
+      state: 'input-available',
+      input: { command },
+      output: undefined,
+    })
+    // The line names the first search "and 2 more"; a lone link would open
+    // a different search (the only one the page can express).
+    expect(running.text).toBe('Searching “comm archive”, and 2 more at once')
+    expect(running.searchHref).toBeUndefined()
+    const done = progressLine({
+      id: 'p',
+      name: 'bash',
+      state: 'output-available',
+      input: { command },
+      output: {
+        summary:
+          'Searched “exgenesis” · 400 tweets · Searched “comm archive” · 21 tweets · Searched “archive” with “opt” or “consent” · 300 tweets',
+        exitCode: 0,
+      },
+    })
+    expect(done.searchHref).toBeUndefined()
+    // The --with search is several searches, which no one page can show.
+    expect(done.searchHrefs).toEqual({
+      'comm archive|': '/search?q=comm+archive&match=all',
+      'exgenesis|': '/search?q=exgenesis',
+    })
+    // A search that runs alone keeps its link, running or done.
+    const alone = progressLine({
+      id: 's',
+      name: 'bash',
+      state: 'input-available',
+      input: { command: 'search singapore > s1.jsonl && wc -l s1.jsonl' },
+      output: undefined,
+    })
+    expect(alone.searchHref).toBe('/search?q=singapore')
   })
 })
 

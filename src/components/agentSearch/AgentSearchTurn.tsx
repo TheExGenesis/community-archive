@@ -1,11 +1,17 @@
 'use client'
 
-import { ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, Copy } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnswerMarkdown } from './AnswerMarkdown'
 import { CitationContext, type CitationLinks } from './CitationContext'
-import { AvatarStack, CitationList, CitationRail } from './CitationRail'
+import {
+  AvatarStack,
+  CitationList,
+  CitationRail,
+  EVIDENCE_PILL,
+  EVIDENCE_PILL_CHEVRON,
+} from './CitationRail'
 import { CitationSheet } from './CitationSheet'
 import { CitationSidebar } from './CitationSidebar'
 import {
@@ -23,6 +29,32 @@ import { RETRY_BUTTON } from './TweetPlaceholder'
 
 const plural = (n: number, word: string) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? word : `${word}s`}`
+
+/** Clean markdown copy of an answer, turning internal citation links into readable references. */
+function copyableAnswer(
+  markdown: string,
+  citations: ReadonlyArray<{
+    n: number
+    id: string
+    anchor: string
+    tweet: { username: string } | null
+  }>,
+) {
+  const body = markdown
+    .replace(/\[([^\]]+)\]\(#quote-[^)]+\)/g, '“$1”')
+    .replace(/\[(\d+)\]\(#ask-[^)]+\)/g, '[$1]')
+    .replace(/\[([^\]]+)\]\(#ask-unverified-[^)]+\)/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  const refs = citations.map((c) => {
+    const handle = c.tweet?.username ? `@${c.tweet.username} ` : ''
+    const url = c.tweet?.username
+      ? `https://x.com/${c.tweet.username}/status/${c.id}`
+      : `https://x.com/i/web/status/${c.id}`
+    return `[${c.n}] ${handle}${url}`
+  })
+  return refs.length ? `${body}\n\n${refs.join('\n')}` : body
+}
 
 /** A run that ended without a full answer, as the page knows it. */
 export interface TurnInterruption {
@@ -46,6 +78,8 @@ interface AgentSearchTurnProps {
   showSources?: boolean
   /** A reopened conversation: fetches again the tweets that failed to load. */
   onRetryTweets?: () => void
+  /** How long an answer finished in this visit took; a saved one says itself. */
+  durationMs?: number | null
 }
 
 export const AgentSearchTurn = memo(function AgentSearchTurn({
@@ -59,6 +93,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   canAskAgain = true,
   showSources = true,
   onRetryTweets,
+  durationMs = null,
 }: AgentSearchTurnProps) {
   const { answer } = view
   const hasAnswer = answer.blocks.length > 0
@@ -173,6 +208,21 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   // sidebar / sheet directly.
   const [citedOpen, setCitedOpen] = useState(false)
   const citedListId = useId()
+  const [copied, setCopied] = useState(false)
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(copyTimer.current), [])
+  const copyAnswer = async () => {
+    const text = copyableAnswer(answer.markdown, answer.citations)
+    if (!text || !navigator.clipboard?.writeText) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard blocked; leave button unchanged.
+    }
+  }
   const [moreOpen, setMoreOpen] = useState(false)
   const sourcesRef = useRef<HTMLDivElement>(null)
   const sourcesId = useId()
@@ -201,6 +251,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         summary={logSummary(view, { writing: true })}
         steps={view.progress}
         timeline={view.timeline}
+        startedAt={startedAt}
         onStop={onStop}
         stopState={stopState}
       />
@@ -231,6 +282,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
       timeline={view.timeline}
       cappedAt={view.receipt.cappedAt}
       more={moreControl}
+      durationMs={durationMs ?? view.durationMs}
     />
   )
 
@@ -323,6 +375,25 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
                   Unfinished answer
                 </p>
               )}
+              {!active &&
+                !answer.checking &&
+                !answer.withheld &&
+                answer.markdown.trim().length > 0 && (
+                  <div className="mt-3 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void copyAnswer()}
+                      className="-ml-2 inline-flex h-7 items-center gap-1.5 rounded-[8px] px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/55 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {copied ? (
+                        <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                      )}
+                      {copied ? 'Copied' : 'Copy answer'}
+                    </button>
+                  </div>
+                )}
             </div>
           )}
 
@@ -406,14 +477,14 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
               onClick={() => setCitedOpen((value) => !value)}
               aria-expanded={citedOpen}
               aria-controls={citedListId}
-              className="group flex min-h-[2.25rem] w-full items-center gap-2.5 rounded-lg bg-muted/30 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className={EVIDENCE_PILL}
             >
               <AvatarStack
                 tweets={answer.citations.flatMap((c) =>
                   c.tweet ? [c.tweet] : [],
                 )}
               />
-              <span className="min-w-0 flex-1 truncate">
+              <span className="min-w-0 truncate">
                 <span className="font-medium text-foreground">Cited</span>
                 <span className="font-normal tabular-nums text-muted-foreground">
                   {' '}
@@ -422,7 +493,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
               </span>
               <ChevronRight
                 aria-hidden="true"
-                className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none ${citedOpen ? 'rotate-90' : ''}`}
+                className={`${EVIDENCE_PILL_CHEVRON} ${citedOpen ? 'rotate-90' : ''}`}
               />
             </button>
             {citedOpen && (
@@ -511,6 +582,7 @@ function sameTurn(a: AgentSearchTurnProps, b: AgentSearchTurnProps) {
     a.canAskAgain === b.canAskAgain &&
     a.showSources === b.showSources &&
     a.onRetryTweets === b.onRetryTweets &&
+    a.durationMs === b.durationMs &&
     a.interrupted?.kind === b.interrupted?.kind &&
     a.interrupted?.elapsedMs === b.interrupted?.elapsedMs
   )

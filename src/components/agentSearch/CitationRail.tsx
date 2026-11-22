@@ -191,6 +191,17 @@ function CitationItem({
   )
 }
 
+/**
+ * The pill that heads a turn's evidence: the tweets found so far while it
+ * runs, then Cited and Sources. One geometry for all three, so the slot keeps
+ * its size when the found tweets give way to the cited ones mid-answer.
+ */
+export const EVIDENCE_PILL_BASE =
+  'inline-flex min-h-[2rem] max-w-full items-center gap-2 rounded-lg bg-muted/30 px-3 py-1 text-left text-[13px]'
+export const EVIDENCE_PILL = `${EVIDENCE_PILL_BASE} group transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
+export const EVIDENCE_PILL_CHEVRON =
+  'h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none'
+
 /** Compact overlapping author avatars for collapsed evidence disclosure pills. */
 export function AvatarStack({
   tweets,
@@ -424,6 +435,14 @@ export const CitationRail = forwardRef<
   if (!inSidebar && showFound) {
     const canExpand = !folded && steady.shown.length > 0
     const expanded = canExpand && previewOpen
+    const compactDetail =
+      foundPhase.kind === 'relevant'
+        ? `of ${count(foundCount)} found`
+        : `${count(foundCount)} found`
+    const sourceDetail =
+      foundPhase.kind === 'latest' && foundPhase.source
+        ? `Newest from ${foundPhase.source.charAt(0).toLowerCase()}${foundPhase.source.slice(1)}`
+        : null
     return (
       <aside
         ref={setRefs}
@@ -437,40 +456,41 @@ export const CitationRail = forwardRef<
               onClick={() => setPreviewOpen((value) => !value)}
               aria-expanded={expanded}
               aria-controls={foundListId}
-              className="group flex min-h-[2.25rem] w-full items-center gap-2.5 rounded-lg bg-muted/30 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className={EVIDENCE_PILL}
             >
               <AvatarStack tweets={steady.shown.map((item) => item.tweet)} />
-              <span className="min-w-0 flex-1 truncate">
+              <span className="min-w-0 truncate">
                 <span className="font-medium text-foreground">{title}</span>
-                {titleDetail && (
-                  <span className="font-normal tabular-nums text-muted-foreground">
-                    {' '}
-                    · {titleDetail}
-                  </span>
-                )}
+                <span className="font-normal tabular-nums text-muted-foreground">
+                  {' '}
+                  · {compactDetail}
+                </span>
               </span>
               <ChevronRight
                 aria-hidden="true"
-                className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`}
+                className={`${EVIDENCE_PILL_CHEVRON} ${expanded ? 'rotate-90' : ''}`}
               />
             </button>
           ) : (
-            <div className="flex min-h-[2.25rem] items-center gap-2.5 rounded-lg bg-muted/30 px-3 py-1.5 text-[13px]">
+            <div className={EVIDENCE_PILL_BASE}>
               <AvatarStack tweets={steady.shown.map((item) => item.tweet)} />
-              <h3 className="min-w-0 flex-1 truncate font-medium text-foreground">
+              <h3 className="min-w-0 truncate font-medium text-foreground">
                 {title}
-                {titleDetail && (
-                  <span className="font-normal tabular-nums text-muted-foreground">
-                    {' '}
-                    · {titleDetail}
-                  </span>
-                )}
+                <span className="font-normal tabular-nums text-muted-foreground">
+                  {' '}
+                  · {compactDetail}
+                </span>
               </h3>
             </div>
           )}
         </div>
         {expanded && (
           <div id={foundListId} className="pl-1">
+            {sourceDetail && (
+              <p className="truncate px-3 py-1 text-xs text-muted-foreground">
+                {sourceDetail}
+              </p>
+            )}
             <ul className="max-h-72 overflow-y-auto overscroll-contain">
               {steady.shown.map(({ tweet }) => (
                 <TweetRow

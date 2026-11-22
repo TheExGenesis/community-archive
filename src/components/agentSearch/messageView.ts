@@ -53,6 +53,22 @@ export interface ProgressLine {
    * one the page can express (no OR lists, no semantic or scoring steps).
    */
   searchHref?: string
+  /**
+   * Per-sub-search links for compound/parallel (`par`) shell steps, keyed by
+   * `<query.toLowerCase()>|<fromUser.toLowerCase()>` so expanded sub-rows link
+   * to their own exact archive search regardless of completion order.
+   */
+  searchHrefs?: Record<string, string>
+  /**
+   * True when a compound/parallel command exited non-zero but some of its
+   * sub-actions still succeeded and produced a summary.
+   */
+  partial?: boolean
+  /**
+   * Human-readable sub-actions of a failed multi-part command so even a
+   * totally failed batch can be expanded to see what it tried.
+   */
+  attempted?: string[]
 }
 
 /**
@@ -234,6 +250,11 @@ export interface TurnView {
   foundPhase: FoundPhase
   /** The steps with the model's reasoning between them, in order. */
   timeline: TimelineEntry[]
+  /**
+   * How long a saved run took (history.ts); null for a live answer, whose
+   * time the page keeps itself.
+   */
+  durationMs: number | null
   /**
    * Tweets this turn's tools returned that are not in hand (a reopened
    * conversation fetches them again): how many are still loading, failed,
@@ -750,6 +771,8 @@ export function archiveSearchHref(search: {
   since?: string | null
   until?: string | null
   sort?: string | null
+  /** Several words matched in any order, not as a phrase. */
+  anyOrder?: boolean
 }): string | null {
   const query = search.query?.trim()
   if (!query) return null
@@ -770,6 +793,7 @@ export function archiveSearchHref(search: {
     if (!PAGE_SORTS.has(search.sort)) return null
     params.set('sort', search.sort)
   }
+  if (search.anyOrder && /\s/.test(query)) params.set('match', 'all')
   return `/search?${params.toString()}`
 }
 
@@ -778,8 +802,8 @@ export function archiveSearchHref(search: {
 // stored runs) make several searches, which the search page has no way to
 // express. The command matches several words in any order unless it
 // passes --phrase (--all is the old name for that default), while the search
-// page reads several words as a phrase, so only --phrase or a single word
-// links to the same search.
+// page reads several words as a phrase, so an any-order search links with
+// `match=all`, which asks the page for the same match.
 const SEARCH_VALUE_FLAGS = new Set([
   'or',
   'with',
@@ -794,58 +818,99 @@ const SEARCH_VALUE_FLAGS = new Set([
 
 const MULTI_SEARCH_FLAGS = new Set(['or', 'with', 'any'])
 
+function parseSearchLineHref(
+  lineText: string,
+): { key: string; href: string } | null {
+  const words = shellWords(lineText)
+  if (words[0] !== 'search') return null
+  if (words.some((word) => UNRESOLVED.test(word))) return null
+  const terms: string[] = []
+  const flags: Record<string, string> = {}
+  let expressible = true
+  let phrase = false
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]
+    if (word === '>' || word === '>>') break
+    if (!word.startsWith('--')) {
+      terms.push(word)
+      continue
+    }
+    const [name, inline] = word.slice(2).split(/=(.*)/s, 2)
+    if (name === 'all') continue
+    if (name === 'phrase') {
+      phrase = true
+      continue
+    }
+    if (!SEARCH_VALUE_FLAGS.has(name) || MULTI_SEARCH_FLAGS.has(name)) {
+      expressible = false
+      break
+    }
+    const value = inline ?? words[++i]
+    if (value === undefined) {
+      expressible = false
+      break
+    }
+    flags[name] = value
+  }
+  const query = terms.join(' ').trim()
+  if (!expressible) return null
+  const href = archiveSearchHref({
+    query,
+    // The command matches several words in any order unless told --phrase;
+    // the page does the same when its link says so.
+    anyOrder: !phrase,
+    fromUser: flags.from,
+    replyToUser: flags['reply-to'],
+    since: flags.since,
+    until: flags.until,
+    sort: flags.sort,
+  })
+  if (!href) return null
+  const from = (flags.from ?? '').replace(/^@/, '').toLowerCase()
+  return { key: `${query.toLowerCase()}|${from}`, href }
+}
+
 /**
  * The first `search` in a shell command the search page can express: for a
  * loop, its first value; never a search with a word the shell fills in.
  */
 export function bashSearchHref(command: string): string | null {
   for (const line of shellLines(command)) {
-    const words = shellWords(line.text)
-    if (words[0] !== 'search') continue
-    if (words.some((word) => UNRESOLVED.test(word))) continue
-    const terms: string[] = []
-    const flags: Record<string, string> = {}
-    let expressible = true
-    let phrase = false
-    for (let i = 1; i < words.length; i++) {
-      const word = words[i]
-      if (word === '>' || word === '>>') break
-      if (!word.startsWith('--')) {
-        terms.push(word)
-        continue
-      }
-      const [name, inline] = word.slice(2).split(/=(.*)/s, 2)
-      if (name === 'all') continue
-      if (name === 'phrase') {
-        phrase = true
-        continue
-      }
-      if (!SEARCH_VALUE_FLAGS.has(name) || MULTI_SEARCH_FLAGS.has(name)) {
-        expressible = false
-        break
-      }
-      const value = inline ?? words[++i]
-      if (value === undefined) {
-        expressible = false
-        break
-      }
-      flags[name] = value
-    }
-    const query = terms.join(' ').trim()
-    // Every word in any order has no equivalent on the page.
-    if (!phrase && query.split(/\s+/).length > 1) expressible = false
-    if (!expressible) continue
-    const href = archiveSearchHref({
-      query,
-      fromUser: flags.from,
-      replyToUser: flags['reply-to'],
-      since: flags.since,
-      until: flags.until,
-      sort: flags.sort,
-    })
-    if (href) return href
+    const parsed = parseSearchLineHref(line.text)
+    if (parsed) return parsed.href
   }
   return null
+}
+
+/**
+ * The link for the one search a step line names: the command's first archive
+ * command, when that is a search the page can express and it runs alone. A
+ * batch (par, a loop) is named by its first command "and N more", so a single
+ * link there would open one search of several, or a different search from the
+ * one named. Its searches get their own links once the step has finished
+ * (bashSearchHrefs).
+ */
+export function stepSearchHref(command: string): string | null {
+  for (const line of shellLines(command)) {
+    const [name] = commandWords(line.text)
+    if (!isArchiveCommand(name)) continue
+    if (name !== 'search' || line.more > 0) return null
+    return parseSearchLineHref(line.text)?.href ?? null
+  }
+  return null
+}
+
+/**
+ * Every expressible `search` inside a shell command (including parallel `par`
+ * batches), keyed by `<query>|<fromUser>` for per-sub-row linking.
+ */
+export function bashSearchHrefs(command: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const line of shellLines(command)) {
+    const parsed = parseSearchLineHref(line.text)
+    if (parsed && !(parsed.key in out)) out[parsed.key] = parsed.href
+  }
+  return out
 }
 
 /** Mirrors DEFAULT_COLLECT in toolImpl: the limit when the agent sets none. */
@@ -860,6 +925,8 @@ export function progressLine(call: ToolCallView): ProgressLine {
   let finished: string
   let failure: string
   let searchHref: string | null = null
+  let searchHrefs: Record<string, string> | null = null
+  let partial = false
 
   switch (call.name) {
     case 'find_people': {
@@ -882,6 +949,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
           since: asString(input.since),
           until: asString(input.until),
           sort: asString(input.sort),
+          anyOrder: asString(input.mode) === 'all',
         })
       }
       const tweets = plural(asArray(out.tweets).length, 'tweet')
@@ -987,15 +1055,36 @@ export function progressLine(call: ToolCallView): ProgressLine {
       running = doing
       finished = asString(out.summary) ?? firstLine ?? `Ran ${command}`
       failure = `Could not finish: ${doing.charAt(0).toLowerCase()}${doing.slice(1)}`
+      const rawCommand = asString(input.command) ?? ''
+      const summary = asString(out.summary)?.trim()
+      const hasUsefulSummary =
+        Boolean(summary) &&
+        summary !== 'A command failed' &&
+        summary !== 'Looked through the results'
       if (done && (asNumber(out.exitCode) ?? 0) !== 0) {
-        return {
-          id: call.id,
-          text: failure,
-          status: 'error',
-          kind: commandKind(asString(input.command) ?? ''),
+        if (!hasUsefulSummary) {
+          const attempted = shellLines(rawCommand).flatMap((line) => {
+            const [name, ...rest] = commandWords(line.text)
+            return isArchiveCommand(name)
+              ? [describeArchiveCommand(name, rest)]
+              : []
+          })
+          return {
+            id: call.id,
+            text: failure,
+            status: 'error',
+            kind: commandKind(rawCommand),
+            ...(attempted.length > 1 ? { attempted } : {}),
+          }
         }
+        // Some sub-commands in a parallel/chained batch succeeded: show what
+        // actually ran instead of masking it behind a red error on subcommand 1.
+        finished = summary!
+        partial = true
       }
-      searchHref = bashSearchHref(asString(input.command) ?? '')
+      searchHref = stepSearchHref(rawCommand)
+      const allHrefs = bashSearchHrefs(rawCommand)
+      if (Object.keys(allHrefs).length > 0) searchHrefs = allHrefs
       break
     }
     default:
@@ -1013,6 +1102,8 @@ export function progressLine(call: ToolCallView): ProgressLine {
         ? commandKind(asString(input.command) ?? '')
         : (TOOL_KINDS[call.name] ?? 'other'),
     ...(searchHref ? { searchHref } : {}),
+    ...(searchHrefs ? { searchHrefs } : {}),
+    ...(partial ? { partial: true } : {}),
   }
 }
 
@@ -1795,6 +1886,7 @@ export function buildTurnView(
     foundSoFar: own.results.length,
     ...foundSoFar(calls, own),
     timeline: timelineFor(message),
+    durationMs: messageDuration(message),
     tweets,
   }
 }
@@ -1901,6 +1993,13 @@ export function messageOutcome(message: UIMessage): TurnOutcome | null {
   return outcome === 'done' || outcome === 'stopped' || outcome === 'failed'
     ? outcome
     : null
+}
+
+/** How long a saved answer's run took, as its message says (history.ts). */
+function messageDuration(message: UIMessage): number | null {
+  const metadata = isRecord(message.metadata) ? message.metadata : {}
+  const ms = asNumber(metadata.durationMs)
+  return ms !== undefined && ms >= 0 ? ms : null
 }
 
 /** The message marked with how its turn ended. */

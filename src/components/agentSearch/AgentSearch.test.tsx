@@ -94,12 +94,12 @@ test('a first visit is the heading and a composer that carries the facts', async
   ).toBeInTheDocument()
   const box = screen.getByLabelText('Your question')
   expect(box).toHaveAttribute('placeholder', 'Ask about members’ tweets')
-  // The facts sit under the box, not inside it.
+  // Privacy and scope live in the quiet subtitle above, keeping the composer unobstructed.
   const composer = box.closest('.rounded-xl') as HTMLElement
-  expect(screen.getByText('Private to you')).toBeInTheDocument()
-  expect(screen.getByText('Answers cite tweets')).toBeInTheDocument()
-  expect(composer).not.toHaveTextContent('Private to you')
-  expect(composer).not.toHaveTextContent('Answers cite tweets')
+  expect(
+    screen.getByText(/Private search across members’ archived tweets/),
+  ).toBeInTheDocument()
+  expect(composer).not.toHaveTextContent('Private search')
   expect(await screen.findByText('10 left today')).toBeInTheDocument()
   expect(screen.queryByText(/Answers are private/)).toBeNull()
   expect(screen.queryByText(/Shift\+Enter/)).toBeNull()
@@ -262,9 +262,14 @@ describe('the conversation in the URL', () => {
     render(<AgentSearch initialConversationId="c1" />)
     // A pushed entry, so the browser's Back returns to the conversation.
     const push = jest.spyOn(window.history, 'pushState')
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Back to Ask the archive' }),
-    )
+    // The title beside the caret is the same control: clicking its text goes back.
+    const back = await screen.findByRole('button', {
+      name: 'Back to Ask the archive',
+    })
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Ask the archive' }),
+    ).toContainElement(back)
+    fireEvent.click(screen.getByText('Ask the archive', { selector: 'button' }))
     expect(window.location.search).toBe('')
     expect(push).toHaveBeenCalledTimes(1)
     push.mockRestore()

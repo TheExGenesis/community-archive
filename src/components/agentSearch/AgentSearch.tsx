@@ -3,7 +3,14 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, ChevronLeft, Globe, Lock, Plus, Quote, X } from 'lucide-react'
+import {
+  ArrowUp,
+  ArrowUpRight,
+  ChevronLeft,
+  Globe,
+  Plus,
+  X,
+} from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import Link from 'next/link'
@@ -131,8 +138,12 @@ function mergeSupply(
 
 const questionAnchor = (messageId: string) => `ask-question-${messageId}`
 
-const BACK_BUTTON =
-  'inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent'
+// The thread header's caret and title, one target. The caret sits where the
+// old 32px icon button centred it, and the title keeps its place beside it.
+const BACK_TITLE =
+  'group inline-flex h-8 items-center gap-2.5 rounded-md pl-2 pr-2 text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent'
+const BACK_CARET =
+  'h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground group-disabled:group-hover:text-muted-foreground'
 
 /**
  * Whether a run's stored answer should take the place of what its stream
@@ -325,6 +336,11 @@ export default function AgentSearch({
   // Questions stopped in this visit, by question message id, with how long
   // they had run (null when the start time is unknown).
   const [stopped, setStopped] = useState<Record<string, number | null>>({})
+  // How long each answer finished in this visit took, by its message id.
+  const [took, setTook] = useState<Record<string, number>>({})
+  const ranRef = useRef(false)
+  // The run under way was picked up from a reload, so its start is unknown.
+  const resumedRef = useRef(false)
   // A Stop pressed and not yet confirmed by the server, or refused by it:
   // which question, how long it had run, and whether the cancel failed.
   const [stopping, setStopping] = useState<{
@@ -625,6 +641,7 @@ export default function AgentSearch({
     if (conversation.runningRunId && !busyRef.current) {
       runIdRef.current = conversation.runningRunId
       acceptedRef.current = true
+      resumedRef.current = true
       setRunStartedAt(Date.now())
       void resumeStream()
     }
@@ -849,6 +866,21 @@ export default function AgentSearch({
   useEffect(() => {
     if (!busy) setStopping(null)
   }, [busy])
+  // When a run asked in this visit ends, keep how long it took, by its
+  // answer's message. A run picked up mid-way (a reload) has no start here.
+  useEffect(() => {
+    if (busy) {
+      ranRef.current = true
+      return
+    }
+    if (!ranRef.current) return
+    ranRef.current = false
+    const last = messages[messages.length - 1]
+    if (last?.role !== 'assistant' || runStartedAt === null) return
+    if (resumedRef.current) return
+    const ms = Date.now() - runStartedAt
+    setTook((current) => ({ ...current, [last.id]: ms }))
+  }, [busy, messages, runStartedAt])
 
   const ask = (question: string) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
@@ -856,6 +888,7 @@ export default function AgentSearch({
     if (error) clearError()
     setLoadError(null)
     setInput('')
+    resumedRef.current = false
     setRunStartedAt(Date.now())
     // The run before is over, however its stream ended; a Stop from here on
     // is for the new run, whose id the server has yet to return.
@@ -1171,52 +1204,41 @@ export default function AgentSearch({
     />
   )
 
-  // First visit: the facts that qualify asking sit beside the box, as the
-  // daily count sits beside Ask.
+  // Start page composer: pure writing surface with the daily count and send
+  // pill bottom-right; privacy and scope live in the quiet subtitle above.
   const startForm = (
     <form onSubmit={onSubmit} className="w-full">
       <label htmlFor={inputId} className="sr-only">
         Your question
       </label>
-      <div className="rounded-xl border border-border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring">
+      <div className="rounded-xl border border-border/80 bg-card shadow-sm transition-shadow focus-within:border-foreground/25 focus-within:shadow-md focus-within:ring-1 focus-within:ring-foreground/15">
         {filterChips && <div className="px-4 pt-3">{filterChips}</div>}
         {textarea(
-          3,
+          2,
           'Ask about members’ tweets',
-          `block w-full px-4 pb-1 ${filterChips ? 'pt-2' : 'pt-3.5'}`,
+          `block min-h-[4.25rem] w-full px-4 pb-2 ${filterChips ? 'pt-2' : 'pt-3.5'}`,
         )}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-1 text-xs text-muted-foreground">
-          <span className="ml-auto flex items-center gap-3">
-            {today ? (
-              <QuestionsLeft today={today} />
-            ) : (
-              !recentLoaded && (
-                // Holds the count's place until the quota arrives.
-                <Skeleton aria-hidden="true" className="h-4 w-20" />
-              )
-            )}
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ArrowUp aria-hidden="true" className="h-4 w-4" />
-              Ask
-            </button>
-          </span>
+        <div className="flex items-center justify-end gap-3 px-4 pb-3 pt-1 text-xs text-muted-foreground">
+          {today ? (
+            <QuestionsLeft today={today} />
+          ) : (
+            !recentLoaded && (
+              // Holds the count's place until the quota arrives.
+              <Skeleton aria-hidden="true" className="h-4 w-20" />
+            )
+          )}
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+          >
+            <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
+            Ask
+          </button>
         </div>
       </div>
-      <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <Lock aria-hidden="true" className="h-3.5 w-3.5" />
-          Private to you
-        </span>
-        <span aria-hidden="true">·</span>
-        <span className="inline-flex items-center gap-1.5">
-          <Quote aria-hidden="true" className="h-3.5 w-3.5" />
-          Answers cite tweets
-        </span>
-        <span aria-hidden="true">·</span>
+      <p className="mt-2.5 px-1 text-xs text-muted-foreground">
+        Private search across members’ archived tweets, with cited answers.{' '}
         <QuestionHandling />
       </p>
       {errorNote}
@@ -1230,7 +1252,7 @@ export default function AgentSearch({
         Ask a follow-up
       </label>
       {filterChips && <div className="mb-1.5">{filterChips}</div>}
-      <div className="flex items-end gap-2 rounded-xl border border-border bg-card p-1.5 pl-3 shadow-sm focus-within:ring-2 focus-within:ring-ring">
+      <div className="flex items-end gap-2 rounded-xl border border-border/80 bg-card p-1.5 pl-3.5 shadow-sm transition-shadow focus-within:border-foreground/25 focus-within:shadow-md focus-within:ring-1 focus-within:ring-foreground/15">
         {textarea(
           input.includes('\n') ? 3 : 1,
           'Ask a follow-up',
@@ -1240,7 +1262,7 @@ export default function AgentSearch({
           type="submit"
           aria-label="Ask"
           disabled={!input.trim()}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
         >
           <ArrowUp aria-hidden="true" className="h-4 w-4" />
         </button>
@@ -1336,33 +1358,35 @@ export default function AgentSearch({
         >
           {inThread ? (
             <div className="mb-6 flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2">
-              {/* The caret leaves the conversation for Ask's start page, as a
-                  new history entry, so the browser's Back returns to it. A
-                  guest's goes to the page itself, which gates them. */}
+              {/* The caret and the title are one control: either leaves the
+                  conversation for Ask's start page, as a new history entry, so
+                  the browser's Back returns to it. A guest's goes to the page
+                  itself, which gates them. */}
               <div className="-ml-2 flex items-center gap-0.5">
-                {guest ? (
-                  <Link
-                    href="/search/ask"
-                    aria-label="Ask the archive"
-                    title="Ask the archive"
-                    className={BACK_BUTTON}
-                  >
-                    <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={startNewConversation}
-                    disabled={busy}
-                    aria-label="Back to Ask the archive"
-                    title="Back to Ask the archive"
-                    className={BACK_BUTTON}
-                  >
-                    <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-                  </button>
-                )}
                 <h1 className="text-[15px] font-semibold text-foreground [font-family:inherit]">
-                  Ask the archive
+                  {guest ? (
+                    <Link
+                      href="/search/ask"
+                      aria-label="Back to Ask the archive"
+                      title="Back to Ask the archive"
+                      className={BACK_TITLE}
+                    >
+                      <ChevronLeft aria-hidden="true" className={BACK_CARET} />
+                      Ask the archive
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={startNewConversation}
+                      disabled={busy}
+                      aria-label="Back to Ask the archive"
+                      title="Back to Ask the archive"
+                      className={BACK_TITLE}
+                    >
+                      <ChevronLeft aria-hidden="true" className={BACK_CARET} />
+                      Ask the archive
+                    </button>
+                  )}
                 </h1>
                 {readOnly && !loading && (
                   <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
@@ -1441,28 +1465,39 @@ export default function AgentSearch({
           {!inThread && (
             <>
               {paused ? pausedNote : outOfQuestions ? limitNote : startForm}
-              {/* Suggestions, not history: chips under the box that fill it
-                rather than send, since one tap should not spend one of the
-                day's questions. */}
-              <ul
-                aria-label="Questions to try"
-                className="mt-4 flex flex-wrap gap-2"
-              >
-                {EXAMPLE_QUESTIONS.map((question) => (
-                  <li key={question}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInput(question)
-                        textareaRef.current?.focus()
-                      }}
-                      className="rounded-full border border-border px-3 py-1.5 text-left text-[13px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {question}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {/* Suggestions, not history: mirrored with Recent via the same
+                quiet eyebrow heading; tapping fills the box rather than sending. */}
+              <section aria-labelledby="try-asking" className="mt-7">
+                <h2
+                  id="try-asking"
+                  className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground [font-family:inherit]"
+                >
+                  Try asking
+                </h2>
+                <ul
+                  aria-label="Questions to try"
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                >
+                  {EXAMPLE_QUESTIONS.map((question) => (
+                    <li key={question}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInput(question)
+                          textareaRef.current?.focus()
+                        }}
+                        className="group flex h-full w-full items-start justify-between gap-2.5 rounded-lg bg-muted/40 px-3.5 py-2.5 text-left text-[13px] leading-snug text-muted-foreground transition-colors hover:bg-muted/75 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span>{question}</span>
+                        <ArrowUpRight
+                          aria-hidden="true"
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60 motion-reduce:transition-none"
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
               <RecentConversations
                 conversations={recent}
                 loading={!recentLoaded}
@@ -1491,14 +1526,52 @@ export default function AgentSearch({
                           ? 'failed'
                           : null
                   const question = messageText(message)
+                  const replyView =
+                    reply !== null
+                      ? (views.get(reply) as TurnView | undefined)
+                      : undefined
+                  const replyStoppedWithoutAnswer =
+                    reply !== null &&
+                    reply < lastIndex &&
+                    Boolean(replyView) &&
+                    replyView!.answer.blocks.length === 0 &&
+                    (message.id in stopped ||
+                      replyView!.outcome === 'stopped' ||
+                      replyView!.outcome === 'failed')
+                  // If an earlier turn stopped before producing any answer and
+                  // the same question was already asked again later in this
+                  // thread, fold it to a quiet one-liner instead of repeating
+                  // the full heading and primary CTA above the real answer.
+                  const supersededEmpty =
+                    (endedEarly !== null || replyStoppedWithoutAnswer) &&
+                    messages
+                      .slice(index + 1)
+                      .some(
+                        (later) =>
+                          later.role === 'user' &&
+                          messageText(later).trim() === question.trim(),
+                      )
+                  if (supersededEmpty) {
+                    return (
+                      <p
+                        key={message.id}
+                        className="text-xs text-muted-foreground/75"
+                      >
+                        {endedEarly === 'failed' ||
+                        replyView?.outcome === 'failed'
+                          ? 'An earlier attempt stopped before it finished.'
+                          : 'Stopped an earlier attempt before it answered.'}
+                      </p>
+                    )
+                  }
                   return (
                     <div
                       key={message.id}
-                      className="space-y-5 border-t border-border pt-6 first:border-t-0 first:pt-0"
+                      className="space-y-4 border-t border-border/60 pt-6 first:border-t-0 first:pt-0"
                     >
                       <h2
                         id={questionAnchor(message.id)}
-                        className="scroll-mt-24 whitespace-pre-wrap break-words text-2xl font-semibold leading-snug text-foreground sm:text-3xl"
+                        className="scroll-mt-24 whitespace-pre-wrap break-words text-xl font-semibold leading-[1.3] tracking-tight text-foreground sm:text-[22px]"
                       >
                         {question}
                       </h2>
@@ -1532,6 +1605,24 @@ export default function AgentSearch({
                   messages[index - 1]?.role === 'user'
                     ? messages[index - 1]
                     : null
+                // Already folded into a quiet one-liner with its user prompt.
+                if (
+                  asked &&
+                  index < lastIndex &&
+                  view.answer.blocks.length === 0 &&
+                  (asked.id in stopped ||
+                    view.outcome === 'stopped' ||
+                    view.outcome === 'failed') &&
+                  messages
+                    .slice(index + 1)
+                    .some(
+                      (later) =>
+                        later.role === 'user' &&
+                        messageText(later).trim() === messageText(asked).trim(),
+                    )
+                ) {
+                  return null
+                }
                 const interrupted: TurnInterruption | null = active
                   ? null
                   : asked && asked.id in stopped
@@ -1566,6 +1657,7 @@ export default function AgentSearch({
                           view.outcome === 'stopped'
                         }
                         onRetryTweets={retryTweets}
+                        durationMs={took[message.id] ?? null}
                       />
                     </EvidenceBoundary>
                   </div>
@@ -1575,17 +1667,19 @@ export default function AgentSearch({
           )}
 
           {/* Pinned to the bottom of the screen while reading a thread; it
-            settles into place below the last turn. Hidden while a question
-            runs: Stop, in the step log, is the only action then. */}
+            settles into place below the last turn with a soft fade scrim so
+            reading prose never collides hard with the composer's top edge. */}
           {hasThread && !loading && !busy && (
-            <div className="sticky bottom-0 z-30 -mx-4 mt-10 max-w-[calc(48rem+2rem)] bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6">
-              {readOnly
-                ? readerNote
-                : paused
-                  ? pausedNote
-                  : outOfQuestions
-                    ? limitNote
-                    : threadForm}
+            <div className="pointer-events-none sticky bottom-0 z-30 -mx-4 mt-8 max-w-[calc(48rem+2rem)] bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 sm:-mx-6 sm:max-w-[calc(48rem+3rem)] sm:px-6">
+              <div className="pointer-events-auto">
+                {readOnly
+                  ? readerNote
+                  : paused
+                    ? pausedNote
+                    : outOfQuestions
+                      ? limitNote
+                      : threadForm}
+              </div>
             </div>
           )}
         </section>

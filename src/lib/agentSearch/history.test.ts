@@ -228,9 +228,15 @@ describe('conversationMessages', () => {
     expect(messages[3].parts).toEqual([
       { type: 'text', text: '_This answer was stopped before it finished._' },
     ])
-    // How each run ended travels with its answer, for the page.
-    expect(messages[1].metadata).toEqual({ outcome: 'done' })
-    expect(messages[3].metadata).toEqual({ outcome: 'stopped' })
+    // How each run ended, and how long it took, travels with its answer.
+    expect(messages[1].metadata).toEqual({
+      outcome: 'done',
+      durationMs: 60000,
+    })
+    expect(messages[3].metadata).toEqual({
+      outcome: 'stopped',
+      durationMs: 60000,
+    })
   })
 
   test('marks a failed run’s partial answer as unfinished', () => {
@@ -248,7 +254,10 @@ describe('conversationMessages', () => {
       { type: 'text', text: 'Half an answer' },
       { type: 'text', text: '\n\n_This answer failed before it finished._' },
     ])
-    expect(answer.metadata).toEqual({ outcome: 'failed' })
+    expect(answer.metadata).toEqual({
+      outcome: 'failed',
+      durationMs: 60000,
+    })
   })
 
   test('falls back to the stored answer text for runs without parts', () => {

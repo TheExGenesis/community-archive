@@ -297,6 +297,34 @@ describe('the bash workspace', () => {
     expect(getTweetsByIds).not.toHaveBeenCalled()
   })
 
+  test('the merge the prompt teaches keeps newest first, and best first for scored files', async () => {
+    // Ids whose string order is not their date order, as real ids of
+    // different lengths are.
+    archive = new Map(
+      [
+        ['9', '2024-01-05'],
+        ['30', '2026-03-01'],
+        ['100', '2026-06-01'],
+        ['20', '2025-02-01'],
+      ].map(([id, day]) => [
+        id,
+        { ...tweet(id), createdAt: `${day}T00:00:00.000Z` },
+      ]),
+    )
+    const out = await run(
+      "search singapore > a.jsonl && search about > b.jsonl && cat a.jsonl b.jsonl | jq -sc 'unique_by(.id)[]' | jq -r .id | tr '\\n' ' ' && echo && cat a.jsonl b.jsonl | jq -sc 'unique_by(.id) | sort_by(.date) | reverse[]' > all.jsonl && jq -r .id all.jsonl | tr '\\n' ' '",
+    )
+    const [byId, newestFirst] = out.stdout.trim().split('\n')
+    // unique_by alone: ids as strings, which is no order a reader wants.
+    expect(byId.trim()).toBe('100 20 30 9')
+    expect(newestFirst.trim()).toBe('100 30 20 9')
+
+    const scored = await run(
+      `printf '%s\\n' '{"id":"9","p":0.2}' '{"id":"30","p":0.9}' > c1.jsonl && printf '%s\\n' '{"id":"100","p":0.6}' '{"id":"30","p":0.9}' > c2.jsonl && cat c1.jsonl c2.jsonl | jq -sc 'unique_by(.id) | sort_by(-.p)[] | select(.p >= 0.5)' | jq -r .id | tr '\\n' ' '`,
+    )
+    expect(scored.stdout.trim()).toBe('30 100')
+  })
+
   test('split cuts a tweet file into parts the next command can use', async () => {
     const first = await run('search singapore > s1.jsonl')
     const out = await run(

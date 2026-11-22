@@ -289,6 +289,38 @@ describe('the fast instructions', () => {
   })
 })
 
+describe('merging files', () => {
+  const prompts = {
+    v1: bashInstructions('2026-10-14'),
+    deep: bashInstructionsV2('2026-10-14', true),
+    fast: bashInstructionsV2('2026-10-14', true, 'fast'),
+  }
+
+  test('search results are merged newest first, never left in id order', () => {
+    for (const text of Object.values(prompts)) {
+      // jq's unique_by sorts by id as a string, which put the oldest first.
+      expect(text).not.toContain("unique_by(.id)[]'")
+      expect(text).toContain(
+        "(cat a b | jq -sc 'unique_by(.id) | sort_by(.date) | reverse[]' > all.jsonl;",
+      )
+    }
+    expect(prompts.fast).toContain(
+      "jq -sc 'unique_by(.id) | sort_by(.date) | reverse[]' > all.jsonl && score all.jsonl",
+    )
+  })
+
+  test('scored files are merged best first', () => {
+    for (const text of [prompts.v1, prompts.deep]) {
+      expect(text).toContain(
+        "cat c1.jsonl c2.jsonl | jq -sc 'unique_by(.id) | sort_by(-.p)[]' > scored.jsonl && expand scored.jsonl",
+      )
+      expect(text).toContain(
+        "jq -sc 'unique_by(.id) | sort_by(-.p)[] | select(.p >= 0.5)' > yes.jsonl",
+      )
+    }
+  })
+})
+
 describe('lists in the answer', () => {
   test('hand-picked tweets go in the marker, files stay for sets a command picks', () => {
     const text = bashInstructions('2026-10-14')

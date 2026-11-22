@@ -474,9 +474,16 @@ async function search(
     cutShort !== undefined
       ? ` · stopped early when a later page failed (${cutShort}); these are the first ${tweets.length}, and more may exist (narrow with --since/--until to read the rest)`
       : ''
+  const moreNote = more
+    ? !sort || sort === 'newest'
+      ? ` · more exist (--sort likes for top posts, --until for earlier dates, or raise --limit, max ${MAX_COLLECT})`
+      : limit < MAX_COLLECT
+        ? ` · more exist (raise --limit, max ${MAX_COLLECT}, or narrow with --since/--until)`
+        : ' · more exist (narrow with --since/--until)'
+    : ''
   return {
     stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
-    stderr: `search ${words(searchedFor(bases, withTerms, mode))}: ${describe(tweets)}${failedNote}${cutNote}${more ? ` · more exist (raise --limit, max ${MAX_COLLECT})` : ''}\n`,
+    stderr: `search ${words(searchedFor(bases, withTerms, mode))}: ${describe(tweets)}${failedNote}${cutNote}${moreNote}\n`,
     exitCode: 0,
   }
 }

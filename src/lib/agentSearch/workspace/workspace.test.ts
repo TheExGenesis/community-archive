@@ -639,6 +639,18 @@ describe('search with several words', () => {
     expect(many.exitCode).toBe(2)
     expect(many.stderr).toContain('at most 9')
   })
+
+  test('a truncated newest-first search suggests --sort likes and --until, not only raising --limit', async () => {
+    const newest = await run('search singapore --limit 2')
+    expect(newest.stderr).toContain(
+      'more exist (--sort likes for top posts, --until for earlier dates, or raise --limit, max 1000)',
+    )
+    const liked = await run('search singapore --sort likes --limit 2')
+    expect(liked.stderr).toContain(
+      'more exist (raise --limit, max 1000, or narrow with --since/--until)',
+    )
+    expect(liked.stderr).not.toContain('--sort likes for top posts')
+  })
 })
 
 describe('the tweet ids a command printed', () => {

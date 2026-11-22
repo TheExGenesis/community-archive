@@ -363,7 +363,7 @@ function ThinkingItem({ text, current }: { text: string; current: boolean }) {
         <p
           ref={bodyRef}
           id={bodyId}
-          className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap break-words border-l border-border pl-3 pr-2 text-xs leading-relaxed text-muted-foreground/85"
+          className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-words pr-2 text-xs leading-relaxed text-muted-foreground/85"
         >
           {text}
         </p>

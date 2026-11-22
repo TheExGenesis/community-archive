@@ -2,7 +2,6 @@ import { WorkflowAgent, type ModelCallStreamPart } from '@ai-sdk/workflow'
 import { isStepCount } from 'ai'
 import { getWritable } from 'workflow'
 import {
-  AGENT_SEARCH_MAX_STEPS,
   agentRunFailure,
   agentSearchInstructions,
   agentSearchPrepareStep,
@@ -24,6 +23,11 @@ import {
 } from '@/lib/agentSearch/citations'
 import { lookupAsker } from '@/lib/agentSearch/asker'
 import { buildConversationContext } from '@/lib/agentSearch/context'
+import {
+  AGENT_SEARCH_PROFILES,
+  LEGACY_AGENT_SEARCH_DEPTH,
+  type AgentSearchDepth,
+} from '@/lib/agentSearch/depth'
 import { buildRunParts } from '@/lib/agentSearch/history'
 import { agentSearchModel } from '@/lib/agentSearch/model'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
@@ -48,10 +52,7 @@ import {
   type ScoreTweetsInput,
   type SearchTweetsToolInput,
 } from '@/lib/agentSearch/toolImpl'
-import {
-  MAX_SEMANTIC_CALLS_PER_RUN,
-  type SemanticSearchInput,
-} from '@/lib/agentSearch/semantic'
+import type { SemanticSearchInput } from '@/lib/agentSearch/semantic'
 import {
   applyChanges,
   describeManifest,
@@ -159,6 +160,7 @@ async function bashStep(
   semanticUsed: number,
   runId: string,
   deadlineAt: number,
+  maxSemanticCalls?: number,
 ) {
   'use step'
   const output = await withRecordedCost(runId, () =>
@@ -166,6 +168,7 @@ async function bashStep(
       command: input.command,
       manifest,
       semanticUsed,
+      maxSemanticCalls,
       runId,
       limits: { deadlineAt },
     }),
@@ -255,7 +258,8 @@ async function recordRunStep(summary: RunSummary) {
     // Admission stored the run before the workflow started. A run the member
     // stopped meanwhile stays stopped; its spend is already recorded.
     const current = await store.get(summary.runId)
-    if (!current) throw new Error(`Agent search run ${summary.runId} is missing`)
+    if (!current)
+      throw new Error(`Agent search run ${summary.runId} is missing`)
     if (current.status !== 'running') return
     await store.update(summary.runId, {
       status: summary.error ? 'failed' : 'completed',
@@ -305,6 +309,11 @@ export interface AgentSearchWorkflowInput {
   /** Reasoning kept between steps and the stall reminder; off for older runs. */
   stepOptions?: PrepareStepOptions
   /**
+   * How hard to search (depth.ts). Runs started before depths existed carry
+   * none and searched deep, so a replay of one keeps its steps and effort.
+   */
+  depth?: AgentSearchDepth
+  /**
    * The member's own OpenRouter key, sealed for this run (ownKey.ts). The
    * workflow's inputs are kept in its event log, so the key never enters it
    * in the clear; the model step opens it just before each call.
@@ -317,6 +326,8 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
 
   const { runId, deadlineAt } = input
   const toolMode = input.toolMode ?? 'typed'
+  const depth = input.depth ?? LEGACY_AGENT_SEARCH_DEPTH
+  const profile = AGENT_SEARCH_PROFILES[depth]
   // The workspace as of the last finished command, carried between steps.
   let workspace: WorkspaceManifest = {}
   // A question may run only a few semantic searches.
@@ -332,6 +343,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
             semanticUsed,
             runId,
             deadlineAt,
+            profile.maxSemanticCalls,
           )
           workspace = applyChanges(workspace, output.workspace)
           semanticUsed += output.semanticCalls ?? 0
@@ -349,8 +361,8 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
           get_interactions: (args) => interactionsStep(args, deadlineAt),
           get_interaction_ties: (args) => interactionTiesStep(args, deadlineAt),
           semantic_search: async (args) => {
-            if (semanticUsed >= MAX_SEMANTIC_CALLS_PER_RUN) {
-              return semanticLimitReached(args.query)
+            if (semanticUsed >= profile.maxSemanticCalls) {
+              return semanticLimitReached(args.query, profile.maxSemanticCalls)
             }
             semanticUsed += 1
             return semanticSearchStep(args, deadlineAt)
@@ -360,12 +372,19 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   const createAgent = (asker: AskerProfile | null) =>
     new WorkflowAgent({
       // Each planner call records its own usage on this run.
-      model: agentSearchModel(input.modelSpec, runId, input.sealedKey ?? null),
+      model: agentSearchModel(
+        input.modelSpec,
+        runId,
+        input.sealedKey ?? null,
+        null,
+        profile.reasoningEffort,
+      ),
       instructions: agentSearchInstructions(
         input.date,
         toolMode,
         input.promptVariant ?? 'v1',
         asker,
+        depth,
       ),
       tools,
     })
@@ -401,11 +420,12 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
     const result = await agent.stream({
       messages: [...context.messages, { role: 'user', content: question }],
       writable: getWritable<ModelCallStreamPart>(),
-      stopWhen: [isStepCount(AGENT_SEARCH_MAX_STEPS), toolsKeepFailing],
+      stopWhen: [isStepCount(profile.maxSteps), toolsKeepFailing],
       prepareStep: agentSearchPrepareStep(
         deadlineAt,
         undefined,
         input.stepOptions ?? {},
+        profile.maxSteps,
       ),
     })
     for (const step of result.steps) {

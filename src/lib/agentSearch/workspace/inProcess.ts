@@ -13,6 +13,8 @@ import { runBashCommand } from './workspace'
 export function createInProcessBash(
   limits: RunLimits = {},
   initial: WorkspaceManifest = {},
+  /** Semantic searches the question may run; a deep run's when left out. */
+  maxSemanticCalls?: number,
 ): { execute: BashExecutor; manifest: () => WorkspaceManifest } {
   let manifest = initial
   let semanticUsed = 0
@@ -24,6 +26,7 @@ export function createInProcessBash(
         manifest,
         limits,
         semanticUsed,
+        maxSemanticCalls,
         tweetCache,
       })
       manifest = applyChanges(manifest, output.workspace)

@@ -356,6 +356,28 @@ describe('the bash workspace', () => {
     expect(semanticSearch).toHaveBeenCalledTimes(1)
   })
 
+  test('a run with a lower semantic cap is stopped at it, and told its own number', async () => {
+    ;(semanticSearch as jest.Mock).mockResolvedValue({
+      query: 'moving there',
+      matched: 1,
+      tweets: [{ ...tweet('3'), distance: 0.91 }],
+    })
+    const fast = (command: string, semanticUsed: number) =>
+      runBashCommand({
+        command,
+        manifest: {},
+        semanticUsed,
+        maxSemanticCalls: 2,
+      })
+    const last = await fast('semantic "moving there for work"', 1)
+    expect(last.exitCode).toBe(0)
+    expect(last.stderr).toContain('0 semantic searches left')
+    const capped = await fast('semantic "again"', 2)
+    expect(capped.exitCode).toBe(1)
+    expect(capped.stderr).toContain('has used its 2 semantic searches')
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+  })
+
   test('a failed semantic search is not an archive outage', async () => {
     ;(semanticSearch as jest.Mock).mockRejectedValue(new Error('timeout'))
     const out = await run('semantic "anything at all"')

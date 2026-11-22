@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       { status: 400, headers: noStore },
     )
   }
-  const { conversationId, question } = parsed
+  const { conversationId, question, depth } = parsed
 
   // A member's own OpenRouter key pays for the planner and raises their daily
   // limit. It is checked with OpenRouter before anything starts, so a bad key
@@ -197,6 +197,7 @@ export async function POST(request: Request) {
         toolMode: agentSearchToolMode(),
         promptVariant: agentSearchPromptVariant(),
         stepOptions: agentSearchPrepareStepOptions(),
+        depth,
         ...(sealedKey ? { sealedKey } : {}),
       },
     ])

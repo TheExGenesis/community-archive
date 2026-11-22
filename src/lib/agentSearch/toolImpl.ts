@@ -16,7 +16,7 @@ import {
   type SearchTweetsInput,
 } from './gateway'
 import {
-  SEMANTIC_LIMIT_MESSAGE,
+  semanticLimitMessage,
   semanticSearch,
   type SemanticSearchInput,
 } from './semantic'
@@ -605,10 +605,10 @@ export async function interactionTiesImpl(
 }
 
 /** What the typed tool returns once a question has used its semantic searches. */
-export const semanticLimitReached = (query: string) => ({
+export const semanticLimitReached = (query: string, max?: number) => ({
   query,
   limitReached: true as const,
-  message: SEMANTIC_LIMIT_MESSAGE,
+  message: semanticLimitMessage(max),
   tweets: [] as [],
 })
 

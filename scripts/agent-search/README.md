@@ -35,7 +35,9 @@ Then, from the repo root:
 
 Other flags: `--model provider:model` (default `AGENT_SEARCH_MODEL` or
 `openrouter:deepseek/deepseek-v4.1-flash`), `--tools bash|typed` (default `AGENT_SEARCH_TOOLS`
-or `bash`: the shell workspace, or the typed tools), `--timeout-ms` (per question, default
+or `bash`: the shell workspace, or the typed tools), `--depth fast|deep` (default `deep`, so results
+stay comparable with earlier runs; `fast` applies the page's default profile: low effort, 8 steps,
+2 semantic searches, the one-round prompt), `--timeout-ms` (per question, default
 300000), `--questions <file>`, `--no-validate-keys`, `--allow-remote-gateway`, `--traces <dir>` (one JSON
 per question with each step's reasoning, commands, the output the model saw and the answer). The
 prompt variant and step options come from `AGENT_SEARCH_PROMPT` (`v1`, `v2`, `v2-examples`),
@@ -58,14 +60,14 @@ about 63k input and 0.6k output tokens with `gpt-6.1-sol`. Run a class or `--lim
 
 ## Question classes and keys
 
-| class | keyType | key |
-|---|---|---|
-| recall-a-tweet | exact | the one tweet (≥20 likes, ≥12 words, not a reply), asked about in paraphrase |
-| survey | partial | hand-picked on-topic tweets from a small SQL pool (`poolSql`) |
-| investigative | partial | the benchmark key from `research/pilot/findings.md` (members only), plus hand-built keys from thread walks and pools |
-| person-centric | exact | every non-retweet by the handle matching a word set (`sql`) |
-| time-bounded | exact | every non-retweet in a UTC month matching a word set (`sql`) |
-| ambiguous-term | judged | `expect: 'clarify' or 'resolve'`, plus optional example ids |
+| class          | keyType | key                                                                                                                  |
+| -------------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| recall-a-tweet | exact   | the one tweet (≥20 likes, ≥12 words, not a reply), asked about in paraphrase                                         |
+| survey         | partial | hand-picked on-topic tweets from a small SQL pool (`poolSql`)                                                        |
+| investigative  | partial | the benchmark key from `research/pilot/findings.md` (members only), plus hand-built keys from thread walks and pools |
+| person-centric | exact   | every non-retweet by the handle matching a word set (`sql`)                                                          |
+| time-bounded   | exact   | every non-retweet in a UTC month matching a word set (`sql`)                                                         |
+| ambiguous-term | judged  | `expect: 'clarify' or 'resolve'`, plus optional example ids                                                          |
 
 Exact SQL keys are capped at 200 ids (`capped: true` would say the cap was hit; none are
 today). Before each question the runner re-fetches the key ids through the gateway and

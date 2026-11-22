@@ -27,7 +27,7 @@ import {
   MAX_SEMANTIC_CALLS_PER_RUN,
   SEMANTIC_DEFAULT_K,
   SEMANTIC_DEFAULT_THRESHOLD,
-  SEMANTIC_LIMIT_MESSAGE,
+  semanticLimitMessage,
   semanticSearch,
 } from '../semantic'
 import type { AgentTweet } from '../types'
@@ -53,7 +53,8 @@ export interface CommandState {
   /** Archive calls that ran, and those that failed (gateway or scorer). */
   calls: number
   failures: number
-  /** Semantic searches this question may still run, and those run here. */
+  /** Semantic searches this question may run in all, may still run, and ran here. */
+  semanticLimit: number
   semanticRemaining: number
   semanticCalls: number
 }
@@ -62,6 +63,7 @@ export function createCommandState(
   limits: RunLimits,
   semanticUsed = 0,
   cache: Map<string, AgentTweet> = new Map(),
+  maxSemanticCalls = MAX_SEMANTIC_CALLS_PER_RUN,
 ): CommandState {
   return {
     limits,
@@ -70,7 +72,8 @@ export function createCommandState(
     summaries: [],
     calls: 0,
     failures: 0,
-    semanticRemaining: Math.max(0, MAX_SEMANTIC_CALLS_PER_RUN - semanticUsed),
+    semanticLimit: maxSemanticCalls,
+    semanticRemaining: Math.max(0, maxSemanticCalls - semanticUsed),
     semanticCalls: 0,
   }
 }
@@ -446,7 +449,7 @@ async function semantic(
   if (state.semanticRemaining <= 0) {
     return {
       stdout: '',
-      stderr: `semantic: ${SEMANTIC_LIMIT_MESSAGE}\n`,
+      stderr: `semantic: ${semanticLimitMessage(state.semanticLimit)}\n`,
       exitCode: 1,
     }
   }

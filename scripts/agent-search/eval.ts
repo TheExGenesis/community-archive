@@ -119,6 +119,8 @@ function parseArgs(argv: string[]) {
     limit: Infinity,
     model: null as string | null,
     tools: null as 'bash' | 'typed' | null,
+    // Deep, so results stay comparable with runs from before depths existed.
+    depth: 'deep' as 'fast' | 'deep',
     concurrency: 1,
     timeoutMs: 300_000,
     questions: join(HERE, 'questions.json'),
@@ -145,6 +147,12 @@ function parseArgs(argv: string[]) {
         throw new Error('--tools must be bash or typed')
       }
       args.tools = mode
+    } else if (flag === '--depth') {
+      const depth = value()
+      if (depth !== 'fast' && depth !== 'deep') {
+        throw new Error('--depth must be fast or deep')
+      }
+      args.depth = depth
     } else if (flag === '--concurrency')
       args.concurrency = Math.max(1, Number(value()))
     else if (flag === '--timeout-ms') args.timeoutMs = Number(value())
@@ -280,6 +288,7 @@ const pct = (value: number | null) =>
 type Modules = {
   agent: typeof import('@/lib/agentSearch/agent')
   citations: typeof import('@/lib/agentSearch/citations')
+  depth: typeof import('@/lib/agentSearch/depth')
   model: typeof import('@/lib/agentSearch/model')
   gateway: typeof import('@/lib/agentSearch/gateway')
   classifier: typeof import('@/lib/agentSearch/classifier')
@@ -458,22 +467,24 @@ function writeTrace(
   )
 }
 
-/** The tools for a mode, with the per-question semantic search cap. */
+/** The tools for a mode, with the depth's per-question semantic search cap. */
 function toolsFor(
   mods: Modules,
   mode: 'bash' | 'typed',
   abortSignal: AbortSignal,
+  maxSemanticCalls: number,
 ): ToolSet {
   if (mode === 'bash') {
     return mods.agent.createBashAgentTools(
-      mods.inProcess.createInProcessBash({ abortSignal }).execute,
+      mods.inProcess.createInProcessBash({ abortSignal }, {}, maxSemanticCalls)
+        .execute,
     )
   }
   let semanticUsed = 0
   return mods.agent.createAgentSearchTools({
     semantic_search: async (input, options) => {
-      if (semanticUsed >= mods.semantic.MAX_SEMANTIC_CALLS_PER_RUN) {
-        return mods.toolImpl.semanticLimitReached(input.query)
+      if (semanticUsed >= maxSemanticCalls) {
+        return mods.toolImpl.semanticLimitReached(input.query, maxSemanticCalls)
       }
       semanticUsed += 1
       return mods.toolImpl.semanticSearchImpl(input, options)
@@ -521,6 +532,8 @@ async function runQuestion(
   if (!error) {
     try {
       const abortSignal = AbortSignal.timeout(args.timeoutMs)
+      // The depth's profile, applied as the workflow applies it.
+      const profile = mods.depth.AGENT_SEARCH_PROFILES[args.depth]
       const agent = new mods.ai.ToolLoopAgent({
         // Its own OpenRouter session, as a production run has (its run id).
         model: mods.model.agentSearchModel(
@@ -528,14 +541,26 @@ async function runQuestion(
           null,
           null,
           `eval-${randomUUID()}`,
+          profile.reasoningEffort,
         ),
-        instructions: mods.agent.agentSearchInstructions(undefined, mode),
-        tools: toolsFor(mods, mode, abortSignal),
+        instructions: mods.agent.agentSearchInstructions(
+          undefined,
+          mode,
+          undefined,
+          null,
+          args.depth,
+        ),
+        tools: toolsFor(mods, mode, abortSignal, profile.maxSemanticCalls),
         stopWhen: [
-          mods.ai.isStepCount(mods.agent.AGENT_SEARCH_MAX_STEPS),
+          mods.ai.isStepCount(profile.maxSteps),
           mods.agent.toolsKeepFailing,
         ],
-        prepareStep: mods.agent.agentSearchPrepareStep(),
+        prepareStep: mods.agent.agentSearchPrepareStep(
+          undefined,
+          undefined,
+          undefined,
+          profile.maxSteps,
+        ),
       })
       const result = await agent.generate({
         prompt: question.question,
@@ -665,7 +690,7 @@ function markdownReport(
   const lines: string[] = []
   lines.push(`# Agent search eval ${meta.startedAt}`, '')
   lines.push(
-    `Model \`${meta.model}\`, tools \`${meta.tools}\`, scorer \`${meta.scorerModel}\`, ${results.length} questions, ` +
+    `Model \`${meta.model}\`, depth \`${meta.depth}\` (effort \`${meta.reasoningEffort}\`, ${meta.maxSteps} steps), tools \`${meta.tools}\`, scorer \`${meta.scorerModel}\`, ${results.length} questions, ` +
       `questions file \`${meta.questions}\`.`,
     '',
   )
@@ -743,6 +768,7 @@ async function main() {
   const mods: Modules = {
     agent: await import('@/lib/agentSearch/agent'),
     citations: await import('@/lib/agentSearch/citations'),
+    depth: await import('@/lib/agentSearch/depth'),
     model: await import('@/lib/agentSearch/model'),
     gateway: await import('@/lib/agentSearch/gateway'),
     classifier: await import('@/lib/agentSearch/classifier'),
@@ -778,8 +804,13 @@ async function main() {
   const meta = {
     startedAt,
     model: modelSpec,
+    depth: args.depth,
     reasoningEffort:
-      mods.model.agentSearchReasoningEffort(modelSpec) ?? 'provider default',
+      mods.model.agentSearchReasoningEffort(
+        modelSpec,
+        undefined,
+        mods.depth.AGENT_SEARCH_PROFILES[args.depth].reasoningEffort,
+      ) ?? 'provider default',
     tools: mode,
     scorerModel:
       scorer === 'decisions'
@@ -788,7 +819,9 @@ async function main() {
           ? mods.classifier.JEV_MODEL
           : mods.model.agentSearchScorerModelSpec(),
     scorer,
-    maxSteps: mods.agent.AGENT_SEARCH_MAX_STEPS,
+    maxSteps: mods.depth.AGENT_SEARCH_PROFILES[args.depth].maxSteps,
+    maxSemanticCalls:
+      mods.depth.AGENT_SEARCH_PROFILES[args.depth].maxSemanticCalls,
     prompt: mods.agent.agentSearchPromptVariant(),
     prepareStep: mods.agent.agentSearchPrepareStepOptions(),
     traces: args.traces,

@@ -184,6 +184,7 @@ export async function runBashCommand({
   manifest,
   limits = {},
   semanticUsed = 0,
+  maxSemanticCalls,
   runId,
   tweetCache,
 }: {
@@ -192,6 +193,8 @@ export async function runBashCommand({
   limits?: RunLimits
   /** Semantic searches the question has already run. */
   semanticUsed?: number
+  /** How many it may run in all; a deep run's count when left out (depth.ts). */
+  maxSemanticCalls?: number
   /** Active run id: reuses hydrated tweets in memory across steps of this run. */
   runId?: string
   /** Optional explicit per-run tweet cache (used by in-process runners/tests). */
@@ -205,6 +208,7 @@ export async function runBashCommand({
     { ...limits, trace, searchSlots: createSlots(SEARCH_CONCURRENCY) },
     semanticUsed,
     cache,
+    maxSemanticCalls,
   )
   const files: Record<string, string | (() => Promise<string>)> = {}
   for (const [path, file] of Object.entries(manifest)) {

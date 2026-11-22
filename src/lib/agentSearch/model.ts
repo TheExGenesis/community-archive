@@ -180,16 +180,18 @@ export const MODEL_REASONING_EFFORT: Record<string, ReasoningEffort> = {
 }
 
 /**
- * The effort to ask the planner for: AGENT_SEARCH_REASONING_EFFORT, else the
- * model's entry above. Null sends nothing, leaving the provider's default;
- * `default` in the env asks for that explicitly. Throws on an unknown value.
+ * The effort to ask the planner for: AGENT_SEARCH_REASONING_EFFORT when set,
+ * else the run's own (a fast run asks for low, depth.ts), else the model's
+ * entry above. Null sends nothing, leaving the provider's default; `default`
+ * in the env asks for that explicitly. Throws on an unknown value.
  */
 export function agentSearchReasoningEffort(
   spec: string,
   value = process.env.AGENT_SEARCH_REASONING_EFFORT,
+  runEffort: ReasoningEffort | null = null,
 ): ReasoningEffort | null {
   const effort = value?.trim().toLowerCase()
-  if (!effort) return MODEL_REASONING_EFFORT[spec] ?? null
+  if (!effort) return runEffort ?? MODEL_REASONING_EFFORT[spec] ?? null
   if (effort === 'default') return null
   if (!REASONING_EFFORTS.has(effort)) {
     throw new Error(
@@ -295,12 +297,14 @@ export function plannerRouting(
  * Builds the provider model at call time, from environment variables or, for
  * an OpenRouter model, from a member's own key. `routing` applies to
  * OpenRouter calls only; without it a call carries just the no-retention
- * filter (the scorer).
+ * filter (the scorer). `runEffort` is the run's reasoning effort, if it has
+ * its own (agentSearchReasoningEffort).
  */
 export function createProviderModel(
   spec: string,
   ownKey: string | null = null,
   routing: PlannerRouting = {},
+  runEffort: ReasoningEffort | null = null,
 ): ProviderModel {
   const { provider, modelId } = parseModelSpec(spec)
   if (provider === 'openai') {
@@ -311,7 +315,7 @@ export function createProviderModel(
   }
   const apiKey = ownKey ?? process.env.OPENROUTER_API_KEY
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not configured')
-  const effort = agentSearchReasoningEffort(spec)
+  const effort = agentSearchReasoningEffort(spec, undefined, runEffort)
   return createOpenAICompatible({
     name: 'openrouter',
     // The Daily Digest's name first (shared OPENROUTER_API_KEY), then ours.
@@ -616,6 +620,8 @@ export class EnvLanguageModel {
     readonly sealedKey: string | null = null,
     /** OpenRouter's sticky-routing key when there is no run id (the eval). */
     readonly sessionId: string | null = null,
+    /** The run's own reasoning effort (a fast run's), or null for the model's. */
+    readonly reasoningEffort: ReasoningEffort | null = null,
   ) {
     parseModelSpec(spec)
   }
@@ -625,7 +631,12 @@ export class EnvLanguageModel {
   }
 
   private inner(): any {
-    this.resolved ??= createProviderModel(this.spec, null, this.routing())
+    this.resolved ??= createProviderModel(
+      this.spec,
+      null,
+      this.routing(),
+      this.reasoningEffort,
+    )
     return this.resolved
   }
 
@@ -637,7 +648,12 @@ export class EnvLanguageModel {
       throw new Error(OWN_KEY_ERRORS.own_key_unavailable)
     }
     const key = await unsealOwnKey(this.sealedKey, this.runId, secret)
-    this.resolved = createProviderModel(this.spec, key, this.routing())
+    this.resolved = createProviderModel(
+      this.spec,
+      key,
+      this.routing(),
+      this.reasoningEffort,
+    )
     return this.resolved
   }
 
@@ -677,7 +693,11 @@ export class EnvLanguageModel {
         ? { ...options, prompt: liftReasoningDetails(options.prompt) }
         : options
     }
-    const effort = agentSearchReasoningEffort(this.spec)
+    const effort = agentSearchReasoningEffort(
+      this.spec,
+      undefined,
+      this.reasoningEffort,
+    )
     if (!effort || options?.providerOptions?.openai?.reasoningEffort) {
       return options
     }
@@ -805,6 +825,9 @@ export class EnvLanguageModel {
       ...(model.runId ? { runId: model.runId } : {}),
       ...(model.sealedKey ? { sealedKey: model.sealedKey } : {}),
       ...(model.sessionId ? { sessionId: model.sessionId } : {}),
+      ...(model.reasoningEffort
+        ? { reasoningEffort: model.reasoningEffort }
+        : {}),
     }
   }
 
@@ -813,12 +836,14 @@ export class EnvLanguageModel {
     runId?: string
     sealedKey?: string
     sessionId?: string
+    reasoningEffort?: ReasoningEffort
   }) {
     return new EnvLanguageModel(
       data.spec,
       data.runId ?? null,
       data.sealedKey ?? null,
       data.sessionId ?? null,
+      data.reasoningEffort ?? null,
     )
   }
 }
@@ -826,18 +851,21 @@ export class EnvLanguageModel {
 /**
  * The planner model; pass the run id to record usage on that run (it is also
  * OpenRouter's session id), a sealed key to call on the member's own
- * OpenRouter key, and a session id when there is no run (the eval).
+ * OpenRouter key, a session id when there is no run (the eval), and the
+ * run's reasoning effort when its depth sets one.
  */
 export function agentSearchModel(
   spec: string,
   runId: string | null = null,
   sealedKey: string | null = null,
   sessionId: string | null = null,
+  reasoningEffort: ReasoningEffort | null = null,
 ): LanguageModel {
   return new EnvLanguageModel(
     spec,
     runId,
     sealedKey,
     sessionId,
+    reasoningEffort,
   ) as unknown as LanguageModel
 }

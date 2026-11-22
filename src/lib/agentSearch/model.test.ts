@@ -414,6 +414,64 @@ describe('planner reasoning effort', () => {
     )
   })
 
+  test('a run’s own effort beats the model’s entry, and the env beats both', () => {
+    const deepseek = 'openrouter:deepseek/deepseek-v4.1-flash'
+    expect(agentSearchReasoningEffort(deepseek, undefined, 'low')).toBe('low')
+    expect(agentSearchReasoningEffort(deepseek, '', 'low')).toBe('low')
+    expect(agentSearchReasoningEffort(deepseek, undefined, null)).toBe('high')
+    expect(agentSearchReasoningEffort(deepseek, 'medium', 'low')).toBe('medium')
+    expect(agentSearchReasoningEffort(deepseek, 'default', 'low')).toBeNull()
+    expect(agentSearchReasoningEffort('openrouter:x/unlisted', '', 'low')).toBe(
+      'low',
+    )
+  })
+
+  test('a fast run’s effort reaches OpenRouter and OpenAI calls', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    process.env.OPENAI_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock)
+      .mockReset()
+      .mockReturnValue(() => ({ doGenerate: jest.fn() }))
+    const realFetch = global.fetch
+    const sent = jest.fn().mockResolvedValue(new Response('{}'))
+    global.fetch = sent as any
+    try {
+      await new EnvLanguageModel(
+        'openrouter:deepseek/deepseek-v4.1-flash',
+        null,
+        null,
+        null,
+        'low',
+      ).doGenerate({})
+      const { fetch } = (createOpenAICompatible as jest.Mock).mock.calls[0][0]
+      await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'deepseek/deepseek-v4.1-flash' }),
+      })
+      expect(JSON.parse(sent.mock.calls[0][1].body).reasoning).toEqual({
+        effort: 'low',
+      })
+      const doGenerate = jest.fn().mockResolvedValue({ content: [] })
+      ;(createOpenAI as jest.Mock).mockReset().mockReturnValue(() => ({
+        doGenerate,
+      }))
+      await new EnvLanguageModel(
+        'openai:gpt-6.1-sol',
+        null,
+        null,
+        null,
+        'low',
+      ).doGenerate({ prompt: [] })
+      expect(doGenerate.mock.calls[0][0].providerOptions).toEqual({
+        openai: { reasoningEffort: 'low' },
+      })
+    } finally {
+      global.fetch = realFetch
+      delete process.env.OPENROUTER_API_KEY
+      delete process.env.OPENAI_API_KEY
+    }
+  })
+
   test('OpenRouter calls carry the effort in the request body', async () => {
     process.env.OPENROUTER_API_KEY = 'test-key'
     ;(createOpenAICompatible as jest.Mock)
@@ -768,6 +826,37 @@ describe('planner provider routing', () => {
     expect(data).toEqual({ spec: 'openrouter:x/y', sessionId: 'eval-2' })
     const back = (EnvLanguageModel as any)[DESERIALIZE](data)
     expect(back.sessionId).toBe('eval-2')
+  })
+
+  test('a run’s effort survives the step boundary, and is absent when it has none', () => {
+    const SERIALIZE = Symbol.for('workflow-serialize')
+    const DESERIALIZE = Symbol.for('workflow-deserialize')
+    const fast = new EnvLanguageModel(
+      'openrouter:x/y',
+      'asr_1',
+      null,
+      null,
+      'low',
+    )
+    const data = (EnvLanguageModel as any)[SERIALIZE](fast)
+    expect(data).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+      reasoningEffort: 'low',
+    })
+    expect((EnvLanguageModel as any)[DESERIALIZE](data).reasoningEffort).toBe(
+      'low',
+    )
+    // A deep run serializes as every run did before depths existed.
+    const deep = new EnvLanguageModel('openrouter:x/y', 'asr_1')
+    expect((EnvLanguageModel as any)[SERIALIZE](deep)).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+    })
+    expect(
+      (EnvLanguageModel as any)[DESERIALIZE]({ spec: 'openrouter:x/y' })
+        .reasoningEffort,
+    ).toBeNull()
   })
 
   test('prices and efforts exist for the strict-ZDR pilot models', () => {

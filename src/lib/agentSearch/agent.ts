@@ -5,6 +5,7 @@ import {
   type AgentSearchToolExecutors,
 } from './toolImpl'
 import { collectToolTweetIds } from './citations'
+import { AGENT_SEARCH_PROFILES, type AgentSearchDepth } from './depth'
 import { MAX_SEMANTIC_CALLS_PER_RUN } from './semantic'
 import { compactTweet, type AgentTweet } from './types'
 import { bashModelOutput, type BashToolOutput } from './workspace/output'
@@ -12,7 +13,8 @@ import { bashModelOutput, type BashToolOutput } from './workspace/output'
 // One agent definition shared by the workflow (durable, tools as steps) and by
 // scripts such as the evaluation runner (in-process).
 
-export const AGENT_SEARCH_MAX_STEPS = 20
+/** A deep run's steps; a fast one gets fewer (depth.ts). */
+export const AGENT_SEARCH_MAX_STEPS = AGENT_SEARCH_PROFILES.deep.maxSteps
 
 /**
  * How the agent searches: `bash`, a shell over the archive whose results are
@@ -29,9 +31,13 @@ export function agentSearchToolMode(
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-/** Instructions for the bash workspace, with an explicit date. */
+/**
+ * Instructions for the bash workspace, with an explicit date. The depth sets
+ * the step and semantic-search counts the text states.
+ */
 export const bashInstructions = (
   date: string = today(),
+  depth: AgentSearchDepth = 'deep',
 ) => `You answer questions about the Community Archive: tweets that members uploaded or opted in to share. You search it from a shell. Today is ${date}.
 
 The shell:
@@ -42,7 +48,7 @@ The shell:
 
 Archive commands (rows on stdout, a one-line summary on stderr, so you see the summary even when you redirect to a file):
 - search <words> [--phrase] [--or w1,w2] [--with w1,w2] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match tweets that contain all of them in any order, which also catches other spellings (open source finds open-source); add --phrase for an exact phrase someone remembers. --or adds alternatives: tweets with the words or with any of these (other names: notion --or @NotionHQ). --with narrows: tweets with the words and at least one of these (notion --with slow,offline). Retweets are excluded.
-- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes a second or two and a question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision. --k is 100 by default.
+- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: search by meaning, for ideas people put in their own words. Rows carry distance (higher is closer), closest first. It takes a second or two and a question gets ${AGENT_SEARCH_PROFILES[depth].maxSemanticCalls}, so describe the idea in plain words and use it for survey and investigative questions, not for names, handles, exact phrases or dates (use search for those). Its results are broad: score them for precision. --k is 100 by default.
 - people <name or handle>: matching members, to get the right handle.
 - timeline @handle [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--oldest] [--no-replies] [--retweets] [--limit N]: that person's own tweets, newest first (200 by default, up to 3000; retweets only with --retweets). Use it to read what someone posts and whom they reply to, rather than searching their tweets for common words.
 - score <file> "<yes/no question about one tweet>" [--yes-if "<what counts as yes>"] [--no-if "<what counts as no>"]: asks the question of every tweet in the file (a reply is read with its parent) and prints the rows with p, the probability that the answer is yes, highest first. p ≥ 0.5 means yes; p says how sure the scorer is, not how strongly the tweet says it. Use it when a search returns more tweets than you can read. The scorer is a small, fast model that sees one tweet's text and your question, nothing else (not the user's question, the author, the date, pictures or other tweets), and takes your words literally. So ask one plain condition a reader could settle from the tweet alone, and name its subject in full rather than "it" or "the project". It cannot count, compare dates or numbers, or know who is writing: use jq on author, date and likes for those. When the line between yes and no needs saying, leave "rather than" and "not just" out of the question and state the line with --yes-if and --no-if, as in score books.jsonl "Does the author say they have read Dune?" --yes-if "they say they read or finished it" --no-if "they only mention it, plan to read it, or saw the film". These are read literally too: a --yes-if wider than the question lets more tweets in.
@@ -59,7 +65,7 @@ How to work:
 3. Save results to files (search … > s1.jsonl) and look at them with small outputs. Add --since/--until only when the question asks about a period.
 4. When the answer is a set of tweets spread across the archive (who criticised something, what people think of a topic), gather broadly, then let the answers you find guide the next searches. First, with par, run keyword searches for the names and the words that signal an answer plus one or two semantic searches for the idea; combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl) and score them with one plain question (score takes up to 1000 tweets; split a bigger file and score the parts with par). Read a sample of the tweets that scored yes and of those just below 0.5: they show what answers look like here. Write one semantic search for each kind of answer you see, in the words those tweets use, run them together and score what they add. Then expand the strongest hits and score what that adds. Work from select(.p >= 0.5). If search says more exist, narrow the words or dates, or say coverage is partial.
 5. Follow conversations when they matter: thread, quotes.
-6. Stop once more searching stops turning up new tweets. Do not repeat a search. You have about 20 commands in all; leave the last two for writing lists and answering.
+6. Stop once more searching stops turning up new tweets. Do not repeat a search. You have about ${AGENT_SEARCH_PROFILES[depth].maxSteps} commands in all; leave the last two for writing lists and answering.
 
 How to answer:
 - Answer the question directly first, in a few sentences. Add sections only when they help.
@@ -144,18 +150,40 @@ export function agentSearchPromptVariant(
   return variant === 'v1' || variant === 'v2' ? variant : 'v2-examples'
 }
 
-const V2_SEMANTIC = `- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: finds tweets anywhere in the archive that express an idea in other words; rows carry distance (higher is closer), closest first. Use it to locate an idea when you don't know the words people used, then follow what it surfaces with search. A question gets ${MAX_SEMANTIC_CALLS_PER_RUN}, and each takes a second or two. Its results are broad: score them for precision. --k is 100 by default. With --from it searches all of that person's tweets.`
+const v2Semantic = (maxSemanticCalls: number) =>
+  `- semantic "<what the tweets say>" [--from @handle] [--k N] [--threshold 0-1]: finds tweets anywhere in the archive that express an idea in other words; rows carry distance (higher is closer), closest first. Use it to locate an idea when you don't know the words people used, then follow what it surfaces with search. A question gets ${maxSemanticCalls}, and each takes a second or two. Its results are broad: score them for precision. --k is 100 by default. With --from it searches all of that person's tweets.`
 
-const V2_WORKING = `What the archive shows:
+const DEEP_AIM =
+  'Aim for the answer the evidence supports best, not the first one that fits. Keep candidate answers open until the evidence separates them; when one line of search stops producing anything new, look at a different kind of evidence rather than more of the same. You are done when more searching would not change your answer.'
+// A fast run gathers once and answers; it has neither the steps nor the
+// semantic searches for a second round.
+const FAST_AIM =
+  'This is a quick pass: one round of gathering, then the answer. Aim for the answer the evidence supports best, and stop as soon as it is solid.'
+
+const DEEP_SET = `- For an answer that is a set of tweets across the archive, gather broadly, then let the answers you find guide the next searches. First, with par, run keyword searches for the names and the words that signal an answer plus one or two semantic searches for the idea; combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl) and score them with one plain question (score takes up to 1000 tweets; split a bigger file and score the parts with par). Read a sample of the tweets that scored yes and of those just below 0.5: they show what answers look like here. Write one semantic search for each kind of answer you see, in the words those tweets use, run them together and score what they add. Then expand the strongest hits and score what that adds. Work from select(.p >= 0.5), and say when coverage is partial.`
+const FAST_SET = `- For an answer that is a set of tweets across the archive, gather once: with par, in one command, run the keyword searches for the names and the words that signal an answer (--limit 50 to 200 each) and at most one semantic search for the idea, and combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl). If that is more than you can read, score it once with one plain question and work from select(.p >= 0.5). Do not run a second round of semantic searches or expand; answer from this pass, and say when coverage is partial.`
+
+const v2Working = (depth: AgentSearchDepth) => {
+  const { maxSteps } = AGENT_SEARCH_PROFILES[depth]
+  const fast = depth === 'fast'
+  return `What the archive shows:
 Each tweet row has its author, date, text, likes and reposts, and, for a reply, the tweet and author it answers (replyTo, replyToAuthor). So the archive records what people said and also what they did: whom they talk to, how often, and how that changed. Some answers are written in a tweet; others only show in patterns across many.
 
 Working:
-Aim for the answer the evidence supports best, not the first one that fits. Keep candidate answers open until the evidence separates them; when one line of search stops producing anything new, look at a different kind of evidence rather than more of the same. You are done when more searching would not change your answer. You have about 20 commands; keep the last two for lists and the answer.
+${fast ? FAST_AIM : DEEP_AIM} You have about ${maxSteps} commands; keep the last two for lists and the answer.
 - If the question names a person or account, run people first (a project may have its own account; the archive's is @comm_archive).
 - search matches words, so use the words that would signal an answer and the forms people write: variants, abbreviations, handles, jargon. Rephrase before concluding nothing was said.
 - Save results to files (search … > s1.jsonl) and inspect them with small outputs. Add --since/--until only when the question asks about a period.
-- For an answer that is a set of tweets across the archive, gather broadly, then let the answers you find guide the next searches. First, with par, run keyword searches for the names and the words that signal an answer plus one or two semantic searches for the idea; combine the files (cat a b | jq -sc 'unique_by(.id)[]' > all.jsonl) and score them with one plain question (score takes up to 1000 tweets; split a bigger file and score the parts with par). Read a sample of the tweets that scored yes and of those just below 0.5: they show what answers look like here. Write one semantic search for each kind of answer you see, in the words those tweets use, run them together and score what they add. Then expand the strongest hits and score what that adds. Work from select(.p >= 0.5), and say when coverage is partial.
+${fast ? FAST_SET : DEEP_SET}
 
+`
+}
+
+// The fast survey example: the deep one's first round, then the list.
+const FAST_SURVEY_EXAMPLE = `2. A survey, "who has complained about Notion?" (one round, then the answer):
+   par 'search notion --or @NotionHQ --limit 200 > k1.jsonl' 'semantic "complaints about using Notion" > m1.jsonl' && cat k1.jsonl m1.jsonl | jq -sc 'unique_by(.id)[]' > all.jsonl && score all.jsonl "Does this tweet complain about or criticise Notion?" > c1.jsonl && jq -c 'select(.p >= 0.5)' c1.jsonl > yes.jsonl && jq -c '{id,p,author,date,text:.text[:160]}' yes.jsonl | head -40
+   mkdir -p lists && jq -c 'select(.text | test("slow"; "i"))' yes.jsonl > lists/slow.jsonl
+   Then a short answer with: [[posts: Too slow | lists/slow.jsonl | by author]]
 `
 
 const V2_INFERENCE = `- Keep what tweets state apart from what you infer from patterns, and say how sure you are. Not finding a statement is not evidence that the opposite is true.
@@ -170,19 +198,42 @@ function section(text: string, from: string, to?: string) {
   return [text.slice(0, start), text.slice(start, end), text.slice(end)]
 }
 
-/** v2 of the bash instructions, built from v1 so shared text stays shared. */
-export function bashInstructionsV2(date: string = today(), examples = false) {
-  const v1 = bashInstructions(date)
+/**
+ * v2 of the bash instructions, built from v1 so shared text stays shared. A
+ * fast run gets the same prompt with its working section and survey example
+ * cut to one round.
+ */
+export function bashInstructionsV2(
+  date: string = today(),
+  examples = false,
+  depth: AgentSearchDepth = 'deep',
+) {
+  const v1 = bashInstructions(date, depth)
   const [beforeSemantic, , afterSemantic] = section(
     v1,
     '- semantic "',
     '\n- people',
   )
-  const withSemantic = beforeSemantic + V2_SEMANTIC + afterSemantic
+  const withSemantic =
+    beforeSemantic +
+    v2Semantic(AGENT_SEARCH_PROFILES[depth].maxSemanticCalls) +
+    afterSemantic
   const [head, , rest] = section(withSemantic, 'How to work:', 'How to answer:')
   const [answer, exampleText] = section(rest, 'Examples (commands shortened):')
-  const examplesPart = examples ? `\n${exampleText.trimEnd()}` : ''
-  return `${head}${V2_WORKING}${answer.trimEnd()}\n${V2_INFERENCE}${examplesPart}`.trimEnd()
+  const shown =
+    depth === 'fast' ? withFastSurveyExample(exampleText) : exampleText
+  const examplesPart = examples ? `\n${shown.trimEnd()}` : ''
+  return `${head}${v2Working(depth)}${answer.trimEnd()}\n${V2_INFERENCE}${examplesPart}`.trimEnd()
+}
+
+/** The examples with the multi-round survey swapped for the one-round one. */
+function withFastSurveyExample(exampleText: string) {
+  const [before, , after] = section(
+    exampleText,
+    '2. A survey, ',
+    '3. A follow-up',
+  )
+  return before + FAST_SURVEY_EXAMPLE + after
 }
 
 /** The member asking, as their archive profile has them. */
@@ -223,13 +274,16 @@ export const agentSearchInstructions = (
   mode: AgentSearchToolMode = 'bash',
   variant: AgentSearchPromptVariant = agentSearchPromptVariant(),
   asker: AskerProfile | null = null,
+  depth: AgentSearchDepth = 'deep',
 ) => {
+  // The v2 prompts carry the fast run's one-round working text; v1 and the
+  // typed tools only get its lower step and semantic-search counts.
   const base =
     mode === 'typed'
       ? typedInstructions(date)
       : variant === 'v1'
-        ? bashInstructions(date)
-        : bashInstructionsV2(date, variant === 'v2-examples')
+        ? bashInstructions(date, depth)
+        : bashInstructionsV2(date, variant === 'v2-examples', depth)
   return asker ? `${base}\n\n${askerInstructions(asker)}` : base
 }
 
@@ -391,6 +445,7 @@ export function agentSearchPrepareStep(
   deadlineAt?: number,
   now: () => number = Date.now,
   options: PrepareStepOptions = agentSearchPrepareStepOptions(),
+  maxSteps: number = AGENT_SEARCH_MAX_STEPS,
 ) {
   return <M extends Message>({
     stepNumber,
@@ -402,7 +457,7 @@ export function agentSearchPrepareStep(
     steps?: PreparedStep[]
   }): { toolChoice?: 'none'; messages?: M[] } => {
     const mustAnswer =
-      stepNumber >= AGENT_SEARCH_MAX_STEPS - 1 ||
+      stepNumber >= maxSteps - 1 ||
       (deadlineAt !== undefined && now() >= deadlineAt)
     if (!messages) return mustAnswer ? { toolChoice: 'none' } : {}
     let next = rebuildMessages(messages, steps, options)

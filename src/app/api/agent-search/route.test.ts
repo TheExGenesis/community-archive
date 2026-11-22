@@ -69,7 +69,7 @@ const SECRET = 'a server secret that is long enough to use'
 
 const store = { update: jest.fn(), get: jest.fn() }
 
-const ask = (headers: Record<string, string> = {}) =>
+const ask = (headers: Record<string, string> = {}, extra: object = {}) =>
   POST(
     new Request('http://localhost/api/agent-search', {
       method: 'POST',
@@ -77,9 +77,18 @@ const ask = (headers: Record<string, string> = {}) =>
       body: JSON.stringify({
         id: '3f1c2a44-9b1e-4d2a-8c3f-2b6a1e0d9c11',
         question: 'Who tweets about Singapore?',
+        ...extra,
       }),
     }),
   )
+
+const startedDepth = () => {
+  const [, [input]] = jest.mocked(start).mock.calls.at(-1) as unknown as [
+    unknown,
+    [{ depth?: string }],
+  ]
+  return input.depth
+}
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -122,6 +131,23 @@ test('without a key, the run is the house’s and nothing is sealed', async () =
   ]
   expect(input).not.toHaveProperty('sealedKey')
   expect(checkOpenRouterKey).not.toHaveBeenCalled()
+})
+
+test('a question runs fast unless it asks for deep; an unknown depth is refused', async () => {
+  expect((await ask()).status).toBe(200)
+  expect(startedDepth()).toBe('fast')
+  // A second run in this test needs its own stream.
+  jest.mocked(start).mockResolvedValueOnce({
+    runId: 'wrun_2',
+    readable: new ReadableStream(),
+    status: Promise.resolve('running'),
+    cancel: jest.fn(),
+  } as never)
+  expect((await ask({}, { depth: 'deep' })).status).toBe(200)
+  expect(startedDepth()).toBe('deep')
+  jest.mocked(start).mockClear()
+  expect((await ask({}, { depth: 'deepest' })).status).toBe(400)
+  expect(start).not.toHaveBeenCalled()
 })
 
 test('an own key is checked, admitted as own, and reaches the workflow only sealed', async () => {

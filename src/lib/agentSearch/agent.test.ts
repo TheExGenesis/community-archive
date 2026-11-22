@@ -54,6 +54,12 @@ describe('agentSearchPrepareStep', () => {
     ).toEqual({ toolChoice: 'none' })
   })
 
+  test('a run with fewer steps must answer on its own last step', () => {
+    const prepare = agentSearchPrepareStep(undefined, undefined, {}, 8)
+    expect(prepare({ stepNumber: 6 })).toEqual({})
+    expect(prepare({ stepNumber: 7 })).toEqual({ toolChoice: 'none' })
+  })
+
   test('forces a written answer once the run’s deadline has passed', () => {
     let now = 1_000
     const prepare = agentSearchPrepareStep(2_000, () => now)
@@ -199,6 +205,74 @@ describe('the v2 instructions', () => {
       v1.indexOf('Examples (commands shortened):'),
     )
     expect(v2).toContain(answerRules.trimEnd())
+  })
+})
+
+describe('the fast instructions', () => {
+  const deep = agentSearchInstructions('2026-10-14', 'bash', 'v2-examples')
+  const fast = agentSearchInstructions(
+    '2026-10-14',
+    'bash',
+    'v2-examples',
+    null,
+    'fast',
+  )
+
+  test('deep is the prompt every run had before depths', () => {
+    expect(
+      agentSearchInstructions(
+        '2026-10-14',
+        'bash',
+        'v2-examples',
+        null,
+        'deep',
+      ),
+    ).toBe(deep)
+    expect(deep).toContain('You have about 20 commands')
+    expect(deep).toContain('A question gets 6,')
+    expect(deep).toContain('Then expand the strongest hits')
+  })
+
+  test('fast states its own counts and gathers once', () => {
+    expect(fast).toContain('You have about 8 commands')
+    expect(fast).toContain('A question gets 2,')
+    expect(fast).toContain('This is a quick pass')
+    expect(fast).toContain('Do not run a second round of semantic searches')
+    expect(fast).not.toContain('Then expand the strongest hits')
+    // Its survey example stops after one round.
+    expect(fast).toContain('(one round, then the answer)')
+    expect(fast).not.toContain('one semantic search for each')
+    expect(fast).not.toContain('expand scored.jsonl')
+    // The commands, the answer rules and the other examples are shared.
+    const shared = (text: string, from: string, to: string) =>
+      text.slice(text.indexOf(from), text.indexOf(to))
+    expect(shared(fast, 'How to answer:', 'Examples (')).toBe(
+      shared(deep, 'How to answer:', 'Examples ('),
+    )
+    expect(shared(fast, '- people <name', 'What the archive shows:')).toBe(
+      shared(deep, '- people <name', 'What the archive shows:'),
+    )
+    expect(fast).toContain('1. A remembered tweet')
+    expect(fast).toContain('3. A follow-up')
+  })
+
+  test('v1 and the typed tools only take the counts', () => {
+    const v1 = agentSearchInstructions('2026-10-14', 'bash', 'v1', null, 'fast')
+    expect(v1).toContain('a question gets 2,')
+    expect(v1).toContain('You have about 8 commands in all')
+    expect(v1).toContain('How to work:')
+    expect(
+      agentSearchInstructions('2026-10-14', 'typed', 'v1', null, 'fast'),
+    ).toBe(agentSearchInstructions('2026-10-14', 'typed', 'v1'))
+  })
+})
+
+describe('lists in the answer', () => {
+  test('hand-picked tweets go in the marker, files stay for sets a command picks', () => {
+    const text = bashInstructions('2026-10-14')
+    expect(text).toContain('[[posts: <short label> | <id>, <id>, <id>]]')
+    expect(text).toContain('[[posts: <short label> | lists/<name>.jsonl]]')
+    expect(text).not.toContain('tweets <id> <id> ... > lists/')
   })
 })
 

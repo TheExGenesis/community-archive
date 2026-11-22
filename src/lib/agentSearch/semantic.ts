@@ -1,3 +1,4 @@
+import { AGENT_SEARCH_PROFILES } from './depth'
 import { callTimeoutMs, type RunLimits } from './deadline'
 import { findMembers, getTweetsByIdsBatched } from './gateway'
 import { traced } from './trace'
@@ -21,11 +22,12 @@ const SEMANTIC_TIMEOUT_MS = 20_000
 export const SEMANTIC_DEFAULT_K = 100
 const MAX_K = 1000
 export const SEMANTIC_DEFAULT_THRESHOLD = 0.65
-/** Semantic searches one question may run. */
-// At 1–5 s each, 6 calls stay within about a tenth of the run deadline and
-// leave most of the 20 steps for keyword search, reading and scoring.
-export const MAX_SEMANTIC_CALLS_PER_RUN = 6
-export const SEMANTIC_LIMIT_MESSAGE = `This question has used its ${MAX_SEMANTIC_CALLS_PER_RUN} semantic searches; use keyword search instead.`
+/** Semantic searches a deep question may run; a fast one gets fewer (depth.ts). */
+export const MAX_SEMANTIC_CALLS_PER_RUN =
+  AGENT_SEARCH_PROFILES.deep.maxSemanticCalls
+export const semanticLimitMessage = (max = MAX_SEMANTIC_CALLS_PER_RUN) =>
+  `This question has used its ${max} semantic ${max === 1 ? 'search' : 'searches'}; use keyword search instead.`
+export const SEMANTIC_LIMIT_MESSAGE = semanticLimitMessage()
 
 const TWEET_ID = /^\d{1,20}$/
 

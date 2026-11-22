@@ -5,6 +5,7 @@ import {
 } from '@/lib/clickhouseGateway'
 import type { PortalMedia, PortalQuotedTweet } from '@/lib/portal/types'
 import { callTimeoutMs, deadlinePassed, type RunLimits } from './deadline'
+import { inSearchSlot } from './slots'
 import { traced } from './trace'
 import type { AgentTweet } from './types'
 
@@ -172,13 +173,17 @@ export async function searchTweets(
   if (input.since) params.set('since', input.since)
   if (input.until) params.set('until', input.until)
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort)
-  const response = await retryWhileBusy(limits, () =>
-    gatewayJson<{
-      data: { tweets: GatewayTweet[]; nextOffset: number | null }
-    }>(limits, ['search'], params, {
-      baseUrl: clickHouseSearchGatewayBaseUrl(),
-      timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
-    }),
+  // One shell command's searches share its slots, so par cannot stack more
+  // on the gateway than a single search command would.
+  const response = await inSearchSlot(limits, () =>
+    retryWhileBusy(limits, () =>
+      gatewayJson<{
+        data: { tweets: GatewayTweet[]; nextOffset: number | null }
+      }>(limits, ['search'], params, {
+        baseUrl: clickHouseSearchGatewayBaseUrl(),
+        timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
+      }),
+    ),
   )
   if (!Array.isArray(response.data?.tweets)) {
     throw new Error('Gateway search returned an invalid payload')

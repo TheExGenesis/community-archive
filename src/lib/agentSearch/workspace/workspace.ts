@@ -1,6 +1,8 @@
 import { Bash, type CommandName } from 'just-bash'
 import { WORKSPACE_PATH } from '../citations'
 import { boundedTimeoutMs, type RunLimits } from '../deadline'
+import { createSlots } from '../slots'
+import { SEARCH_CONCURRENCY } from '../toolImpl'
 import { inPhase, startTrace, summarizeTrace } from '../trace'
 import type { AgentTweet } from '../types'
 import {
@@ -198,7 +200,12 @@ export async function runBashCommand({
   // Where this command's time goes; the caller logs it (output.timing).
   const trace = startTrace()
   const cache = tweetCache ?? (runId ? getRunTweetCache(runId) : undefined)
-  const state = createCommandState({ ...limits, trace }, semanticUsed, cache)
+  const state = createCommandState(
+    // Every search this command line runs, under par too, shares these slots.
+    { ...limits, trace, searchSlots: createSlots(SEARCH_CONCURRENCY) },
+    semanticUsed,
+    cache,
+  )
   const files: Record<string, string | (() => Promise<string>)> = {}
   for (const [path, file] of Object.entries(manifest)) {
     if (!WORKSPACE_PATH.test(path)) continue

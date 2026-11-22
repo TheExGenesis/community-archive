@@ -17,7 +17,9 @@ import {
   getTweetsByIds,
   getTweetsByIdsBatched,
   retryWhileBusy,
+  searchTweets,
 } from './gateway'
+import { createSlots } from './slots'
 import { startTrace } from './trace'
 
 const v1Row = {
@@ -492,4 +494,41 @@ test('does not wait past the run deadline', async () => {
     retryWhileBusy({ deadlineAt: Date.now() + 50 }, call, [1_000]),
   ).rejects.toThrow('(503)')
   expect(call).toHaveBeenCalledTimes(1)
+})
+
+describe('search slots', () => {
+  const env = { ...process.env }
+  beforeEach(() => {
+    process.env.CLICKHOUSE_SEARCH_API_URL = 'http://gw.test/'
+    process.env.CLICKHOUSE_ANALYTICS_API_TOKEN = 'site-token'
+  })
+  afterEach(() => {
+    process.env = { ...env }
+  })
+
+  // How many gateway searches were in flight at once, at most.
+  async function peakOf(limits: Parameters<typeof searchTweets>[1]) {
+    let inFlight = 0
+    let peak = 0
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockImplementation(async () => {
+      peak = Math.max(peak, ++inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 3))
+      inFlight--
+      return { data: { tweets: [], nextOffset: null } }
+    })
+    await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        searchTweets({ query: `word${i}` }, limits),
+      ),
+    )
+    return peak
+  }
+
+  test('searches sharing one run’s slots never exceed them', async () => {
+    expect(await peakOf({ searchSlots: createSlots(3) })).toBe(3)
+  })
+
+  test('without slots every search goes out at once, as before', async () => {
+    expect(await peakOf({})).toBe(12)
+  })
 })

@@ -263,6 +263,40 @@ describe('the bash workspace', () => {
     expect(out.stderr).toContain('scored by decisions')
   })
 
+  test('every search of one command line shares the same three slots', async () => {
+    await run(`par 'search "{}" > s_{}.jsonl' singapore about tweet`)
+    const slots = (searchTweets as jest.Mock).mock.calls.map(
+      (call) => call[1].searchSlots,
+    )
+    expect(slots.length).toBe(3)
+    expect(slots[0]).toBeDefined()
+    expect(new Set(slots).size).toBe(1)
+    // The next command line gets its own.
+    await run('search singapore > again.jsonl')
+    const next = (searchTweets as jest.Mock).mock.calls.at(-1)[1].searchSlots
+    expect(next).toBeDefined()
+    expect(next).not.toBe(slots[0])
+  })
+
+  test('score reads a reply’s parent from the run’s cache instead of fetching it', async () => {
+    archive.set('5', { ...tweet('5'), replyToTweetId: '1' })
+    const tweetCache = new BoundedTweetMap()
+    const first = await runBashCommand({
+      command: 'search singapore > s1.jsonl',
+      manifest: {},
+      tweetCache,
+    })
+    ;(getTweetsByIds as jest.Mock).mockClear()
+    await runBashCommand({
+      command:
+        'score s1.jsonl "Does this tweet talk about living in Singapore?" > c1.jsonl',
+      manifest: applyChanges({}, first.workspace),
+      tweetCache,
+    })
+    // Tweet 5 replies to tweet 1, which the search already fetched.
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+  })
+
   test('agent-added fields are kept, long strings are not', async () => {
     const out = await run(
       `echo '{"id":"1","group":"expat","note":"${'x'.repeat(80)}","text":"t"}' > g.jsonl`,

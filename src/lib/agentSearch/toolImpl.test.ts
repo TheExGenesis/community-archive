@@ -27,12 +27,14 @@ jest.mock('./gateway', () => ({
 }))
 
 import { isPolicyBlockedAccount } from './policy'
-import { findMembers, getUser, searchTweets } from './gateway'
+import { findMembers, getTweetsByIds, getUser, searchTweets } from './gateway'
+import { scoreTweets } from './classifier'
 import {
   collectAcrossTerms,
   collectAndScoreImpl,
   findPeopleImpl,
   SEARCH_CONCURRENCY,
+  scoreWithParents,
   searchPages,
   searchTweetsImpl,
 } from './toolImpl'
@@ -337,5 +339,50 @@ describe('searchPages', () => {
       nextOffset: null,
     })
     expect(searchTweets).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('scoreWithParents', () => {
+  const full = (id: string) => ({
+    ...tweet(id),
+    observedAt: '2025-01-01T00:00:00.000Z',
+  })
+  const reply = (id: string, parent: string) => ({
+    ...full(id),
+    replyToTweetId: parent,
+  })
+
+  test('fetches only the parents it does not already have, and keeps them', async () => {
+    const cache = new Map([['p2', full('p2')]])
+    ;(getTweetsByIds as jest.Mock).mockImplementation(async (ids: string[]) =>
+      ids.map(full),
+    )
+    await scoreWithParents(
+      'Is it a reply?',
+      // p1 is among the tweets scored, p2 is in the run's cache, p3 is neither.
+      [full('p1'), reply('1', 'p1'), reply('2', 'p2'), reply('3', 'p3')],
+      true,
+      {},
+      {},
+      cache,
+    )
+    expect(
+      (getTweetsByIds as jest.Mock).mock.calls.map((call) => call[0]),
+    ).toEqual([['p3']])
+    expect(cache.has('p3')).toBe(true)
+    const items = (scoreTweets as jest.Mock).mock.calls.at(-1)[1]
+    expect(
+      items.map((item: { parentText: string | null }) => item.parentText),
+    ).toEqual([null, 'post p1', 'post p2', 'post p3'])
+  })
+
+  test('makes no lookup when every parent is in hand', async () => {
+    await scoreWithParents(
+      'Is it a reply?',
+      [full('p1'), reply('1', 'p1')],
+      true,
+      {},
+    )
+    expect(getTweetsByIds).not.toHaveBeenCalled()
   })
 })

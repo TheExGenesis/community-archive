@@ -218,18 +218,33 @@ export async function searchTweetsImpl(
   }
 }
 
+/**
+ * The text of each reply's parent. A parent already in hand (among the tweets
+ * being scored, or in `cache`, the run's fetched tweets) is not fetched
+ * again; those fetched here join the cache.
+ */
 async function parentTexts(
   tweets: AgentTweet[],
   limits: RunLimits,
+  cache?: Map<string, AgentTweet>,
 ): Promise<Map<string, string>> {
-  const parentIds = Array.from(
-    new Set(
-      tweets.map((t) => t.replyToTweetId).filter((id): id is string => !!id),
-    ),
-  )
+  const inHand = new Map(tweets.map((tweet) => [tweet.id, tweet]))
   const texts = new Map<string, string>()
-  for (const parent of await getTweetsByIdsBatched(parentIds, limits)) {
+  const missing = new Set<string>()
+  for (const tweet of tweets) {
+    const id = tweet.replyToTweetId
+    if (!id || texts.has(id)) continue
+    const parent = inHand.get(id) ?? cache?.get(id)
+    if (parent) texts.set(id, parent.text)
+    else missing.add(id)
+  }
+  if (!missing.size) return texts
+  for (const parent of await getTweetsByIdsBatched(
+    Array.from(missing),
+    limits,
+  )) {
     texts.set(parent.id, parent.text)
+    cache?.set(parent.id, parent)
   }
   return texts
 }
@@ -240,9 +255,10 @@ export async function scoreWithParents(
   withParent: boolean,
   limits: RunLimits,
   definitions: ScoreDefinitions = {},
+  cache?: Map<string, AgentTweet>,
 ) {
   const parents = withParent
-    ? await parentTexts(tweets, limits)
+    ? await parentTexts(tweets, limits, cache)
     : new Map<string, string>()
   const result = await scoreTweets(
     criterion,

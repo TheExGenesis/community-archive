@@ -677,6 +677,7 @@ async function score(
       !flags['no-parent'],
       state.limits,
       definitions,
+      state.cache,
     )
   } catch (error) {
     // A partly failed scoring run still spent money.

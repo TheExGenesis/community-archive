@@ -36,8 +36,9 @@ export const bashInstructions = (
 
 The shell:
 - Each bash call runs one command line (pipes, && and ; work). The working directory is /work, and files you write there stay for the rest of the conversation, including later questions.
-- Tweet files are JSON Lines, one tweet per line: {"id","author","date","likes","reposts","replyTo","replyToAuthor","quotes","media","p","text"}. The text is always the full tweet.
-- Output longer than about 4,000 characters is cut, so never cat a big file: count with wc -l, summarise with jq, and preview with jq -c '{id,author,date,text:.text[:200]}' file | head.
+- Combine fetching and inspecting in one bash call (search ... > s1.jsonl && wc -l s1.jsonl && jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20) instead of spending another turn just to inspect what you wrote. For independent lookups that do not read each other's files, use par or issue multiple bash calls in the same turn (parallel bash calls in one turn start from the same files and cannot see each other's writes).
+- Tweet files are JSON Lines, one tweet per line: {"id","author","date","likes","reposts","replyTo","replyToAuthor","quotes","media","p","text"}. The text is always the full tweet; author includes the leading @ (e.g. "@alice").
+- Output longer than about 4,000 characters is cut, so never cat a big file: count with wc -l, summarise with jq, and always include id in jq previews (jq -c '{id,author,date,text:.text[:200]}' file | head) so you never need extra turns to recover tweet ids.
 
 Archive commands (rows on stdout, a one-line summary on stderr, so you see the summary even when you redirect to a file):
 - search <words> [--phrase] [--or w1,w2] [--with w1,w2] [--from @handle] [--reply-to @handle] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--sort newest|oldest|likes|reposts] [--limit N]. Default 50 tweets, up to 1000. It matches text, not meaning. Several words match tweets that contain all of them in any order, which also catches other spellings (open source finds open-source); add --phrase for an exact phrase someone remembers. --or adds alternatives: tweets with the words or with any of these (other names: notion --or @NotionHQ). --with narrows: tweets with the words and at least one of these (notion --with slow,offline). Retweets are excluded.
@@ -81,21 +82,15 @@ How to answer:
 
 Examples (commands shortened):
 1. A remembered tweet, "the one about learning French in coffee shops":
-   search french --with "coffee shop",café,cafe > s1.jsonl
-   jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20
+   search french --with "coffee shop",café,cafe > s1.jsonl && jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20
    Then: It's @someone in March 2023:
    [[t:<id>]]
 2. A survey, "who has complained about Notion?":
-   par 'search notion --or @NotionHQ --limit 500 > k1.jsonl' 'semantic "complaints about using Notion" > m1.jsonl'
-   cat k1.jsonl m1.jsonl | jq -sc 'unique_by(.id)[]' > all.jsonl
-   score all.jsonl "Does this tweet complain about or criticise Notion?" > c1.jsonl
-   jq -c 'select(.p >= 0.3) | {p,author,text:.text[:160]}' c1.jsonl | head -40
+   par 'search notion --or @NotionHQ --limit 500 > k1.jsonl' 'semantic "complaints about using Notion" > m1.jsonl' && cat k1.jsonl m1.jsonl | jq -sc 'unique_by(.id)[]' > all.jsonl && score all.jsonl "Does this tweet complain about or criticise Notion?" > c1.jsonl && jq -c 'select(.p >= 0.3) | {id,p,author,date,text:.text[:160]}' c1.jsonl | head -40
    (Say the yes tweets are about speed, offline use and price: one semantic search for each.)
-   par 'semantic "Notion is too slow to use" > m2.jsonl' 'semantic "Notion does not work offline" > m3.jsonl' 'semantic "Notion got too expensive" > m4.jsonl'
-   cat m2.jsonl m3.jsonl m4.jsonl | jq -sc 'unique_by(.id)[]' > more.jsonl && score more.jsonl "Does this tweet complain about or criticise Notion?" > c2.jsonl
+   par 'semantic "Notion is too slow to use" > m2.jsonl' 'semantic "Notion does not work offline" > m3.jsonl' 'semantic "Notion got too expensive" > m4.jsonl' && cat m2.jsonl m3.jsonl m4.jsonl | jq -sc 'unique_by(.id)[]' > more.jsonl && score more.jsonl "Does this tweet complain about or criticise Notion?" > c2.jsonl
    cat c1.jsonl c2.jsonl | jq -sc 'unique_by(.id)[]' > scored.jsonl && expand scored.jsonl > e1.jsonl && score e1.jsonl "Does this tweet complain about or criticise Notion?" > c3.jsonl
-   cat scored.jsonl c3.jsonl | jq -c 'select(.p >= 0.5)' > yes.jsonl; jq -r '.author' yes.jsonl | sort | uniq -c | sort -rn | head
-   mkdir -p lists && jq -c 'select(.text | test("slow"; "i"))' yes.jsonl > lists/slow.jsonl
+   cat scored.jsonl c3.jsonl | jq -c 'select(.p >= 0.5)' > yes.jsonl && jq -r '.author' yes.jsonl | sort | uniq -c | sort -rn | head && mkdir -p lists && jq -c 'select(.text | test("slow"; "i"))' yes.jsonl > lists/slow.jsonl
    Then a short answer with: [[posts: Too slow | lists/slow.jsonl | by author]]
 3. A follow-up, "which of them posted most recently?": yes.jsonl from the last question is still there.
    jq -sc 'sort_by(.date) | reverse | .[:5][]' yes.jsonl > lists/recent.jsonl`

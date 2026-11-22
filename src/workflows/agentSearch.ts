@@ -58,6 +58,7 @@ import {
   type WorkspaceManifest,
 } from '@/lib/agentSearch/workspace/manifest'
 import { streamedBashOutput } from '@/lib/agentSearch/workspace/output'
+import { clearRunTweetCache } from '@/lib/agentSearch/workspace/runCache'
 import { runBashCommand } from '@/lib/agentSearch/workspace/workspace'
 
 // Each tool runs as a durable step, recorded in the run's event log and never
@@ -165,6 +166,7 @@ async function bashStep(
       command: input.command,
       manifest,
       semanticUsed,
+      runId,
       limits: { deadlineAt },
     }),
   )
@@ -233,37 +235,41 @@ interface RunSummary {
 // has already added its own to the run (see usage.ts).
 async function recordRunStep(summary: RunSummary) {
   'use step'
-  // A citation is valid when a tool returned the tweet in this conversation:
-  // in this run, or in an earlier turn (see citations.ts).
-  // Lists may name workspace files from this run or an earlier turn.
-  const files = new Map(Object.entries(summary.priorFiles))
-  collectWorkspaceFiles(summary.toolOutputs).forEach((ids, path) =>
-    files.set(path, ids),
-  )
-  const { cited, invalid } = validateCitations(
-    summary.text,
-    [
-      ...Array.from(collectToolTweetIds(summary.toolOutputs)),
-      ...summary.priorTweetIds,
-    ],
-    files,
-  )
-  const store = getAgentSearchRunStore()
-  // Admission stored the run before the workflow started. A run the member
-  // stopped meanwhile stays stopped; its spend is already recorded.
-  const current = await store.get(summary.runId)
-  if (!current) throw new Error(`Agent search run ${summary.runId} is missing`)
-  if (current.status !== 'running') return
-  await store.update(summary.runId, {
-    status: summary.error ? 'failed' : 'completed',
-    completedAt: new Date().toISOString(),
-    answer: summary.text || null,
-    parts: summary.parts,
-    citedTweetIds: cited,
-    invalidCitationIds: invalid,
-    toolCalls: summary.toolCalls,
-    error: summary.error,
-  })
+  try {
+    // A citation is valid when a tool returned the tweet in this conversation:
+    // in this run, or in an earlier turn (see citations.ts).
+    // Lists may name workspace files from this run or an earlier turn.
+    const files = new Map(Object.entries(summary.priorFiles))
+    collectWorkspaceFiles(summary.toolOutputs).forEach((ids, path) =>
+      files.set(path, ids),
+    )
+    const { cited, invalid } = validateCitations(
+      summary.text,
+      [
+        ...Array.from(collectToolTweetIds(summary.toolOutputs)),
+        ...summary.priorTweetIds,
+      ],
+      files,
+    )
+    const store = getAgentSearchRunStore()
+    // Admission stored the run before the workflow started. A run the member
+    // stopped meanwhile stays stopped; its spend is already recorded.
+    const current = await store.get(summary.runId)
+    if (!current) throw new Error(`Agent search run ${summary.runId} is missing`)
+    if (current.status !== 'running') return
+    await store.update(summary.runId, {
+      status: summary.error ? 'failed' : 'completed',
+      completedAt: new Date().toISOString(),
+      answer: summary.text || null,
+      parts: summary.parts,
+      citedTweetIds: cited,
+      invalidCitationIds: invalid,
+      toolCalls: summary.toolCalls,
+      error: summary.error,
+    })
+  } finally {
+    clearRunTweetCache(summary.runId)
+  }
 }
 
 const errorText = (error: unknown) =>

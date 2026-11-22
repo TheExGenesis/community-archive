@@ -294,10 +294,17 @@ describe('tool modes', () => {
 
   test('each mode has its own instructions, both with semantic search', () => {
     const bash = agentSearchInstructions('2026-10-13', 'bash')
+    const bashV1 = bashInstructions('2026-10-13')
+    const bashV2 = bashInstructionsV2('2026-10-13', true)
     const typed = agentSearchInstructions('2026-10-13', 'typed')
     expect(bash).toContain('Today is 2026-10-13')
     expect(bash).toContain('[[posts:')
     expect(bash).toContain('semantic')
+    expect(bashV1).toContain('Combine fetching and inspecting in one bash call')
+    expect(bashV2).toContain('Combine fetching and inspecting in one bash call')
+    expect(bashV2).toContain('parallel bash calls')
+    expect(bashV2).toContain('author includes the leading @')
+    expect(bashV2).toContain('{id,p,author,date,text:.text[:160]}')
     expect(typed).toContain('semantic_search')
     expect(typed).not.toContain('[[posts:')
   })

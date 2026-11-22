@@ -11,10 +11,12 @@ import {
   MODEL_PRICES_USD_PER_MTOK,
   REASONING_DETAILS_KEY,
   agentSearchReasoningEffort,
+  createProviderModel,
   estimateModelCostUsd,
   liftReasoningDetails,
   mergeReasoningDetails,
   parseModelSpec,
+  plannerRouting,
   readModelCallUsage,
   resolveModelPrice,
   setModelUsageRecorder,
@@ -431,7 +433,11 @@ describe('planner reasoning effort', () => {
       })
       const body = JSON.parse(sent.mock.calls[0][1].body)
       expect(body.reasoning).toEqual({ effort: 'medium' })
-      expect(body.provider).toEqual({ data_collection: 'deny', zdr: true })
+      expect(body.provider).toEqual({
+        preferred_max_latency: { p90: 2 },
+        data_collection: 'deny',
+        zdr: true,
+      })
     } finally {
       global.fetch = realFetch
       delete process.env.OPENROUTER_API_KEY
@@ -629,5 +635,148 @@ describe('reasoning details across tool calls', () => {
     expect(result.content[0].providerMetadata).toEqual({
       [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
     })
+  })
+})
+
+describe('planner provider routing', () => {
+  const ENV_KEYS = [
+    'OPENROUTER_API_KEY',
+    'AGENT_SEARCH_PROVIDER_ONLY',
+    'AGENT_SEARCH_PROVIDER_IGNORE',
+    'AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90',
+  ]
+  afterEach(() => {
+    for (const key of ENV_KEYS) delete process.env[key]
+  })
+
+  // The body the fetch wrapper sends for a request with `provider` already set.
+  async function sentBody(
+    build: () => unknown,
+    request: Record<string, unknown> = {},
+  ) {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock)
+      .mockReset()
+      .mockReturnValue(() => ({ doGenerate: jest.fn() }))
+    const realFetch = global.fetch
+    const sent = jest.fn().mockResolvedValue(new Response('{}'))
+    global.fetch = sent as any
+    try {
+      await build()
+      const { fetch } = (createOpenAICompatible as jest.Mock).mock.calls[0][0]
+      await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'x', ...request }),
+      })
+      return JSON.parse(sent.mock.calls[0][1].body)
+    } finally {
+      global.fetch = realFetch
+    }
+  }
+
+  test('reads the session, latency preference and slugs', () => {
+    expect(plannerRouting('asr_1', {})).toEqual({
+      sessionId: 'asr_1',
+      maxLatencyP90: 2,
+    })
+    expect(
+      plannerRouting(null, {
+        AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90: ' 1.5 ',
+        AGENT_SEARCH_PROVIDER_ONLY: 'together, baseten/fast,',
+        AGENT_SEARCH_PROVIDER_IGNORE: 'decart',
+      }),
+    ).toEqual({
+      maxLatencyP90: 1.5,
+      only: ['together', 'baseten/fast'],
+      ignore: ['decart'],
+    })
+    expect(
+      plannerRouting(null, { AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90: 'OFF' }),
+    ).toEqual({ maxLatencyP90: null })
+    for (const bad of ['0', '-1', 'fast']) {
+      expect(() =>
+        plannerRouting(null, { AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90: bad }),
+      ).toThrow('Invalid AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90')
+    }
+  })
+
+  test('a run’s calls carry its id as the session and no usage flag', async () => {
+    setModelUsageRecorder(jest.fn().mockResolvedValue(undefined))
+    const body = await sentBody(() =>
+      new EnvLanguageModel(
+        'openrouter:deepseek/deepseek-v4.1-flash-1017',
+        'asr_abc',
+      ).doGenerate({}),
+    ).finally(() => setModelUsageRecorder(null))
+    expect(body.session_id).toBe('asr_abc')
+    expect(body.usage).toBeUndefined()
+    expect(body.reasoning).toEqual({ effort: 'high' })
+    expect(body.provider).toEqual({
+      preferred_max_latency: { p90: 2 },
+      data_collection: 'deny',
+      zdr: true,
+    })
+  })
+
+  test('without a run, the session id is the one given (the eval)', async () => {
+    const body = await sentBody(() =>
+      new EnvLanguageModel(
+        'openrouter:z-ai/glm-5.3-flash',
+        null,
+        null,
+        'eval-1',
+      ).doGenerate({}),
+    )
+    expect(body.session_id).toBe('eval-1')
+    expect(body.reasoning).toEqual({ effort: 'high' })
+  })
+
+  test('pins and skips hosts, and never loses the no-retention flags', async () => {
+    process.env.AGENT_SEARCH_PROVIDER_ONLY = 'baseten/fast'
+    process.env.AGENT_SEARCH_PROVIDER_IGNORE = 'decart'
+    process.env.AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90 = 'off'
+    const body = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash-1017',
+        ).doGenerate({}),
+      { provider: { zdr: false, data_collection: 'allow' } },
+    )
+    expect(body.session_id).toBeUndefined()
+    expect(body.provider).toEqual({
+      only: ['baseten/fast'],
+      ignore: ['decart'],
+      data_collection: 'deny',
+      zdr: true,
+    })
+  })
+
+  test('the scorer’s calls carry only the no-retention flags', async () => {
+    process.env.AGENT_SEARCH_PROVIDER_ONLY = 'together'
+    const body = await sentBody(() =>
+      (createProviderModel('openrouter:typesafe/jev-1') as any).doGenerate({}),
+    )
+    expect(body.provider).toEqual({ data_collection: 'deny', zdr: true })
+    expect(body.session_id).toBeUndefined()
+  })
+
+  test('the session id survives the workflow step boundary', () => {
+    const SERIALIZE = Symbol.for('workflow-serialize')
+    const DESERIALIZE = Symbol.for('workflow-deserialize')
+    const model = new EnvLanguageModel('openrouter:x/y', null, null, 'eval-2')
+    const data = (EnvLanguageModel as any)[SERIALIZE](model)
+    expect(data).toEqual({ spec: 'openrouter:x/y', sessionId: 'eval-2' })
+    const back = (EnvLanguageModel as any)[DESERIALIZE](data)
+    expect(back.sessionId).toBe('eval-2')
+  })
+
+  test('prices and efforts exist for the strict-ZDR pilot models', () => {
+    for (const spec of [
+      'openrouter:deepseek/deepseek-v4.1-flash-1017',
+      'openrouter:z-ai/glm-5.3-flash',
+    ]) {
+      expect(MODEL_PRICES_USD_PER_MTOK[spec]).toBeDefined()
+      expect(agentSearchReasoningEffort(spec, undefined)).toBe('high')
+    }
   })
 })

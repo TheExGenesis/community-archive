@@ -17,6 +17,7 @@ import {
 } from './manifest'
 import type { BashToolOutput } from './output'
 import { formatRows, toRow, uniqueIds } from './rows'
+import { getRunTweetCache } from './runCache'
 
 /** The built-in tools the agent may use alongside the archive commands. */
 const SHELL_COMMANDS: CommandName[] = [
@@ -147,9 +148,11 @@ export function scoresInOutput(stdout: string): Record<string, number> {
 }
 
 /**
- * Tweet ids in command output: `"id":"…"` in rows, a bare id on a line, or
- * an id leading a line of fields (jq's `"\(.id)\t\(.date)…"`, CSV, columns).
- * A long number inside a sentence is not taken for one.
+ * Tweet ids in command output: `"id":"…"` in rows, a bare id on a line, an id
+ * leading a line of fields (`jq`'s `"\(.id)\t\(.date)…"`, CSV, columns), or a
+ * standalone 15–20 digit id in a tab-, comma-, or pipe-delimited column (e.g.
+ * `[.p, .id, .author, .text] | @tsv`). A long number inside a sentence is not
+ * taken for one.
  */
 export function idsInOutput(stdout: string): string[] {
   const ids = new Set<string>()
@@ -158,6 +161,11 @@ export function idsInOutput(stdout: string): string[] {
   }
   for (const match of Array.from(
     stdout.matchAll(/^\s*"?(\d{15,20})"?(?=\s*$|[\t ,|])/gm),
+  )) {
+    ids.add(match[1])
+  }
+  for (const match of Array.from(
+    stdout.matchAll(/[\t,|]\s*"?(\d{15,20})"?(?=\s*(?:$|[\t,|]))/gm),
   )) {
     ids.add(match[1])
   }
@@ -174,16 +182,23 @@ export async function runBashCommand({
   manifest,
   limits = {},
   semanticUsed = 0,
+  runId,
+  tweetCache,
 }: {
   command: string
   manifest: WorkspaceManifest
   limits?: RunLimits
   /** Semantic searches the question has already run. */
   semanticUsed?: number
+  /** Active run id: reuses hydrated tweets in memory across steps of this run. */
+  runId?: string
+  /** Optional explicit per-run tweet cache (used by in-process runners/tests). */
+  tweetCache?: Map<string, AgentTweet>
 }): Promise<BashToolOutput> {
   // Where this command's time goes; the caller logs it (output.timing).
   const trace = startTrace()
-  const state = createCommandState({ ...limits, trace }, semanticUsed)
+  const cache = tweetCache ?? (runId ? getRunTweetCache(runId) : undefined)
+  const state = createCommandState({ ...limits, trace }, semanticUsed, cache)
   const files: Record<string, string | (() => Promise<string>)> = {}
   for (const [path, file] of Object.entries(manifest)) {
     if (!WORKSPACE_PATH.test(path)) continue

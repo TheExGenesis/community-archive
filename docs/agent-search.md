@@ -165,18 +165,19 @@ its own three, so a `par` of searches can still pass the gateway's limit. just-b
 a page, so a short or empty page does not end a search; a null `nextOffset`
 does, and no page past offset 5,000 is asked for.
 
-`timeline` reads the API v1 route `GET /accounts/{account}/tweets` (200 per
-page, keyset cursor). It follows `next_cursor` through short and empty pages
-until the cursor is null or it has `--limit` tweets, and stops early, saying
-so, on a cursor it already followed or after `ceil(limit / 200) + 10` pages. A
-`429` or `503` is retried after `Retry-After` (at most 10 s, 1 s when absent),
-up to three attempts, never past the run's deadline or after Stop. A `422`
-(too broad for the API's query budget) prints the tweets already read, marked
-partial, and tells the agent to narrow with `--since`/`--until`. Locally the
-gateway stand-in serves it at `<CLICKHOUSE_SEARCH_API_URL>/v1`. Which
-production route and key the agent should use is not settled: the keyed
-public API allows 60 requests a minute and two in flight per account, which a
-run can exceed.
+`timeline` reads `GET /v1/accounts/{account}/tweets` on the internal gateway
+(200 per page, keyset cursor) using `CLICKHOUSE_ANALYTICS_API_TOKEN`, like
+every other Ask gateway read. It follows `next_cursor` through short and empty
+pages until the cursor is null or it has `--limit` tweets, and stops early,
+saying so, on a cursor it already followed or after `ceil(limit / 200) + 10`
+pages. A `429` or `503` is retried after `Retry-After` (at most 10 s, 1 s when
+absent), up to three attempts, never past the run's deadline or after Stop. A
+`422` (too broad for the API's query budget) prints the tweets already read,
+marked partial, and tells the agent to narrow with `--since`/`--until`.
+`COMMUNITY_ARCHIVE_API_KEY` is only preferred when
+`COMMUNITY_ARCHIVE_API_V1_URL` explicitly points outside the internal gateway.
+(Gateway-first check: verify production `/v1/accounts/{account}/tweets` accepts
+`CLICKHOUSE_ANALYTICS_API_TOKEN` without the public 60 rpm / 2-in-flight cap.)
 
 The prompt steers semantic search to paraphrased ideas, surveys and
 investigative questions, and keyword search to names, handles, exact phrases
@@ -300,6 +301,9 @@ resolved headers, including the API key, into the event log.
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AGENT_SEARCH_MODEL`                                                                                            | `openrouter:deepseek/deepseek-v4.1-flash`        | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative                                                                                                |
 | `AGENT_SEARCH_REASONING_EFFORT`                                                                                 | per model (`MODEL_REASONING_EFFORT`)             | Planner effort: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`; `default` sends none. Unlisted models get their provider's default                                  |
+| `AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90`                                                                         | `2`                                              | Planner's OpenRouter `preferred_max_latency` in seconds at p90; slower providers move down the list but are never blocked. `off` sends none                                       |
+| `AGENT_SEARCH_PROVIDER_ONLY`                                                                                    |                                                  | Comma-separated OpenRouter provider slugs the planner may use (`together`, `baseten/fast`), for pinned pilots. A pinned host must still be ZDR, or the call fails                 |
+| `AGENT_SEARCH_PROVIDER_IGNORE`                                                                                  |                                                  | Comma-separated OpenRouter provider slugs the planner skips                                                                                                                       |
 | `AGENT_SEARCH_TOOLS`                                                                                            | `bash`                                           | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with                                                                        |
 | `AGENT_SEARCH_PROMPT`                                                                                           | `v2-examples`                                    | `v1` (numbered procedure) or `v2` (goal and definition of done, no examples) instead of the default. The route passes it to the run, which keeps it                               |
 | `AGENT_SEARCH_KEEP_REASONING`                                                                                   | on                                               | `off` stops putting each step's reasoning back on its tool call (the workflow agent drops it between steps; DeepSeek expects it back)                                             |
@@ -403,6 +407,18 @@ carries each step's details on its first tool call and puts them back on the
 message before the next call. Without them, Gemini models lose their thought
 signatures between tool calls.
 
+## Planner routing
+
+Planner calls on OpenRouter send the run id as `session_id`, so the run stays on
+one provider from its first call and keeps its prompt cache (without it,
+OpenRouter pins only after a cache hit). They also send
+`preferred_max_latency: { p90: 2 }`, which moves providers slower than 2 s at p90
+down the list without replacing OpenRouter's default routing; `order` and `sort`
+would replace it. Measured median time to first output per call was 0.7-1.8 s by
+host in local runs. `AGENT_SEARCH_PROVIDER_ONLY` pins a pilot to one host (use
+`only`, not `order`); `AGENT_SEARCH_PROVIDER_IGNORE` skips hosts. The scorer's
+calls carry only the no-retention flags.
+
 ## Data handling and retention
 
 What leaves the site for a question, and what deleting reaches. The page's
@@ -411,7 +427,9 @@ plain words; keep the two in step.
 
 - **The planner model** (OpenRouter by default) receives the question, earlier
   turns as compact context, and the tool outputs, which include tweet text.
-  OpenRouter calls carry `zdr: true` and `data_collection: deny`.
+  OpenRouter calls carry `zdr: true` and `data_collection: deny`. The run id
+  goes out as OpenRouter's `session_id`, which keeps a run on one provider
+  (warm prompt cache) and groups its calls in OpenRouter's logs.
 - **Semantic search** sends the agent's own search phrase (its wording of the
   idea, not necessarily the question verbatim) to the Community Archive's
   embeddings API.

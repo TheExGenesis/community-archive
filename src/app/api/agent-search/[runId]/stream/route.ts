@@ -15,6 +15,8 @@ import {
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
+// Match the start route's Stockholm region (next to Helsinki gateway & London auth).
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
 

@@ -7,6 +7,8 @@ import {
 } from '@/lib/agentSearch/historyTweets'
 
 export const dynamic = 'force-dynamic'
+// Hydrates conversation tweets from the Helsinki ClickHouse gateway.
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
 

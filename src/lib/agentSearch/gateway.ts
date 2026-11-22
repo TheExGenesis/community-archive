@@ -623,12 +623,14 @@ export async function getInteractionTies(
   )
 }
 
-// --- API v1 ---------------------------------------------------------------
-// One account's own tweets come from the public API v1 contract
-// (analytics.community-archive.org/v1/openapi.json). Locally the gateway
-// stand-in serves it at <CLICKHOUSE_SEARCH_API_URL>/v1. Which production
-// route and key the agent should use is not decided yet: the keyed public API
-// allows 60 requests a minute and two in flight per account.
+// --- Account timeline (gateway /v1) ---------------------------------------
+// One account's own tweets come from the gateway's /v1/accounts/{account}/tweets
+// route (keyset-paginated, 200 per page). As a first-party feature, Ask calls
+// the internal gateway host with CLICKHOUSE_ANALYTICS_API_TOKEN (the same
+// internal token used by all other gateway reads); COMMUNITY_ARCHIVE_API_KEY is
+// only preferred when COMMUNITY_ARCHIVE_API_V1_URL explicitly targets another
+// host. Gateway-first check: production /v1 must accept
+// CLICKHOUSE_ANALYTICS_API_TOKEN without public-key throttling.
 
 interface V1Tweet {
   tweet_id: string
@@ -744,10 +746,12 @@ async function apiV1Json<T>(
 ): Promise<T> {
   const base = apiV1BaseUrl()
   if (!base) throw new Error('CLICKHOUSE_SEARCH_API_URL is not configured')
+  const explicitBase = process.env.COMMUNITY_ARCHIVE_API_V1_URL?.trim()
   const token =
-    process.env.COMMUNITY_ARCHIVE_API_KEY?.trim() ||
-    process.env.CLICKHOUSE_ANALYTICS_API_TOKEN
-  if (!token) throw new Error('No key for the Community Archive API v1')
+    (explicitBase ? process.env.COMMUNITY_ARCHIVE_API_KEY?.trim() : undefined) ||
+    process.env.CLICKHOUSE_ANALYTICS_API_TOKEN?.trim() ||
+    process.env.COMMUNITY_ARCHIVE_API_KEY?.trim()
+  if (!token) throw new Error('No key for the Community Archive gateway timeline')
   const attempt = async (timeoutMs: number) => {
     const timeout = AbortSignal.timeout(timeoutMs)
     const stop = limits.abortSignal

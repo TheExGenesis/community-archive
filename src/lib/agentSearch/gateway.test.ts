@@ -96,6 +96,14 @@ describe('API v1 timeline', () => {
     })
   })
 
+  test('uses the internal gateway token even when COMMUNITY_ARCHIVE_API_KEY is set on the default host', async () => {
+    process.env.COMMUNITY_ARCHIVE_API_KEY = 'cak_public'
+    await getAccountTweets({ account: '@maskys_' })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('http://gw.test/v1/accounts/maskys_/tweets?order=desc&limit=200')
+    expect(init.headers.Authorization).toBe('Bearer site-token')
+  })
+
   test('keeps the @ on a numeric username, and uses an explicit base and key', async () => {
     process.env.COMMUNITY_ARCHIVE_API_V1_URL = 'https://api.test/v1/'
     process.env.COMMUNITY_ARCHIVE_API_KEY = 'cak_test'

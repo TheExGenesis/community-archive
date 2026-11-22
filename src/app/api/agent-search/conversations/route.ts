@@ -11,6 +11,7 @@ import { ownKeysEnabled } from '@/lib/agentSearch/openRouterKey'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
 const RECENT_RUNS = 200

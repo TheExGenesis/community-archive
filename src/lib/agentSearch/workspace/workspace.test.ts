@@ -68,6 +68,15 @@ import { MAX_SEMANTIC_CALLS_PER_RUN, semanticSearch } from '../semantic'
 import { USAGE } from './commands'
 import { applyChanges, type WorkspaceManifest } from './manifest'
 import { bashModelOutput, streamedBashOutput } from './output'
+import { createInProcessBash } from './inProcess'
+import {
+  BoundedTweetMap,
+  MAX_CACHED_RUNS,
+  RUN_CACHE_TTL_MS,
+  clearAllRunTweetCaches,
+  clearRunTweetCache,
+  getRunTweetCache,
+} from './runCache'
 import {
   WorkspaceUnavailableError,
   idsInOutput,
@@ -94,6 +103,7 @@ let archive: Map<string, ReturnType<typeof tweet>>
 
 beforeEach(() => {
   jest.clearAllMocks()
+  clearAllRunTweetCaches()
   archive = new Map(
     ['1', '2', '3', '4'].map((id) => [
       id,
@@ -442,13 +452,16 @@ describe('search with several words', () => {
 })
 
 describe('the tweet ids a command printed', () => {
-  test('come from rows, bare lines, and lines of fields an id leads', () => {
+  test('come from rows, bare lines, leading columns, and delimited TSV/CSV/pipe columns', () => {
     const stdout = [
       '{"id":"1111111111111111111","text":"a"}',
       '2222222222222222222',
       '3333333333333333333\t2026-10-06\tsome text',
       '"4444444444444444444",2026-10-06,"csv"',
       '5555555555555555555 2026-10-06 columns',
+      '0.97\t6666666666666666666\t@alice\tsome text',
+      '0.97,"7777777777777777777",@alice,"csv"',
+      '2026-10-06 | 8888888888888888888 | @alice',
     ].join('\n')
     expect(idsInOutput(stdout).sort()).toEqual([
       '1111111111111111111',
@@ -456,6 +469,9 @@ describe('the tweet ids a command printed', () => {
       '3333333333333333333',
       '4444444444444444444',
       '5555555555555555555',
+      '6666666666666666666',
+      '7777777777777777777',
+      '8888888888888888888',
     ])
   })
 
@@ -941,5 +957,86 @@ describe('what the model sees of a command', () => {
       output: 'Searched “x” · 2 tweets\ns1.jsonl · 2 tweets',
       exitCode: 0,
     })
+  })
+})
+
+describe('per-run tweet cache', () => {
+  test('reuses tweets fetched earlier in the same runId without calling the gateway again', async () => {
+    const first = await runBashCommand({
+      command: 'search singapore > s1.jsonl',
+      manifest: {},
+      runId: 'asr_run_1',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(first.exitCode).toBe(0)
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+
+    const manifest = applyChanges({}, first.workspace)
+    const second = await runBashCommand({
+      command: "jq -c 'select(.author == \"@alice\")' s1.jsonl | wc -l",
+      manifest,
+      runId: 'asr_run_1',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(second.exitCode).toBe(0)
+    expect(second.stdout.trim()).toBe('3')
+    // Rebuilding s1.jsonl hit the per-run cache instead of the gateway.
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+
+    // A follow-up question (new runId) fetches fresh from the gateway so opt-outs apply.
+    archive.delete('2')
+    const followUp = await runBashCommand({
+      command: "jq -c 'select(.author == \"@alice\")' s1.jsonl | wc -l",
+      manifest,
+      runId: 'asr_run_2',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(followUp.exitCode).toBe(0)
+    expect(followUp.stdout.trim()).toBe('2')
+    expect(getTweetsByIds).toHaveBeenCalledTimes(1)
+  })
+
+  test('clearRunTweetCache drops the run immediately and createInProcessBash shares one cache per run', async () => {
+    const first = await runBashCommand({
+      command: 'search singapore > s1.jsonl',
+      manifest: {},
+      runId: 'asr_clear_me',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    const manifest = applyChanges({}, first.workspace)
+    clearRunTweetCache('asr_clear_me')
+    await runBashCommand({
+      command: 'wc -l s1.jsonl',
+      manifest,
+      runId: 'asr_clear_me',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(getTweetsByIds).toHaveBeenCalledTimes(1)
+    ;(getTweetsByIds as jest.Mock).mockClear()
+
+    const runner = createInProcessBash({ deadlineAt: Date.now() + 60_000 })
+    await runner.execute({ command: 'search singapore > s1.jsonl' })
+    const res = await runner.execute({ command: 'wc -l < s1.jsonl' })
+    expect(res.stdout.trim()).toBe('4')
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+  })
+
+  test('enforces run LRU limit, TTL expiry, and per-run tweet cap', () => {
+    const t0 = 1_000_000
+    for (let i = 0; i < MAX_CACHED_RUNS + 2; i++) {
+      getRunTweetCache(`run_${i}`, t0 + i).set('1', tweet('1'))
+    }
+    // Oldest two runs were evicted.
+    expect(getRunTweetCache('run_0', t0 + 100).size).toBe(0)
+    // TTL expiry drops stale runs.
+    const active = getRunTweetCache('run_ttl', t0)
+    active.set('1', tweet('1'))
+    expect(getRunTweetCache('run_ttl', t0 + RUN_CACHE_TTL_MS + 1).size).toBe(0)
+    // BoundedTweetMap caps entries per run.
+    const bounded = new BoundedTweetMap(2)
+    bounded.set('1', tweet('1'))
+    bounded.set('2', tweet('2'))
+    bounded.set('3', tweet('3'))
+    expect(Array.from(bounded.keys())).toEqual(['2', '3'])
   })
 })

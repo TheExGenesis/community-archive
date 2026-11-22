@@ -61,10 +61,11 @@ export interface CommandState {
 export function createCommandState(
   limits: RunLimits,
   semanticUsed = 0,
+  cache: Map<string, AgentTweet> = new Map(),
 ): CommandState {
   return {
     limits,
-    cache: new Map(),
+    cache,
     costUsd: 0,
     summaries: [],
     calls: 0,

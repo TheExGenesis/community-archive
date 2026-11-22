@@ -10,6 +10,7 @@
 // Env: AGENT_SEARCH_PROMPT (v1|v2|v2-examples), AGENT_SEARCH_KEEP_REASONING=on,
 //      AGENT_SEARCH_STALL_REMINDER=on.
 
+import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, join, resolve } from 'path'
@@ -521,7 +522,13 @@ async function runQuestion(
     try {
       const abortSignal = AbortSignal.timeout(args.timeoutMs)
       const agent = new mods.ai.ToolLoopAgent({
-        model: mods.model.agentSearchModel(modelSpec),
+        // Its own OpenRouter session, as a production run has (its run id).
+        model: mods.model.agentSearchModel(
+          modelSpec,
+          null,
+          null,
+          `eval-${randomUUID()}`,
+        ),
         instructions: mods.agent.agentSearchInstructions(undefined, mode),
         tools: toolsFor(mods, mode, abortSignal),
         stopWhen: [

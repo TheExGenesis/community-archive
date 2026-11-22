@@ -44,6 +44,20 @@ export const MODEL_PRICES_USD_PER_MTOK: Record<string, ModelPrice> = {
     cachedInput: 0.006,
     output: 1.2,
   },
+  // Together's price, the highest standard endpoint (openrouter.ai endpoints
+  // API, read 2026-11-22). Priority endpoints cost more (baseten/fast is
+  // 0.6 / 0.014 / 2.4), so a run pinned to one needs the price env overrides.
+  'openrouter:deepseek/deepseek-v4.1-flash-1017': {
+    input: 0.3,
+    cachedInput: 0.006,
+    output: 1.2,
+  },
+  // Together's price (endpoints API, read 2026-11-22).
+  'openrouter:z-ai/glm-5.3-flash': {
+    input: 0.15,
+    cachedInput: 0.03,
+    output: 0.5,
+  },
 }
 
 /** Price overrides as read from the environment, still unparsed. */
@@ -152,10 +166,13 @@ const REASONING_EFFORTS = new Set<string>([
  * default runs at an effort nobody chose: on OpenRouter Gemini 3.5 Flash-Lite
  * defaults to minimal and reasoned 0 tokens, and GPT-6.1 Sol called directly
  * reasoned a median 85 tokens a turn (pilot runs, 2026-11-16). DeepSeek's
- * entry is its OpenRouter default, written down.
+ * entries are its OpenRouter default, written down. GLM-5.3-Flash defaults to
+ * max on OpenRouter; high matches DeepSeek's effort for comparison.
  */
 export const MODEL_REASONING_EFFORT: Record<string, ReasoningEffort> = {
   'openrouter:deepseek/deepseek-v4.1-flash': 'high',
+  'openrouter:deepseek/deepseek-v4.1-flash-1017': 'high',
+  'openrouter:z-ai/glm-5.3-flash': 'high',
   'openrouter:google/gemini-4-hydrogen': 'medium',
   'openrouter:google/gemini-3.5-flash-lite': 'high',
   'openrouter:openai/gpt-6.1-sol': 'medium',
@@ -211,12 +228,79 @@ export function parseModelSpec(spec: string): {
 }
 
 /**
+ * How the planner's OpenRouter calls pick a provider, on top of the
+ * no-retention filter every call carries (openrouter.ai/docs, provider
+ * selection and prompt caching, read 2026-11-22):
+ * - `sessionId` goes out as `session_id`, so OpenRouter keeps a run on one
+ *   provider from its first call and the prompt cache stays warm. Without it,
+ *   sticky routing starts only after a cache hit.
+ * - `maxLatencyP90` (seconds) goes out as `preferred_max_latency`: providers
+ *   slower than that at p90 over the last five minutes move down the list.
+ *   It never blocks a call, and it keeps OpenRouter's default routing (unlike
+ *   `order` or `sort`, which replace it).
+ * - `only` and `ignore` are provider slugs (`together`, `baseten/fast`), for
+ *   runs pinned to one host and for skipping one.
+ */
+export interface PlannerRouting {
+  sessionId?: string
+  maxLatencyP90?: number | null
+  only?: string[]
+  ignore?: string[]
+}
+
+/** Seconds; per-call median time to first output is 0.7-1.8 s by host. */
+export const DEFAULT_PROVIDER_MAX_LATENCY_P90 = 2
+
+function providerSlugs(value: string | undefined): string[] | undefined {
+  const slugs = value
+    ?.split(',')
+    .map((slug) => slug.trim())
+    .filter(Boolean)
+  return slugs?.length ? slugs : undefined
+}
+
+/**
+ * The planner's routing for a session: AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90
+ * (seconds, or `off`), AGENT_SEARCH_PROVIDER_ONLY and
+ * AGENT_SEARCH_PROVIDER_IGNORE (comma-separated slugs). Throws on a latency
+ * that is not a positive number.
+ */
+export function plannerRouting(
+  sessionId: string | null,
+  env: Record<string, string | undefined> = process.env,
+): PlannerRouting {
+  const latency =
+    env.AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90?.trim().toLowerCase()
+  let maxLatencyP90: number | null = DEFAULT_PROVIDER_MAX_LATENCY_P90
+  if (latency === 'off') maxLatencyP90 = null
+  else if (latency) {
+    maxLatencyP90 = Number(latency)
+    if (!Number.isFinite(maxLatencyP90) || maxLatencyP90 <= 0) {
+      throw new Error(
+        `Invalid AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90: ${JSON.stringify(latency)}`,
+      )
+    }
+  }
+  const only = providerSlugs(env.AGENT_SEARCH_PROVIDER_ONLY)
+  const ignore = providerSlugs(env.AGENT_SEARCH_PROVIDER_IGNORE)
+  return {
+    ...(sessionId ? { sessionId } : {}),
+    maxLatencyP90,
+    ...(only ? { only } : {}),
+    ...(ignore ? { ignore } : {}),
+  }
+}
+
+/**
  * Builds the provider model at call time, from environment variables or, for
- * an OpenRouter model, from a member's own key.
+ * an OpenRouter model, from a member's own key. `routing` applies to
+ * OpenRouter calls only; without it a call carries just the no-retention
+ * filter (the scorer).
  */
 export function createProviderModel(
   spec: string,
   ownKey: string | null = null,
+  routing: PlannerRouting = {},
 ): ProviderModel {
   const { provider, modelId } = parseModelSpec(spec)
   if (provider === 'openai') {
@@ -239,11 +323,22 @@ export function createProviderModel(
     includeUsage: true,
     fetch: async (input, init) => {
       // Ask OpenRouter for providers that neither retain nor train on prompts.
+      // The two flags go last so no routing option can override them. Usage
+      // and cost come in every response without asking; `usage: { include }`
+      // is deprecated and ignored (OpenRouter usage accounting docs).
       if (typeof init?.body === 'string') {
         const body = JSON.parse(init.body)
-        body.provider = { ...body.provider, data_collection: 'deny', zdr: true }
-        // Usage accounting: the final chunk reports what the call cost.
-        body.usage = { include: true }
+        body.provider = {
+          ...body.provider,
+          ...(routing.only ? { only: routing.only } : {}),
+          ...(routing.ignore ? { ignore: routing.ignore } : {}),
+          ...(routing.maxLatencyP90
+            ? { preferred_max_latency: { p90: routing.maxLatencyP90 } }
+            : {}),
+          data_collection: 'deny',
+          zdr: true,
+        }
+        if (routing.sessionId) body.session_id = routing.sessionId
         if (effort) body.reasoning = { ...body.reasoning, effort }
         init = { ...init, body: JSON.stringify(body) }
       }
@@ -519,12 +614,18 @@ export class EnvLanguageModel {
     readonly spec: string,
     readonly runId: string | null = null,
     readonly sealedKey: string | null = null,
+    /** OpenRouter's sticky-routing key when there is no run id (the eval). */
+    readonly sessionId: string | null = null,
   ) {
     parseModelSpec(spec)
   }
 
+  private routing(): PlannerRouting {
+    return plannerRouting(this.runId ?? this.sessionId)
+  }
+
   private inner(): any {
-    this.resolved ??= createProviderModel(this.spec)
+    this.resolved ??= createProviderModel(this.spec, null, this.routing())
     return this.resolved
   }
 
@@ -536,7 +637,7 @@ export class EnvLanguageModel {
       throw new Error(OWN_KEY_ERRORS.own_key_unavailable)
     }
     const key = await unsealOwnKey(this.sealedKey, this.runId, secret)
-    this.resolved = createProviderModel(this.spec, key)
+    this.resolved = createProviderModel(this.spec, key, this.routing())
     return this.resolved
   }
 
@@ -703,6 +804,7 @@ export class EnvLanguageModel {
       spec: model.spec,
       ...(model.runId ? { runId: model.runId } : {}),
       ...(model.sealedKey ? { sealedKey: model.sealedKey } : {}),
+      ...(model.sessionId ? { sessionId: model.sessionId } : {}),
     }
   }
 
@@ -710,27 +812,32 @@ export class EnvLanguageModel {
     spec: string
     runId?: string
     sealedKey?: string
+    sessionId?: string
   }) {
     return new EnvLanguageModel(
       data.spec,
       data.runId ?? null,
       data.sealedKey ?? null,
+      data.sessionId ?? null,
     )
   }
 }
 
 /**
- * The planner model; pass the run id to record usage on that run, and a
- * sealed key to call on the member's own OpenRouter key.
+ * The planner model; pass the run id to record usage on that run (it is also
+ * OpenRouter's session id), a sealed key to call on the member's own
+ * OpenRouter key, and a session id when there is no run (the eval).
  */
 export function agentSearchModel(
   spec: string,
   runId: string | null = null,
   sealedKey: string | null = null,
+  sessionId: string | null = null,
 ): LanguageModel {
   return new EnvLanguageModel(
     spec,
     runId,
     sealedKey,
+    sessionId,
   ) as unknown as LanguageModel
 }

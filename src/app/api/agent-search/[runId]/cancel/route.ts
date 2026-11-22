@@ -3,8 +3,10 @@ import { getRun } from 'workflow/api'
 import { getAgentSearchAccess } from '@/lib/agentSearch/eligibility'
 import { workflowRunIdOf } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
+import { clearRunTweetCache } from '@/lib/agentSearch/workspace/runCache'
 
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
 
@@ -61,5 +63,6 @@ export async function POST(
     error: 'Stopped by the member',
     completedAt: new Date().toISOString(),
   })
+  clearRunTweetCache(runId)
   return NextResponse.json({ status: 'failed' }, { headers: noStore })
 }

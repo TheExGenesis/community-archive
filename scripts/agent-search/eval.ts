@@ -87,8 +87,10 @@ interface QuestionResult {
   commandErrors: number
   semanticCalls: number
   wallMs: number
-  /** The run reached its deadline, so its last step answered without tools. */
+  /** The run ended at or after its deadline. */
   reachedDeadline: boolean
+  /** A step started after the deadline, so the deadline (not the step cap) forced the answer. */
+  answeredAtDeadline: boolean
   stepTimings: StepTiming[]
   error: string | null
   score: Score
@@ -122,6 +124,8 @@ interface Score {
 
 /** Time past the run's deadline for its last, tool-less answer. */
 const FINAL_ANSWER_MS = 120_000
+/** How much of each command's stdout a trace keeps. */
+const TRACE_OUTPUT_CHARS = 40_000
 
 function parseArgs(argv: string[]) {
   const args = {
@@ -457,11 +461,13 @@ function writeTrace(
         input: call.input,
         ...(output && typeof output.stdout === 'string'
           ? {
-              stdout: clip(output.stdout, 4000),
-              stderr: clip(output.stderr ?? '', 1000),
+              // More than the model saw (MODEL_OUTPUT_CHARS, 10,000), so a
+              // reviewer can tell what a clip hid from it.
+              stdout: clip(output.stdout, TRACE_OUTPUT_CHARS),
+              stderr: clip(output.stderr ?? '', 2000),
               exitCode: output.exitCode,
             }
-          : { output: clip(output, 4000) }),
+          : { output: clip(output, TRACE_OUTPUT_CHARS) }),
         ...(part?.type === 'tool-error'
           ? { error: clip(part.error, 500) }
           : {}),
@@ -552,6 +558,8 @@ async function runQuestion(
   let usage: Partial<LanguageModelUsage> = {}
   let error: string | null = null
   const toolErrors: unknown[] = []
+  // Whether a step began after the deadline (it then answers without tools).
+  let answeredAtDeadline = false
   // Planner calls, and those whose charge OpenRouter reported.
   let modelCalls = 0
   let reportedCalls = 0
@@ -576,6 +584,12 @@ async function runQuestion(
       const abortSignal = AbortSignal.timeout(timeoutMs)
       // The depth's profile, applied as the workflow applies it.
       const profile = mods.depth.AGENT_SEARCH_PROFILES[args.depth]
+      const prepare = mods.agent.agentSearchPrepareStep(
+        deadlineAt,
+        undefined,
+        undefined,
+        profile.maxSteps,
+      )
       const agent = new mods.ai.ToolLoopAgent({
         // Its own OpenRouter session, as a production run has (its run id),
         // and each call's charge as OpenRouter reports it.
@@ -611,12 +625,10 @@ async function runQuestion(
           mods.ai.isStepCount(profile.maxSteps),
           mods.agent.toolsKeepFailing,
         ],
-        prepareStep: mods.agent.agentSearchPrepareStep(
-          deadlineAt,
-          undefined,
-          undefined,
-          profile.maxSteps,
-        ),
+        prepareStep: (stepArgs) => {
+          if (Date.now() >= deadlineAt) answeredAtDeadline = true
+          return prepare(stepArgs)
+        },
       })
       const result = await agent.generate({
         prompt: question.question,
@@ -732,6 +744,7 @@ async function runQuestion(
     semanticCalls,
     wallMs: Date.now() - started,
     reachedDeadline: Date.now() >= deadlineAt,
+    answeredAtDeadline,
     stepTimings,
     error,
     score: score(

@@ -625,12 +625,11 @@ export async function getInteractionTies(
 
 // --- Account timeline (gateway /v1) ---------------------------------------
 // One account's own tweets come from the gateway's /v1/accounts/{account}/tweets
-// route (keyset-paginated, 200 per page). As a first-party feature, Ask calls
-// the internal gateway host with CLICKHOUSE_ANALYTICS_API_TOKEN (the same
-// internal token used by all other gateway reads); COMMUNITY_ARCHIVE_API_KEY is
-// only preferred when COMMUNITY_ARCHIVE_API_V1_URL explicitly targets another
-// host. Gateway-first check: production /v1 must accept
-// CLICKHOUSE_ANALYTICS_API_TOKEN without public-key throttling.
+// route (keyset-paginated, 200 per page). Production /v1 accepts only personal
+// cak_ keys (PR #1276), with the public limits (60 a minute, two in flight per
+// account), so Ask sends COMMUNITY_ARCHIVE_API_KEY first and falls back to
+// CLICKHOUSE_ANALYTICS_API_TOKEN on a 401 or 403 (apiV1Json). An internal
+// budget for Ask on /v1 is a gateway change (control-panel).
 
 interface V1Tweet {
   tweet_id: string
@@ -747,11 +746,20 @@ async function apiV1Json<T>(
   const base = apiV1BaseUrl()
   if (!base) throw new Error('CLICKHOUSE_SEARCH_API_URL is not configured')
   const explicitBase = process.env.COMMUNITY_ARCHIVE_API_V1_URL?.trim()
-  const token =
-    (explicitBase ? process.env.COMMUNITY_ARCHIVE_API_KEY?.trim() : undefined) ||
-    process.env.CLICKHOUSE_ANALYTICS_API_TOKEN?.trim() ||
-    process.env.COMMUNITY_ARCHIVE_API_KEY?.trim()
-  if (!token) throw new Error('No key for the Community Archive gateway timeline')
+  const siteToken = process.env.CLICKHOUSE_ANALYTICS_API_TOKEN?.trim()
+  const publicKey = process.env.COMMUNITY_ARCHIVE_API_KEY?.trim()
+  // Production /v1 accepts only personal cak_ keys (PR #1276), so the public
+  // key goes first when it is set. The internal token is the fallback: the
+  // local stand-in takes it, and so will /v1 if the gateway adds an internal
+  // bypass. A 401 or 403 moves to the next key once instead of failing the
+  // timeline. An explicit host gets one key, as before, and no fallback.
+  const tokens = (
+    explicitBase ? [publicKey || siteToken] : [publicKey, siteToken]
+  ).filter((t, i, all): t is string => !!t && all.indexOf(t) === i)
+  if (!tokens.length) {
+    throw new Error('No key for the Community Archive gateway timeline')
+  }
+  let keyIndex = 0
   const attempt = async (timeoutMs: number) => {
     const timeout = AbortSignal.timeout(timeoutMs)
     const stop = limits.abortSignal
@@ -759,7 +767,7 @@ async function apiV1Json<T>(
       : undefined
     try {
       const response = await fetch(`${base}${path}?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${tokens[keyIndex]}` },
         signal: stop?.signal ?? timeout,
         cache: 'no-store',
       })
@@ -779,6 +787,17 @@ async function apiV1Json<T>(
     for (let attempts = 1; ; attempts++) {
       const { response, body } = await attempt(timeoutMs)
       if (response.ok && body) return body
+      // A refused key moves to the next one; that is not a retry, so it
+      // does not use up an attempt.
+      if (
+        (response.status === 401 || response.status === 403) &&
+        keyIndex < tokens.length - 1
+      ) {
+        keyIndex += 1
+        attempts -= 1
+        timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
+        continue
+      }
       const error = new ApiV1Error(
         response.status,
         body?.error?.code ?? 'upstream_unavailable',

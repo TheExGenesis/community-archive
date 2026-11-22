@@ -96,12 +96,69 @@ describe('API v1 timeline', () => {
     })
   })
 
-  test('uses the internal gateway token even when COMMUNITY_ARCHIVE_API_KEY is set on the default host', async () => {
+  test('sends the public key first when it is set (production /v1 takes only cak_ keys)', async () => {
     process.env.COMMUNITY_ARCHIVE_API_KEY = 'cak_public'
     await getAccountTweets({ account: '@maskys_' })
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('http://gw.test/v1/accounts/maskys_/tweets?order=desc&limit=200')
-    expect(init.headers.Authorization).toBe('Bearer site-token')
+    expect(url).toBe(
+      'http://gw.test/v1/accounts/maskys_/tweets?order=desc&limit=200',
+    )
+    expect(init.headers.Authorization).toBe('Bearer cak_public')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('falls back to the internal token once when the public key is refused', async () => {
+    process.env.COMMUNITY_ARCHIVE_API_KEY = 'cak_public'
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      json: async () => ({ error: { code: 'unauthorized', message: 'no' } }),
+    })
+    const page = await getAccountTweets({ account: '@maskys_' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe(
+      'Bearer cak_public',
+    )
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe(
+      'Bearer site-token',
+    )
+    expect(page.tweets[0].id).toBe('11')
+  })
+
+  test('a refused key with nothing to fall back to fails at once', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 403,
+      headers: new Headers(),
+      json: async () => ({ error: { code: 'forbidden', message: 'no' } }),
+    })
+    await expect(
+      getAccountTweets({ account: '@maskys_' }),
+    ).rejects.toMatchObject({
+      status: 403,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('an explicit host gets one key and no fallback', async () => {
+    process.env.COMMUNITY_ARCHIVE_API_V1_URL = 'https://api.test/v1/'
+    process.env.COMMUNITY_ARCHIVE_API_KEY = 'cak_test'
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      json: async () => ({}),
+    })
+    await expect(
+      getAccountTweets({ account: '@maskys_' }),
+    ).rejects.toMatchObject({
+      status: 401,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe(
+      'Bearer cak_test',
+    )
   })
 
   test('keeps the @ on a numeric username, and uses an explicit base and key', async () => {

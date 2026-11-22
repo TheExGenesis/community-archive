@@ -23,6 +23,31 @@ describe('ClickHouse analytics gateway requests', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('allows the routes behind Ask’s interactions and ties commands', () => {
+    expect(
+      analyticsGatewayRequestUrl(
+        ['interactions'],
+        new URLSearchParams(
+          'a=maskys_&b=exgenesis&since=2024-01&until=2025-12&limit=20&raw=1',
+        ),
+        'https://gw.example/analytics',
+      ).toString(),
+    ).toBe(
+      'https://gw.example/analytics/interactions?a=maskys_&b=exgenesis&since=2024-01&until=2025-12&limit=20',
+    )
+    expect(
+      analyticsGatewayRequestUrl(
+        ['interaction-ties'],
+        new URLSearchParams(
+          'accounts=a,b&before=2025-01&months=12&peers=5&x=1',
+        ),
+        'https://gw.example/analytics',
+      ).toString(),
+    ).toBe(
+      'https://gw.example/analytics/interaction-ties?accounts=a%2Cb&before=2025-01&months=12&peers=5',
+    )
+  })
+
   test('never exposes the private self-location endpoint through the public proxy', () => {
     expect(() =>
       analyticsGatewayRequestUrl(
@@ -298,7 +323,11 @@ describe('library snapshot endpoints', () => {
       'https://gateway.example/analytics/library',
     )
     expect(
-      analyticsGatewayRequestUrl(['library', 'shard', '31'], none, base).toString(),
+      analyticsGatewayRequestUrl(
+        ['library', 'shard', '31'],
+        none,
+        base,
+      ).toString(),
     ).toBe('https://gateway.example/analytics/library/shard/31')
     expect(() =>
       analyticsGatewayRequestUrl(['library', 'shard', '..'], none, base),

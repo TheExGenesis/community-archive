@@ -22,6 +22,7 @@ import {
   questionWithWorkspace,
   toolsKeepFailing,
 } from './agent'
+import { MODEL_OUTPUT_CHARS } from './workspace/output'
 
 describe('agentSearchPrepareStep', () => {
   test('the reasoning and stall flags are on unless set to off', () => {
@@ -432,7 +433,7 @@ describe('tool modes', () => {
     expect(bashV2).toContain('Combine fetching and inspecting in one bash call')
     // Lookups to run together go in one call: the agent's tool calls of a
     // turn run one after another.
-    expect(bashV2).toContain('use par inside one bash call')
+    expect(bashV2).toContain('Make one bash call per turn')
     expect(bashV2).not.toContain('multiple bash calls in the same turn')
     expect(bashV2).toContain('not a JSON row, so do not pipe it to jq')
     expect(bashV2).toContain('sed, split, mkdir')
@@ -448,7 +449,7 @@ describe('tool modes', () => {
     expect(bash.inputSchema.safeParse({ command: '' }).success).toBe(false)
     const out = bash.toModelOutput({
       output: {
-        stdout: 'x\n'.repeat(5000),
+        stdout: 'x\n'.repeat(MODEL_OUTPUT_CHARS),
         stderr: '',
         exitCode: 0,
         summary: '',
@@ -458,7 +459,7 @@ describe('tool modes', () => {
     })
     expect(out.type).toBe('json')
     expect(Object.keys(out.value)).toEqual(['output', 'exitCode'])
-    expect(out.value.output.length).toBeLessThan(4200)
+    expect(out.value.output.length).toBeLessThan(MODEL_OUTPUT_CHARS + 200)
     expect(out.value.output).toContain('more lines not shown')
   })
 

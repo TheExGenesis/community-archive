@@ -86,7 +86,11 @@ import {
 import { MAX_SEMANTIC_CALLS_PER_RUN, semanticSearch } from '../semantic'
 import { USAGE } from './commands'
 import { applyChanges, type WorkspaceManifest } from './manifest'
-import { bashModelOutput, streamedBashOutput } from './output'
+import {
+  MODEL_OUTPUT_CHARS,
+  bashModelOutput,
+  streamedBashOutput,
+} from './output'
 import { createInProcessBash } from './inProcess'
 import {
   BoundedTweetMap,
@@ -1176,6 +1180,38 @@ describe('what the page receives of a command', () => {
   })
 })
 
+describe('files written in another shape', () => {
+  test('a merged JSON array is kept as rows, and stderr says how it reads now', async () => {
+    const first = await run('search singapore > s1.jsonl')
+    const out = await run(
+      "jq -sc 'unique_by(.id)' s1.jsonl > pool.jsonl",
+      applyChanges({}, first.workspace),
+    )
+    expect(out.workspace['pool.jsonl']).toMatchObject({ kind: 'tweets' })
+    expect(out.stderr).toMatch(
+      /^note: pool\.jsonl was one JSON array or multi-line JSON; later commands see it as JSON Lines/,
+    )
+    const next = await run(
+      'wc -l pool.jsonl',
+      applyChanges(applyChanges({}, first.workspace), out.workspace),
+    )
+    expect(next.stdout.trim()).toBe('4 pool.jsonl')
+  })
+
+  test('a long file that is neither rows nor short text is named on stderr', async () => {
+    const out = await run(`seq 1 6000 | awk '{print "line " $1}' > notes.txt`)
+    expect(out.workspace['notes.txt']).toBeNull()
+    expect(out.stderr).toContain(
+      'note: notes.txt is not kept for later commands',
+    )
+  })
+
+  test('a JSON Lines file brings no note', async () => {
+    const out = await run('search singapore > s1.jsonl')
+    expect(out.stderr).not.toContain('note:')
+  })
+})
+
 describe('what the model sees of a command', () => {
   test('long output is cut with a note, and the summary on stderr stays', () => {
     const stdout = Array.from(
@@ -1187,7 +1223,7 @@ describe('what the model sees of a command', () => {
       stderr: 'search: 500 tweets\n',
       exitCode: 0,
     })
-    expect(view.output.length).toBeLessThan(4200)
+    expect(view.output.length).toBeLessThan(MODEL_OUTPUT_CHARS + 200)
     expect(view.output).toMatch(/… \d+ more lines not shown/)
     expect(view.output).toContain('search: 500 tweets')
   })

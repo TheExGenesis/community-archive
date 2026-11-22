@@ -51,8 +51,9 @@ preview's `dev` account, the question runs without it.
    [The workspace](#the-workspace)). Each command is a durable step. Every
    archive read goes through the gateway (`gateway.ts`), which applies
    opt-outs. The page receives the command's summary, the tweet files it
-   wrote and the tweets it touched; the model receives only stdout, capped at
-   about 4,000 characters, and the exit code. `AGENT_SEARCH_TOOLS=typed`
+   wrote and the tweets it touched; the model receives only stdout and
+   stderr, capped at about 10,000 characters (with a note of how many lines
+   were left out), and the exit code. `AGENT_SEARCH_TOOLS=typed`
    switches back to the earlier typed tools (`find_people`, `search_tweets`,
    `semantic_search`, `collect_and_score`, `score_tweets`, `get_thread`,
    `get_quote_posts`, `get_tweets`, implemented in `toolImpl.ts`), which pass
@@ -179,7 +180,11 @@ group label, say), never tweet text. A file is rebuilt only when a command
 reads it, by fetching its ids through the gateway again, so a tweet whose
 author has opted out since drops out. Other files (counts, notes) are carried
 as text for the rest of the run (up to 20,000 characters) but are never
-stored with the answer, since they may hold tweet text.
+stored with the answer, since they may hold tweet text. A tweet file written
+as one JSON array or as multi-line objects (jq without `-c`, or without
+`[]` after `-s`) is kept and rebuilt as JSON Lines; a file that is neither
+tweets nor short text is not kept. Either way the command's stderr says so,
+first, so the agent does not later find the file changed or gone.
 
 The agent's tool calls of one turn are started together, so shell commands
 run one at a time in call order (`createSlots(1)` in the workflow and in the

@@ -13,13 +13,14 @@ import {
   type CommandState,
 } from './commands'
 import {
+  MAX_TEXT_FILE_CHARS,
   manifestFileFor,
   type ManifestChanges,
   type ManifestFile,
   type WorkspaceManifest,
 } from './manifest'
 import type { BashToolOutput } from './output'
-import { formatRows, toRow, uniqueIds } from './rows'
+import { formatRows, parseRowLines, toRow, uniqueIds } from './rows'
 import { getRunTweetCache } from './runCache'
 
 /** The built-in tools the agent may use alongside the archive commands. */
@@ -267,6 +268,9 @@ export async function runBashCommand({
   // Rows printed with a p first; a file the command wrote has the last word.
   const scores = scoresInOutput(result.stdout)
   const changedFiles: Record<string, string[]> = {}
+  // Files written in a shape the next command will not see as written; the
+  // model learns it on stderr instead of finding the file gone.
+  const notes: string[] = []
   for (const absolute of Array.from(touched)) {
     const path = relative(absolute)
     if (!path || !WORKSPACE_PATH.test(path)) continue
@@ -276,7 +280,17 @@ export async function runBashCommand({
     }
     const stat = await bash.fs.stat(absolute)
     if (!stat.isFile) continue
-    const file = manifestFileFor(await bash.fs.readFile(absolute))
+    const content = await bash.fs.readFile(absolute)
+    const file = manifestFileFor(content)
+    if (!file) {
+      notes.push(
+        `note: ${path} is not kept for later commands: it is neither tweet rows (one JSON object with an id per line, as jq -c writes) nor text under ${MAX_TEXT_FILE_CHARS.toLocaleString('en-US')} characters`,
+      )
+    } else if (file.kind === 'tweets' && !parseRowLines(content)) {
+      notes.push(
+        `note: ${path} was one JSON array or multi-line JSON; later commands see it as JSON Lines, one tweet per line (read it with jq -c '.', not '.[]')`,
+      )
+    }
     workspace[path] = file
     if (file?.kind === 'tweets') {
       changedFiles[path] = uniqueIds(file.rows)
@@ -323,7 +337,10 @@ export async function runBashCommand({
 
   return {
     stdout: result.stdout,
-    stderr: result.stderr,
+    // First, so the cap on what the model sees of stderr cannot hide them.
+    stderr: notes.length
+      ? `${notes.join('\n')}\n${result.stderr}`
+      : result.stderr,
     exitCode: result.exitCode,
     summary,
     files: changedFiles,

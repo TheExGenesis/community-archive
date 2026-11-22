@@ -37,7 +37,11 @@ export interface BashToolOutput {
   timing?: CommandTiming
 }
 
-const MODEL_OUTPUT_CHARS = 4000
+// What the model sees of a command. At 4,000 the prompt's own example
+// preview (40 rows of 200 characters) showed 12-16 rows, and in the
+// 2026-11-22 eval runs that printed 30-140 rows saw 15-25, missing the top
+// of their own scored lists. It stays in the context of every later step.
+export const MODEL_OUTPUT_CHARS = 10_000
 
 /**
  * What the model sees of a command: stdout then stderr, capped, with a note

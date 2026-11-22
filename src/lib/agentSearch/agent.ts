@@ -642,6 +642,10 @@ export function createAgentSearchTools(
           count: output.tweets.length,
           nextOffset: output.nextOffset,
           tweets: compactList(output.tweets),
+          // Terms whose search failed; the tweets are from the others.
+          ...('failedTerms' in output && output.failedTerms
+            ? { failedTerms: output.failedTerms }
+            : {}),
         }),
     }),
     semantic_search: tool({
@@ -682,6 +686,8 @@ export function createAgentSearchTools(
           keptCount: output.keptCount,
           kept: compactList(output.kept),
           borderline: compactList(output.borderline),
+          // Terms whose search failed; the collection is from the others.
+          ...(output.failedTerms ? { failedTerms: output.failedTerms } : {}),
         }),
     }),
     score_tweets: tool({

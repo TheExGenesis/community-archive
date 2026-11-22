@@ -9,6 +9,7 @@ import {
   archiveCommands,
   createCommandState,
   fetchTweets,
+  fetchTweetsSettled,
   type CommandState,
 } from './commands'
 import {
@@ -304,10 +305,11 @@ export async function runBashCommand({
     ]),
   ).slice(0, MAX_PAGE_TWEETS)
   const pageStarted = Date.now()
+  // A failed lookup batch loses only its own cards, not every card.
   const tweets = ids.length
-    ? await inPhase(state.limits, 'page', () => fetchTweets(state, ids)).catch(
-        () => [],
-      )
+    ? await inPhase(state.limits, 'page', () => fetchTweetsSettled(state, ids))
+        .then((found) => found.tweets)
+        .catch(() => [])
     : []
   const pageMs = Date.now() - pageStarted
   const wrote = Object.entries(changedFiles).map(

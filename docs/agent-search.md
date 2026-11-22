@@ -189,6 +189,20 @@ slots. The prompt tells the agent to use `par` inside one call instead. A
 search waiting for a slot gives up as soon as the run's deadline passes or
 the run is stopped, and so does the wait before a busy-gateway retry.
 
+A command that makes several archive calls keeps what answered when some
+fail, so the agent does not pay for the same calls twice. A search term that
+fails, or a page after a search's first, a `timeline` page after the first, a
+lookup batch in `tweets` or `semantic`, and a batch of accounts in `ties`
+each lose only their own part. The command prints the rows it has, exits 0,
+and says on stderr what failed and what to run again (the failed search
+terms by name, the accounts `ties` could not check), and its summary on the
+page ends ", partial". A reply whose parent could not be fetched is scored
+on its own words, and `score` says how many were. Three things still fail
+outright: a command in which no call answered (so the shell command reads as
+the archive being down), Stop, and rebuilding a workspace file, which must
+not take a failed lookup for deleted tweets. The typed tools report
+`failedTerms` the same way.
+
 Each command's output reports the changes it made (`workspace`) and the ids in
 each tweet file it wrote (`files`). The stored run keeps the summary, exit
 code, `files`, tweet-file changes and tweet ids (`history.ts`), never stdout,
@@ -215,8 +229,8 @@ Inside a command, archive calls run in turn unless they are independent:
 `search` asks for its first page alone and the rest three at a time, `--or`
 and `--with` search three terms at a time (so one command keeps at most three
 searches in flight), id lookups go 100 ids per call with four calls in
-flight, and `par` runs six command lines together. Each of those lines keeps
-its own three, so a `par` of searches can still pass the gateway's limit. just-bash itself runs
+flight, and `par` runs six command lines together, all of them sharing the
+command's three search slots. just-bash itself runs
 `&`, `;` and loops one command after another. Deleted tweets are left out of
 a page, so a short or empty page does not end a search; a null `nextOffset`
 does, and no page past offset 5,000 is asked for.
@@ -231,7 +245,10 @@ saying so, on a cursor it already followed or after `ceil(limit / 200) + 10`
 pages. A `429` or `503` is retried after `Retry-After` (at most 10 s, 1 s when
 absent), up to three attempts, never past the run's deadline or after Stop. A
 `422` (too broad for the API's query budget) prints the tweets already read,
-marked partial, and tells the agent to narrow with `--since`/`--until`.
+marked partial, and tells the agent to narrow with `--since`/`--until`; it
+exits 1, because the agent has to change the command. Any other failure after
+the first page (a timeout, the API busy past its retries, the run's deadline)
+also keeps the tweets read, but exits 0.
 When `COMMUNITY_ARCHIVE_API_V1_URL` names another host, that host gets one key
 (the public key, else the gateway token) and no fallback. The keyed API allows
 60 requests a minute and two in flight per account, so a `par` of several

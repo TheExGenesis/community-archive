@@ -16,6 +16,7 @@ import {
   getTweetDetails,
   getTweetsByIds,
   getTweetsByIdsBatched,
+  getTweetsByIdsSettled,
   retryWhileBusy,
   searchTweets,
 } from './gateway'
@@ -443,6 +444,58 @@ describe('getTweetsByIdsBatched', () => {
     expect(found.map((t) => t.id).sort()).toEqual([...ids].sort())
     expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(10)
     expect(most).toBe(4)
+  })
+})
+
+describe('getTweetsByIdsSettled', () => {
+  const answer = (params: URLSearchParams) => ({
+    data: {
+      tweets: params
+        .get('ids')!
+        .split(',')
+        .map((id) => card(id)),
+    },
+  })
+
+  test('keeps the batches that answered and names the ids of the one that failed', async () => {
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockImplementation(
+      async (_path: string[], params: URLSearchParams) => {
+        if (params.get('ids')!.split(',').includes('150'))
+          throw new Error('busy')
+        return answer(params)
+      },
+    )
+    const ids = Array.from({ length: 250 }, (_, i) => String(i + 1))
+    const found = await getTweetsByIdsSettled(ids)
+    // Ids 101-200 were one batch.
+    expect(found.tweets).toHaveLength(150)
+    expect(found.failedIds).toHaveLength(100)
+    expect(found.failedIds[0]).toBe('101')
+    expect((found.error as Error).message).toBe('busy')
+  })
+
+  test('every batch answering looks like the strict lookup', async () => {
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockImplementation(
+      async (_path: string[], params: URLSearchParams) => answer(params),
+    )
+    expect(await getTweetsByIdsSettled(['1', '2'])).toEqual({
+      tweets: [
+        expect.objectContaining({ id: '1' }),
+        expect.objectContaining({ id: '2' }),
+      ],
+      failedIds: [],
+    })
+  })
+
+  test('Stop throws instead of returning what answered', async () => {
+    const stop = new AbortController()
+    ;(fetchAnalyticsGatewayJson as jest.Mock).mockImplementation(async () => {
+      stop.abort(new Error('stopped'))
+      throw new Error('aborted')
+    })
+    await expect(
+      getTweetsByIdsSettled(['1'], { abortSignal: stop.signal }),
+    ).rejects.toThrow('stopped')
   })
 })
 

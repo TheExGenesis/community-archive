@@ -11,6 +11,25 @@ jest.mock('./gateway', () => ({
   getTweetsByIdsBatched: jest.fn(async (ids: string[], limits: unknown) =>
     jest.requireMock('./gateway').getTweetsByIds(ids, limits),
   ),
+  // Settled lookups too: a failed batch of 100 is reported, not thrown.
+  getTweetsByIdsSettled: jest.fn(async (ids: string[], limits: unknown) => {
+    const { getTweetsByIds } = jest.requireMock('./gateway')
+    const tweets: unknown[] = []
+    const failedIds: string[] = []
+    let error: unknown
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100)
+      try {
+        tweets.push(...(await getTweetsByIds(batch, limits)))
+      } catch (caught) {
+        failedIds.push(...batch)
+        error ??= caught
+      }
+    }
+    return error === undefined
+      ? { tweets, failedIds }
+      : { tweets, failedIds, error }
+  }),
 }))
 
 import { RunDeadlineError } from './deadline'
@@ -25,6 +44,44 @@ const respond = (body: unknown, ok = true, status = 200) =>
   jest.fn(async () => ({ ok, status, json: async () => body }) as Response)
 
 describe('semantic search', () => {
+  test('a failed lookup loses only its own matches, and they are counted', async () => {
+    const keys = Array.from({ length: 150 }, (_, i) => ({
+      key: String(1000 + i),
+      distance: 0.9,
+    }))
+    const fetchImpl = respond({ success: true, results: keys, count: 150 })
+    ;(getTweetsByIds as jest.Mock).mockImplementationOnce(async () => {
+      throw new Error('busy')
+    })
+    const result = await semanticSearch(
+      { query: 'an idea' },
+      {},
+      fetchImpl as unknown as typeof fetch,
+    )
+    // The first batch of 100 failed; the second answered.
+    expect(result.tweets).toHaveLength(50)
+    expect(result.unfetched).toBe(100)
+    expect(result.matched).toBe(150)
+  })
+
+  test('fails when no match could be fetched', async () => {
+    const fetchImpl = respond({
+      success: true,
+      results: [{ key: '7', distance: 0.9 }],
+      count: 1,
+    })
+    ;(getTweetsByIds as jest.Mock).mockImplementationOnce(async () => {
+      throw new Error('busy')
+    })
+    await expect(
+      semanticSearch(
+        { query: 'an idea' },
+        {},
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).rejects.toThrow('busy')
+  })
+
   test('sends the query and filter, then re-fetches the ids through the gateway', async () => {
     const fetchImpl = respond({
       success: true,

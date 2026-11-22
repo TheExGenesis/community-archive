@@ -1,6 +1,6 @@
 import { AGENT_SEARCH_PROFILES } from './depth'
 import { callTimeoutMs, type RunLimits } from './deadline'
-import { findMembers, getTweetsByIdsBatched } from './gateway'
+import { findMembers, getTweetsByIdsSettled } from './gateway'
 import { traced } from './trace'
 import type { AgentTweet } from './types'
 
@@ -81,7 +81,13 @@ export async function semanticSearch(
   input: SemanticSearchInput,
   limits: RunLimits = {},
   fetchImpl: typeof fetch = fetch,
-): Promise<{ query: string; tweets: SemanticTweet[]; matched: number }> {
+): Promise<{
+  query: string
+  tweets: SemanticTweet[]
+  matched: number
+  /** Matches whose lookup failed, when any did. */
+  unfetched?: number
+}> {
   const query = input.query.trim()
   if (!query) throw new Error('Semantic search needs a query')
   const given = input.fromUser?.trim().replace(/^@/, '')
@@ -132,14 +138,23 @@ export async function semanticSearch(
     ranked.push({ id, distance: Math.round(distance * 1000) / 1000 })
   }
   const byId = new Map<string, AgentTweet>()
-  const found = await getTweetsByIdsBatched(
+  // A failed lookup batch loses only its own matches, and they are counted,
+  // not taken for deleted tweets; when none came back the search fails.
+  const found = await getTweetsByIdsSettled(
     ranked.map((r) => r.id),
     limits,
   )
-  for (const tweet of found) byId.set(tweet.id, tweet)
+  if (ranked.length && found.failedIds.length === ranked.length)
+    throw found.error
+  for (const tweet of found.tweets) byId.set(tweet.id, tweet)
   const tweets = ranked.flatMap(({ id, distance }) => {
     const tweet = byId.get(id)
     return tweet ? [{ ...tweet, distance }] : []
   })
-  return { query, tweets, matched: ranked.length }
+  return {
+    query,
+    tweets,
+    matched: ranked.length,
+    ...(found.failedIds.length ? { unfetched: found.failedIds.length } : {}),
+  }
 }

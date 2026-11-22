@@ -32,6 +32,25 @@ jest.mock('../gateway', () => ({
       found.push(...(await getTweetsByIds(ids.slice(i, i + 100), limits)))
     return found
   }),
+  // Settled lookups too: a failed batch of 100 is reported, not thrown.
+  getTweetsByIdsSettled: jest.fn(async (ids: string[], limits: unknown) => {
+    const { getTweetsByIds } = jest.requireMock('../gateway')
+    const tweets: unknown[] = []
+    const failedIds: string[] = []
+    let error: unknown
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100)
+      try {
+        tweets.push(...(await getTweetsByIds(batch, limits)))
+      } catch (caught) {
+        failedIds.push(...batch)
+        error ??= caught
+      }
+    }
+    return error === undefined
+      ? { tweets, failedIds }
+      : { tweets, failedIds, error }
+  }),
   getAccountTweets: jest.fn(),
   ApiV1Error: class ApiV1Error extends Error {
     constructor(
@@ -1264,5 +1283,168 @@ describe('per-run tweet cache', () => {
     bounded.set('2', tweet('2'))
     bounded.set('3', tweet('3'))
     expect(Array.from(bounded.keys())).toEqual(['2', '3'])
+  })
+})
+
+describe('partial results', () => {
+  const fail = (message = 'gateway timeout') => {
+    throw new Error(message)
+  }
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1))
+
+  test('a search term that fails loses only its own rows, and is named', async () => {
+    ;(searchTweets as jest.Mock).mockImplementation(async ({ query }) =>
+      query === 'tpot'
+        ? fail()
+        : { tweets: Array.from(archive.values()), nextOffset: null },
+    )
+    const out = await run('search singapore --or tpot > s1.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files).toEqual({ 's1.jsonl': ['1', '2', '3', '4'] })
+    expect(out.stderr).toContain(
+      '1 of 2 searches failed (gateway timeout): “tpot”; these rows are from the others, so search only the failed ones again',
+    )
+    expect(out.summary).toBe(
+      'Searched “singapore” or “tpot” · 4 tweets, partial',
+    )
+  })
+
+  test('every term failing still reads as the archive down', async () => {
+    ;(searchTweets as jest.Mock).mockImplementation(async () => fail())
+    await expect(
+      run('search singapore --with expat,visa > s1.jsonl'),
+    ).rejects.toBeInstanceOf(WorkspaceUnavailableError)
+  })
+
+  test('a single search keeps its first page when a later one fails', async () => {
+    const first = ids(100).map((id) => tweet(id))
+    ;(searchTweets as jest.Mock).mockImplementation(async ({ offset = 0 }) =>
+      offset === 0 ? { tweets: first, nextOffset: 100 } : fail(),
+    )
+    const out = await run('search singapore --limit 250 > s1.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files['s1.jsonl']).toEqual(ids(100))
+    expect(out.stderr).toContain(
+      'stopped early when a later page failed (gateway timeout); these are the first 100',
+    )
+    expect(out.stderr).not.toContain('more exist')
+    expect(out.summary).toBe('Searched “singapore” · 100 tweets, partial')
+  })
+
+  test('timeline keeps the pages it read when a later one fails', async () => {
+    ;(getAccountTweets as jest.Mock).mockImplementation(async ({ cursor }) =>
+      cursor ? fail() : { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' },
+    )
+    const out = await run('timeline @alice > a.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files).toEqual({ 'a.jsonl': ['1', '2'] })
+    expect(out.stderr).toContain(
+      'stopped when a later page failed (gateway timeout); more may exist (narrow it with --since/--until)',
+    )
+    expect(out.summary).toBe("Read @alice's tweets · 2 tweets, partial")
+
+    // A failed first page still fails the command.
+    ;(getAccountTweets as jest.Mock).mockImplementation(async () => fail())
+    const none = await run('search singapore > s.jsonl; timeline @alice')
+    expect(none.exitCode).toBe(1)
+    expect(none.stdout).toBe('')
+    expect(none.stderr).toContain('timeline: gateway timeout')
+  })
+
+  test('score scores a reply alone when its parent cannot be fetched', async () => {
+    const { scoreTweets } = jest.requireMock('../classifier')
+    archive.set('5', { ...tweet('5'), replyToTweetId: '99' })
+    ;(getTweetsByIds as jest.Mock).mockImplementation(
+      async (asked: string[]) =>
+        asked.includes('99')
+          ? fail('parent lookup timed out')
+          : asked.flatMap((id) => (archive.has(id) ? [archive.get(id)] : [])),
+    )
+    const out = await run(
+      'search singapore > s1.jsonl && score s1.jsonl "Does this tweet talk about living in Singapore?" > c1.jsonl',
+    )
+    expect(out.exitCode).toBe(0)
+    expect(out.files['c1.jsonl']).toHaveLength(5)
+    expect(out.stderr).toContain(
+      '1 reply scored without the tweet they answer (that lookup failed: parent lookup timed out)',
+    )
+    const items = (scoreTweets as jest.Mock).mock.calls.at(-1)[1]
+    expect(
+      items.find((item: { id: string }) => item.id === '5').parentText,
+    ).toBe(undefined)
+    // What the scorer spent is still counted.
+    expect(out.costUsd).toBe(0.01)
+  })
+
+  test('tweets keeps the batches that answered, and says the rest failed', async () => {
+    for (const id of ids(150)) archive.set(id, tweet(id))
+    ;(getTweetsByIds as jest.Mock).mockImplementation(
+      async (asked: string[]) =>
+        asked.includes('1')
+          ? fail('lookup failed')
+          : asked.flatMap((id) => (archive.has(id) ? [archive.get(id)] : [])),
+    )
+    const out = await run('seq 1 150 | tweets > t.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files['t.jsonl']).toEqual(ids(150).slice(100))
+    expect(out.stderr).toContain(
+      'tweets: 50 tweets of 150 found · 100 could not be fetched (lookup failed), which is not the same as not found; run tweets again for those',
+    )
+    expect(out.summary).toBe('Fetched 50 tweets, partial')
+    ;(getTweetsByIds as jest.Mock).mockImplementation(async () => fail())
+    await expect(run('seq 1 150 | tweets')).rejects.toBeInstanceOf(
+      WorkspaceUnavailableError,
+    )
+  })
+
+  test('rebuilding a workspace file stays strict: a failed batch fails the read', async () => {
+    for (const id of ids(150)) archive.set(id, tweet(id))
+    const manifest: WorkspaceManifest = {
+      'a.jsonl': { kind: 'tweets', rows: ids(150).map((id) => ({ id })) },
+    }
+    ;(getTweetsByIds as jest.Mock).mockImplementation(
+      async (asked: string[]) =>
+        asked.includes('1')
+          ? fail()
+          : asked.flatMap((id) => (archive.has(id) ? [archive.get(id)] : [])),
+    )
+    // Alone, the read is the command's only archive call: the archive is down.
+    await expect(run('cat a.jsonl | wc -l', manifest)).rejects.toBeInstanceOf(
+      WorkspaceUnavailableError,
+    )
+    // Beside a search that answered, the read fails rather than printing the
+    // 50 tweets of the batch that came back.
+    ;(searchTweets as jest.Mock).mockResolvedValue({
+      tweets: [],
+      nextOffset: null,
+    })
+    const out = await run(
+      'search singapore > s.jsonl; cat a.jsonl | wc -l',
+      manifest,
+    )
+    expect(out.exitCode).not.toBe(0)
+    expect(out.stdout.trim()).not.toBe('50')
+    expect(out.files['a.jsonl']).toBeUndefined()
+  })
+
+  test('Stop during a search of several terms returns no partial rows', async () => {
+    const stop = new AbortController()
+    ;(searchTweets as jest.Mock).mockImplementation(async ({ query }) => {
+      if (query === 'b') {
+        stop.abort(new Error('stopped'))
+        throw new Error('stopped')
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return { tweets: [tweet('1')], nextOffset: null }
+    })
+    // The search fails as a whole, so its one call counts as failed; had it
+    // kept term a's row as partial, the command would have succeeded.
+    await expect(
+      runBashCommand({
+        command: 'search a --or b',
+        manifest: {},
+        limits: { abortSignal: stop.signal },
+      }),
+    ).rejects.toBeInstanceOf(WorkspaceUnavailableError)
   })
 })

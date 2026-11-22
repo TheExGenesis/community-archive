@@ -24,7 +24,7 @@ jest.mock('../semantic', () => ({
 import { getInteractionTies, getInteractions } from '../gateway'
 import { isPolicyBlockedAccount } from '../policy'
 import { interactionTiesImpl, interactionsImpl } from '../toolImpl'
-import { runBashCommand } from './workspace'
+import { WorkspaceUnavailableError, runBashCommand } from './workspace'
 
 const zero = { tweets: 0, replies: 0, mentions: 0, quotes: 0 }
 const projection = {
@@ -286,6 +286,60 @@ describe('ties', () => {
     expect((getInteractionTies as jest.Mock).mock.calls.at(-1)[0].peers).toBe(
       10,
     )
+  })
+})
+
+describe('ties when a lookup fails', () => {
+  // 30 accounts in one month: two lookups, of 25 and 5.
+  const handles = Array.from({ length: 30 }, (_, i) => `a${i + 1}`)
+  const command = `ties ${handles.join(' ')} --before 2024-06`
+  const answer = (accounts: string[], before: string) => ({
+    before,
+    months: 12,
+    window: { from: '2023-06', until: before },
+    accounts: accounts.map((input) => ({
+      input,
+      account: {
+        id: `id-${input}`,
+        username: input,
+        name: input,
+        isMember: false,
+      },
+      peers: 1,
+      mutualPeers: 1,
+      mutualMembers: 1,
+      tweetsToMembers: 1,
+      tweetsFromMembers: 1,
+      topMutual: [],
+    })),
+    projection,
+  })
+
+  test('the accounts of a failed lookup are named; the rest are reported', async () => {
+    ;(getInteractionTies as jest.Mock).mockImplementation(
+      async ({ accounts, before }) => {
+        if (accounts.includes('a1')) throw new Error('gateway timeout')
+        return answer(accounts, before)
+      },
+    )
+    const result = await run(command)
+    expect(result.exitCode).toBe(0)
+    expect(getInteractionTies).toHaveBeenCalledTimes(2)
+    expect(result.stdout.trim().split('\n')).toHaveLength(5)
+    expect(result.stderr).toContain(
+      '25 of 30 accounts could not be checked (gateway timeout): @a1, @a2, @a3, @a4, @a5, @a6 and 19 more; run ties again for those',
+    )
+    expect(result.summary).toBe('Checked ties of 5 accounts, partial')
+  })
+
+  test('every lookup failing reads as the archive down', async () => {
+    // Every lookup now runs even after one fails, so the command counts as
+    // one call: counted per lookup, two failures would read as two calls and
+    // one failure, not as an outage.
+    ;(getInteractionTies as jest.Mock).mockRejectedValue(
+      new Error('gateway timeout'),
+    )
+    await expect(run(command)).rejects.toBeInstanceOf(WorkspaceUnavailableError)
   })
 })
 

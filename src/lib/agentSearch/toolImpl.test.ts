@@ -19,6 +19,25 @@ jest.mock('./gateway', () => ({
       found.push(...(await getTweetsByIds(ids.slice(i, i + 100), limits)))
     return found
   }),
+  // Settled lookups too: a failed batch of 100 is reported, not thrown.
+  getTweetsByIdsSettled: jest.fn(async (ids: string[], limits: unknown) => {
+    const { getTweetsByIds } = jest.requireMock('./gateway')
+    const tweets: unknown[] = []
+    const failedIds: string[] = []
+    let error: unknown
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100)
+      try {
+        tweets.push(...(await getTweetsByIds(batch, limits)))
+      } catch (caught) {
+        failedIds.push(...batch)
+        error ??= caught
+      }
+    }
+    return error === undefined
+      ? { tweets, failedIds }
+      : { tweets, failedIds, error }
+  }),
   findMembers: jest.fn(),
   getQuotePosts: jest.fn(),
   getTweetDetails: jest.fn(),
@@ -342,6 +361,125 @@ describe('searchPages', () => {
   })
 })
 
+describe('searchPages when a page fails', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1))
+  // Pages from `failAt` on reject; the rest are served.
+  const failFrom = (failAt: number, error = new Error('timed out')) => {
+    const inner = (searchTweets as jest.Mock).getMockImplementation()!
+    ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+      if ((input.offset ?? 0) >= failAt) throw error
+      return inner(input)
+    })
+  }
+
+  test('a failed later page keeps the pages before it, marked partial', async () => {
+    serve({ x: ids(450) })
+    failFrom(200)
+    const result = await searchPages({ query: 'x' }, 1000, {})
+    expect(result.tweets).toHaveLength(200)
+    expect(result.partial).toBe('timed out')
+    // Where the next page would start: more may exist.
+    expect(result.nextOffset).toBe(200)
+  })
+
+  test('a failed first page fails the search', async () => {
+    serve({ x: ids(450) })
+    failFrom(0)
+    await expect(searchPages({ query: 'x' }, 1000, {})).rejects.toThrow(
+      'timed out',
+    )
+  })
+
+  test('a failure past the end of the results does not count', async () => {
+    // 150 results: page 2 ends them, so page 3 (sent in the same wave) is
+    // past the end and its failure is ignored.
+    serve({ x: ids(150) })
+    const inner = (searchTweets as jest.Mock).getMockImplementation()!
+    ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+      if ((input.offset ?? 0) >= 200) throw new Error('past the end')
+      return inner(input)
+    })
+    const result = await searchPages({ query: 'x' }, 1000, {})
+    expect(result).toEqual({ tweets: expect.any(Array), nextOffset: null })
+    expect(result.tweets).toHaveLength(150)
+  })
+
+  test('Stop fails the search even after pages were read', async () => {
+    serve({ x: ids(450) })
+    const stop = new AbortController()
+    const inner = (searchTweets as jest.Mock).getMockImplementation()!
+    ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+      if ((input.offset ?? 0) >= 100) {
+        stop.abort(new Error('stopped'))
+        throw new Error('stopped')
+      }
+      return inner(input)
+    })
+    await expect(
+      searchPages({ query: 'x' }, 1000, { abortSignal: stop.signal }),
+    ).rejects.toThrow('stopped')
+  })
+})
+
+describe('collectAcrossTerms when a term fails', () => {
+  const failing = (bad: string[], error = new Error('timed out')) => {
+    const inner = (searchTweets as jest.Mock).getMockImplementation()!
+    ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+      if (bad.includes(input.query)) throw error
+      return inner(input)
+    })
+  }
+
+  test('keeps the terms that answered and names the ones that failed', async () => {
+    serve({ a: range('1', 5), b: range('2', 5), c: range('3', 5) })
+    failing(['b'])
+    const result = await collectAcrossTerms(['a', 'b', 'c'], 100, {}, {})
+    expect(result.collected.size).toBe(10)
+    expect(result.failedTerms).toEqual([{ term: 'b', error: 'timed out' }])
+    // A failed term is not asked for again.
+    const asked = (searchTweets as jest.Mock).mock.calls.filter(
+      ([input]) => input.query === 'b',
+    )
+    expect(asked).toHaveLength(1)
+  })
+
+  test('fails when no term answers', async () => {
+    serve({ a: range('1', 5), b: range('2', 5) })
+    failing(['a', 'b'])
+    await expect(collectAcrossTerms(['a', 'b'], 100, {}, {})).rejects.toThrow(
+      'timed out',
+    )
+  })
+
+  test('collect_and_score reports the failed terms and scores the rest', async () => {
+    serve({ book: range('1', 5), novel: range('2', 5) })
+    failing(['novel'])
+    const result = await collectAndScoreImpl({
+      terms: ['book', 'novel'],
+      criterion: 'Does this tweet name a book?',
+    })
+    expect(result.collected).toBe(5)
+    expect(result.failedTerms).toEqual([{ term: 'novel', error: 'timed out' }])
+  })
+
+  test('the typed search keeps the alternatives that answered', async () => {
+    serve({ book: ['1'], recommend: ['2'] })
+    failing(['recommend'])
+    const result = await searchTweetsImpl({
+      query: 'book',
+      anyOf: ['recommend'],
+    })
+    expect(result.tweets.map((t) => t.id)).toEqual(['1'])
+    expect(result).toMatchObject({
+      failedTerms: [{ term: 'recommend', error: 'timed out' }],
+    })
+    failing(['book', 'recommend'])
+    await expect(
+      searchTweetsImpl({ query: 'book', anyOf: ['recommend'] }),
+    ).rejects.toThrow('timed out')
+  })
+})
+
 describe('scoreWithParents', () => {
   const full = (id: string) => ({
     ...tweet(id),
@@ -374,6 +512,30 @@ describe('scoreWithParents', () => {
     expect(
       items.map((item: { parentText: string | null }) => item.parentText),
     ).toEqual([null, 'post p1', 'post p2', 'post p3'])
+  })
+
+  test('a failed parent lookup scores the replies on their own words', async () => {
+    ;(getTweetsByIds as jest.Mock).mockRejectedValue(new Error('busy'))
+    const result = await scoreWithParents(
+      'Is it a reply?',
+      [full('1'), reply('2', 'p9')],
+      true,
+      {},
+    )
+    expect(result.scored.map((t) => t.id).sort()).toEqual(['1', '2'])
+    expect(result).toMatchObject({ withoutParent: 1, parentError: 'busy' })
+    const items = (scoreTweets as jest.Mock).mock.calls.at(-1)[1]
+    expect(items[1].parentText).toBeUndefined()
+  })
+
+  test('past the run deadline a failed parent lookup fails the score', async () => {
+    ;(getTweetsByIds as jest.Mock).mockRejectedValue(new Error('late'))
+    await expect(
+      scoreWithParents('Is it a reply?', [reply('2', 'p9')], true, {
+        deadlineAt: Date.now() - 1,
+      }),
+    ).rejects.toThrow('late')
+    expect(scoreTweets).not.toHaveBeenCalled()
   })
 
   test('makes no lookup when every parent is in hand', async () => {

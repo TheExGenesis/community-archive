@@ -296,6 +296,53 @@ export async function getTweetsByIdsBatched(
   return found
 }
 
+/** What a settled lookup got, and the ids of the batches that failed. */
+export interface SettledTweets {
+  tweets: AgentTweet[]
+  /** Ids in batches that failed; empty when every batch answered. */
+  failedIds: string[]
+  /** The first failure, when there was one. */
+  error?: unknown
+}
+
+/**
+ * As getTweetsByIdsBatched, but a failed batch does not sink the others:
+ * what answered comes back with the ids of the batches that did not, so the
+ * caller can say what is missing. For reply context, the page's tweet cards
+ * and the `tweets` and `semantic` commands. Rebuilding a workspace file and
+ * scoring stay strict, so a failed batch is never taken for deleted tweets.
+ * Stop still throws.
+ */
+export async function getTweetsByIdsSettled(
+  ids: string[],
+  limits: RunLimits = {},
+): Promise<SettledTweets> {
+  const unique = Array.from(new Set(ids))
+  const batches: string[][] = []
+  for (let i = 0; i < unique.length; i += ID_BATCH)
+    batches.push(unique.slice(i, i + ID_BATCH))
+  const tweets: AgentTweet[] = []
+  const failedIds: string[] = []
+  let error: unknown
+  for (let i = 0; i < batches.length; i += ID_BATCH_CONCURRENCY) {
+    const group = batches.slice(i, i + ID_BATCH_CONCURRENCY)
+    const settled = await Promise.allSettled(
+      group.map((batch) => getTweetsByIds(batch, limits)),
+    )
+    settled.forEach((result, j) => {
+      if (result.status === 'fulfilled') tweets.push(...result.value)
+      else {
+        failedIds.push(...group[j])
+        error ??= result.reason
+      }
+    })
+    if (limits.abortSignal?.aborted) throw limits.abortSignal.reason ?? error
+  }
+  return error === undefined
+    ? { tweets, failedIds }
+    : { tweets, failedIds, error }
+}
+
 /**
  * Tweets by id from the gateway's tweet-cards route, at most 100 per call:
  * text, counts, media, reply-to, the quoted tweet and the conversation id.

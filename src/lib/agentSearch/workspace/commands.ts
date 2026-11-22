@@ -6,6 +6,8 @@ import {
   getAccountTweets,
   getTweetDetails,
   getTweetsByIdsBatched,
+  getTweetsByIdsSettled,
+  type SettledTweets,
   type SearchMode,
   type SearchSort,
 } from '../gateway'
@@ -22,6 +24,7 @@ import {
   interactionsImpl,
   scoreWithParents,
   searchPages,
+  type FailedTerm,
 } from '../toolImpl'
 import {
   MAX_SEMANTIC_CALLS_PER_RUN,
@@ -118,6 +121,39 @@ export async function fetchTweets(
   return ids
     .map((id) => state.cache.get(id))
     .filter((tweet): tweet is AgentTweet => Boolean(tweet))
+}
+
+/**
+ * As fetchTweets, but a failed lookup batch loses only its own tweets, which
+ * come back as `failedIds`. `requested` is how many ids had to be fetched,
+ * so a caller can tell "every lookup failed" from "nothing to fetch".
+ */
+export async function fetchTweetsSettled(
+  state: CommandState,
+  ids: string[],
+): Promise<SettledTweets & { requested: number }> {
+  const missing = ids.filter((id) => !state.cache.has(id))
+  const found: SettledTweets = missing.length
+    ? await getTweetsByIdsSettled(missing, state.limits)
+    : { tweets: [], failedIds: [] }
+  for (const tweet of found.tweets) state.cache.set(tweet.id, tweet)
+  return {
+    ...found,
+    tweets: ids
+      .map((id) => state.cache.get(id))
+      .filter((tweet): tweet is AgentTweet => Boolean(tweet)),
+    requested: missing.length,
+  }
+}
+
+const messageOf = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
+
+/** Up to `max` names, then how many more. */
+function someOf(names: string[], max = 6) {
+  return names.length > max
+    ? `${names.slice(0, max).join(', ')} and ${names.length - max} more`
+    : names.join(', ')
 }
 
 function remember(state: CommandState, tweets: AgentTweet[]) {
@@ -392,18 +428,18 @@ async function search(
   state.calls += 1
   let tweets: AgentTweet[] = []
   let more = false
+  // Searches that failed while others answered, and a single search cut
+  // short by a failed later page: the rows that came back are kept.
+  let failedTerms: FailedTerm[] = []
+  let cutShort: string | undefined
   if (terms.length > 1) {
     // Every term is searched in the same mode, with the same filters and
     // sort. With --sort likes the merged rows interleave each term's sorted
     // list, so they are not in like order overall.
-    const { collected, capped } = await collectAcrossTerms(
-      terms,
-      limit,
-      filters,
-      state.limits,
-    )
-    tweets = Array.from(collected.values())
-    more = capped
+    const result = await collectAcrossTerms(terms, limit, filters, state.limits)
+    tweets = Array.from(result.collected.values())
+    more = result.capped
+    failedTerms = result.failedTerms ?? []
   } else {
     // One search: the words alone, or the words plus a single --with word.
     const result = await searchPages(
@@ -412,7 +448,8 @@ async function search(
       state.limits,
     )
     tweets = result.tweets
-    more = result.nextOffset !== null
+    cutShort = result.partial
+    more = result.nextOffset !== null && cutShort === undefined
   }
   remember(state, tweets)
   // The page's line names the words; the model's also says how they matched.
@@ -424,12 +461,21 @@ async function search(
   const withText = withTerms.length
     ? ` with ${withTerms.map(quote).join(' or ')}`
     : ''
+  const partial = failedTerms.length > 0 || cutShort !== undefined
   state.summaries.push(
-    `Searched ${words(bases.map(quote).join(' or ') + withText)} · ${plural(tweets.length, 'tweet')}`,
+    `Searched ${words(bases.map(quote).join(' or ') + withText)} · ${plural(tweets.length, 'tweet')}${partial ? ', partial' : ''}`,
   )
+  // Naming the failed searches lets the agent run only those again.
+  const failedNote = failedTerms.length
+    ? ` · ${failedTerms.length} of ${terms.length} searches failed (${failedTerms[0].error}): ${someOf(failedTerms.map((failed) => quote(failed.term)))}; these rows are from the others, so search only the failed ones again`
+    : ''
+  const cutNote =
+    cutShort !== undefined
+      ? ` · stopped early when a later page failed (${cutShort}); these are the first ${tweets.length}, and more may exist (narrow with --since/--until to read the rest)`
+      : ''
   return {
     stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
-    stderr: `search ${words(searchedFor(bases, withTerms, mode))}: ${describe(tweets)}${more ? ` · more exist (raise --limit, max ${MAX_COLLECT})` : ''}\n`,
+    stderr: `search ${words(searchedFor(bases, withTerms, mode))}: ${describe(tweets)}${failedNote}${cutNote}${more ? ` · more exist (raise --limit, max ${MAX_COLLECT})` : ''}\n`,
     exitCode: 0,
   }
 }
@@ -485,6 +531,9 @@ async function semantic(
     ),
     stderr:
       `semantic ${what}: ${describe(result.tweets)} · rows ordered by distance, closest first` +
+      (result.unfetched
+        ? ` · ${result.unfetched} of ${result.matched} matches could not be fetched (a lookup failed); the rest are here`
+        : '') +
       ` · ${state.semanticRemaining} semantic ${state.semanticRemaining === 1 ? 'search' : 'searches'} left\n`,
     exitCode: 0,
   }
@@ -518,6 +567,8 @@ async function timeline(
   const followed = new Set<string>()
   let cursor: string | null = null
   let cutShort: string | null = null
+  // A later page that failed: the pages before it are kept.
+  let failedPage: string | null = null
   try {
     for (let pages = 1; ; pages++) {
       const page = await getAccountTweets(
@@ -571,11 +622,17 @@ async function timeline(
         exitCode: 1,
       }
     }
-    throw error
+    // Any other failure after the first page (a timeout, the API busy past
+    // its retries, the run's time limit) keeps the pages read, as a 422
+    // does, but exits 0: the command did what it could and the rows are
+    // good. A failed first page, or Stop, fails the command.
+    if (!tweets.length || state.limits.abortSignal?.aborted) throw error
+    failedPage = messageOf(error)
+    cutShort = `stopped when a later page failed (${failedPage})`
   }
   remember(state, tweets)
   state.summaries.push(
-    `Read ${name}'s tweets · ${plural(tweets.length, 'tweet')}`,
+    `Read ${name}'s tweets · ${plural(tweets.length, 'tweet')}${failedPage ? ', partial' : ''}`,
   )
   return {
     stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
@@ -708,7 +765,11 @@ async function score(
       (borderline
         ? `, ${borderline} more between ${BORDERLINE_THRESHOLD} and ${KEEP_THRESHOLD}`
         : '') +
-      ` · rows sorted by p, highest first · scored by ${result.scorer}\n`,
+      ` · rows sorted by p, highest first · scored by ${result.scorer}` +
+      (result.withoutParent
+        ? ` · ${result.withoutParent === 1 ? '1 reply' : `${result.withoutParent} replies`} scored without the tweet they answer (that lookup failed: ${result.parentError})`
+        : '') +
+      '\n',
     exitCode: 0,
   }
 }
@@ -898,11 +959,22 @@ async function tweetsById(
     throw new UsageError(`at most ${MAX_IDS_PER_COMMAND} ids`)
   }
   state.calls += 1
-  const tweets = await fetchTweets(state, ids)
-  state.summaries.push(`Fetched ${plural(tweets.length, 'tweet')}`)
+  const found = await fetchTweetsSettled(state, ids)
+  // Every lookup failed: the command fails (and reads as the archive down).
+  if (found.requested && found.failedIds.length === found.requested)
+    throw found.error
+  const tweets = found.tweets
+  state.summaries.push(
+    `Fetched ${plural(tweets.length, 'tweet')}${found.failedIds.length ? ', partial' : ''}`,
+  )
   return {
     stdout: formatRows(tweets.map((tweet) => toRow(tweet))),
-    stderr: `tweets: ${plural(tweets.length, 'tweet')} of ${ids.length} found\n`,
+    stderr:
+      `tweets: ${plural(tweets.length, 'tweet')} of ${ids.length} found` +
+      (found.failedIds.length
+        ? ` · ${found.failedIds.length} could not be fetched (${messageOf(found.error)}), which is not the same as not found; run tweets again for those`
+        : '') +
+      '\n',
     exitCode: 0,
   }
 }
@@ -1133,18 +1205,29 @@ async function ties(
   }
   const rows: string[] = []
   const notes: string[] = []
+  // One archive call for the command, as for search: when every lookup
+  // fails, the failure counted once matches the calls, and the archive reads
+  // as down. A failed lookup otherwise loses only its own accounts.
+  state.calls += 1
+  const unchecked: string[] = []
+  let answered = 0
+  let firstError: unknown
   for (const [month, handles] of Array.from(byMonth)) {
     for (let i = 0; i < handles.length; i += TIES_PER_CALL) {
-      state.calls += 1
-      const result = await interactionTiesImpl(
-        {
-          accounts: handles.slice(i, i + TIES_PER_CALL),
-          before: month,
-          months,
-          peers,
-        },
-        state.limits,
-      )
+      const accounts = handles.slice(i, i + TIES_PER_CALL)
+      let result: Awaited<ReturnType<typeof interactionTiesImpl>>
+      try {
+        result = await interactionTiesImpl(
+          { accounts, before: month, months, peers },
+          state.limits,
+        )
+      } catch (error) {
+        if (state.limits.abortSignal?.aborted) throw error
+        firstError ??= error
+        unchecked.push(...accounts.map((handle) => `@${handle}`))
+        continue
+      }
+      answered += 1
       for (const entry of result.accounts) {
         if (!entry.account) {
           rows.push(
@@ -1182,12 +1265,20 @@ async function ties(
       }
     }
   }
+  if (!answered) throw firstError
   const shown =
     notes.length > 6 ? `${notes.slice(0, 6).join(', ')}, …` : notes.join(', ')
-  state.summaries.push(`Checked ties of ${plural(unique.length, 'account')}`)
+  state.summaries.push(
+    `Checked ties of ${plural(unique.length - unchecked.length, 'account')}${unchecked.length ? ', partial' : ''}`,
+  )
   return {
     stdout: `${rows.join('\n')}\n`,
-    stderr: `ties (${months} months before ${byMonth.size === 1 ? Array.from(byMonth.keys())[0] : 'each month'}; a tie = replied, mentioned or quoted each way): ${shown}\n`,
+    stderr:
+      `ties (${months} months before ${byMonth.size === 1 ? Array.from(byMonth.keys())[0] : 'each month'}; a tie = replied, mentioned or quoted each way): ${shown}` +
+      (unchecked.length
+        ? ` · ${unchecked.length} of ${plural(unique.length, 'account')} could not be checked (${messageOf(firstError)}): ${someOf(unchecked)}; run ties again for those`
+        : '') +
+      '\n',
     exitCode: 0,
   }
 }

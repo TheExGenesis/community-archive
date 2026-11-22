@@ -177,6 +177,11 @@ function dateFlag(value: string | true | undefined, name: string) {
   return value
 }
 
+/** A flag's text, or undefined when it was not given or is blank. */
+function textFlag(value: string | true | undefined) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
 function intFlag(
   value: string | true | undefined,
   name: string,
@@ -268,7 +273,7 @@ export const USAGE: Record<string, string> = {
     'usage: timeline @handle [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--oldest] [--no-replies] [--retweets] [--limit N]',
   par: "usage: par '<command with {}>' word... | par '<command>' '<command>'...",
   score:
-    'usage: score <file> "<yes/no question about one tweet>" [--no-parent]',
+    'usage: score <file> "<yes/no question about one tweet>" [--yes-if "<what counts as yes>"] [--no-if "<what counts as no>"] [--no-parent]',
   thread: 'usage: thread <tweet id>',
   quotes: 'usage: quotes <tweet id> [--limit N]',
   expand: 'usage: expand <scored file> [--min-p P] [--seeds N] [--limit N]',
@@ -640,13 +645,21 @@ async function score(
   args: string[],
   readFile: (path: string) => Promise<string>,
 ): Promise<CommandResult> {
-  const { positional, flags } = parseCommandArgs(args, [], ['no-parent'])
+  const { positional, flags } = parseCommandArgs(
+    args,
+    ['yes-if', 'no-if'],
+    ['no-parent'],
+  )
   const [path, ...rest] = positional
   const criterion = rest.join(' ').trim()
   if (!path || criterion.length < 10) {
     throw new UsageError(
       'give a file and a yes/no question of at least 10 characters',
     )
+  }
+  const definitions = {
+    yesIf: textFlag(flags['yes-if']),
+    noIf: textFlag(flags['no-if']),
   }
   const ids = await readIds(path, readFile)
   if (ids.length > MAX_IDS_PER_COMMAND) {
@@ -663,6 +676,7 @@ async function score(
       tweets,
       !flags['no-parent'],
       state.limits,
+      definitions,
     )
   } catch (error) {
     // A partly failed scoring run still spent money.
@@ -684,7 +698,7 @@ async function score(
       (borderline
         ? `, ${borderline} more between ${BORDERLINE_THRESHOLD} and ${KEEP_THRESHOLD}`
         : '') +
-      ' · rows sorted by p, highest first\n',
+      ` · rows sorted by p, highest first · scored by ${result.scorer}\n`,
     exitCode: 0,
   }
 }

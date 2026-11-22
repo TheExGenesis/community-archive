@@ -60,19 +60,27 @@ preview's `dev` account, the question runs without it.
 3. The agent starts with keyword searches, adding semantic search for ideas
    phrased many ways. When a question's answer is a set of posts and the
    searches are too many and too noisy to read, it collects a file of
-   candidates (up to 1,000) and scores each one against a yes/no criterion
-   (`classifier.ts`). The default scorer is OpenAI's Decisions API (one
-   `predicate` question per post, 100 requests at a time); Jev through
-   OpenRouter and an LLM with structured output are alternatives. Jev takes
-   up to 50 posts a request (kept under about 30 KB, where OpenRouter would
-   switch it to a slower long-context mode), 8 requests at a time. Both make
-   up to three attempts on rate limits, server errors and dropped
-   connections, waiting as long as `Retry-After` asks (10 seconds at most)
-   and never past the run's deadline. A rejected key stops the scorer at
-   once; for Jev so do spent credits and a missing endpoint. A score that
-   loses fewer than a tenth of its posts returns the rest.
-   When Decisions or Jev fails and the other's key is set, the other scores
-   every post instead. Replies are scored with their parent's text.
+   candidates (up to 1,000) and scores each one against a yes/no question
+   (`classifier.ts`), optionally with what counts as yes and as no
+   (`score ... --yes-if "..." --no-if "..."`). The scorer sees one tweet's
+   text, its parent's text for a reply, and those words, nothing else, and
+   reads them literally; the prompt tells the agent to ask one plain
+   condition and to keep authors, dates and counts in `jq`. The default
+   scorer is OpenAI's Decisions API (one `predicate` question per post, 100
+   requests at a time; definitions are appended to the question); Jev 1.14
+   through OpenRouter (definitions go in its `criteria` field) and an LLM
+   with structured output are alternatives. Jev takes up to 50 posts a
+   request (kept under about 30 KB, where OpenRouter would switch it to a
+   slower long-context mode), 8 requests at a time. Both make up to three
+   attempts on rate limits, server errors and dropped connections. They wait
+   as long as `Retry-After` asks, never past the run's deadline; a wait over
+   10 seconds ends the retries, and one request told to wait holds the
+   others back. A rejected key, spent credits or a spend limit stop the
+   scorer at once, as does a missing endpoint for Jev. A refused answer is a
+   lost post, and a score that loses fewer than a tenth of its posts returns
+   the rest. When Decisions or Jev fails and the other's key is set, the
+   other scores every post instead. Replies are scored with their parent's
+   text.
 4. The answer cites single tweets as `[[t:<id>]]` (alone on a line, the tweet
    shows whole), quotes them as `[[q:<id> | exact words]]` (checked word for
    word), and shows sets of tweets as lists,
@@ -110,7 +118,7 @@ work on files under `/work`, and archive commands are added
 | `semantic "<idea>" [--from @h] [--k N] [--threshold 0-1]`                                                                          | Meaning search (below), 100 results by default; rows carry `distance`                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `people <name or handle>`                                                                                                          | Members and accounts matching a name                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `timeline @handle [--since D] [--until D] [--oldest] [--no-replies] [--retweets] [--limit N]`                                      | That person's own tweets by date, newest first (200 by default, up to 3,000; no retweets unless asked), from API v1                                                                                                                                                                                                                                                                                                                                                                          |
-| `score <file> "<yes/no question>" [--no-parent]`                                                                                   | Scores every tweet in a file; rows gain `p`, best first                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `score <file> "<yes/no question>" [--yes-if "..."] [--no-if "..."] [--no-parent]`                                                  | Scores every tweet in a file; rows gain `p`, best first. `--yes-if` and `--no-if` say what counts as yes and as no                                                                                                                                                                                                                                                                                                                                                                           |
 | `expand <file> [--min-p P] [--seeds N] [--limit N]`                                                                                | The threads and quote posts around a scored file's best tweets (`p` ≥ 0.7, 15 by default, up to 40, four at a time); prints the tweets not already in the file (300 by default, up to 1,000), to score next                                                                                                                                                                                                                                                                                  |
 | `thread <id>`, `quotes <id>`, `tweets <id…>`, `show <id>`                                                                          | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet                                                                                                                                                                                                                                                                                                                                                                                               |
 | `par '<command with {}>' word…` or `par '<command>' '<command>'…`                                                                  | Runs up to 30 command lines, 6 at a time, output in the order given (a `for` loop runs them one after another)                                                                                                                                                                                                                                                                                                                                                                               |

@@ -245,6 +245,24 @@ describe('the bash workspace', () => {
     expect(c1?.kind === 'tweets' && c1.rows[0]).toEqual({ id: '1', p: 0.9 })
   })
 
+  test('score passes yes and no definitions on and names the scorer', async () => {
+    const { scoreTweets } = jest.requireMock('../classifier')
+    const first = await run('search singapore > s1.jsonl')
+    const out = await run(
+      'score s1.jsonl "Does the author say they live in Singapore?" --yes-if "they say they live there now" --no-if "they visit or only mention it" > c1.jsonl',
+      applyChanges({}, first.workspace),
+    )
+    const [criterion, , , definitions] = (
+      scoreTweets as jest.Mock
+    ).mock.calls.at(-1)
+    expect(criterion).toBe('Does the author say they live in Singapore?')
+    expect(definitions).toEqual({
+      yesIf: 'they say they live there now',
+      noIf: 'they visit or only mention it',
+    })
+    expect(out.stderr).toContain('scored by decisions')
+  })
+
   test('agent-added fields are kept, long strings are not', async () => {
     const out = await run(
       `echo '{"id":"1","group":"expat","note":"${'x'.repeat(80)}","text":"t"}' > g.jsonl`,
@@ -973,7 +991,7 @@ describe('per-run tweet cache', () => {
 
     const manifest = applyChanges({}, first.workspace)
     const second = await runBashCommand({
-      command: "jq -c 'select(.author == \"@alice\")' s1.jsonl | wc -l",
+      command: 'jq -c \'select(.author == "@alice")\' s1.jsonl | wc -l',
       manifest,
       runId: 'asr_run_1',
       limits: { deadlineAt: Date.now() + 60_000 },
@@ -986,7 +1004,7 @@ describe('per-run tweet cache', () => {
     // A follow-up question (new runId) fetches fresh from the gateway so opt-outs apply.
     archive.delete('2')
     const followUp = await runBashCommand({
-      command: "jq -c 'select(.author == \"@alice\")' s1.jsonl | wc -l",
+      command: 'jq -c \'select(.author == "@alice")\' s1.jsonl | wc -l',
       manifest,
       runId: 'asr_run_2',
       limits: { deadlineAt: Date.now() + 60_000 },

@@ -1,4 +1,4 @@
-import { scoreTweets } from './classifier'
+import { scoreTweets, type ScoreDefinitions } from './classifier'
 import type { RunLimits } from './deadline'
 import {
   findMembers,
@@ -239,6 +239,7 @@ export async function scoreWithParents(
   tweets: AgentTweet[],
   withParent: boolean,
   limits: RunLimits,
+  definitions: ScoreDefinitions = {},
 ) {
   const parents = withParent
     ? await parentTexts(tweets, limits)
@@ -253,6 +254,7 @@ export async function scoreWithParents(
         : null,
     })),
     limits,
+    definitions,
   )
   const scored: ScoredTweet[] = tweets
     .filter((tweet) => result.scores.has(tweet.id))

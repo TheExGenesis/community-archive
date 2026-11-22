@@ -196,7 +196,7 @@ const thinking = (id: string, text: string, latest = false): TimelineEntry => ({
 })
 const step = (line: ProgressLine): TimelineEntry => ({ kind: 'step', line })
 
-test('reasoning being written shows in full; earlier reasoning is folded', () => {
+test('reasoning starts folded by default and opens on click in chronological order', () => {
   const timeline = [
     thinking('t1', 'Start with the word itself. Then widen.'),
     step(done(1)),
@@ -215,27 +215,35 @@ test('reasoning being written shows in full; earlier reasoning is folded', () =>
       onStop={jest.fn()}
     />,
   )
-  // The live line has the newest sentence; the log below it, opened, has
-  // the reasoning being written in full.
-  const header = screen.getAllByRole('button', { name: /Thinking/ })[0]
+  // The live header shows the newest sentence; inside the chronological log,
+  // both earlier and active reasoning start folded to a single quiet line.
+  const header = within(screen.getByLabelText('Search progress')).getByRole(
+    'button',
+  )
   expect(screen.getByLabelText('Search progress')).toHaveTextContent(
     'Thinking · Read the thread around it.',
   )
   const progress = document.getElementById(
     header.getAttribute('aria-controls') ?? '',
   ) as HTMLElement
+  expect(progress).toHaveTextContent('Thinking · Start with the word itself.')
+  expect(progress).not.toHaveTextContent('Then widen.')
+  expect(progress).toHaveTextContent('Thinking · Read the thread around it.')
+  expect(progress).not.toHaveTextContent('One reply looks relevant.')
+
+  // Opening an earlier thought expands it in place and keeps it open as later steps arrive.
+  const [first, second] = within(progress).getAllByRole('button', {
+    name: /Thinking/,
+  })
+  fireEvent.click(first)
+  expect(progress).toHaveTextContent('Then widen.')
+  fireEvent.click(second)
   expect(progress).toHaveTextContent(
     'One reply looks relevant. Read the thread around it.',
   )
-  // Earlier reasoning folds to its first sentence and opens on request.
-  expect(progress).toHaveTextContent('Thinking · Start with the word itself.')
-  expect(progress).not.toHaveTextContent('Then widen.')
-  const [first] = within(progress).getAllByRole('button', { name: /Thinking/ })
-  fireEvent.click(first)
-  expect(progress).toHaveTextContent('Then widen.')
 
-  // The next step starts: the latest reasoning folds by itself, and what
-  // the reader opened stays open.
+  // The next step starts: what the reader opened stays open, and the new step
+  // appends chronologically at the end.
   rerender(
     <StepLog
       mode="running"
@@ -255,9 +263,8 @@ test('reasoning being written shows in full; earlier reasoning is folded', () =>
       .querySelector('button')
       ?.getAttribute('aria-controls') ?? '',
   ) as HTMLElement
-  expect(log).toHaveTextContent('Thinking · One reply looks relevant.')
-  expect(log).not.toHaveTextContent('Read the thread around it.')
   expect(log).toHaveTextContent('Then widen.')
+  expect(log).toHaveTextContent('Searched “term 2” · 2 tweets')
 })
 
 test('the running log folds to the entry under way and its newest sentence', () => {

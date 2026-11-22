@@ -56,8 +56,8 @@ type Status = ProgressLine['status'] | 'stopped'
 const ICON_STATUS: Record<Status, string> = {
   running: 'animate-pulse text-foreground motion-reduce:animate-none',
   error: 'text-destructive',
-  stopped: 'opacity-50',
-  done: '',
+  stopped: 'text-muted-foreground/45',
+  done: 'text-muted-foreground/70',
 }
 
 function KindIcon({
@@ -69,15 +69,14 @@ function KindIcon({
 }) {
   const Icon = kind === 'thinking' ? Brain : KIND_ICONS[kind]
   return (
-    <Icon aria-hidden="true" className={`h-4 w-4 ${ICON_STATUS[status]}`} />
+    <Icon
+      aria-hidden="true"
+      className={`h-3.5 w-3.5 shrink-0 ${ICON_STATUS[status]}`}
+    />
   )
 }
 
-/**
- * One line of the log, in columns every line shares: what it did, left of
- * the rail; then a caret where the line opens (its place kept where it does
- * not); then what it says.
- */
+/** One line of the log: subtle icon beside clean text, no vertical divider rail. */
 function LogRow({
   icon,
   className = '',
@@ -88,54 +87,18 @@ function LogRow({
   children: ReactNode
 }) {
   return (
-    <li className={`flex ${className}`}>
-      <span className="flex w-5 shrink-0 justify-center pt-0.5">{icon}</span>
-      <div className="min-w-0 flex-1 border-l border-border pb-1.5 pl-1">
-        {children}
-      </div>
+    <li className={`flex items-start gap-2.5 py-1 ${className}`}>
+      <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
     </li>
   )
 }
 
-/** A note under the steps, on the rail in the text column. */
-function LogNote({
-  children,
-  caret,
-}: {
-  children: ReactNode
-  /** The log keeps a caret column: start where its text does. */
-  caret: boolean
-}) {
-  return (
-    <div className="flex">
-      <span className="w-5 shrink-0" />
-      <p
-        className={`min-w-0 flex-1 border-l border-border pb-1.5 text-sm text-muted-foreground ${
-          caret ? 'pl-[calc(0.25rem+1rem)]' : 'pl-1'
-        }`}
-      >
-        {children}
-      </p>
-    </div>
-  )
-}
-
-/** Whether a log has a line that opens, and so keeps a caret column. */
-const anyOpens = (entries: TimelineEntry[]) =>
-  entries.some((entry) => entry.kind === 'thinking')
-
-/** The caret column: a caret on a line that opens, its room on one that does not. */
-function Caret({ open }: { open?: boolean }) {
-  return (
-    <span className="flex h-5 w-3.5 shrink-0 items-center justify-center">
-      {open !== undefined && (
-        <ChevronRight
-          aria-hidden="true"
-          className={`h-3.5 w-3.5 opacity-60 transition-transform group-hover:opacity-100 motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
-        />
-      )}
-    </span>
-  )
+/** A quiet note under the steps inside an expanded log. */
+function LogNote({ children }: { children: ReactNode }) {
+  return <p className="mt-2 text-xs text-muted-foreground/75">{children}</p>
 }
 
 /**
@@ -161,27 +124,27 @@ function OpenInSearch({ href }: { href: string }) {
 function StepItem({
   step,
   status,
-  caret,
 }: {
   step: ProgressLine
   status: ProgressLine['status'] | 'stopped'
-  /** The log keeps a caret column: hold its place. */
-  caret: boolean
 }) {
   return (
     <LogRow
       className="group"
       icon={<KindIcon kind={step.kind} status={status} />}
     >
-      <div className="flex items-start gap-0.5">
-        {caret && <Caret />}
-        <span
-          className={`min-w-0 break-words ${status === 'running' ? 'text-foreground' : ''}`}
-        >
-          {step.text}
-          {step.searchHref && <OpenInSearch href={step.searchHref} />}
-        </span>
-      </div>
+      <span
+        className={`min-w-0 break-words ${
+          status === 'running'
+            ? 'font-medium text-foreground'
+            : status === 'error'
+              ? 'text-destructive'
+              : ''
+        }`}
+      >
+        {step.text}
+        {step.searchHref && <OpenInSearch href={step.searchHref} />}
+      </span>
     </LogRow>
   )
 }
@@ -193,19 +156,20 @@ function firstSentence(text: string) {
 }
 
 /**
- * The model's reasoning between steps. While it is being written it stays
- * open and shows the whole text as it streams; once the next step starts it
- * folds to its first sentence. A reader's own open or close wins over both.
+ * The model's reasoning between steps. Folded by default to a calm single-line
+ * summary so raw internal monologue stays quiet unless the reader opens it.
  */
 function ThinkingItem({ text, current }: { text: string; current: boolean }) {
-  const [readerOpen, setReaderOpen] = useState<boolean | null>(null)
-  const open = readerOpen ?? current
+  const [open, setOpen] = useState(false)
   const bodyId = useId()
   const bodyRef = useRef<HTMLParagraphElement>(null)
-  // Keep the newest text in view while it streams.
+  const preview = current
+    ? latestThought(text) || firstSentence(text)
+    : firstSentence(text)
+  // Keep the newest text in view if the reader chose to open it while streaming.
   useEffect(() => {
     const body = bodyRef.current
-    if (body && current) body.scrollTop = body.scrollHeight
+    if (body && current && open) body.scrollTop = body.scrollHeight
   }, [text, current, open])
   return (
     <LogRow
@@ -213,23 +177,29 @@ function ThinkingItem({ text, current }: { text: string; current: boolean }) {
     >
       <button
         type="button"
-        onClick={() => setReaderOpen(!open)}
+        onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls={bodyId}
-        className="group flex max-w-full items-start gap-0.5 rounded-sm text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group inline-flex max-w-full items-center gap-1 rounded-sm text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <Caret open={open} />
         <span className="min-w-0 truncate">
-          <span className={current ? 'text-foreground' : ''}>Thinking</span>
-          {!open && <span> · {firstSentence(text)}</span>}
+          <span className={current ? 'font-medium text-foreground' : ''}>
+            Thinking
+          </span>
+          {!open && preview && (
+            <span className="text-muted-foreground/80"> · {preview}</span>
+          )}
         </span>
+        <ChevronRight
+          aria-hidden="true"
+          className={`h-3.5 w-3.5 shrink-0 opacity-50 transition-transform group-hover:opacity-100 motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
+        />
       </button>
       {open && (
-        // On the rail with the rest, under the text column.
         <p
           ref={bodyRef}
           id={bodyId}
-          className="mt-1 max-h-60 max-w-[68ch] overflow-y-auto whitespace-pre-wrap break-words pl-4 text-xs leading-relaxed text-muted-foreground"
+          className="mt-1 max-h-48 max-w-[68ch] overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground/85"
         >
           {text}
         </p>
@@ -242,21 +212,39 @@ function StepList({
   entries,
   live = false,
   stoppedRunning = false,
+  scrollable = false,
   id,
-  caret,
 }: {
   entries: TimelineEntry[]
-  /** Keep the caret column though no line opens (under a header that has one). */
-  caret?: boolean
   /** The run is still going: its latest reasoning is being written. */
   live?: boolean
   /** A run that is over: a step still marked running was cut short. */
   stoppedRunning?: boolean
+  /** Cap height and follow new entries while a run streams. */
+  scrollable?: boolean
   id?: string
 }) {
+  const listRef = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    const list = listRef.current
+    if (!scrollable || !list) return
+    // Keep scrolling to the latest step unless the reader scrolled up to inspect earlier ones.
+    const nearBottom =
+      list.scrollHeight - list.scrollTop - list.clientHeight < 80
+    if (nearBottom) list.scrollTop = list.scrollHeight
+  }, [entries, scrollable])
+
   return (
-    <ol id={id} className="text-sm text-muted-foreground">
-      {entries.map((entry, _index, all) =>
+    <ol
+      ref={listRef}
+      id={id}
+      className={`space-y-0.5 text-[13px] leading-snug text-muted-foreground ${
+        scrollable
+          ? 'max-h-72 overflow-y-auto overscroll-contain pb-1 pr-1'
+          : ''
+      }`}
+    >
+      {entries.map((entry) =>
         entry.kind === 'thinking' ? (
           <ThinkingItem
             key={entry.id}
@@ -267,7 +255,6 @@ function StepList({
           <StepItem
             key={entry.line.id}
             step={entry.line}
-            caret={caret ?? anyOpens(all)}
             status={
               stoppedRunning && entry.line.status === 'running'
                 ? 'stopped'
@@ -296,9 +283,9 @@ function useElapsed(startedAt: number) {
   return Math.max(0, now - startedAt)
 }
 
-// Always there while a run goes, so it needs no frame to be found.
+// Compact, quiet stop button aligned with the status header.
 const STOP_CLASS =
-  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60'
+  'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60'
 
 /**
  * Where a Stop stands with the server: asked and not yet confirmed, or
@@ -314,7 +301,7 @@ function StopButton({
   state?: StopState | null
 }) {
   return (
-    <span className="flex shrink-0 items-center gap-3">
+    <span className="flex shrink-0 items-center gap-2">
       {state === 'failed' && (
         <span role="alert" className="text-xs text-muted-foreground">
           Couldn’t stop. Try again.
@@ -332,7 +319,7 @@ function StopButton({
             className="h-3 w-3 animate-spin motion-reduce:animate-none"
           />
         ) : (
-          <Square aria-hidden="true" className="h-3 w-3 fill-current" />
+          <Square aria-hidden="true" className="h-2.5 w-2.5 fill-current" />
         )}
         {state === 'pending' ? 'Stopping…' : 'Stop'}
       </button>
@@ -341,9 +328,9 @@ function StopButton({
 }
 
 /**
- * The live log while a question searches, before any answer text. The
- * header folds the steps to one line: the step under way and the model's
- * newest sentence about it. Stop stays either way.
+ * The live log while a question searches, before any answer text. A calm
+ * recessed card with a status header bar and chronological steps underneath.
+ * Stop stays accessible whether open or folded.
  */
 function RunningLog({
   steps,
@@ -377,48 +364,49 @@ function RunningLog({
         },
       ]
   const current = entries[entries.length - 1]
-  // The header is always the step under way; the log below it is what came
-  // before, plus the reasoning being written so it can be read as it streams.
-  const below = entries.filter(
-    (entry, index) =>
-      index < entries.length - 1 || (entry.kind === 'thinking' && open),
-  )
   const stepCount = logged.filter((entry) => entry.kind === 'step').length
   const thought = current.kind === 'thinking' ? latestThought(current.text) : ''
+  const hasBody = logged.length > 0
   return (
     <div className="space-y-2">
-      <div className="flex min-h-[2.5rem] items-center gap-3">
-        {/* Only the step line is announced; the clock beside it is not. */}
-        {/* The log's columns, so the rail runs from here down through the
-            steps below. */}
+      <div className="flex min-h-[2.5rem] items-center gap-2.5 rounded-lg bg-muted/40 px-3 py-1">
+        {/* Only the active status is announced; the ticking clock beside it is not. */}
         <div
           aria-live="polite"
           aria-label="Search progress"
-          className="flex min-w-0 flex-1 self-stretch"
+          className="flex min-w-0 flex-1 items-center"
         >
-          <span className="flex w-5 shrink-0 items-center justify-center">
-            {current.kind === 'thinking' ? (
-              <KindIcon kind="thinking" status="running" />
-            ) : (
-              <KindIcon kind={current.line.kind} status={current.line.status} />
-            )}
-          </span>
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
-            aria-controls={listId}
-            className="group flex min-h-[2.5rem] min-w-0 flex-1 items-center gap-0.5 border-l border-border pl-1 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            aria-controls={hasBody ? listId : undefined}
+            className="group flex min-w-0 max-w-full items-center gap-2 rounded-md py-1 text-left text-[13px] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Caret open={open} />
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+              {current.kind === 'thinking' ? (
+                <KindIcon kind="thinking" status="running" />
+              ) : (
+                <KindIcon
+                  kind={current.line.kind}
+                  status={current.line.status}
+                />
+              )}
+            </span>
             <span className="min-w-0 truncate">
-              <span className="text-foreground">
+              <span className="font-medium text-foreground">
                 {current.kind === 'thinking' ? 'Thinking' : current.line.text}
               </span>
               {thought && (
                 <span className="text-muted-foreground"> · {thought}</span>
               )}
             </span>
+            {hasBody && (
+              <ChevronRight
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
+              />
+            )}
           </button>
         </div>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -434,8 +422,10 @@ function RunningLog({
         </span>
         <StopButton onStop={onStop} state={stopState} />
       </div>
-      {open && below.length > 0 && (
-        <StepList id={listId} entries={below} live caret />
+      {open && hasBody && (
+        <div className="pl-2">
+          <StepList id={listId} entries={logged} live scrollable />
+        </div>
       )}
     </div>
   )
@@ -443,8 +433,8 @@ function RunningLog({
 
 /**
  * A run that is over without a full answer: stopped by the member or
- * failed. The steps stay where they were, latest last, with a way to ask
- * again.
+ * failed. The steps stay in chronological order inside the same calm card,
+ * with a way to ask again.
  */
 function EndedLog({
   mode,
@@ -492,9 +482,9 @@ function EndedLog({
 
   return (
     <div className="space-y-2" role={mode === 'failed' ? 'alert' : 'status'}>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg bg-muted/40 px-3 py-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-[13px] font-medium text-foreground">
             {title}
             {loggedSteps.length > 0 && (
               <span className="font-normal text-muted-foreground">
@@ -505,7 +495,7 @@ function EndedLog({
             )}
           </p>
           {mode === 'failed' && unavailable && (
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               This question still counts toward today’s limit.
             </p>
           )}
@@ -522,7 +512,7 @@ function EndedLog({
               onClick={onAskAgain}
               disabled={!canAskAgain}
               aria-describedby={canAskAgain ? undefined : reasonId}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
               Ask again
@@ -530,22 +520,26 @@ function EndedLog({
           </div>
         )}
       </div>
-      {hidden > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowEarlier((value) => !value)}
-          aria-expanded={showEarlier}
-          aria-controls={listId}
-          className="flex items-center gap-2 rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ChevronsUpDown aria-hidden="true" className="h-4 w-4" />
-          {showEarlier
-            ? 'Hide earlier steps'
-            : `${hidden} earlier ${hidden === 1 ? 'step' : 'steps'}`}
-        </button>
-      )}
-      {visible.length > 0 && (
-        <StepList id={listId} entries={visible} stoppedRunning />
+      {(hidden > 0 || visible.length > 0) && (
+        <div className="space-y-2 pl-2">
+          {hidden > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowEarlier((value) => !value)}
+              aria-expanded={showEarlier}
+              aria-controls={listId}
+              className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronsUpDown aria-hidden="true" className="h-3.5 w-3.5" />
+              {showEarlier
+                ? 'Hide earlier steps'
+                : `${hidden} earlier ${hidden === 1 ? 'step' : 'steps'}`}
+            </button>
+          )}
+          {visible.length > 0 && (
+            <StepList id={listId} entries={visible} stoppedRunning />
+          )}
+        </div>
       )}
     </div>
   )
@@ -604,8 +598,9 @@ export function StepLog(props: StepLogProps) {
 }
 
 /**
- * The step log folded to one line once the answer starts: the same steps,
- * opened in place. Stop stays beside it while the answer is written.
+ * The step log folded to a calm rounded pill once the answer starts: the same
+ * steps open cleanly underneath in a recessed card. Stop stays beside it while
+ * the answer is written.
  */
 export function LogLine({
   summary,
@@ -639,19 +634,19 @@ export function LogLine({
   const entries = entriesFor(steps, timeline)
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
           aria-controls={contentId}
-          className="-ml-1.5 inline-flex min-h-[2.5rem] max-w-full items-center gap-1.5 rounded-md px-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex min-h-[2rem] max-w-full items-center gap-1.5 rounded-lg bg-muted/40 px-3 py-1 text-left text-[13px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
+          <span className="min-w-0 truncate">{summary}</span>
           <ChevronRight
             aria-hidden="true"
-            className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
+            className={`h-3.5 w-3.5 shrink-0 opacity-60 transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
           />
-          <span className="min-w-0">{summary}</span>
         </button>
         {more && (
           <button
@@ -659,31 +654,29 @@ export function LogLine({
             onClick={more.onToggle}
             aria-expanded={more.open}
             aria-controls={more.controls}
-            className="group -ml-3 mr-auto inline-flex min-h-[2.5rem] shrink-0 items-center rounded-md px-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-[2rem] shrink-0 items-center rounded-lg px-2.5 py-1 text-[13px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span aria-hidden="true" className="mr-1.5">
-              ·
-            </span>
-            <span className="underline decoration-muted-foreground/40 underline-offset-4 group-hover:decoration-foreground">
-              {more.count.toLocaleString('en-US')} more found
-            </span>
+            {more.count.toLocaleString('en-US')} more found
           </button>
         )}
-        {onStop && <StopButton onStop={onStop} state={stopState} />}
+        {onStop && (
+          <div className="ml-auto">
+            <StopButton onStop={onStop} state={stopState} />
+          </div>
+        )}
       </div>
       {open && (
-        // The type icons sit under the header's chevron; one rail runs down.
-        <div id={contentId} className="-ml-0.5">
+        <div id={contentId} className="pl-2 pt-0.5">
           {entries.length > 0 && (
             <StepList entries={entries} live={Boolean(onStop)} />
           )}
           {cappedAt ? (
-            <LogNote caret={anyOpens(entries)}>
+            <LogNote>
               A check stopped at its {cappedAt.toLocaleString('en-US')}-tweet
               limit, so more matching tweets exist.
             </LogNote>
           ) : null}
-          <LogNote caret={anyOpens(entries)}>{NOT_SEARCHED_LINE}.</LogNote>
+          <LogNote>{NOT_SEARCHED_LINE}.</LogNote>
         </div>
       )}
     </div>

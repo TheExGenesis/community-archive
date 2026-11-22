@@ -1,14 +1,11 @@
 'use client'
 
+import { ChevronRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnswerMarkdown } from './AnswerMarkdown'
-import {
-  CitationContext,
-  SIDEBAR_MEDIA,
-  type CitationLinks,
-} from './CitationContext'
-import { CitationList, CitationRail } from './CitationRail'
+import { CitationContext, type CitationLinks } from './CitationContext'
+import { AvatarStack, CitationList, CitationRail } from './CitationRail'
 import { CitationSheet } from './CitationSheet'
 import { CitationSidebar } from './CitationSidebar'
 import {
@@ -171,8 +168,11 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         ? null
         : { kind: view.outcome, elapsedMs: null }))
 
-  // Tweets found but not in the answer open below it from the log line's
-  // count. Phones always show them.
+  // Cited tweets and extra sources sit collapsed by default below the answer
+  // behind calm disclosure bars, while inline citation chips still open the
+  // sidebar / sheet directly.
+  const [citedOpen, setCitedOpen] = useState(false)
+  const citedListId = useId()
   const [moreOpen, setMoreOpen] = useState(false)
   const sourcesRef = useRef<HTMLDivElement>(null)
   const sourcesId = useId()
@@ -184,9 +184,8 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
           open: moreOpen,
           controls: sourcesId,
           onToggle: () => {
-            const wide = window.matchMedia?.(SIDEBAR_MEDIA).matches ?? false
-            const opening = !wide || !moreOpen
-            if (wide) setMoreOpen(opening)
+            const opening = !moreOpen
+            setMoreOpen(opening)
             if (opening) {
               requestAnimationFrame(() =>
                 sourcesRef.current?.scrollIntoView({ block: 'start' }),
@@ -402,15 +401,37 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
 
         {cited > 0 ? (
           <section aria-label="Cited tweets" className="min-w-0 space-y-2">
-            <h3 className="text-base font-semibold text-foreground">
-              Cited{' '}
-              <span className="font-normal tabular-nums text-muted-foreground">
-                · {cited}
+            <button
+              type="button"
+              onClick={() => setCitedOpen((value) => !value)}
+              aria-expanded={citedOpen}
+              aria-controls={citedListId}
+              className="group flex min-h-[2.25rem] w-full items-center gap-2.5 rounded-lg bg-muted/30 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <AvatarStack
+                tweets={answer.citations.flatMap((c) =>
+                  c.tweet ? [c.tweet] : [],
+                )}
+              />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium text-foreground">Cited</span>
+                <span className="font-normal tabular-nums text-muted-foreground">
+                  {' '}
+                  · {cited}
+                </span>
               </span>
-            </h3>
-            <EvidenceBoundary label="cited tweets">
-              <CitationList citations={answer.citations} linkTarget />
-            </EvidenceBoundary>
+              <ChevronRight
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none ${citedOpen ? 'rotate-90' : ''}`}
+              />
+            </button>
+            {citedOpen && (
+              <div id={citedListId}>
+                <EvidenceBoundary label="cited tweets">
+                  <CitationList citations={answer.citations} linkTarget />
+                </EvidenceBoundary>
+              </div>
+            )}
           </section>
         ) : (
           active && (
@@ -428,13 +449,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
         )}
 
         {!active && showSources && (
-          <div
-            ref={sourcesRef}
-            id={sourcesId}
-            className={`min-w-0 scroll-mt-24 ${
-              moreControl && !moreOpen ? 'lg:hidden' : ''
-            }`}
-          >
+          <div ref={sourcesRef} id={sourcesId} className="min-w-0 scroll-mt-24">
             <EvidenceBoundary label="sources">
               <Sources
                 title={
@@ -444,13 +459,12 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
                       ? 'Found before it stopped'
                       : 'Sources'
                 }
-                // Opened from the count, the section needs no heading of
-                // its own on wide screens.
-                titleClassName={moreControl ? 'lg:sr-only' : undefined}
                 relevant={view.relevant}
                 relevantNotShown={view.relevantNotShown}
                 otherMatches={view.otherMatches}
                 citations={answer.citations}
+                open={moreOpen}
+                onOpenChange={setMoreOpen}
               />
             </EvidenceBoundary>
           </div>

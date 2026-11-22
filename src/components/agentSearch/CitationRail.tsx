@@ -4,13 +4,16 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react'
 import type { MouseEvent } from 'react'
-import { X } from 'lucide-react'
+import { ChevronRight, X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
+import { TweetAvatar } from '@/components/TweetAvatar'
+import type { PortalTweet } from '@/lib/portal/types'
 import { SIDEBAR_MEDIA, useCitationLinks } from './CitationContext'
 import type { Citation, FoundPhase, FoundTweet } from './messageView'
 import { TweetPlaceholder } from './TweetPlaceholder'
@@ -188,24 +191,65 @@ function CitationItem({
   )
 }
 
+/** Compact overlapping author avatars for collapsed evidence disclosure pills. */
+export function AvatarStack({
+  tweets,
+  limit = 4,
+}: {
+  tweets: ReadonlyArray<Pick<PortalTweet, 'id' | 'username' | 'avatar'>>
+  limit?: number
+}) {
+  const unique: Array<Pick<PortalTweet, 'id' | 'username' | 'avatar'>> = []
+  const seen = new Set<string>()
+  for (const t of tweets) {
+    const key = t.username || t.id
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(t)
+    if (unique.length >= limit) break
+  }
+  if (!unique.length) return null
+  return (
+    <span aria-hidden="true" className="flex shrink-0 items-center -space-x-1.5">
+      {unique.map((t) => (
+        <span
+          key={t.id}
+          className="inline-flex rounded-full ring-2 ring-background [&_span]:text-[8px]"
+        >
+          <TweetAvatar tweet={t} size={18} />
+        </span>
+      ))}
+    </span>
+  )
+}
+
 /** Cited tweets as compact rows that open in full, under the answer. */
 export function CitationList({
   citations,
   linkTarget = false,
+  contained = false,
 }: {
   citations: Citation[]
   /** Carries the citations' anchor ids; only one list on the page may. */
   linkTarget?: boolean
+  /** Rendered inside a rounded disclosure card: drop outer borders and margin hang. */
+  contained?: boolean
 }) {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   return (
-    <ol className="divide-y divide-border border-y border-border">
+    <ol
+      className={
+        contained
+          ? 'divide-y divide-border/60'
+          : 'divide-y divide-border border-y border-border'
+      }
+    >
       {citations.map((citation) => (
         <CitationItem
           key={citation.id}
           citation={citation}
           linkTarget={linkTarget}
-          hang
+          hang={!contained}
           expanded={opened.has(citation.anchor)}
           onToggle={() =>
             setOpened((current) => {
@@ -269,6 +313,8 @@ export const CitationRail = forwardRef<
   const holdPositionUntil = useRef(0)
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   const [position, setPosition] = useState(1)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const foundListId = useId()
 
   const setRefs = (node: HTMLElement | null) => {
     railRef.current = node
@@ -374,6 +420,79 @@ export const CitationRail = forwardRef<
       else next.add(anchor)
       return next
     })
+
+  if (!inSidebar && showFound) {
+    const canExpand = !folded && steady.shown.length > 0
+    const expanded = canExpand && previewOpen
+    return (
+      <aside
+        ref={setRefs}
+        aria-label={title}
+        className="scroll-mt-24 space-y-1.5"
+      >
+        <div ref={headerRef}>
+          {canExpand ? (
+            <button
+              type="button"
+              onClick={() => setPreviewOpen((value) => !value)}
+              aria-expanded={expanded}
+              aria-controls={foundListId}
+              className="group flex min-h-[2.25rem] w-full items-center gap-2.5 rounded-lg bg-muted/30 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <AvatarStack tweets={steady.shown.map((item) => item.tweet)} />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium text-foreground">{title}</span>
+                {titleDetail && (
+                  <span className="font-normal tabular-nums text-muted-foreground">
+                    {' '}
+                    · {titleDetail}
+                  </span>
+                )}
+              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`}
+              />
+            </button>
+          ) : (
+            <div className="flex min-h-[2.25rem] items-center gap-2.5 rounded-lg bg-muted/30 px-3 py-1.5 text-[13px]">
+              <AvatarStack tweets={steady.shown.map((item) => item.tweet)} />
+              <h3 className="min-w-0 flex-1 truncate font-medium text-foreground">
+                {title}
+                {titleDetail && (
+                  <span className="font-normal tabular-nums text-muted-foreground">
+                    {' '}
+                    · {titleDetail}
+                  </span>
+                )}
+              </h3>
+            </div>
+          )}
+        </div>
+        {expanded && (
+          <div id={foundListId} className="pl-1">
+            <ul className="max-h-72 overflow-y-auto overscroll-contain">
+              {steady.shown.map(({ tweet }) => (
+                <TweetRow
+                  key={tweet.id}
+                  tweet={tweet}
+                  className={`last:border-b-0 transition-colors duration-1000 motion-reduce:transition-none ${
+                    steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''
+                  }`}
+                />
+              ))}
+            </ul>
+            {foundCount > steady.shown.length && (
+              <p className="px-3 py-1.5 text-xs text-muted-foreground">
+                Showing a sample of {steady.shown.length} from {count(foundCount)}{' '}
+                found — browse all matches once the answer finishes.
+              </p>
+            )}
+          </div>
+        )}
+      </aside>
+    )
+  }
 
   return (
     <aside

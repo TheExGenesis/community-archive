@@ -37,17 +37,28 @@ function rail(found: FoundTweet[], phase: FoundPhase, count: number) {
   )
 }
 
+const openPreview = () => {
+  const toggle = within(screen.getByRole('complementary')).getAllByRole(
+    'button',
+  )[0]
+  if (toggle.getAttribute('aria-expanded') === 'false') fireEvent.click(toggle)
+}
+
 const shown = () =>
   within(screen.getByRole('complementary'))
     .getAllByText(/^Tweet \d$/)
     .map((el) => el.textContent)
 
-test('names the phase and keeps tweets on screen in place as new ones arrive', () => {
+test('names the phase, starts collapsed by default, and keeps tweets in place once opened', () => {
   const latest: FoundPhase = { kind: 'latest', source: 'Searched “singapore”' }
   const { rerender } = render(rail([item('1'), item('2')], latest, 300))
-  expect(
-    screen.getByRole('complementary', { name: 'Latest matches' }),
-  ).toHaveTextContent('300 found · newest from searched “singapore”')
+  const aside = screen.getByRole('complementary', { name: 'Latest matches' })
+  expect(aside).toHaveTextContent(
+    '300 found · newest from searched “singapore”',
+  )
+  // Collapsed by default while searching.
+  expect(within(aside).queryByText('Tweet 1')).toBeNull()
+  openPreview()
   expect(shown()).toEqual(['Tweet 1', 'Tweet 2'])
 
   // A new set: the newcomer enters at the top, tweet 2 moves down instead of
@@ -77,6 +88,7 @@ test('a newcomer’s highlight clears even when the same tweets come again', () 
   try {
     const latest: FoundPhase = { kind: 'latest', source: null }
     const { rerender } = render(rail([item('1')], latest, 1))
+    openPreview()
     rerender(rail([item('2'), item('1')], latest, 2))
     const row = () => screen.getByText('Tweet 2').closest('li')
     expect(row()).toHaveClass('bg-brand/10')
@@ -89,9 +101,10 @@ test('a newcomer’s highlight clears even when the same tweets come again', () 
   }
 })
 
-test('shows at most five', () => {
+test('shows at most five when opened', () => {
   const many = ['1', '2', '3', '4', '5', '6'].map((id) => item(id))
   render(rail(many, { kind: 'latest', source: null }, 6))
+  openPreview()
   expect(shown()).toHaveLength(5)
 })
 

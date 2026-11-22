@@ -183,6 +183,12 @@ test('renders the answer with its list, its cited tweets and the sources', () =>
   expect(screen.getByText(/Not searched: live X/)).toBeInTheDocument()
 
   const cited = screen.getByRole('region', { name: 'Cited tweets' })
+  // Cited starts collapsed by default and opens on click.
+  const citedToggle = within(cited).getByRole('button', { name: /Cited/ })
+  expect(citedToggle).toHaveAttribute('aria-expanded', 'false')
+  expect(cited).not.toHaveTextContent('Post 1')
+  fireEvent.click(citedToggle)
+  expect(citedToggle).toHaveAttribute('aria-expanded', 'true')
   expect(cited).toHaveTextContent('Post 1')
   expect(screen.getByText(/marked unverified/)).toHaveTextContent(
     'One reference in this answer couldn’t be checked',
@@ -197,8 +203,11 @@ test('renders the answer with its list, its cited tweets and the sources', () =>
   expect(document.activeElement?.getAttribute('href')).toMatch(/-tweet-1$/)
   expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
 
-  // Sources hold only what the answer neither cites nor lists.
+  // Sources hold only what the answer neither cites nor lists, collapsed by default.
   const sources = screen.getByRole('region', { name: 'Sources' })
+  const sourcesToggle = within(sources).getByRole('button', { name: /Sources/ })
+  expect(sourcesToggle).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(sourcesToggle)
   // Cited tweets sit under the answer, not in a Sources tier.
   expect(within(sources).queryByRole('button', { name: /Cited/ })).toBeNull()
   expect(within(sources).getByText('@shared')).toBeInTheDocument()
@@ -219,9 +228,10 @@ test('a chip opens the cited tweets in a sidebar that closes with its button or 
     },
   ]
   render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
-  // Closed by default: the cited tweets sit under the answer.
+  // Closed by default: the cited tweets sit folded under the answer.
   const cited = screen.getByRole('region', { name: 'Cited tweets' })
   expect(screen.queryByRole('dialog')).toBeNull()
+  fireEvent.click(within(cited).getByRole('button', { name: /Cited/ }))
   const rows = cited.querySelectorAll<HTMLElement>('[data-anchor]')
   expect(rows).toHaveLength(2)
   // What a chip click does on a wide screen (AnswerMarkdown).
@@ -374,6 +384,7 @@ describe('a reopened conversation, its tweets still loading', () => {
       screen.getByRole('button', { name: '1 step · 5 tweets in the answer' }),
     ).toBeInTheDocument()
     const cited = screen.getByRole('region', { name: 'Cited tweets' })
+    fireEvent.click(within(cited).getByRole('button', { name: /Cited/ }))
     expect(
       within(cited).getAllByRole('status', { name: 'Loading this tweet' }),
     ).toHaveLength(2)
@@ -451,6 +462,7 @@ describe('a reopened conversation, its tweets still loading', () => {
       />,
     )
     const cited = screen.getByRole('region', { name: 'Cited tweets' })
+    fireEvent.click(within(cited).getByRole('button', { name: /Cited/ }))
     expect(within(cited).getAllByText('Couldn’t load this tweet')).toHaveLength(
       2,
     )

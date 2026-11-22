@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import type { PortalTweet } from '@/lib/portal/types'
+import { AvatarStack } from './CitationRail'
 import { EvidenceBoundary } from './EvidenceBoundary'
 import { GroupingToggle, type Grouping } from './GroupingToggle'
 import type { Citation } from './messageView'
@@ -16,28 +18,34 @@ type Tier = 'relevant' | 'other'
 const count = (n: number) => n.toLocaleString('en-US')
 
 const PILL =
-  'inline-flex min-h-[2.25rem] items-center rounded-full px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  'inline-flex min-h-[2rem] items-center rounded-full px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 /**
  * What the search found that the answer neither cites nor lists, by tier:
- * judged relevant, or other matches. Each tier reads as tweets or grouped by
- * person; tweets the answer cites carry their number.
+ * judged relevant, or other matches. Collapsed by default behind a calm
+ * disclosure bar so the answer stays uncluttered; expands in place to tiers
+ * and tweet/people grouping.
  */
 export function Sources({
   title,
-  titleClassName = '',
   relevant,
   relevantNotShown,
   otherMatches,
   citations,
+  open: controlledOpen,
+  onOpenChange,
+  defaultOpen = false,
 }: {
   title: string
-  titleClassName?: string
   relevant: PortalTweet[]
   /** Judged relevant but not returned to the page. */
   relevantNotShown: number
   otherMatches: PortalTweet[]
   citations: Citation[]
+  /** Controlled open state (e.g. synced with the log line's "more found" button). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  defaultOpen?: boolean
 }) {
   const tiers: Array<{ id: Tier; label: string }> = []
   if (relevant.length || relevantNotShown) {
@@ -52,8 +60,15 @@ export function Sources({
       label: `Other matches (${count(otherMatches.length)})`,
     })
   }
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen)
+  const open = controlledOpen ?? uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    setUncontrolledOpen(next)
+    onOpenChange?.(next)
+  }
   const [chosen, setChosen] = useState<Tier | null>(null)
   const [grouping, setGrouping] = useState<Grouping>('tweets')
+  const bodyId = useId()
   if (!tiers.length) return null
   const tier =
     chosen && tiers.some((t) => t.id === chosen) ? chosen : tiers[0].id
@@ -61,6 +76,8 @@ export function Sources({
   const citationNumbers = new Map(
     citations.map((citation) => [citation.id, citation.n]),
   )
+  const totalCount = relevant.length + relevantNotShown + otherMatches.length
+  const previewTweets = relevant.length ? relevant : otherMatches
 
   const body = (id: Tier) => {
     const tweets = tweetsFor(id)
@@ -80,7 +97,7 @@ export function Sources({
           />
         )}
         {id === 'relevant' && relevantNotShown > 0 && (
-          <p className="text-sm text-muted-foreground">
+          <p className="px-4 pb-3 text-xs text-muted-foreground">
             {count(relevantNotShown)} more were judged relevant but not
             returned.
           </p>
@@ -90,42 +107,69 @@ export function Sources({
   }
 
   return (
-    <section aria-label={title} className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3
-          className={`text-base font-semibold text-foreground ${titleClassName}`}
-        >
-          {title}
-        </h3>
-        <GroupingToggle
-          value={grouping}
-          onChange={setGrouping}
-          label="Group sources"
+    <section aria-label={title} className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        className="group flex min-h-[2.25rem] w-full items-center gap-2.5 rounded-lg bg-muted/30 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <AvatarStack tweets={previewTweets} />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium text-foreground">{title}</span>
+          <span className="font-normal tabular-nums text-muted-foreground">
+            {' '}
+            · {count(totalCount)}
+          </span>
+        </span>
+        <ChevronRight
+          aria-hidden="true"
+          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}
         />
-      </div>
-      {tiers.length > 1 && (
-        <div role="group" aria-label="Which tweets" className="flex gap-1">
-          {tiers.map((t) => {
-            const selected = t.id === tier
-            return (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => setChosen(t.id)}
-                className={`${PILL} ${
-                  selected
-                    ? 'bg-muted font-medium text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+      </button>
+      {open && (
+        <div id={bodyId} className="space-y-2 pt-1">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            {tiers.length > 1 ? (
+              <div
+                role="group"
+                aria-label="Which tweets"
+                className="flex gap-1"
               >
-                {t.label}
-              </button>
-            )
-          })}
+                {tiers.map((t) => {
+                  const selected = t.id === tier
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setChosen(t.id)}
+                      className={`${PILL} ${
+                        selected
+                          ? 'bg-muted font-medium text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <span className="text-xs font-medium text-muted-foreground">
+                {tiers[0].label}
+              </span>
+            )}
+            <GroupingToggle
+              value={grouping}
+              onChange={setGrouping}
+              label="Group sources"
+            />
+          </div>
+          <EvidenceBoundary label="sources">{body(tier)}</EvidenceBoundary>
         </div>
       )}
-      <EvidenceBoundary label="sources">{body(tier)}</EvidenceBoundary>
     </section>
   )
 }

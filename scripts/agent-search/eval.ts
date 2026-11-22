@@ -5,7 +5,8 @@
 //     scripts/agent-search/eval.ts --only recall-future-historians
 //
 // Flags: --only id,id  --class name[,name]  --limit N  --model provider:model
-//        --tools bash|typed  --concurrency N  --timeout-ms N  --questions path
+//        --tools bash|typed  --concurrency N  --deadline-ms N  --timeout-ms N
+//        --questions path
 //        --dry-run  --no-validate-keys  --allow-remote-gateway  --traces dir
 // Env: AGENT_SEARCH_PROMPT (v1|v2|v2-examples), AGENT_SEARCH_KEEP_REASONING=on,
 //      AGENT_SEARCH_STALL_REMINDER=on.
@@ -81,6 +82,8 @@ interface QuestionResult {
   commandErrors: number
   semanticCalls: number
   wallMs: number
+  /** The run reached its deadline, so its last step answered without tools. */
+  reachedDeadline: boolean
   stepTimings: StepTiming[]
   error: string | null
   score: Score
@@ -112,6 +115,9 @@ interface Score {
 
 // ---------- arguments and environment ----------
 
+/** Time past the run's deadline for its last, tool-less answer. */
+const FINAL_ANSWER_MS = 120_000
+
 function parseArgs(argv: string[]) {
   const args = {
     only: [] as string[],
@@ -122,7 +128,12 @@ function parseArgs(argv: string[]) {
     // Deep, so results stay comparable with runs from before depths existed.
     depth: 'deep' as 'fast' | 'deep',
     concurrency: 1,
-    timeoutMs: 300_000,
+    // The run's deadline, as production sets it (AGENT_SEARCH_RUN_DEADLINE_MS):
+    // past it no tool call starts and the next step must answer. The hard
+    // timeout, which throws the run away, defaults to the deadline plus time
+    // for that last answer.
+    deadlineMs: null as number | null,
+    timeoutMs: null as number | null,
     questions: join(HERE, 'questions.json'),
     dryRun: false,
     validateKeys: true,
@@ -156,6 +167,7 @@ function parseArgs(argv: string[]) {
     } else if (flag === '--concurrency')
       args.concurrency = Math.max(1, Number(value()))
     else if (flag === '--timeout-ms') args.timeoutMs = Number(value())
+    else if (flag === '--deadline-ms') args.deadlineMs = Number(value())
     else if (flag === '--questions') args.questions = resolve(value())
     else if (flag === '--dry-run') args.dryRun = true
     else if (flag === '--no-validate-keys') args.validateKeys = false
@@ -289,6 +301,7 @@ type Modules = {
   agent: typeof import('@/lib/agentSearch/agent')
   citations: typeof import('@/lib/agentSearch/citations')
   depth: typeof import('@/lib/agentSearch/depth')
+  deadline: typeof import('@/lib/agentSearch/deadline')
   model: typeof import('@/lib/agentSearch/model')
   gateway: typeof import('@/lib/agentSearch/gateway')
   classifier: typeof import('@/lib/agentSearch/classifier')
@@ -467,17 +480,24 @@ function writeTrace(
   )
 }
 
-/** The tools for a mode, with the depth's per-question semantic search cap. */
+/**
+ * The tools for a mode, with the depth's per-question semantic search cap and
+ * the run's deadline, after which no archive or scorer call starts.
+ */
 function toolsFor(
   mods: Modules,
   mode: 'bash' | 'typed',
   abortSignal: AbortSignal,
+  deadlineAt: number,
   maxSemanticCalls: number,
 ): ToolSet {
   if (mode === 'bash') {
     return mods.agent.createBashAgentTools(
-      mods.inProcess.createInProcessBash({ abortSignal }, {}, maxSemanticCalls)
-        .execute,
+      mods.inProcess.createInProcessBash(
+        { abortSignal, deadlineAt },
+        {},
+        maxSemanticCalls,
+      ).execute,
     )
   }
   let semanticUsed = 0
@@ -491,7 +511,10 @@ function toolsFor(
           )
         }
         semanticUsed += 1
-        return mods.toolImpl.semanticSearchImpl(input, options)
+        return mods.toolImpl.semanticSearchImpl(input, {
+          abortSignal: options?.abortSignal,
+          deadlineAt,
+        })
       },
     },
     maxSemanticCalls,
@@ -524,6 +547,10 @@ async function runQuestion(
   let usage: Partial<LanguageModelUsage> = {}
   let error: string | null = null
   const toolErrors: unknown[] = []
+  // As production: a deadline the agent answers at, and a hard stop after it.
+  const deadlineMs = args.deadlineMs ?? mods.deadline.agentSearchRunDeadlineMs()
+  const deadlineAt = started + deadlineMs
+  const timeoutMs = args.timeoutMs ?? deadlineMs + FINAL_ANSWER_MS
 
   try {
     ;({ key, dropped: keyDropped } = await validateKey(
@@ -537,7 +564,7 @@ async function runQuestion(
 
   if (!error) {
     try {
-      const abortSignal = AbortSignal.timeout(args.timeoutMs)
+      const abortSignal = AbortSignal.timeout(timeoutMs)
       // The depth's profile, applied as the workflow applies it.
       const profile = mods.depth.AGENT_SEARCH_PROFILES[args.depth]
       const agent = new mods.ai.ToolLoopAgent({
@@ -556,13 +583,19 @@ async function runQuestion(
           null,
           args.depth,
         ),
-        tools: toolsFor(mods, mode, abortSignal, profile.maxSemanticCalls),
+        tools: toolsFor(
+          mods,
+          mode,
+          abortSignal,
+          deadlineAt,
+          profile.maxSemanticCalls,
+        ),
         stopWhen: [
           mods.ai.isStepCount(profile.maxSteps),
           mods.agent.toolsKeepFailing,
         ],
         prepareStep: mods.agent.agentSearchPrepareStep(
-          undefined,
+          deadlineAt,
           undefined,
           undefined,
           profile.maxSteps,
@@ -671,6 +704,7 @@ async function runQuestion(
     commandErrors,
     semanticCalls,
     wallMs: Date.now() - started,
+    reachedDeadline: Date.now() >= deadlineAt,
     stepTimings,
     error,
     score: score(
@@ -775,6 +809,7 @@ async function main() {
     agent: await import('@/lib/agentSearch/agent'),
     citations: await import('@/lib/agentSearch/citations'),
     depth: await import('@/lib/agentSearch/depth'),
+    deadline: await import('@/lib/agentSearch/deadline'),
     model: await import('@/lib/agentSearch/model'),
     gateway: await import('@/lib/agentSearch/gateway'),
     classifier: await import('@/lib/agentSearch/classifier'),

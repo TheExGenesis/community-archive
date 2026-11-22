@@ -37,8 +37,10 @@ Other flags: `--model provider:model` (default `AGENT_SEARCH_MODEL` or
 `openrouter:deepseek/deepseek-v4.1-flash`), `--tools bash|typed` (default `AGENT_SEARCH_TOOLS`
 or `bash`: the shell workspace, or the typed tools), `--depth fast|deep` (default `deep`, so results
 stay comparable with earlier runs; `fast` applies the page's default profile: low effort, 8 steps,
-2 semantic searches, the one-round prompt), `--timeout-ms` (per question, default
-300000), `--questions <file>`, `--no-validate-keys`, `--allow-remote-gateway`, `--traces <dir>` (one JSON
+2 semantic searches, the one-round prompt), `--deadline-ms` (the run's deadline, default
+`AGENT_SEARCH_RUN_DEADLINE_MS` or 300000: as in production, after it no tool call starts and the next
+step answers from what it has), `--timeout-ms` (a hard stop that discards the run, default the
+deadline plus 120000), `--questions <file>`, `--no-validate-keys`, `--allow-remote-gateway`, `--traces <dir>` (one JSON
 per question with each step's reasoning, commands, the output the model saw and the answer). The
 prompt variant and step options come from `AGENT_SEARCH_PROMPT` (`v1`, `v2`, `v2-examples`),
 `AGENT_SEARCH_KEEP_REASONING=on` and `AGENT_SEARCH_STALL_REMINDER=on`; each result file records them.

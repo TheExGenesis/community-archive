@@ -193,16 +193,30 @@ function applyLocations(stories: MapStory[], lookup: MapLookup) {
   }
 }
 
+type WeeklyEdition = NonNullable<
+  Awaited<ReturnType<typeof getPublishedWeeklyDigest>>
+>
+type DailyRef = { digestDate: string; story: DigestStory }
+
+const mondayBefore = (weekStart: string) => {
+  const date = new Date(`${weekStart}T12:00:00Z`)
+  date.setUTCDate(date.getUTCDate() - 7)
+  return date.toISOString().slice(0, 10)
+}
+
 /**
- * The current Week in Review for the map's browse panel: the running week's
- * edition when it is newer than the latest final week (as /digest/week shows
- * it), else that final week. Each weekly story carries the daily stories it
- * cites, which the map already knows how to highlight and open.
+ * The map's browse panel: the latest daily digest's stories that the current
+ * Week in Review does not already carry, then that week, then the week
+ * before. The current week is the running week's edition when it is newer
+ * than the latest final week (as /digest/week shows it), else that final
+ * week. Each weekly story carries the daily stories it cites, which the map
+ * already knows how to highlight and open.
  */
 export async function weeklyMapPage(): Promise<WeeklyMapPage> {
-  const [latest, soFar] = await Promise.all([
+  const [latest, soFar, today] = await Promise.all([
     getPublishedWeeklyDigest(),
     getWeekSoFar(),
+    getPublishedDigest(undefined, { strict: true }),
   ])
   const running = !!soFar && (!latest || soFar.weekStart > latest.weekStart)
   const edition = running ? soFar : latest
@@ -210,12 +224,22 @@ export async function weeklyMapPage(): Promise<WeeklyMapPage> {
   // once the Week in Review has started, so treat none as unavailable rather
   // than serving (and caching) an empty section.
   if (!edition) throw new Error('Weekly digest unavailable')
-  const { content } = edition
+  const previous = running
+    ? latest
+    : await getPublishedWeeklyDigest(mondayBefore(edition.weekStart))
+  const weeks: [WeeklyEdition, boolean][] = [[edition, running]]
+  if (previous && previous.weekStart < edition.weekStart)
+    weeks.push([previous, false])
+
   const dates = Array.from(
     new Set(
-      content.stories.flatMap((s) => s.dailyStories.map((r) => r.digestDate)),
+      weeks.flatMap(([w]) =>
+        w.content.stories.flatMap((s) =>
+          s.dailyStories.map((r) => r.digestDate),
+        ),
+      ),
     ),
-  )
+  ).filter((date) => date !== today?.digestDate)
   const dailies = new Map(
     await Promise.all(
       dates.map(
@@ -224,34 +248,64 @@ export async function weeklyMapPage(): Promise<WeeklyMapPage> {
       ),
     ),
   )
-  const refs = content.stories.map((weekly) =>
-    weekly.dailyStories.flatMap((ref) => {
-      const story = dailies
-        .get(ref.digestDate)
-        ?.content.stories.find((s) => s.slug === ref.slug)
-      return story ? [{ digestDate: ref.digestDate, story }] : []
-    }),
+  if (today) dailies.set(today.digestDate, today)
+  const weekRefs = weeks.map(([w]) =>
+    w.content.stories.map((weekly) =>
+      weekly.dailyStories.flatMap((ref): DailyRef[] => {
+        const story = dailies
+          .get(ref.digestDate)
+          ?.content.stories.find((s) => s.slug === ref.slug)
+        return story ? [{ digestDate: ref.digestDate, story }] : []
+      }),
+    ),
   )
-  const { stories, lookup } = await checkedDigestStories(refs.flat())
+  // Today's stories the current week already weaves in appear there, not
+  // twice. Before the week-so-far run picks today up, all of them show.
+  const woven = new Set(
+    edition.content.stories.flatMap((s) =>
+      s.dailyStories.map((r) => `${r.digestDate}/${r.slug}`),
+    ),
+  )
+  const todayRefs: DailyRef[] = today
+    ? today.content.stories
+        .filter((s) => !woven.has(`${today.digestDate}/${s.slug}`))
+        .map((story) => ({ digestDate: today.digestDate, story }))
+    : []
+
+  const { stories, lookup } = await checkedDigestStories([
+    ...todayRefs,
+    ...weekRefs.flat(2),
+  ])
   if (lookup) applyLocations(stories, lookup)
-  let next = 0
-  return {
-    weekStart: content.weekStart,
-    weekEnd: content.weekEnd,
-    soFar: running,
-    throughDate: running ? content.throughDate : undefined,
-    stories: content.stories.map((weekly, index) => ({
-      id: `${edition.weekStart}/${weekly.slug}`,
+  let next = todayRefs.length
+  const [current, before] = weeks.map(([w, isRunning], index) => ({
+    weekStart: w.content.weekStart,
+    weekEnd: w.content.weekEnd,
+    soFar: isRunning,
+    throughDate: isRunning ? w.content.throughDate : undefined,
+    stories: w.content.stories.map((weekly, story) => ({
+      id: `${w.weekStart}/${weekly.slug}`,
       title: weekly.title,
       subtitle: weekly.subtitle,
       // A week-so-far edition has no story pages yet; its stories are
       // anchors on the current week page.
-      href: running
+      href: isRunning
         ? `/digest/week#${weekly.slug}`
-        : `/digest/week/${edition.weekStart}/${weekly.slug}`,
+        : `/digest/week/${w.weekStart}/${weekly.slug}`,
       days: weekly.days,
-      stories: refs[index].map(() => stories[next++]),
+      stories: weekRefs[index][story].map(() => stories[next++]),
     })),
+  }))
+  return {
+    ...current,
+    today:
+      today && todayRefs.length
+        ? {
+            date: today.digestDate,
+            stories: stories.slice(0, todayRefs.length),
+          }
+        : undefined,
+    previous: before,
     located: !!lookup,
   }
 }

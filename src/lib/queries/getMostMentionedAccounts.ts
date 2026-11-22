@@ -1,100 +1,70 @@
-import { MentionedUser } from '@/components/TopMentionedMissingUsers'
-import { createServerClient } from '@/utils/supabase'
+import 'server-only'
+import { unstable_cache } from 'next/cache'
+import type { MentionedUser } from '@/components/TopMentionedMissingUsers'
+import { createServerServiceRoleClient } from '@/utils/supabase'
+import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import { devLog } from '../devLog'
-import { cookies } from 'next/headers'
 
-export async function getAccountMostMentionedAccounts(
-  username: string,
-): Promise<MentionedUser[]> {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+/**
+ * "Most Wanted" on /mission-control: the most-mentioned accounts across the
+ * archive. The page is public, so this must not run a corpus RPC as anon or
+ * per request: it reads with the server's service role (anonymous corpus
+ * access is revoked) and is shared from the Data Cache for an hour. An hour
+ * matches the other aggregate panels; the list holds handles and counts, and
+ * opt-outs are removed from the mention tables at ingestion.
+ */
+const cachedArchiveMostMentionedAccounts = unstable_cache(
+  async (): Promise<MentionedUser[]> => {
+    const supabase = createServerServiceRoleClient()
+    const { data: rawUsers, error } = await supabase.rpc(
+      'get_top_mentioned_users',
+      { limit_: 10 },
+    )
 
-  const { data: users, error } = await supabase
-    .schema('public')
-    .rpc('get_account_most_mentioned_accounts' as any, {
-      username_: username,
-      limit_: 10,
+    if (error || !rawUsers) {
+      // Throw so a failure is not cached as an empty list.
+      throw new Error(
+        `get_top_mentioned_users failed: ${error?.message ?? 'no data'}`,
+      )
+    }
+
+    const users = rawUsers
+    devLog('users', users)
+    const userIds = users.map((user: any) => user.user_id)
+
+    const [{ data: profiles }, { data: accounts }] = await Promise.all([
+      supabase
+        .from('profile')
+        .select('*')
+        .in('account_id', userIds)
+        .order('archive_upload_id', { ascending: false }),
+      supabase.from('account').select('*').in('account_id', userIds),
+    ])
+
+    return users.map((user: any) => {
+      const profile = profiles?.find((p) => p.account_id === user.user_id)
+      const account = accounts?.find((a) => a.account_id === user.user_id)
+      return {
+        mentioned_user_id: user.user_id,
+        screen_name: user.screen_name,
+        mention_count: user.mention_count,
+        account_display_name: user.name,
+        avatar_media_url: profile?.avatar_media_url,
+        uploaded: !!account,
+      }
     })
-
-  if (error) {
-    console.error('Error fetching most mentioned accounts:', error)
-    return []
-  }
-
-  const mentionedUsers = await Promise.all(
-    users
-      .filter((user: any) => user.screen_name !== username)
-      .map(async (user: any) => {
-        const { data: profile } = await supabase
-          .from('profile')
-          .select('*')
-          .eq('account_id', user.user_id)
-          .order('archive_upload_id', { ascending: false })
-          .limit(1)
-          .single()
-
-        const { data: account } = await supabase
-          .from('account')
-          .select('*')
-          .eq('account_id', user.user_id)
-          .single()
-
-        return {
-          mentioned_user_id: user.user_id,
-          screen_name: user.screen_name,
-          mention_count: user.mention_count,
-          account_display_name: user.name,
-          avatar_media_url: profile?.avatar_media_url,
-          uploaded: !!account,
-        }
-      }),
-  )
-  devLog('mentionedUsers', mentionedUsers)
-  return mentionedUsers
-}
+  },
+  ['archive-most-mentioned-accounts-v1', productionReadCacheKey()],
+  { revalidate: 3600 },
+)
 
 export async function getArchiveMostMentionedAccounts(): Promise<
   MentionedUser[]
 > {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
-  const { data: rawUsers, error } = await supabase
-    .rpc('get_top_mentioned_users', { limit_: 10 })
-
-  if (error || !rawUsers) {
+  try {
+    return await cachedArchiveMostMentionedAccounts()
+  } catch (error) {
     console.error('Error fetching most mentioned accounts:', error)
     return []
   }
-
-  const users = rawUsers
-
-  devLog('users', users)
-  const userIds = users.map((user: any) => user.user_id)
-
-  const { data: profiles } = await supabase
-    .from('profile')
-    .select('*')
-    .in('account_id', userIds)
-    .order('archive_upload_id', { ascending: false })
-
-  const { data: accounts } = await supabase
-    .from('account')
-    .select('*')
-    .in('account_id', userIds)
-
-  const mentionedUsers = users.map((user: any) => {
-    const profile = profiles?.find((p) => p.account_id === user.user_id)
-    const account = accounts?.find((a) => a.account_id === user.user_id)
-    return {
-      mentioned_user_id: user.user_id,
-      screen_name: user.screen_name,
-      mention_count: user.mention_count,
-      account_display_name: user.name,
-      avatar_media_url: profile?.avatar_media_url,
-      uploaded: !!account,
-    }
-  })
-
-  devLog('mentionedUsers', mentionedUsers)
-  return mentionedUsers
 }

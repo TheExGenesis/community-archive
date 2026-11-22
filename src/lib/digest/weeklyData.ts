@@ -125,6 +125,17 @@ export const getPublishedWeeklyDigest = requestCache(
     )(),
 )
 
+/**
+ * The running week's edition when it is newer than the latest final week,
+ * which is what /digest/week leads with. On Monday the final edition of last
+ * week (09:00 UTC) wins until the new week's first week-so-far run (09:30).
+ */
+export const runningWeekSoFar = (
+  latest: WeeklyDigestEdition | null,
+  soFar: WeeklyDigestEdition | null,
+): WeeklyDigestEdition | null =>
+  soFar && (!latest || soFar.weekStart > latest.weekStart) ? soFar : null
+
 async function readWeekSoFar(): Promise<WeeklyDigestEdition | null> {
   const { data, error } = await weeklyTable()
     .select(PUBLIC_COLUMNS)
@@ -156,6 +167,21 @@ export const listPublishedWeeks = (limit = 26): Promise<string[]> =>
     ['weekly-digest-weeks', String(limit)],
     { revalidate: SHARED_READ_SECONDS },
   )()
+
+/**
+ * Mondays that have a weekly edition to open: every published week the
+ * calendar can reach plus the running week's in-progress edition. Both reads
+ * are shared across requests, so pages that show it stay cacheable.
+ */
+export async function listWeeklyEditionWeeks(): Promise<string[]> {
+  const [published, soFar] = await Promise.all([
+    listPublishedWeeks(104),
+    getWeekSoFar(),
+  ])
+  return soFar && !published.includes(soFar.weekStart)
+    ? [soFar.weekStart, ...published]
+    : published
+}
 
 /**
  * How many of the newest published weeks each deploy renders ahead of time, so
@@ -216,9 +242,10 @@ export async function loadWeeklyRefPreviews(
     story.dailyStories.forEach((ref) => dailyDates.add(ref.digestDate))
     story.continuesFrom.forEach((ref) => priorWeeks.add(ref.weekStart))
   }
-  content.alsoNotable.forEach((item) =>
-    dailyDates.add(item.dailyStory.digestDate),
-  )
+  content.alsoNotable.forEach((item) => {
+    dailyDates.add(item.dailyStory.digestDate)
+    item.continuesFrom?.forEach((ref) => priorWeeks.add(ref.weekStart))
+  })
 
   const previews: Record<string, WeeklyRefPreview> = {}
   await Promise.all([

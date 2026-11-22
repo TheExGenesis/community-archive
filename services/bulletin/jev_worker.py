@@ -18,6 +18,7 @@ import jev_author
 import jev_model as model
 import resolution
 import tweet_context
+import web_titles
 import worker
 
 MAX_SECONDS = 900
@@ -25,6 +26,13 @@ MAX_PAGES = 300
 MAX_CALLS = 400
 BATCH = {'disposition': 16, 'enrich': 3, 'value': 1}
 WINDOW_DAYS = 2
+# Board lifetimes (src/lib/bulletin/board.ts expiry()); keep them in step.
+ACTIVE_DAYS = {'ask': dt.timedelta(days=14), 'offer': dt.timedelta(days=60)}
+# The unit's systemd start limit (ca-bulletin.service TimeoutStartSec), less a
+# margin; title requests after the run stay inside it.
+UNIT_SECONDS = 1200 - 60
+# Enriched source reads cap reply/quote evidence per call; keep chunks small.
+RENEWAL_BATCH = 100
 
 
 def summary(text):
@@ -289,16 +297,80 @@ def _resolution_source_read(fn, run_id, started):
             time.sleep(delay)
 
 
+def _utc(value):
+    if value is None or isinstance(value, dt.datetime):
+        return value
+    parsed=dt.datetime.fromisoformat(str(value).replace(' ','T').replace('Z','+00:00'))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
+
+
+def _renewals(ids, run_id, started):
+    """Latest self-quote per notice, or None where the gateway could not say."""
+    found={}
+    for i in range(0,len(ids),RENEWAL_BATCH):
+        chunk=ids[i:i+RENEWAL_BATCH]
+        if time.monotonic()-started>MAX_SECONDS:
+            found.update(dict.fromkeys(chunk))
+            continue
+        try:
+            rows=_resolution_source_read(lambda: clickhouse_source.get('bulletin-sources',
+                ids=','.join(chunk),enrich='true')['data'],run_id,started)
+        except Exception as exc:
+            worker.log_failure(exc,run_id=run_id,stage='resolution_renewals')
+            found.update(dict.fromkeys(chunk))
+            continue
+        # Absent rows (deleted, opted out) and null renewals both mean "not renewed".
+        never=dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+        renewed={r['tweet_id']:_utc(r.get('renewed_at')) or never for r in rows}
+        found.update({ident:renewed.get(ident,never) for ident in chunk})
+    return found
+
+
+def _lifetime(row):
+    return ACTIVE_DAYS['ask' if row['side']=='ask' else 'offer']
+
+
+def _active(rows, run_id, started):
+    """Notices the board still lists as current; only these are rechecked daily.
+
+    Mirrors the board's expiry(): an explicit date wins, standing notices stay,
+    otherwise an ask lasts 14 days and an offer 60 from its post or latest
+    self-quote renewal. Past notices keep their last evidenced status.
+    """
+    now=dt.datetime.now(dt.timezone.utc)
+    lapsed=[]
+    keep=set()
+    for row in rows:
+        if row['expires_at']:
+            if row['expires_at']>=now.date():
+                keep.add(row['tweet_id'])
+        elif row['standing'] or row['posted_at']+_lifetime(row)>now:
+            keep.add(row['tweet_id'])
+        else:
+            lapsed.append(row)
+    if lapsed:
+        renewed=_renewals([r['tweet_id'] for r in lapsed],run_id,started)
+        for row in lapsed:
+            at=renewed[row['tweet_id']]
+            # Unknown renewal state is checked rather than silently skipped.
+            if at is None or at+_lifetime(row)>now:
+                keep.add(row['tweet_id'])
+    return [r for r in rows if r['tweet_id'] in keep]
+
+
 def check_resolutions(db, run_id, counts, started, limit, key):
     """Recheck current author reply evidence without reclassifying the seed.
 
-    Bounded by the run's time and call budgets, not a row count: the ready set
-    grows daily, and a fixed cap eventually outruns the unit's retry allowance.
+    Bounded by the run's time and call budgets, not a row count. Only notices
+    the board still shows as current are due, so the daily set tracks recent
+    volume instead of growing with every notice in the recheck horizon.
     """
-    rows=db.execute('''SELECT * FROM bulletin.jev_items WHERE status='ready'
+    candidates=db.execute('''SELECT * FROM bulletin.jev_items WHERE status='ready'
       AND (context_checked_at IS NULL OR context_checked_at<date_trunc('day',now()))
       AND (standing OR posted_at>=now()-interval '75 days')
       ORDER BY context_checked_at ASC NULLS FIRST,tweet_id''').fetchall()
+    rows=_active(candidates,run_id,started)
+    counts['resolution_past']=len(candidates)-len(rows)
     checked=0
     for job in rows:
         if time.monotonic()-started>MAX_SECONDS or counts['calls']>=limit:
@@ -382,7 +454,7 @@ def check_resolutions(db, run_id, counts, started, limit, key):
     counts['resolution_checked']=checked
     pending=db.execute('''SELECT count(*) n FROM bulletin.jev_items WHERE status='ready'
       AND (context_checked_at IS NULL OR context_checked_at<date_trunc('day',now()))
-      AND (standing OR posted_at>=now()-interval '75 days')''').fetchone()['n']
+      AND tweet_id=ANY(%s)''',([r['tweet_id'] for r in rows],)).fetchone()['n']
     counts['resolution_pending']=pending
     return 'resolution_backlog' if pending else 'ok'
 
@@ -435,6 +507,9 @@ def run(db, *, window=None, rescan=False, enqueue_only=False,
             counts['retryable'] = pending['retryable']
             if pending['n'] and status=='ok':
                 status = 'pending_review' if pending['retryable'] else 'classification_failed'
+            if active=='jev':
+                # New notices are published by now; titling them never changes the status.
+                counts['titles'] = web_titles.request_titles(started+UNIT_SECONDS)
         db.execute('UPDATE bulletin.runs SET status=%s,counts=%s,finished_at=now() WHERE id=%s',
             (status,Jsonb(counts),run_id))
         if active=='jev':

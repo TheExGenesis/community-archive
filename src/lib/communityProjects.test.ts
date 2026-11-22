@@ -2,12 +2,14 @@ import {
   COMMUNITY_PROJECTS,
   filterCommunityProjects,
   homepageFeaturedProjects,
+  HOMEPAGE_PICKS,
   mergeCommunityCatalog,
+  type CommunityProject,
 } from './communityProjects'
 
 describe('community project catalog', () => {
   it('contains only verified entries and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(15)
+    expect(COMMUNITY_PROJECTS).toHaveLength(17)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -25,26 +27,16 @@ describe('community project catalog', () => {
         expect(project.projectUrl).toBe('https://tpot.uptrusthq.com/')
         expect(project.creator).toBe('UpTrust HQ')
         expect(project.sourceTweetId).toBeUndefined()
+      } else if (project.slug === 'threadapalooza') {
+        expect(project.projectUrl).toBe('https://threadapalooza.maskys.com/')
+        expect(project.sourceTweetId).toBeUndefined()
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')
     }
   })
 
-  it('lets admin-edited rows choose the home page projects', () => {
-    expect(
-      homepageFeaturedProjects(mergeCommunityCatalog([])).map(
-        (project) => project.slug,
-      ),
-    ).toEqual([
-      'pairwise',
-      'birdseye',
-      'bangers-page',
-      'tweet-harvest',
-      'magic-search',
-      'new-words-and-their-pioneers',
-    ])
-
+  it('lets admin-edited rows override the curated catalog', () => {
     const edited = mergeCommunityCatalog([
       {
         ...COMMUNITY_PROJECTS[0],
@@ -70,31 +62,51 @@ describe('community project catalog', () => {
       ])[0].summary,
     ).toBe('A new headline.')
     expect(edited[0].name).toBe('Pairwise (edited)')
-    expect(
-      homepageFeaturedProjects(edited).map((project) => project.slug),
-    ).toEqual([
-      'birdseye',
-      'bangers-page',
-      'tweet-harvest',
-      'magic-search',
-      'new-words-and-their-pioneers',
-      'model-behavior-reports',
-    ])
+    expect(edited[0].featured).toBe(false)
     expect(
       filterCommunityProjects(edited, '', 'Games', 'Featured')[0].featured,
     ).toBe(true)
   })
 
-  it('fills two rows when admins have featured fewer than six projects', () => {
-    const catalog = COMMUNITY_PROJECTS.map((project, index) => ({
-      ...project,
-      featured: index >= 6 && index < 9,
-    }))
-    const selected = homepageFeaturedProjects(catalog)
-    expect(selected).toHaveLength(6)
-    expect(selected.slice(0, 3)).toEqual(catalog.slice(6, 9))
-    expect(selected.slice(3)).toEqual(catalog.slice(0, 3))
-    expect(new Set(selected.map((project) => project.slug)).size).toBe(6)
+  it('shows the picked home page apps in order', () => {
+    const cuties: CommunityProject = {
+      ...COMMUNITY_PROJECTS[0],
+      slug: 'cuties-b9b5e204',
+      name: 'Cuties',
+      projectUrl: 'https://cuties.example.org/',
+      featured: true,
+    }
+    const twesties: CommunityProject = {
+      ...COMMUNITY_PROJECTS[0],
+      slug: 'twesties-8a710e65',
+      name: 'Twesties',
+      projectUrl: 'https://twesties.example.org/',
+      featured: true,
+    }
+    const catalog = mergeCommunityCatalog([
+      ...COMMUNITY_PROJECTS.map((project) => ({ ...project, featured: true })),
+      cuties,
+      twesties,
+    ])
+    expect(
+      homepageFeaturedProjects(catalog).map((project) => project.slug),
+    ).toEqual([...HOMEPAGE_PICKS])
+  })
+
+  it('fills slots a pick leaves empty with featured projects', () => {
+    // Before the published rows load, the database-only Cuties is missing.
+    expect(
+      homepageFeaturedProjects(mergeCommunityCatalog([])).map(
+        (project) => project.slug,
+      ),
+    ).toEqual([
+      'model-behavior-reports',
+      'meet-your-neighbors',
+      'followle',
+      'threadapalooza',
+      'distill',
+      'pairwise',
+    ])
   })
 
   it('searches across project, creator, category, and tag copy', () => {
@@ -121,7 +133,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Common Tongue')
+    expect(newest[0].name).toBe('Threadapalooza')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,
@@ -193,6 +205,7 @@ describe('community project catalog', () => {
       'Birdseye',
       'Bangers.page',
       'Tweet Harvest',
+      'Meet Your Neighbors',
       'Semantic Search',
       "Malcolm Ocean's Links",
       'Distill',

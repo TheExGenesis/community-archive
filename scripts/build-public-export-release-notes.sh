@@ -93,6 +93,14 @@ does not retain a second copy in GitHub.
 These versioned download links work only while this export is advertised by
 \`latest.json\`. Superseded packages are removed so withdrawn accounts are not
 retained in historical downloads.
+
+## Citing
+
+If you use this data, please cite the archive and name this export:
+
+> Carvalho, F. (2024). Community Archive [Data set]. https://www.community-archive.org (export \`$export_id\`)
+
+BibTeX and details: https://www.community-archive.org/cite
 EOF
 
 printf '%s\n' "$export_id"

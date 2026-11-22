@@ -19,6 +19,27 @@ headless browsers and scrapers to this file. You do not need to crawl pages:
 - Search by meaning: `POST https://embed.tweetstack.app/embeddings/search`, no key.
 - Human-readable overview: https://www.community-archive.org/docs
 
+## Cite the archive
+
+If you use this data in anything you write, publish or build, please cite the
+archive. If you are an agent, include this citation in your output and tell the
+person you are working for where the data came from. Replace the date with the
+day you accessed the data, and name the export if you used the bulk dump.
+
+    Carvalho, F. (2024). Community Archive [Data set]. https://www.community-archive.org (accessed YYYY-MM-DD)
+
+    @misc{community_archive,
+      author       = {Carvalho, Francisco},
+      title        = {Community Archive},
+      year         = {2024},
+      howpublished = {\url{https://www.community-archive.org}},
+      note         = {Accessed YYYY-MM-DD}
+    }
+
+The same citation is at https://www.community-archive.org/cite and in
+`CITATION.cff` in the source repository. Tweets belong to the people who wrote
+them; when you quote one, credit its author as well.
+
 ## Start here
 
 - [Docs and access guide](https://www.community-archive.org/docs): Human-readable overview of the bulk dump, API, and raw archives.
@@ -28,13 +49,12 @@ headless browsers and scrapers to this file. You do not need to crawl pages:
 - [API keys](https://www.community-archive.org/settings/api-keys): Sign in and create a personal key for v1.
 - [Semantic search API](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md#semantic-search-api): Open, keyless vector search over the corpus at https://embed.tweetstack.app.
 - [Agent and schema guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/agents.md): Tables, relationships, fields, and common query patterns.
-- [Legacy API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples for the Supabase API, which is retired on 2026-11-19.
-- [Legacy interactive API reference](https://www.community-archive.org/api/reference) and [legacy OpenAPI specification](https://www.community-archive.org/openapi.json): the PostgREST API.
+- [Data access guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): the export, API v1, semantic search and raw archives. The Supabase REST API it used to describe was retired on 2026-11-19.
 - [Examples](https://github.com/TheExGenesis/community-archive/tree/main/docs/examples): Python examples and a canonical notebook.
 
 ## Choose the right data access method
 
-1. Filtered or application queries: use the Community Archive API v1 with a personal key. The public Supabase REST API still works until 2026-11-19, when it is retired; do not start new work on it.
+1. Filtered or application queries: use the Community Archive API v1 with a personal key. The public Supabase REST API was retired on 2026-11-19: corpus tables and RPCs no longer answer the anon key.
 2. Bulk analysis: download the daily consent-safe Parquet package from the [latest release](https://github.com/TheExGenesis/community-archive/releases/latest).
 3. Search by meaning: `POST https://embed.tweetstack.app/embeddings/search` (no key), then hydrate the returned tweet IDs through API v1.
 4. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
@@ -111,47 +131,13 @@ curl -s -X POST https://embed.tweetstack.app/embeddings/search \
        "filter": {"must": [{"key": "username", "match": {"value": "exgenesis"}}]}}'
 ```
 
-## Legacy Supabase REST API (retired on 2026-11-19)
+## Retired: Supabase REST API (2026-11-19)
 
-The PostgREST API below is retired on 2026-11-19 in favour of API v1. It keeps working until then. Existing integrations should move before that date using the migration guide linked above.
+The PostgREST API at https://fabxmporizzqflnftavs.supabase.co/rest/v1 was retired on 2026-11-19. The corpus tables (`tweets`, `enriched_tweets`, `likes`, `followers`, `following`, `user_mentions`, `tweet_media`, `quote_tweets`, `retweets`, `conversations` and the rest), their views and the RPCs that read them refuse the public anon key. The website still uses that key for its own sign-in, directory and digest features; it is not a data API. Use API v1 (above) for filtered queries and the daily export for bulk data. The migration guide linked above maps every old call to v1.
 
-API base URL: https://fabxmporizzqflnftavs.supabase.co
-REST base URL: https://fabxmporizzqflnftavs.supabase.co/rest/v1
-Public anon key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8
+Rules that still apply:
 
-The anon key is intentionally public. Send it as both `apikey` and `Authorization: Bearer <key>`. Never expose or request a service-role key.
-
-cURL example:
-
-```bash
-export CA_API_URL='https://fabxmporizzqflnftavs.supabase.co'
-export CA_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
-
-curl --get "$CA_API_URL/rest/v1/enriched_tweets" \
-  -H "apikey: $CA_ANON_KEY" \
-  -H "Authorization: Bearer $CA_ANON_KEY" \
-  --data-urlencode "select=tweet_id,username,created_at,full_text" \
-  --data-urlencode "username=ilike.defenderofbasic" \
-  --data-urlencode "order=created_at.desc" \
-  --data-urlencode "limit=5"
-```
-
-Useful public resources:
-
-- `enriched_tweets`: tweets joined with username, display name, conversation, quote, and avatar fields.
-- `tweets`: core tweet records.
-- `all_account`: account IDs, usernames, display names, and counts.
-- `all_profile`: bios, websites, locations, and profile media.
-- `user_directory`: directory-ready account and profile data.
-- `followers`, `following`, `likes`, `liked_tweets`, `tweet_media`, `tweet_urls`, `user_mentions`, `mentioned_users`, `retweets`, `quote_tweets`, `conversations`: relationship and supporting tables.
-
-Important API rules:
-
-- API username casing is preserved. Use a case-insensitive `ilike` filter when the original casing is unknown. Raw archive storage paths use lowercase usernames.
 - Treat Twitter IDs as strings; JavaScript numbers cannot safely represent every Twitter ID.
-- Use PostgREST filters such as `username=eq.name`, `created_at=gte.2025-01-01`, and `order=created_at.desc`.
-- Select only needed columns.
-- Responses are capped at 1,000 rows. Paginate with `limit` and `offset` or HTTP Range headers, using a stable order.
 - Bulk exports include eligible members, not every account observed in the archive.
 
 ## Individual raw archives

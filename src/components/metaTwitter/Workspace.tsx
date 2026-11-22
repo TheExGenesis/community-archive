@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type RefObject } from 'react'
+import { useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import Link from 'next/link'
 import {
   ArrowDown,
@@ -46,6 +46,8 @@ export function Workspace({
   avatarUrl,
   contextTitle,
   contextQuote = null,
+  contextNote = null,
+  belowBangers = null,
   tweets,
   bangersAvailable,
   bangersLoading,
@@ -81,6 +83,10 @@ export function Workspace({
   contextTitle: string
   /** A section's own words, shown under its theme heading. */
   contextQuote?: string | null
+  /** Says what the list is, under the heading when there is no quote. */
+  contextNote?: ReactNode
+  /** Rendered under the bangers, in the same column (the latest posts). */
+  belowBangers?: ReactNode
   tweets: BangerTweet[]
   bangersAvailable: boolean
   bangersLoading: boolean
@@ -176,6 +182,16 @@ export function Workspace({
               className="mt-0.5 text-[13px] italic leading-snug text-muted-foreground"
             >
               “{contextQuote}”
+            </p>
+          </div>
+        ) : contextNote ? (
+          <div className="min-w-0">
+            {heading}
+            <p
+              id="profile-bangers-note"
+              className="mt-0.5 text-[13px] leading-snug text-muted-foreground"
+            >
+              {contextNote}
             </p>
           </div>
         ) : (
@@ -276,125 +292,136 @@ export function Workspace({
       )}
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_280px]">
-        <section
-          aria-labelledby="profile-bangers-heading"
-          aria-describedby={contextQuote ? 'profile-bangers-quote' : undefined}
-          className="flex flex-col gap-3"
-        >
-          {!bangersAvailable && (
-            <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
-              Bangers are temporarily unavailable. The rest of this profile is
-              still here.
-            </div>
-          )}
-          {bangersAvailable && bangersLoading && tweets.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
-              Loading bangers…
-            </div>
-          )}
-          {bangersAvailable && !bangersLoading && tweets.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
-              No posts in this chapter have at least two Community Archive
-              quotes yet.
-            </div>
-          )}
+        <div className="flex min-w-0 flex-col gap-6">
+          <section
+            aria-labelledby="profile-bangers-heading"
+            aria-describedby={
+              contextQuote
+                ? 'profile-bangers-quote'
+                : contextNote
+                  ? 'profile-bangers-note'
+                  : undefined
+            }
+            className="flex flex-col gap-3"
+          >
+            {!bangersAvailable && (
+              <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
+                Bangers are temporarily unavailable. The rest of this profile is
+                still here.
+              </div>
+            )}
+            {bangersAvailable && bangersLoading && tweets.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
+                Loading bangers…
+              </div>
+            )}
+            {bangersAvailable && !bangersLoading && tweets.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
+                No posts in this chapter have at least two Community Archive
+                quotes yet.
+              </div>
+            )}
 
-          {tweets.map((tweet, index) => (
-            <div
-              key={tweet.tweet_id}
-              className="relative"
-              style={{
-                contentVisibility: 'auto',
-                containIntrinsicSize: '0 320px',
-              }}
-            >
-              {tweet.curation?.is_featured && !editing && (
-                <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 shadow-sm dark:bg-amber-950 dark:text-amber-200">
-                  <Star className="h-3 w-3 fill-current" aria-hidden="true" />
-                  Featured
-                </span>
-              )}
-              {editing && (
-                <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-full border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
-                  <button
-                    type="button"
-                    aria-label={`Dismiss banger ${tweet.tweet_id}`}
-                    onClick={() => onDismiss?.('bangers', tweet.tweet_id)}
-                    disabled={editSaving}
-                    className="rounded-full p-1.5 hover:bg-muted disabled:opacity-50"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`${tweet.curation?.is_featured ? 'Unfeature' : 'Feature'} banger ${tweet.tweet_id}`}
-                    aria-pressed={tweet.curation?.is_featured === true}
-                    onClick={() => onToggleFeature?.('bangers', tweet.tweet_id)}
-                    disabled={editSaving}
-                    className="rounded-full p-1.5 hover:bg-muted disabled:opacity-50"
-                  >
-                    <Star
-                      className={`h-3.5 w-3.5 ${tweet.curation?.is_featured ? 'fill-amber-400 text-amber-500' : ''}`}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Move banger ${tweet.tweet_id} up`}
-                    onClick={() => onMove?.('bangers', tweet.tweet_id, -1)}
-                    disabled={
-                      editSaving ||
-                      index === 0 ||
-                      !sharesFeaturedGroup(tweet, tweets[index - 1])
-                    }
-                    className="rounded-full p-1.5 hover:bg-muted disabled:opacity-35"
-                  >
-                    <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Move banger ${tweet.tweet_id} down`}
-                    onClick={() => onMove?.('bangers', tweet.tweet_id, 1)}
-                    disabled={
-                      editSaving ||
-                      index === tweets.length - 1 ||
-                      !sharesFeaturedGroup(tweet, tweets[index + 1])
-                    }
-                    className="rounded-full p-1.5 hover:bg-muted disabled:opacity-35"
-                  >
-                    <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              )}
-              <TweetCard
-                tweet={bangerPortalTweet(tweet, avatarUrl)}
-                featuredRank={index + 1}
-                clickable={false}
-                showDate
-                showExternalLink
-                origin="profile"
-                returnTo={returnTo}
-              />
-            </div>
-          ))}
-
-          {hasMore && (
-            <div ref={loadMoreRef} className="flex justify-center py-1">
-              <button
-                type="button"
-                onClick={onLoadMore}
-                disabled={bangersLoading}
-                className="rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+            {tweets.map((tweet, index) => (
+              <div
+                key={tweet.tweet_id}
+                className="relative"
+                style={{
+                  contentVisibility: 'auto',
+                  containIntrinsicSize: '0 320px',
+                }}
               >
-                {bangersLoading
-                  ? 'Loading more bangers…'
-                  : loadMoreFailed
-                    ? 'Retry loading bangers'
-                    : 'Load more bangers'}
-              </button>
-            </div>
-          )}
-        </section>
+                {tweet.curation?.is_featured && !editing && (
+                  <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 shadow-sm dark:bg-amber-950 dark:text-amber-200">
+                    <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                    Featured
+                  </span>
+                )}
+                {editing && (
+                  <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-full border border-border bg-card/95 p-1 shadow-sm backdrop-blur">
+                    <button
+                      type="button"
+                      aria-label={`Dismiss banger ${tweet.tweet_id}`}
+                      onClick={() => onDismiss?.('bangers', tweet.tweet_id)}
+                      disabled={editSaving}
+                      className="rounded-full p-1.5 hover:bg-muted disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${tweet.curation?.is_featured ? 'Unfeature' : 'Feature'} banger ${tweet.tweet_id}`}
+                      aria-pressed={tweet.curation?.is_featured === true}
+                      onClick={() =>
+                        onToggleFeature?.('bangers', tweet.tweet_id)
+                      }
+                      disabled={editSaving}
+                      className="rounded-full p-1.5 hover:bg-muted disabled:opacity-50"
+                    >
+                      <Star
+                        className={`h-3.5 w-3.5 ${tweet.curation?.is_featured ? 'fill-amber-400 text-amber-500' : ''}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move banger ${tweet.tweet_id} up`}
+                      onClick={() => onMove?.('bangers', tweet.tweet_id, -1)}
+                      disabled={
+                        editSaving ||
+                        index === 0 ||
+                        !sharesFeaturedGroup(tweet, tweets[index - 1])
+                      }
+                      className="rounded-full p-1.5 hover:bg-muted disabled:opacity-35"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move banger ${tweet.tweet_id} down`}
+                      onClick={() => onMove?.('bangers', tweet.tweet_id, 1)}
+                      disabled={
+                        editSaving ||
+                        index === tweets.length - 1 ||
+                        !sharesFeaturedGroup(tweet, tweets[index + 1])
+                      }
+                      className="rounded-full p-1.5 hover:bg-muted disabled:opacity-35"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+                <TweetCard
+                  tweet={bangerPortalTweet(tweet, avatarUrl)}
+                  featuredRank={index + 1}
+                  clickable={false}
+                  showDate
+                  showExternalLink
+                  origin="profile"
+                  returnTo={returnTo}
+                />
+              </div>
+            ))}
+
+            {hasMore && (
+              <div ref={loadMoreRef} className="flex justify-center py-1">
+                <button
+                  type="button"
+                  onClick={onLoadMore}
+                  disabled={bangersLoading}
+                  className="rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+                >
+                  {bangersLoading
+                    ? 'Loading more bangers…'
+                    : loadMoreFailed
+                      ? 'Retry loading bangers'
+                      : 'Load more bangers'}
+                </button>
+              </div>
+            )}
+          </section>
+          {belowBangers}
+        </div>
 
         <aside className="flex flex-col gap-5">
           <section aria-labelledby="profile-media-heading">

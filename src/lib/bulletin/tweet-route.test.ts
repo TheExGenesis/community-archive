@@ -2,16 +2,17 @@ import { createHash } from 'crypto'
 import { GET as BATCH_GET } from '@/app/api/bulletin/tweets/route'
 import { GET } from '@/app/api/bulletin/tweet/[id]/route'
 import {
-  loadBulletinBoardState,
+  loadVerifiedBulletinBoard,
   requireBulletinUser,
   type StoredNotice,
 } from './data'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { fetchClickHouseTweetThreadPageData } from '@/lib/clickhouseTweetPage'
 import type { TweetData } from '@/lib/tweets/types'
+import type { Notice } from './types'
 
 jest.mock('./data', () => ({
-  loadBulletinBoardState: jest.fn(),
+  loadVerifiedBulletinBoard: jest.fn(),
   requireBulletinUser: jest.fn(),
 }))
 jest.mock('@/lib/clickhouseGateway', () => ({
@@ -40,7 +41,9 @@ const call = () =>
   })
 beforeEach(() => {
   jest.resetAllMocks()
-  jest.mocked(loadBulletinBoardState).mockResolvedValue({ notices: [notice] })
+  jest
+    .mocked(loadVerifiedBulletinBoard)
+    .mockResolvedValue({ notices: [notice], sources: new Map() })
   jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
     data: [
       {
@@ -56,12 +59,15 @@ beforeEach(() => {
     .mockResolvedValue({ tweet: detail, threadTree: null })
 })
 test('starts independent reads together but does not publish until consent state resolves', async () => {
-  let release!: (state: { notices: StoredNotice[] }) => void
+  let release!: (state: {
+    notices: StoredNotice[]
+    sources: Map<string, Notice>
+  }) => void
   let markReadStarted!: () => void
   const readStarted = new Promise<void>((resolve) => {
     markReadStarted = resolve
   })
-  jest.mocked(loadBulletinBoardState).mockImplementation(() => {
+  jest.mocked(loadVerifiedBulletinBoard).mockImplementation(() => {
     markReadStarted()
     return new Promise((resolve) => {
       release = resolve
@@ -71,7 +77,7 @@ test('starts independent reads together but does not publish until consent state
   await readStarted
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(1)
   expect(fetchClickHouseTweetThreadPageData).toHaveBeenCalledTimes(1)
-  release({ notices: [notice] })
+  release({ notices: [notice], sources: new Map() })
   const result = await response
   expect(result.status).toBe(200)
   expect(result.headers.get('Cache-Control')).toBe('private, no-store')
@@ -84,7 +90,7 @@ test('never starts reads before authentication succeeds', async () => {
   jest.mocked(requireBulletinUser).mockRejectedValue(new Error('Sign in'))
   await expect(call()).rejects.toThrow('Sign in')
   expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
-  expect(loadBulletinBoardState).not.toHaveBeenCalled()
+  expect(loadVerifiedBulletinBoard).not.toHaveBeenCalled()
 })
 test.each([
   'missing notice',
@@ -93,7 +99,9 @@ test.each([
   'upstream failure',
 ])('fails closed for %s', async (reason) => {
   if (reason === 'missing notice')
-    jest.mocked(loadBulletinBoardState).mockResolvedValue({ notices: [] })
+    jest
+      .mocked(loadVerifiedBulletinBoard)
+      .mockResolvedValue({ notices: [], sources: new Map() })
   if (reason === 'changed author')
     jest.mocked(fetchClickHouseTweetThreadPageData).mockResolvedValue({
       tweet: { ...detail, account_id: 'b' },
@@ -116,8 +124,8 @@ test.each([
 test('a batch shares policy/source reads and suppresses a changed tweet independently', async () => {
   const other = { ...notice, tweet_id: '124' }
   jest
-    .mocked(loadBulletinBoardState)
-    .mockResolvedValue({ notices: [notice, other] })
+    .mocked(loadVerifiedBulletinBoard)
+    .mockResolvedValue({ notices: [notice, other], sources: new Map() })
   jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
     data: [
       {
@@ -150,7 +158,7 @@ test('a batch shares policy/source reads and suppresses a changed tweet independ
   expect(response.status).toBe(200)
   expect(response.headers.get('Cache-Control')).toBe('private, no-store')
   expect(await response.json()).toMatchObject({ tweets: [{ id: '123' }] })
-  expect(loadBulletinBoardState).toHaveBeenCalledTimes(1)
+  expect(loadVerifiedBulletinBoard).toHaveBeenCalledTimes(1)
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(1)
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
     ['bulletin-sources'],
@@ -168,7 +176,7 @@ test.each(['', 'bad', '1,2,3,4,5,6,7,8,9'])(
         )
       ).status,
     ).toBe(400)
-    expect(loadBulletinBoardState).not.toHaveBeenCalled()
+    expect(loadVerifiedBulletinBoard).not.toHaveBeenCalled()
     expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
   },
 )
@@ -178,7 +186,7 @@ test('batch reads require authentication', async () => {
   await expect(
     BATCH_GET(new Request('http://localhost/api/bulletin/tweets?ids=123')),
   ).rejects.toThrow('Sign in')
-  expect(loadBulletinBoardState).not.toHaveBeenCalled()
+  expect(loadVerifiedBulletinBoard).not.toHaveBeenCalled()
   expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
 })
 test('returns archived replies beneath the notice, oldest first, without placeholders', async () => {

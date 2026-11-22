@@ -3,9 +3,6 @@ import { getStrands, getAppPolicy } from '@/lib/community-apps/data'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import { selectStrandContext } from '@/lib/community-apps/strand-context'
 import { fetchClickHouseTweetThreadPageData } from '@/lib/clickhouseTweetPage'
-import { isClickHouseReadsEnabled } from '@/lib/clickhouseGateway'
-import { createServerServiceRoleClient } from '@/utils/supabase'
-import type { ThreadTweet } from '@/lib/threadUtils'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 const headers = { 'Cache-Control': 'private, no-store' }
@@ -31,26 +28,8 @@ export async function GET(
         { error: 'Strand post unavailable' },
         { status: 404, headers },
       )
-    let nodes: ThreadTweet[]
-    if (isClickHouseReadsEnabled()) {
-      const page = await fetchClickHouseTweetThreadPageData(id)
-      nodes = Object.values(page?.threadTree?.tweets ?? {})
-    } else {
-      // Existing read-only permalink RPC. Use only archived reply metadata;
-      // this context preview does not fetch missing posts from Twitter.
-      const { data, error } = await createServerServiceRoleClient().rpc(
-        'get_tweet_page_data' as never,
-        { p_tweet_id: id } as never,
-      )
-      if (error) throw new Error('Thread unavailable')
-      const result = data as unknown as {
-        tweet?: ThreadTweet
-        conversation_tweets?: ThreadTweet[]
-      }
-      nodes = result?.conversation_tweets ?? []
-      if (result?.tweet && !nodes.some((n) => n.tweet_id === id))
-        nodes = [...nodes, result.tweet]
-    }
+    const page = await fetchClickHouseTweetThreadPageData(id)
+    const nodes = Object.values(page?.threadTree?.tweets ?? {})
     const policy = await getAppPolicy([])
     const allowed = nodes.filter(
       (n) =>

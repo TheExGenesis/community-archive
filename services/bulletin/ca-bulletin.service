@@ -17,6 +17,9 @@ Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
 LoadCredentialEncrypted=openrouter_api_key:/etc/credstore.encrypted/ca-bulletin-openrouter
 LoadCredentialEncrypted=clickhouse_api_token:/etc/credstore.encrypted/ca-bulletin-clickhouse
 Environment=CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
+# Shared with the website's BULLETIN_TITLES_SECRET; create it before installing this unit.
+LoadCredentialEncrypted=bulletin_titles_secret:/etc/credstore.encrypted/ca-bulletin-titles
+Environment=BULLETIN_TITLES_URL=https://www.community-archive.org/api/bulletin/titles
 ExecStart=/usr/bin/python3 /opt/community-archive-bulletin/current/run_service.py
 TimeoutStartSec=20min
 MemoryMax=512M

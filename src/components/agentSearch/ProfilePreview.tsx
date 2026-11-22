@@ -6,11 +6,14 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactElement,
+  type MouseEvent,
   type ReactNode,
 } from 'react'
 import Link from 'next/link'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { TweetAvatar } from '@/components/TweetAvatar'
+import { loadedAvatar } from '@/lib/loadedAvatars'
 import { Popover, PopoverContent } from '@/components/ui/popover'
 import type { ProfilePreview as Preview } from '@/app/api/profile/[account_id]/preview/route'
 import type { Person } from './profileLinks'
@@ -24,21 +27,31 @@ export const ProfilePeopleContext = createContext<
 // the card stops asking.
 const previews = new Map<string, Promise<Preview | null>>()
 
+// Previews are for signed-in members. Once the archive turns one down for that
+// reason, the page stops asking for the rest.
+let membersOnly = false
+
 function loadPreview(key: string): Promise<Preview | null> {
   let pending = previews.get(key)
   if (!pending) {
+    if (membersOnly) return Promise.resolve(null)
     pending = fetch(`/api/profile/${encodeURIComponent(key)}/preview`)
-      .then((response) =>
-        response.ok ? (response.json() as Promise<Preview>) : null,
-      )
+      .then((response) => {
+        if (response.status === 401) membersOnly = true
+        return response.ok ? (response.json() as Promise<Preview>) : null
+      })
+      .then((preview) => {
+        if (preview) primeProfilePreviews([preview])
+        return preview
+      })
       .catch(() => null)
     previews.set(key, pending)
   }
   return pending
 }
 
-// Previews a page already resolved on the server, readable synchronously so
-// the card opens complete.
+// Previews a page already resolved, or that a hover already fetched, readable
+// synchronously so the card opens complete.
 const known = new Map<string, Preview>()
 
 /** Hand over previews the page loaded with itself. */
@@ -55,10 +68,13 @@ const knownPreview = (person: Person) =>
   (person.accountId && known.get(person.accountId)) ||
   known.get(person.username.toLowerCase())
 
+const previewKey = (person: Person) => person.accountId ?? person.username
+
 /** Forgets fetched previews; for tests. */
 export function clearProfilePreviews() {
   previews.clear()
   known.clear()
+  membersOnly = false
 }
 
 const handleOf = (children: ReactNode) => {
@@ -75,11 +91,14 @@ const handleOf = (children: ReactNode) => {
 export function ProfileCard({
   person,
   href,
+  newTab = true,
 }: {
   person: Person
   href: string
+  /** Whether "Open profile" opens a new tab, as links in an answer do. */
+  newTab?: boolean
 }) {
-  const key = person.accountId ?? person.username
+  const key = previewKey(person)
   const [preview, setPreview] = useState<Preview | null | undefined>(() =>
     knownPreview(person),
   )
@@ -112,7 +131,9 @@ export function ProfileCard({
           tweet={{
             id: person.tweetId ?? person.username,
             username: person.username,
-            avatar: person.avatar ?? preview?.avatar ?? null,
+            // The photo the page already shows for them, when it has one.
+            avatar:
+              loadedAvatar(person) ?? person.avatar ?? preview?.avatar ?? null,
           }}
           size={40}
         />
@@ -147,8 +168,7 @@ export function ProfileCard({
       )}
       <Link
         href={href}
-        target="_blank"
-        rel="noopener noreferrer"
+        {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
         className="inline-block rounded-sm text-xs font-medium text-brand underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         Open profile
@@ -161,9 +181,83 @@ const LINK_CLASS =
   'rounded-sm underline decoration-transparent underline-offset-2 transition-colors hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand'
 
 /**
- * A handle in the answer, linked to the profile. On a pointer that can hover,
- * a card about the person opens after a short pause and stays while the
- * pointer moves onto it; touch screens just follow the link.
+ * Wraps an avatar, a name or a handle so that, on a pointer that can hover, a
+ * card with the person's bio opens after a short pause and stays while the
+ * pointer moves onto it. Touch screens just follow the wrapped link. The
+ * child must be a single element that takes a ref and mouse handlers.
+ *
+ * By default the card waits for the bio and stays shut without one (signed
+ * out, say), since the name and avatar are already on screen. `eager` opens
+ * it at once with what `person` holds, for callers that add facts of their own.
+ */
+export function ProfileHoverCard({
+  person,
+  href,
+  newTab = false,
+  eager = false,
+  children,
+}: {
+  person: Person
+  href: string
+  newTab?: boolean
+  eager?: boolean
+  children: ReactElement
+}) {
+  const [open, setOpen] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const hovering = useRef(false)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const later = (next: boolean, ms: number) => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => setOpen(next), ms)
+  }
+  const show = () => {
+    if (eager || knownPreview(person)) return setOpen(true)
+    void loadPreview(previewKey(person)).then((preview) => {
+      if (preview && hovering.current) setOpen(true)
+    })
+  }
+  // The card is portalled, but React still bubbles its events to the wrapped
+  // element's ancestors; a clickable tweet row must not open from a click here.
+  const contain = (event: MouseEvent) => event.stopPropagation()
+
+  if (!person.username) return children
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverPrimitive.Anchor
+        asChild
+        onMouseEnter={() => {
+          if (!window.matchMedia('(hover: hover)').matches) return
+          hovering.current = true
+          clearTimeout(timer.current)
+          timer.current = setTimeout(show, 300)
+        }}
+        onMouseLeave={() => {
+          hovering.current = false
+          later(false, 150)
+        }}
+      >
+        {children}
+      </PopoverPrimitive.Anchor>
+      <PopoverContent
+        side="top"
+        align="start"
+        className="w-72 p-0"
+        onMouseEnter={() => clearTimeout(timer.current)}
+        onMouseLeave={() => later(false, 150)}
+        onClick={contain}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
+        <ProfileCard person={person} href={href} newTab={newTab} />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
+ * A handle in the answer, linked to the profile, with a hover card for the
+ * people the run knows about.
  */
 export function ProfileLink({
   href,
@@ -174,45 +268,20 @@ export function ProfileLink({
 }) {
   const people = useContext(ProfilePeopleContext)
   const person = people?.get(handleOf(children))
-  const [open, setOpen] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(timer.current), [])
-  const later = (next: boolean, ms: number) => {
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setOpen(next), ms)
-  }
-
   const link = (
     <Link
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       className={LINK_CLASS}
-      onMouseEnter={() => {
-        if (person && window.matchMedia('(hover: hover)').matches) {
-          later(true, 300)
-        }
-      }}
-      onMouseLeave={() => later(false, 150)}
     >
       {children}
     </Link>
   )
   if (!person) return link
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverPrimitive.Anchor asChild>{link}</PopoverPrimitive.Anchor>
-      <PopoverContent
-        side="top"
-        align="start"
-        className="w-72 p-0"
-        onMouseEnter={() => clearTimeout(timer.current)}
-        onMouseLeave={() => later(false, 150)}
-        onOpenAutoFocus={(event) => event.preventDefault()}
-        onCloseAutoFocus={(event) => event.preventDefault()}
-      >
-        <ProfileCard person={person} href={href} />
-      </PopoverContent>
-    </Popover>
+    <ProfileHoverCard person={person} href={href} newTab eager>
+      {link}
+    </ProfileHoverCard>
   )
 }

@@ -252,6 +252,14 @@ test('public browser content uses anonymous production reads, while personal con
     method: 'POST',
     body: '{}',
   })
+  // Anonymous corpus access is retired: corpus reads never cross the bridge.
+  await routed('https://stage.example.com/rest/v1/tweets?select=tweet_id', {
+    method: 'GET',
+  })
+  await routed('https://stage.example.com/rest/v1/rpc/search_tweets', {
+    method: 'POST',
+    body: '{}',
+  })
   expect(
     fetchMock.mock.calls
       .slice(1)

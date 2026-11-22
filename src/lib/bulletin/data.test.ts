@@ -8,13 +8,18 @@ import {
   loadBulletinRelationships,
   loadBulletinRelationshipsForAccount,
   loadBulletinViewer,
+  loadPublicBulletinBoard,
+  loadVerifiedBulletinBoard,
   requireBulletinUser,
+  clearBulletinCaches,
 } from './data'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getOptInStatus } from '@/lib/auth-utils'
 import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { readBulletinTitles } from './titles'
+jest.mock('./titles', () => ({ readBulletinTitles: jest.fn() }))
 jest.mock('@/lib/clickhouseGateway', () => ({
   fetchAnalyticsGatewayJson: jest.fn(),
 }))
@@ -38,8 +43,22 @@ const rpc = jest.fn()
 // The board page composes these two steps; exercise them the same way.
 const loadNotices = async () =>
   hydrateBulletinNotices(await loadBulletinBoardState())
+jest.mock('next/server', () => ({ after: jest.fn() }))
+// Stands in for Vercel's Data Cache: the first result is kept until cleared.
+const mockDataCache = new Map<unknown, unknown>()
+jest.mock('next/cache', () => ({
+  unstable_cache:
+    <T>(build: () => Promise<T>) =>
+    async () => {
+      if (!mockDataCache.has(build)) mockDataCache.set(build, await build())
+      return mockDataCache.get(build) as T
+    },
+}))
 beforeEach(() => {
   jest.clearAllMocks()
+  clearBulletinCaches()
+  mockDataCache.clear()
+  jest.mocked(readBulletinTitles).mockResolvedValue(new Map())
   jest.mocked(getOptInStatus).mockResolvedValue({
     data: { opted_in: true, explicit_optout: false },
     error: null,
@@ -418,3 +437,106 @@ test.each([null, { is_anonymous: true }])(
     expect(rpc).not.toHaveBeenCalled()
   },
 )
+
+describe('shared verified board', () => {
+  const hash = (text: string) => createHash('sha256').update(text).digest('hex')
+  const stored = [
+    { tweet_id: '1', account_id: '10', content_hash: hash('Offer: help') },
+    { tweet_id: '2', account_id: '10', content_hash: hash('Offer: old') },
+    {
+      tweet_id: '3',
+      account_id: '10',
+      content_hash: hash('Ask: rides'),
+      resolution_state: 'resolved',
+      resolution_tweet_id: '9',
+      resolution_content_hash: hash('Found one'),
+    },
+  ]
+  const source = (tweet_id: string, full_text: string) => ({
+    tweet_id,
+    account_id: '10',
+    full_text,
+    reply_to_tweet_id: null,
+    retweet: false,
+    created_at: '2026-09-01 00:00:00',
+  })
+  beforeEach(() => {
+    jest
+      .mocked(getCurrentUser)
+      .mockResolvedValue({ id: 'member', is_anonymous: false } as User)
+    rpc.mockResolvedValue({ data: stored, error: null })
+    jest
+      .mocked(fetchAnalyticsGatewayJson)
+      .mockImplementation(async (_path, params) =>
+        params?.get('enrich')
+          ? {
+              data: [
+                source('1', 'Offer: help'),
+                source('2', 'Offer: edited'),
+                source('3', 'Ask: rides'),
+              ],
+            }
+          : {
+              data: [{ tweet_id: '9', account_id: '10', full_text: 'Deleted' }],
+            },
+      )
+  })
+
+  test('one read serves later page views, with failed sources and stale resolutions removed', async () => {
+    jest
+      .mocked(readBulletinTitles)
+      .mockResolvedValue(new Map([['1', 'Offering help']]))
+    const board = await loadVerifiedBulletinBoard()
+    expect(Array.from(board.sources.keys())).toEqual(['1', '3'])
+    // Cards carry the stored AI title when one exists.
+    expect(board.sources.get('1')?.title).toBe('Offering help')
+    expect(board.sources.get('3')?.title).toBeNull()
+    // The resolution post changed, so the ask is open again.
+    expect(board.sources.get('3')).toMatchObject({
+      resolution_state: 'unknown',
+      resolution_tweet_id: null,
+    })
+    await loadVerifiedBulletinBoard()
+    await loadPublicBulletinBoard()
+    expect(rpc).toHaveBeenCalledTimes(1)
+  })
+
+  test('a fresh server reads the shared copy instead of rebuilding', async () => {
+    await loadVerifiedBulletinBoard()
+    clearBulletinCaches() // a new server: empty memory, same Data Cache
+    const board = await loadPublicBulletinBoard()
+    expect(Array.from(board.sources.keys())).toEqual(['1', '3'])
+    expect(board.notices).toHaveLength(3)
+    expect(board.notices[0]).toEqual({
+      tweet_id: '1',
+      account_id: '10',
+      content_hash: hash('Offer: help'),
+      kind: undefined,
+      side: undefined,
+    })
+    expect(rpc).toHaveBeenCalledTimes(1)
+  })
+
+  test('a shared copy past the staleness bound is rebuilt, not shown', async () => {
+    const start = Date.now()
+    await loadVerifiedBulletinBoard()
+    clearBulletinCaches()
+    const later = jest.spyOn(Date, 'now')
+    later.mockReturnValue(start + 8 * 60_000)
+    await loadPublicBulletinBoard()
+    expect(rpc).toHaveBeenCalledTimes(1)
+    clearBulletinCaches()
+    later.mockReturnValue(start + 10 * 60_000)
+    await loadPublicBulletinBoard()
+    expect(rpc).toHaveBeenCalledTimes(2)
+    later.mockRestore()
+  })
+
+  test('readers still need active consent before the shared board is returned', async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null)
+    await expect(loadVerifiedBulletinBoard()).rejects.toThrow(
+      'redirect:/login?redirect=/bulletin',
+    )
+    expect(rpc).not.toHaveBeenCalled()
+  })
+})

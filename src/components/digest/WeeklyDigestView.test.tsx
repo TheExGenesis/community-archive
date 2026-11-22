@@ -5,7 +5,11 @@ import '@testing-library/jest-dom'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { WeeklyDigestView, WeeklyStoryView } from './WeeklyDigestView'
+import {
+  moreFromLastWeek,
+  WeeklyDigestView,
+  WeeklyStoryView,
+} from './WeeklyDigestView'
 import { dailyPreviewKey, type WeeklyDigestContent } from '@/lib/digest/weekly'
 import type { WeeklyDigestEdition } from '@/lib/digest/weeklyData'
 import type { PortalTweet } from '@/lib/portal/types'
@@ -39,15 +43,24 @@ jest.mock('@/components/digest/DigestSubscribeButton', () => ({
   DigestSubscribeButton: () => null,
 }))
 
-const content = JSON.parse(
-  readFileSync(
-    join(
-      process.cwd(),
-      'memos/artifacts/20261108-weekly-digest-v7/2026-10-26.json',
+const fixture = (weekStart: string) =>
+  JSON.parse(
+    readFileSync(
+      join(
+        process.cwd(),
+        `memos/artifacts/20261108-weekly-digest-v7/${weekStart}.json`,
+      ),
+      'utf8',
     ),
-    'utf8',
-  ),
-) as WeeklyDigestContent
+  ) as WeeklyDigestContent
+const content = fixture('2026-10-26')
+const lastWeekContent = fixture('2026-10-19')
+const lastWeek: WeeklyDigestEdition = {
+  id: 'last-week',
+  weekStart: lastWeekContent.weekStart,
+  publishedAt: null,
+  content: lastWeekContent,
+}
 const edition: WeeklyDigestEdition = {
   id: 'week',
   weekStart: content.weekStart,
@@ -146,5 +159,117 @@ describe('WeeklyDigestView', () => {
       expect(screen.getByText(segment.commentary)).toBeInTheDocument()
     }
     expect(screen.getByText('← Previous story')).toBeInTheDocument()
+  })
+  describe('week so far', () => {
+    const soFarEdition: WeeklyDigestEdition = {
+      ...edition,
+      content: { ...content, throughDate: '2026-10-28' },
+    }
+    const continued = content.stories.flatMap((story) => story.continuesFrom)
+    const continuedLastWeek = continued.filter(
+      (ref) => ref.weekStart === lastWeek.weekStart,
+    )
+
+    test("lists last week's stories that no story this week continues", () => {
+      // The fixture week continues exactly one of last week's stories.
+      expect(continuedLastWeek).toHaveLength(1)
+      render(
+        <WeeklyDigestView
+          edition={soFarEdition}
+          weeks={[lastWeek.weekStart]}
+          soFar={{ lastWeek }}
+        />,
+      )
+      const section = screen
+        .getByRole('heading', { name: 'More from last week' })
+        .closest('section') as HTMLElement
+      const open = lastWeekContent.stories.filter(
+        (story) => story.slug !== continuedLastWeek[0].slug,
+      )
+      const links = Array.from(section.querySelectorAll('a'))
+      expect(links.map((link) => link.getAttribute('href'))).toEqual([
+        ...open.map(
+          (story) => `/digest/week/${lastWeek.weekStart}/${story.slug}`,
+        ),
+        `/digest/week/${lastWeek.weekStart}`,
+      ])
+      expect(links[0]).toHaveTextContent(open[0].subtitle.replace(/[*_`]/g, ''))
+      expect(links.at(-1)).toHaveTextContent(
+        "Read last week's Week in Review →",
+      )
+      expect(screen.queryByText('Last week in review')).toBeNull()
+    })
+
+    test('is only the heading and the link when every story continues', () => {
+      const allContinued: WeeklyDigestContent = {
+        ...soFarEdition.content,
+        stories: soFarEdition.content.stories.map((story, index) => ({
+          ...story,
+          continuesFrom:
+            index === 0
+              ? lastWeekContent.stories.map((item) => ({
+                  weekStart: lastWeek.weekStart,
+                  slug: item.slug,
+                  title: item.title,
+                }))
+              : story.continuesFrom,
+        })),
+      }
+      expect(moreFromLastWeek(lastWeek, allContinued)).toEqual([])
+      render(
+        <WeeklyDigestView
+          edition={{ ...soFarEdition, content: allContinued }}
+          weeks={[lastWeek.weekStart]}
+          soFar={{ lastWeek }}
+        />,
+      )
+      const section = screen
+        .getByRole('heading', { name: 'More from last week' })
+        .closest('section') as HTMLElement
+      expect(
+        Array.from(section.querySelectorAll('a')).map((link) =>
+          link.getAttribute('href'),
+        ),
+      ).toEqual([`/digest/week/${lastWeek.weekStart}`])
+    })
+
+    test('a final edition has no "More from last week"', () => {
+      render(<WeeklyDigestView edition={edition} weeks={[content.weekStart]} />)
+      expect(screen.queryByText('More from last week')).toBeNull()
+    })
+  })
+
+  test('links an also-notable entry to the earlier week it continues', () => {
+    const ref = {
+      weekStart: lastWeek.weekStart,
+      slug: lastWeekContent.stories[2].slug,
+      title: lastWeekContent.stories[2].title,
+    }
+    const withContinuation: WeeklyDigestContent = {
+      ...content,
+      alsoNotable: content.alsoNotable.map((item, index) =>
+        index === 0 ? { ...item, continuesFrom: [ref] } : item,
+      ),
+    }
+    render(
+      <WeeklyDigestView
+        edition={{ ...edition, content: withContinuation }}
+        weeks={[content.weekStart]}
+      />,
+    )
+    const also = screen
+      .getByRole('heading', { name: 'Also this week' })
+      .closest('section') as HTMLElement
+    const entries = also.querySelectorAll('li')
+    expect(entries[0]).toHaveTextContent(
+      'Continues from the week of 19 October',
+    )
+    expect(
+      entries[0].querySelector(
+        `a[href="/digest/week/${ref.weekStart}/${ref.slug}"]`,
+      ),
+    ).not.toBeNull()
+    // Entries without the field (every entry of older editions) are unchanged.
+    expect(entries[1]).not.toHaveTextContent('Continues from')
   })
 })

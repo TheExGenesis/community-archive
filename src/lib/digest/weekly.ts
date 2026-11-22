@@ -104,6 +104,11 @@ export interface WeeklyDigestStory {
 export interface WeeklyAlsoNotable {
   line: string
   dailyStory: WeeklyDailyStoryRef
+  /**
+   * Earlier weekly stories this entry continues. Absent on editions written
+   * before also-notable entries could carry a continuation.
+   */
+  continuesFrom?: WeeklyContinuityRef[]
 }
 
 export interface WeeklyDigestContent {
@@ -217,10 +222,15 @@ export const WEEKLY_DIGEST_JSON_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['daily_ref', 'line'],
+        required: ['daily_ref', 'line', 'continues_from'],
         properties: {
           daily_ref: { type: 'string', minLength: 3, maxLength: 20 },
           line: { type: 'string', minLength: 12, maxLength: 200 },
+          continues_from: {
+            type: 'array',
+            maxItems: 2,
+            items: { type: 'string', minLength: 3, maxLength: 20 },
+          },
         },
       },
     },
@@ -254,7 +264,7 @@ WRITING
 - trend_terms: up to ${WEEKLY_MAX_TREND_TERMS} single words or short phrases (lower case, as people would actually type them in tweets) whose daily usage would show this story in the archive, such as a product, person, place or coined phrase central to it. Prefer specific terms ("sora", "polymarket") over generic ones ("ai", "model"). Leave empty when nothing distinctive fits.
 - Dek: one sentence under the week's date, roughly 120 to ${WEEKLY_DEK_MAX_CHARS} characters,, that goes straight into the week's biggest moments. Build it from the tweets' own words: quote short phrases exactly, in quotation marks, and say plainly whose they are or what they were about. Do not open with "A week", "This week", "The week" or any framing about the week itself; start with the first thing that happened or was said. No metaphors, wordplay, mood-setting or invented imagery ("sprang leaks", "the captain's final bow"); no @handles; no colon-separated lists. Good shape (invented example): "A lab said its model 'solved the conjecture outright'; the city council voted to 'pause every new data center'; a bakery's sourdough post 'broke the timeline.'" Bad shape: "A week of machines solving puzzles and bread taking over."
 - Executive summary: exactly three bullet sentences a reader can understand without opening anything. Aim for about 150 characters each and never exceed 200. Lead each bullet with one story; add a second only if it fits in a short clause. Prefer naming fewer stories clearly over cramming. No compressed noun piles, no unexplained jargon or product names without saying what they are.
-- "also_notable": up to 6 one-line mentions of daily stories that did not make the weekly cut but are worth a click. Each line must be understandable on its own.
+- "also_notable": up to 6 one-line mentions of daily stories that did not make the weekly cut but are worth a click. Each line must be understandable on its own. Set its "continues_from" to the previous weekly refs it continues, by the same rule as for weekly stories (same concrete subject, checked against every previous weekly story); leave it empty otherwise.
 - Each daily ref may appear in at most one weekly story, and not also in also_notable.
 
 Return one JSON object that matches the schema. No Markdown fences or prose outside the JSON.`
@@ -376,6 +386,22 @@ export function renderWeeklyDigestPrompt(input: {
     ? [
         `WEEK SO FAR: Monday ${input.weekStart} to Sunday ${dates[6]}, still in progress. The daily digests so far run through ${weekday(input.throughDate)} ${input.throughDate}; the later days have not happened yet.`,
         'Write the week so far: select and describe stories only from the days supplied. Do not imply the week is over, do not predict how stories will develop, and do not mention that later days are absent. An "ongoing" story still needs daily stories from at least two dates.',
+        ...(prior.some(
+          (week) => week.week_start === addDays(input.weekStart, -7),
+        )
+          ? [
+              'Last week is among the previous weekly digests below. Check every story and also_notable entry against its stories as carefully as for a finished week: a subject picked up from last week sets continues_from and continuity_note.',
+            ]
+          : []),
+        ...(editions.length === 1
+          ? [
+              'Only one daily digest exists so far, so every story is "major". Its stories may each become one weekly story; bundle two only on a shared concrete subject, as usual. Do not pad: write only what the daily stories and their tweets support.',
+            ]
+          : editions.length === 2
+            ? [
+                'Only two daily digests exist so far. A story is "ongoing" only if it appears on both dates; everything else is "major". Do not pad: write only what the daily stories and their tweets support.',
+              ]
+            : []),
       ]
     : [`WEEK: Monday ${input.weekStart} to Sunday ${dates[6]}.`]
   return [
@@ -761,6 +787,21 @@ export function assembleWeeklyDigestContent(input: {
       errors.push(`${label} repeats ${ref}, which is already in a weekly story`)
       return
     }
+    const continuesFrom: WeeklyContinuityRef[] = []
+    for (const weeklyRefId of Array.from(
+      new Set(
+        requireStrings(raw.continues_from ?? [], `${label}.continues_from`),
+      ),
+    )) {
+      const prior = weekly.get(weeklyRefId)
+      if (!prior) {
+        errors.push(
+          `${label}.continues_from contains unknown weekly ref ${weeklyRefId}`,
+        )
+      } else {
+        continuesFrom.push(prior)
+      }
+    }
     alsoNotable.push({
       line: requireString(raw.line, `${label}.line`),
       dailyStory: {
@@ -768,6 +809,7 @@ export function assembleWeeklyDigestContent(input: {
         slug: found.story.slug,
         title: found.story.title,
       },
+      ...(continuesFrom.length > 0 ? { continuesFrom } : {}),
     })
   })
 
@@ -845,8 +887,11 @@ export function weeklyDigestToMarkdown(
   if (content.alsoNotable.length > 0) {
     lines.push('## Also this week', '')
     for (const item of content.alsoNotable) {
+      const continues = (item.continuesFrom ?? [])
+        .map((ref) => `continues “${ref.title}” (week of ${ref.weekStart})`)
+        .join('; ')
       lines.push(
-        `- ${item.line} ([${item.dailyStory.digestDate}](${siteUrl}/digest/${item.dailyStory.digestDate}/${item.dailyStory.slug}))`,
+        `- ${item.line} ([${item.dailyStory.digestDate}](${siteUrl}/digest/${item.dailyStory.digestDate}/${item.dailyStory.slug}))${continues ? ` — ${continues}` : ''}`,
       )
     }
     lines.push('')

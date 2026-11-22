@@ -188,8 +188,13 @@ test('shows one stream with combined labels, and combines side, category and sea
   expect(screen.queryByRole('region')).not.toBeInTheDocument()
   const cards = screen.getAllByRole('article')
   expect(cards).toHaveLength(2)
-  expect(within(cards[0]).getByText('Feedback wanted')).toBeInTheDocument()
-  expect(within(cards[1]).getByText('Help')).toBeInTheDocument()
+  // The kind is an icon whose tooltip names it.
+  expect(
+    within(cards[0]).getByRole('button', { name: 'Filter by Feedback' }),
+  ).toHaveAttribute('data-tip', 'Feedback wanted · click to filter')
+  expect(
+    within(cards[1]).getByRole('button', { name: 'Filter by Help' }),
+  ).toHaveAttribute('data-tip', 'Help · click to filter')
   expect(
     screen.queryByLabelText(/replies from archived members/),
   ).not.toBeInTheDocument()

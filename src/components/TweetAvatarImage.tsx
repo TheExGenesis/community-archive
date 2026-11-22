@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AvatarImage } from '@/components/ui/avatar'
+import { rememberLoadedAvatar } from '@/lib/loadedAvatars'
 
 const avatarRequests = new Map<string, Promise<string | null>>()
 
@@ -75,9 +76,15 @@ export default function TweetAvatarImage({
     <AvatarImage
       src={resolvedSrc || undefined}
       alt={alt}
-      onError={() => {
-        setResolvedSrc('')
-        void recoverAvatar()
+      onLoadingStatusChange={(status) => {
+        if (status === 'loaded' && resolvedSrc) {
+          rememberLoadedAvatar({ username }, resolvedSrc)
+        }
+        // Radix decodes off-DOM; a failed image never mounts an img/onError.
+        if (status === 'error') {
+          setResolvedSrc('')
+          void recoverAvatar()
+        }
       }}
     />
   )

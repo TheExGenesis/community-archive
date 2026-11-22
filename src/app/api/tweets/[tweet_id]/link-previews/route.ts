@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getTweetLinkPreviews } from '@/lib/linkPreviews'
+import { getCachedTweetLinkPreviews } from '@/lib/linkPreviews'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -17,9 +17,9 @@ export async function GET(
     )
   }
   try {
-    const previews = await getTweetLinkPreviews([params.tweet_id])
+    const previews = await getCachedTweetLinkPreviews(params.tweet_id)
     return NextResponse.json(
-      { previews: previews.get(params.tweet_id) ?? [] },
+      { previews },
       {
         headers: {
           'Cache-Control':

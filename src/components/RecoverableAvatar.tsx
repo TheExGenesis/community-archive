@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { rememberLoadedAvatar } from '@/lib/loadedAvatars'
 
 type Props = {
   accountId: string
@@ -79,6 +80,9 @@ function ResolvedAvatar({
           alt={alt}
           className={imageClassName}
           onLoadingStatusChange={(status) => {
+            if (status === 'loaded') {
+              rememberLoadedAvatar({ accountId }, url)
+            }
             // Radix decodes off-DOM; failed images never mount an img/onError.
             if (status === 'error') {
               setUrl(null)

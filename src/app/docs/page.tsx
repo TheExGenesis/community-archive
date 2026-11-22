@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowUpRight, Bot, Braces, Database } from 'lucide-react'
+import { ACCESS_DATE_PLACEHOLDER, plainCitation } from '@/lib/citation'
 
 const V1_API_URL = 'https://analytics.community-archive.org/v1'
 const V1_OPENAPI_URL = 'https://analytics.community-archive.org/v1/openapi.json'
@@ -10,13 +11,10 @@ const API_KEYS_URL = '/settings/api-keys'
 const SEMANTIC_SEARCH_URL = 'https://embed.tweetstack.app'
 const SEMANTIC_SEARCH_GUIDE_URL =
   'https://github.com/TheExGenesis/community-archive/blob/main/docs/api-doc.md#semantic-search-api'
-const API_URL = 'https://fabxmporizzqflnftavs.supabase.co'
 const EXPORT_RELEASE_URL =
   'https://github.com/TheExGenesis/community-archive/releases/latest'
 const EXPORT_POINTER_URL =
   'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json'
-const ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
 const semanticSearchCurlExample = `curl -s -X POST ${SEMANTIC_SEARCH_URL}/embeddings/search \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -75,34 +73,6 @@ do {
   cursor = page.next_cursor
 } while (cursor)`
 
-const curlExample = `export CA_API_URL='${API_URL}'
-export CA_ANON_KEY='${ANON_KEY}'
-
-curl --get "$CA_API_URL/rest/v1/enriched_tweets" \\
-  -H "apikey: $CA_ANON_KEY" \\
-  -H "Authorization: Bearer $CA_ANON_KEY" \\
-  --data-urlencode "select=tweet_id,username,created_at,full_text" \\
-  --data-urlencode "username=ilike.defenderofbasic" \\
-  --data-urlencode "order=created_at.desc" \\
-  --data-urlencode "limit=5"`
-
-const javascriptExample = `import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  '${API_URL}',
-  process.env.CA_ANON_KEY,
-)
-
-const { data, error } = await supabase
-  .from('enriched_tweets')
-  .select('tweet_id, username, created_at, full_text')
-  .ilike('username', 'defenderofbasic')
-  .order('created_at', { ascending: false })
-  .limit(5)
-
-if (error) throw error
-console.log(data)`
-
 function CodeBlock({ children }: { children: string }) {
   return (
     <pre className="overflow-x-auto rounded-lg border border-border bg-background p-4 text-sm leading-6 text-foreground">
@@ -152,14 +122,14 @@ export default function DocsPage() {
             </p>
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-5">
               <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                API v1 is live
+                The Supabase REST API is retired
               </p>
               <p className="text-sm leading-6 text-foreground">
-                The keyed Community Archive API at{' '}
-                <code className="break-all">{V1_API_URL}</code> replaces the
-                public Supabase REST API, which is retired on{' '}
-                <strong>19 November 2026</strong>. Move existing integrations
-                before then; new projects should start on v1.
+                The public Supabase REST API was retired on{' '}
+                <strong>19 November 2026</strong>: the tweet corpus no longer
+                answers the anon key. Use the keyed Community Archive API at{' '}
+                <code className="break-all">{V1_API_URL}</code> for filtered
+                queries and the daily export for bulk data.
               </p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <ResourceLink href={API_KEYS_URL}>
@@ -178,9 +148,29 @@ export default function DocsPage() {
                 https://www.community-archive.org/llms.txt
               </ResourceLink>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                This plain-text index includes the data dump, API credentials,
-                query examples, schema notes, and deeper documentation links.
+                This plain-text index includes the data dump, API v1 routes and
+                keys, query examples, schema notes, and deeper documentation
+                links.
               </p>
+            </div>
+            <div
+              id="cite"
+              className="rounded-lg border border-border bg-muted/40 p-5"
+            >
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                If you use the archive, please cite it
+              </p>
+              <p className="text-sm leading-6 text-foreground">
+                This applies to the export, the API and anything an agent writes
+                from them. Use this citation, with the date you accessed the
+                data:
+              </p>
+              <pre className="mt-3 whitespace-pre-wrap break-words rounded-md border border-border bg-background p-3 text-sm">
+                {plainCitation(ACCESS_DATE_PLACEHOLDER)}
+              </pre>
+              <div className="mt-3">
+                <ResourceLink href="/cite">BibTeX and details</ResourceLink>
+              </div>
             </div>
           </div>
         </div>
@@ -483,15 +473,17 @@ export default function DocsPage() {
           </div>
         </section>
 
-        <section className="space-y-8" id="legacy-api">
+        <section className="space-y-4" id="legacy-api">
           <div className="max-w-3xl">
             <h2 className="text-3xl font-bold text-foreground">
-              Legacy Supabase REST API
+              Retired: the Supabase REST API
             </h2>
             <p className="mt-2 leading-7 text-muted-foreground">
-              The PostgREST API served by Supabase is retired on{' '}
-              <strong>19 November 2026</strong> in favour of v1 above. It keeps
-              working until then; follow the{' '}
+              Until <strong>19 November 2026</strong> the corpus tables were
+              readable through Supabase PostgREST with a shared public anon key.
+              That access has ended: tweets, likes, follows, mentions and the
+              views and functions over them now refuse the anon key. Move to API
+              v1 above with the{' '}
               <Link
                 href={V1_MIGRATION_GUIDE_URL}
                 className="font-medium text-brand"
@@ -499,74 +491,9 @@ export default function DocsPage() {
                 rel="noopener noreferrer"
               >
                 call-by-call migration guide
-              </Link>{' '}
-              to move. Send the public anon key in both the <code>apikey</code>{' '}
-              and <code>Authorization</code> headers. The anon key is
-              intentionally public; never use a service-role key in client code.
+              </Link>
+              , or download the daily export for bulk work.
             </p>
-            <div className="mt-4 flex flex-wrap gap-4">
-              <ResourceLink href="/api/reference">
-                Interactive reference
-              </ResourceLink>
-              <ResourceLink href="/openapi.json">OpenAPI JSON</ResourceLink>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">cURL</h3>
-            <CodeBlock>{curlExample}</CodeBlock>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-foreground">
-              JavaScript
-            </h3>
-            <CodeBlock>{javascriptExample}</CodeBlock>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg border border-border bg-card p-5">
-              <h3 className="font-semibold text-foreground">
-                Useful resources
-              </h3>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <code>enriched_tweets</code> — joined tweet and account data
-                </li>
-                <li>
-                  <code>tweets</code> — core tweet records
-                </li>
-                <li>
-                  <code>all_account</code> — accounts and usernames
-                </li>
-                <li>
-                  <code>all_profile</code> — bios and profile media
-                </li>
-                <li>
-                  <code>user_directory</code> — directory-ready account data
-                </li>
-              </ul>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-5">
-              <h3 className="font-semibold text-foreground">Query rules</h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-                <li>
-                  Username casing is preserved; use <code>ilike</code> when the
-                  original casing is unknown.
-                </li>
-                <li>Treat Twitter IDs as strings, not numbers.</li>
-                <li>
-                  Request only the columns you need with <code>select</code>.
-                </li>
-                <li>
-                  Paginate large results; responses are capped at 1,000 rows.
-                </li>
-                <li>
-                  Use a stable <code>order</code> when paging through changing
-                  data.
-                </li>
-              </ul>
-            </div>
           </div>
         </section>
 
@@ -588,7 +515,7 @@ export default function DocsPage() {
               Semantic search guide
             </ResourceLink>
             <ResourceLink href="https://github.com/TheExGenesis/community-archive/blob/main/docs/api-doc.md">
-              Legacy API guide
+              Data access guide
             </ResourceLink>
             <ResourceLink href="https://github.com/TheExGenesis/community-archive/tree/main/docs/examples">
               Python examples and notebook

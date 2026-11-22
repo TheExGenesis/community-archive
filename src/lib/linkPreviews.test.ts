@@ -466,3 +466,19 @@ describe('preview images and self links', () => {
     ).toMatchObject({ isVideo: true })
   })
 })
+
+describe('preview reads that fail', () => {
+  test('throw instead of returning an empty, cacheable result', async () => {
+    const from = jest.fn(() => ({
+      select: () => ({
+        in: async () => ({ data: null, error: { message: 'timeout' } }),
+      }),
+    }))
+    jest
+      .mocked(createServerServiceRoleClient)
+      .mockReturnValue({ from } as never)
+    await expect(getTweetLinkPreviews(['12345'])).rejects.toThrow(
+      'Failed to load tweet URLs',
+    )
+  })
+})

@@ -1,20 +1,12 @@
 import 'server-only'
 import { measureServerRead } from '@/lib/performance/server'
 import {
-  hydrateBulletinNotices,
-  loadBulletinBoardState,
   loadBulletinDismissals,
   loadBulletinRelationships,
   loadBulletinViewer,
-  verifyBulletinResolutions,
-  type StoredNotice,
+  loadVerifiedBulletinBoard,
 } from './data'
-import {
-  isPast,
-  isRecommendedCandidate,
-  sortNotices,
-  visibleStatus,
-} from './board'
+import { isRecommendedCandidate, sortNotices, visibleStatus } from './board'
 import { matchesJevFilters } from './curation'
 import {
   BULLETIN_PAGE_SIZE,
@@ -30,6 +22,7 @@ export class BulletinCursorExpired extends Error {}
 function matches(notice: Notice, search: string) {
   if (!search) return true
   return [
+    notice.title,
     notice.summary,
     notice.preview_text,
     notice.username,
@@ -45,7 +38,8 @@ function matches(notice: Notice, search: string) {
 /**
  * One ranked stream under the active filters, paged by a single cursor keyed
  * by the selected category ('all' or a kind). The directory stays server-side;
- * only source-verified card contents are returned.
+ * only source-verified card contents are returned. Sources come pre-checked
+ * from the shared board, so a page view only adds the reader's own reads.
  */
 export async function loadBulletinPage(
   filters: BulletinFilters,
@@ -54,8 +48,8 @@ export async function loadBulletinPage(
 ): Promise<BulletinPage> {
   const now = Date.now()
   const search = filters.search.trim().toLowerCase()
-  const [state, hidden, personal] = await Promise.all([
-    measureServerRead('bulletin.state', () => loadBulletinBoardState(false)),
+  const [board, hidden, personal] = await Promise.all([
+    measureServerRead('bulletin.state', loadVerifiedBulletinBoard),
     // A failed read shows hidden notices again rather than blanking the board.
     measureServerRead('bulletin.dismissals', loadBulletinDismissals).catch(
       () => [] as string[],
@@ -69,122 +63,47 @@ export async function loadBulletinPage(
   const inKinds = (o: { kind: string }) =>
     !chosenKinds.length || chosenKinds.includes(o.kind)
   const dismissed = new Set(hidden)
-  const known = state.notices.filter(
-    (o) =>
+  // Live cards only: a notice whose source check failed is never shown.
+  const known = board.notices.flatMap((o) => {
+    const card = board.sources.get(o.tweet_id)
+    return card &&
       !dismissed.has(o.tweet_id) &&
       o.kind in KIND_LABELS &&
-      matchesJevFilters(o, filters) &&
-      isRecommendedCandidate(o, filters.recommended, me),
-  )
+      matchesJevFilters(card, filters) &&
+      isRecommendedCandidate(card, filters.recommended, me) &&
+      visibleStatus(card, now, filters.past, filters.resolved) &&
+      matches(card, search)
+      ? [card]
+      : []
+  })
   const bySide = known.filter(
     (o) => filters.side === 'all' || o.side === filters.side,
   )
   const byKind = known.filter(inKinds)
-  const eligible = bySide.filter(inKinds)
-  const verified = new Map<string, Notice>()
-  const rejected = new Set<string>()
-  async function hydrate(notices: StoredNotice[]) {
-    if (!notices.length) return
-    const rows = await measureServerRead('bulletin.sources', () =>
-      hydrateBulletinNotices({ ...state, notices }),
-    )
-    const found = new Set(rows.map((o) => o.tweet_id))
-    for (const o of notices)
-      if (!found.has(o.tweet_id)) rejected.add(o.tweet_id)
-    for (const o of rows) verified.set(o.tweet_id, o)
-  }
-  const live = (o: StoredNotice | Notice): Notice => {
-    const source = verified.get(o.tweet_id)
-    // Resolution verification runs alongside hydration, which may finish first.
-    // Always use the verified resolution state when selecting visible cards.
-    return source
-      ? {
-          ...source,
-          resolution_state: o.resolution_state,
-          resolution_tweet_id: o.resolution_tweet_id,
-        }
-      : o
-  }
-  const shown = (o: Notice) =>
-    !rejected.has(o.tweet_id) &&
-    visibleStatus(o, now, filters.past, filters.resolved) &&
-    matches(o, search)
-
-  // Select the first page from metadata order, then verify it against the
-  // live source. A self-quote can renew an otherwise expired undated notice,
-  // so those are checked up front and pagination never silently loses them.
-  // Full-text search deliberately checks every candidate, not just page one.
-  const metadataOrder = sortNotices(
-    eligible,
-    filters.recommended,
-    me,
-    personal,
-    now,
-    filters.ascending,
-    false, // Live uptake ranks loaded cards in the client, never a partial server cursor.
-    filters.sortBy,
-  )
-  const active = metadataOrder.filter((o) =>
-    visibleStatus(o, now, filters.past, filters.resolved),
-  )
-  const start = after ? active.findIndex((o) => o.tweet_id === after) + 1 : 0
-  const first = active.slice(start, start + BULLETIN_PAGE_SIZE)
-  const preflight = new Map(
-    [...eligible.filter((o) => !o.expires_at && isPast(o, now)), ...first].map(
-      (o) => [o.tweet_id, o],
-    ),
-  )
-  await Promise.all([
-    measureServerRead('bulletin.resolutions', () =>
-      verifyBulletinResolutions(state.notices),
-    ),
-    hydrate(
-      search ? eligible : (Array.from(preflight.values()) as StoredNotice[]),
-    ),
-  ])
-
   const rows = sortNotices(
-    eligible.map(live).filter(shown),
+    bySide.filter(inKinds),
     filters.recommended,
     me,
     personal,
     now,
     filters.ascending,
-    false, // Live uptake ranks loaded cards in the client, never a partial server cursor.
+    false, // Live uptake ranks loaded cards in the client, never the server cursor.
     filters.sortBy,
   )
   const index = after ? rows.findIndex((o) => o.tweet_id === after) : -1
   if (after && index < 0)
     throw new BulletinCursorExpired('The board changed. Refresh to continue.')
-  let position = index + 1
-  const selected: Notice[] = []
-  // Fill holes from removed/edited posts without returning unverified summaries.
-  while (selected.length < BULLETIN_PAGE_SIZE && position < rows.length) {
-    const chunk = rows.slice(
-      position,
-      position + BULLETIN_PAGE_SIZE - selected.length,
-    )
-    await hydrate(
-      chunk.filter(
-        (o) => !verified.has(o.tweet_id) && !rejected.has(o.tweet_id),
-      ) as StoredNotice[],
-    )
-    for (const row of chunk) {
-      const current = verified.has(row.tweet_id) ? live(row) : undefined
-      if (current && shown(current)) selected.push(current)
-    }
-    position += chunk.length
-  }
+  const position = Math.min(index + 1 + BULLETIN_PAGE_SIZE, rows.length)
+  const selected = rows.slice(index + 1, position)
 
   // Chip and toggle counts under the other dimension's current filter, so a
-  // reader can see where notices are before clicking. Metadata-based except
-  // where a source was already checked; the footer says counts may adjust.
+  // reader can see where notices are before clicking.
   const counts: Record<string, number> = {}
   for (const kind of Object.keys(KIND_LABELS)) counts[kind] = 0
   counts.offer = 0
   counts.ask = 0
-  for (const o of bySide.map(live)) if (shown(o)) counts[o.kind]++
-  for (const o of byKind.map(live)) if (shown(o)) counts[o.side]++
+  for (const o of bySide) counts[o.kind]++
+  for (const o of byKind) counts[o.side]++
 
   return {
     notices: selected,
@@ -193,7 +112,7 @@ export async function loadBulletinPage(
       [filters.kind]:
         position < rows.length ? rows[position - 1].tweet_id : null,
     },
-    total: state.notices.length,
+    total: board.notices.length,
     dismissed: hidden.length,
     now,
     personal,

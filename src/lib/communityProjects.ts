@@ -272,6 +272,24 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-03-14',
   },
   {
+    slug: 'threadapalooza',
+    name: 'Threadapalooza',
+    creator: 'Kifah',
+    creatorHandle: 'maskys_',
+    summary: 'Seven years of 100-tweet Threadapalooza threads, as a book.',
+    description:
+      'In 2019 @vgr dared his “regional experts” to write 100-tweet threads, and writers have done it every December since. This reads them as an anthology: about 140 deep dives grouped into parts and topics, browsable by year or author, with starred picks.',
+    archiveUse:
+      'Finds Threadapalooza threads in public opted-in Community Archive accounts and rebuilds each one as a readable essay.',
+    category: 'Research',
+    tags: ['Threads', 'Long-form writing', 'Anthology'],
+    projectUrl: 'https://threadapalooza.maskys.com/',
+    image: '/images/community/threadapalooza-card.webp',
+    coverClass: 'from-[#f6f2ea] via-[#e9b872] to-[#7a3f8f]',
+    featured: false,
+    publishedAt: '2026-11-20',
+  },
+  {
     slug: 'community-archive-radio',
     name: 'Community Archive Radio',
     creator: 'Joshua',
@@ -289,6 +307,27 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     coverClass: 'from-[#352b70] via-[#7956d8] to-[#8bd2ee]',
     featured: false,
     publishedAt: '2026-08-16',
+  },
+  {
+    // Listed ahead of Followle so it takes Followle's homepage slot.
+    slug: 'meet-your-neighbors',
+    name: 'Meet Your Neighbors',
+    creator: 'Joe Weisenthal & khaled',
+    creatorHandle: 'TheStalwart',
+    summary: 'A political map that shows who on X thinks most like you.',
+    description:
+      'A new kind of political map with no ideology labels: it finds the ten accounts that agree with you most often across about 600 contested issues, laid out as a city of like-minded buildings. Upload your own posts to move in.',
+    archiveUse:
+      'Built from the 2,187 Community Archive accounts with at least 300 of their own tweets since January 2025, whose stances on each issue are extracted and compared pair by pair.',
+    category: 'Tools',
+    tags: ['Politics', 'Social graph', 'Maps'],
+    projectUrl: 'https://meetyourneighbors.ai/',
+    sourceTweetId: '2122772024934515183',
+    sourceUrl: 'https://x.com/TheStalwart/status/2122772024934515183',
+    image: '/images/community/meet-your-neighbors-card.webp',
+    coverClass: 'from-[#f1f4f7] via-[#d7e4ef] to-[#163a5f]',
+    featured: true,
+    publishedAt: '2026-11-17',
   },
   {
     slug: 'followle',
@@ -437,11 +476,32 @@ export function communityMenu(catalog: CommunityProject[]): CommunityMenu {
 
 export const HOMEPAGE_FEATURED_PROJECT_COUNT = 6
 
-/** Featured projects lead; fill the second row from the existing gallery. */
+/** The home page's Community Apps, in order. */
+export const HOMEPAGE_PICKS = [
+  'model-behavior-reports',
+  'cuties-b9b5e204',
+  'meet-your-neighbors',
+  'followle',
+  'threadapalooza',
+  'distill',
+] as const
+
+/**
+ * The picked apps lead in order; featured projects fill any slot a pick
+ * leaves empty (for example before the published rows have loaded).
+ */
 export function homepageFeaturedProjects(catalog: CommunityProject[]) {
-  return filterCommunityProjects(catalog, '', 'All', 'Featured')
-    .filter((project) => project.projectUrl)
-    .slice(0, HOMEPAGE_FEATURED_PROJECT_COUNT)
+  const launchable = catalog.filter((project) => project.projectUrl)
+  const bySlug = new Map(launchable.map((project) => [project.slug, project]))
+  const picked = HOMEPAGE_PICKS.flatMap((slug) => bySlug.get(slug) ?? [])
+  const pickedSlugs = new Set(picked.map((project) => project.slug))
+  const fill = filterCommunityProjects(
+    launchable,
+    '',
+    'All',
+    'Featured',
+  ).filter((project) => !pickedSlugs.has(project.slug))
+  return [...picked, ...fill].slice(0, HOMEPAGE_FEATURED_PROJECT_COUNT)
 }
 
 export function filterCommunityProjects(

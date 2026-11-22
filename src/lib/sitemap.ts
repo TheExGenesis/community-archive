@@ -26,6 +26,7 @@ const PUBLIC_STATIC_PATHS = [
   '/research',
   '/supporters',
   '/data-policy',
+  '/cite',
 ]
 
 // PostgREST caps result sets, so page with a stable order until a short page.

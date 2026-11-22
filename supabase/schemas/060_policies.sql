@@ -165,41 +165,44 @@ CREATE POLICY "Users can delete their own archive" ON "storage"."objects"
 CREATE POLICY "Data is modifiable by their users" ON "public"."all_account" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
 CREATE POLICY "Data is modifiable by their users" ON "public"."archive_upload" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
 
--- Public read policies
+-- Public read policies. Corpus tables (followers, following, likes, the
+-- entity tables, quote_tweets, retweets, tweets) are readable by signed-in
+-- members only: anonymous corpus access was retired on 2026-11-19
+-- (20261119190000_retire_anon_corpus_access.sql).
 CREATE POLICY "Data is publicly visible" ON "public"."all_account" FOR SELECT USING (("is_tombstone" IS NOT TRUE));
 CREATE POLICY "Data is publicly visible" ON "public"."all_profile" FOR SELECT USING (true);
 CREATE POLICY "Data is publicly visible" ON "public"."archive_upload" FOR SELECT USING (true);
-CREATE POLICY "Data is publicly visible" ON "public"."followers" FOR SELECT USING (true);
-CREATE POLICY "Data is publicly visible" ON "public"."following" FOR SELECT USING (true);
-CREATE POLICY "Data is publicly visible" ON "public"."likes" FOR SELECT USING (true);
+CREATE POLICY "Data is publicly visible" ON "public"."followers" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Data is publicly visible" ON "public"."following" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Data is publicly visible" ON "public"."likes" FOR SELECT TO "authenticated" USING (true);
 
 -- Entity read policies
 -- NOTE: liked_tweets and mentioned_users are global dedup tables written only by
 -- the service_role worker (which bypasses RLS). They intentionally have NO
 -- authenticated write policy: the previous "modifiable by their users" policy was
 -- uncorrelated to the row being changed and allowed cross-user modification (#370).
-CREATE POLICY "Entities are publicly visible" ON "public"."liked_tweets" FOR SELECT USING (
+CREATE POLICY "Entities are publicly visible" ON "public"."liked_tweets" FOR SELECT TO "authenticated" USING (
   "author_account_id" IS NOT NULL
   OR ("is_tombstone" = true AND "full_text" = '')
 );
-CREATE POLICY "Entities are publicly visible" ON "public"."mentioned_users" FOR SELECT USING (true);
-CREATE POLICY "Entities are publicly visible" ON "public"."tweet_media" FOR SELECT USING (true);
-CREATE POLICY "Entities are publicly visible" ON "public"."tweet_urls" FOR SELECT USING (true);
-CREATE POLICY "Entities are publicly visible" ON "public"."user_mentions" FOR SELECT USING (true);
-CREATE POLICY "Conversations are publicly visible" ON "public"."conversations" FOR SELECT USING (true);
+CREATE POLICY "Entities are publicly visible" ON "public"."mentioned_users" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Entities are publicly visible" ON "public"."tweet_media" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Entities are publicly visible" ON "public"."tweet_urls" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Entities are publicly visible" ON "public"."user_mentions" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Conversations are publicly visible" ON "public"."conversations" FOR SELECT TO "authenticated" USING (true);
 
 -- quote_tweets / retweets are written only by the service_role (firehose + worker).
 -- Reads are public; anon/authenticated writes are revoked in 060_grants and enforced
 -- by RLS being enabled here (#369).
-CREATE POLICY "Quote tweets are publicly visible" ON "public"."quote_tweets" FOR SELECT USING (true);
-CREATE POLICY "Retweets are publicly visible" ON "public"."retweets" FOR SELECT USING (true);
+CREATE POLICY "Quote tweets are publicly visible" ON "public"."quote_tweets" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Retweets are publicly visible" ON "public"."retweets" FOR SELECT TO "authenticated" USING (true);
 
 -- Opt-in table policies
 CREATE POLICY "Public can view opted-in users" ON "public"."optin" FOR SELECT USING (("opted_in" = true));
 CREATE POLICY "Users can view own opt-in status" ON "public"."optin" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 -- Tweets public read policy
-CREATE POLICY "anyone can read tweets" ON "public"."tweets" FOR SELECT USING (("is_tombstone" IS NOT TRUE));
+CREATE POLICY "anyone can read tweets" ON "public"."tweets" FOR SELECT TO "authenticated" USING (("is_tombstone" IS NOT TRUE));
 
 -- TES schema policy
 CREATE POLICY "Allow select for all" ON "tes"."blocked_scraping_users" FOR SELECT USING (true);
@@ -237,7 +240,7 @@ CREATE POLICY "Profile curation is publicly visible"
 
 CREATE POLICY "Tweet link previews are publicly visible"
   ON "public"."tweet_link_previews" FOR SELECT
-  TO "anon", "authenticated" USING (true);
+  TO "authenticated" USING (true);
 
 
 
@@ -266,7 +269,7 @@ ALTER TABLE "public"."tweet_page_summaries" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Tweet page summaries are publicly readable"
   ON "public"."tweet_page_summaries"
   FOR SELECT
-  TO "anon", "authenticated"
+  TO "authenticated"
   USING (true);
 
 -- No user policies: runs are read and written only by the server's
@@ -282,3 +285,9 @@ create policy "Trend stories are publicly readable"
   for select
   to "anon", "authenticated"
   using (true);
+
+-- No policies on the search alert and notification tables: service-role only.
+ALTER TABLE "public"."search_alerts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."search_alert_matches" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."search_alert_email_sends" ENABLE ROW LEVEL SECURITY;

@@ -20,10 +20,11 @@ type JsonObject = Record<string, unknown>
 export const WEEKLY_MIN_DAILY_EDITIONS = 5
 
 /**
- * The week-so-far edition starts once the week has this many dailies
- * (Wednesday morning); until then /digest/week leads with last week.
+ * The week-so-far edition starts with the week's first daily (Monday
+ * morning, after last week's final edition), so /digest/week moves to the
+ * new week the same day.
  */
-export const WEEK_SO_FAR_MIN_DAILY_EDITIONS = 3
+export const WEEK_SO_FAR_MIN_DAILY_EDITIONS = 1
 
 /** Public status of the current week's provisional edition. */
 export const WEEK_SO_FAR_STATUS = 'in_progress'

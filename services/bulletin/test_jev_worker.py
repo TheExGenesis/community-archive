@@ -124,6 +124,8 @@ class JevWorkerTests(unittest.TestCase):
 
     def test_author_reply_can_resolve_jev_notice_with_verified_evidence(self):
         self.assertEqual(jev_worker.run(self.db,window=self.window,backfill_budget=.05)['status'],'ok')
+        # Keep the fixture notice current; a fixed date ages out of the recheck set.
+        self.db.execute('UPDATE bulletin.jev_items SET posted_at=now()')
         reply=dict(tweet_id='2',account_id='10',full_text='The residency is filled.',
             created_at=self.window[0]+dt.timedelta(hours=1),reply_to_tweet_id='1')
         seed={**self.source,'username':'alice'}
@@ -183,6 +185,56 @@ class JevWorkerTests(unittest.TestCase):
             expired=time.monotonic()-jev_worker.MAX_SECONDS-1
             self.assertEqual(jev_worker.check_resolutions(self.db,1,counts,expired,10,'test'),'resolution_backlog')
             self.assertEqual((counts['resolution_checked'],counts['resolution_pending']),(0,251))
+
+    def test_daily_rechecks_follow_the_board_lifetime(self):
+        self.assertEqual(jev_worker.run(self.db,window=self.window,backfill_budget=.05)['status'],'ok')
+        columns=[r['column_name'] for r in self.db.execute("""SELECT column_name::text FROM information_schema.columns
+          WHERE table_schema='bulletin' AND table_name='jev_items'
+          AND column_name NOT IN ('tweet_id','posted_at','side','standing','expires_at','context_checked_at')""")]
+        today=dt.date.today()
+        cases={  # tweet_id: (days old, side, standing, expires_at, due)
+            '2001':(5,'ask',False,None,True),
+            '2002':(20,'ask',False,None,False),
+            '2003':(20,'ask',False,None,True),     # renewed by a self-quote 3 days ago
+            '2004':(40,'offer',False,None,True),
+            '2005':(70,'offer',False,None,False),
+            '2006':(70,'ask',True,None,True),      # standing
+            '2007':(5,'ask',False,today-dt.timedelta(days=1),False),
+            '2008':(30,'ask',False,today,True),    # explicit date still today
+            '2009':(20,'ask',False,None,True),     # renewal lookup failed: check, don't skip
+        }
+        for ident,(age,side,standing,expires,_) in cases.items():
+            self.db.execute(f"""INSERT INTO bulletin.jev_items(tweet_id,posted_at,side,standing,expires_at,{','.join(columns)})
+              SELECT %s,now()-%s,%s,%s,%s,{','.join('j.'+c for c in columns)}
+              FROM bulletin.jev_items j WHERE j.tweet_id='1'""",
+              (ident,dt.timedelta(days=age),side,standing,expires))
+        self.db.execute("DELETE FROM bulletin.jev_items WHERE tweet_id='1'")
+        renewed=(dt.datetime.now(dt.timezone.utc)-dt.timedelta(days=3)).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        lookups=[]
+        def gateway(path,**params):
+            ids=params['ids'].split(',')
+            lookups.append((path,params.get('enrich'),sorted(ids)))
+            if '2009' in ids:
+                raise RuntimeError('gateway unavailable')
+            return {'data':[{'tweet_id':i,'renewed_at':renewed if i=='2003' else None} for i in ids if i!='2005']}
+        seed={**self.source,'username':'alice'}
+        context=PreparedContext('seed only',{'1':('10',self.source['content_hash'])},{'1':seed})
+        with patch.object(jev_worker.clickhouse_source,'get',side_effect=gateway), \
+             patch.object(jev_worker,'RENEWAL_BATCH',3), \
+             patch.object(jev_worker,'_valid_sources',side_effect=lambda db,jobs:[(jobs[0],seed)]), \
+             patch.object(jev_worker.tweet_context,'prepare',return_value=context), \
+             patch.object(jev_worker.tweet_context,'still_current',return_value=True):
+            counts={'calls':0,'failed':0,'suppressed':0}
+            self.assertEqual(jev_worker.check_resolutions(self.db,1,counts,time.monotonic(),10,'test'),'ok')
+        due=sorted(i for i,case in cases.items() if case[-1])
+        self.assertEqual((counts['resolution_checked'],counts['resolution_pending'],counts['resolution_past']),
+            (len(due),0,len(cases)-len(due)))
+        checked=[r['tweet_id'] for r in self.db.execute(
+            'SELECT tweet_id FROM bulletin.jev_items WHERE context_checked_at IS NOT NULL ORDER BY tweet_id')]
+        self.assertEqual(checked,due)
+        # Only notices past their base lifetime need the renewal lookup.
+        self.assertEqual(sorted(i for _,enrich,ids in lookups for i in ids if enrich=='true'),
+            ['2002','2003','2005','2009'])
 
     def test_shadow_state_is_private_and_cutover_requires_database_owner(self):
         for role in ('anon','authenticated'):

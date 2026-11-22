@@ -656,6 +656,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"notifications": {
+                  Row: {
+                    "alert_id": string | null,"created_at": string,"id": string,"kind": string,"payload": NonNullable<Json>,"read_at": string | null,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "alert_id"?: string | null,"created_at"?: string,"id"?: string,"kind": string,"payload"?: NonNullable<Json>,"read_at"?: string | null,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "alert_id"?: string | null,"created_at"?: string,"id"?: string,"kind"?: string,"payload"?: NonNullable<Json>,"read_at"?: string | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notifications_alert_id_fkey"
+      columns: ["alert_id"]
+isOneToOne: false
+      referencedRelation: "search_alerts"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"optin": {
                   Row: {
                     "created_at": string | null,"explicit_optout": boolean | null,"id": string,"opt_out_reason": string | null,"opted_in": boolean,"opted_in_at": string | null,"opted_out_at": string | null,"terms_version": string,"twitter_user_id": string | null,"updated_at": string | null,"user_id": string | null,"username": string
@@ -790,6 +810,60 @@ isOneToOne: true
                   }
                   Update: {
                     "count"?: number | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"search_alert_email_sends": {
+                  Row: {
+                    "created_at": string,"id": string,"message_id": string | null,"sent_at": string | null,"status": string,"unsubscribe_token": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"message_id"?: string | null,"sent_at"?: string | null,"status"?: string,"unsubscribe_token"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"message_id"?: string | null,"sent_at"?: string | null,"status"?: string,"unsubscribe_token"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"search_alert_matches": {
+                  Row: {
+                    "alert_id": string,"created_at": string,"email_send_id": string | null,"id": string,"reply_to_tweet_id": string | null,"tweet_created_at": string,"tweet_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "alert_id": string,"created_at"?: string,"email_send_id"?: string | null,"id"?: string,"reply_to_tweet_id"?: string | null,"tweet_created_at": string,"tweet_id": string,"user_id": string
+                  }
+                  Update: {
+                    "alert_id"?: string,"created_at"?: string,"email_send_id"?: string | null,"id"?: string,"reply_to_tweet_id"?: string | null,"tweet_created_at"?: string,"tweet_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "search_alert_matches_alert_id_fkey"
+      columns: ["alert_id"]
+isOneToOne: false
+      referencedRelation: "search_alerts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "search_alert_matches_email_send_id_fkey"
+      columns: ["email_send_id"]
+isOneToOne: false
+      referencedRelation: "search_alert_email_sends"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"search_alerts": {
+                  Row: {
+                    "created_at": string,"deleted_at": string | null,"email_enabled": boolean,"from_user": string | null,"id": string,"last_checked_at": string,"last_error": string | null,"last_error_at": string | null,"last_seen_tweet_id": string | null,"mode": string,"query": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"deleted_at"?: string | null,"email_enabled"?: boolean,"from_user"?: string | null,"id"?: string,"last_checked_at"?: string,"last_error"?: string | null,"last_error_at"?: string | null,"last_seen_tweet_id"?: string | null,"mode"?: string,"query": string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"deleted_at"?: string | null,"email_enabled"?: boolean,"from_user"?: string | null,"id"?: string,"last_checked_at"?: string,"last_error"?: string | null,"last_error_at"?: string | null,"last_seen_tweet_id"?: string | null,"mode"?: string,"query"?: string,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     
@@ -1257,9 +1331,17 @@ isOneToOne: false
               "like_count": number,"tweet_id": string,"viewer_liked": boolean
             }[]
                            },
+"claim_search_alert_email":
+{ Args: { "p_max_age"?: string,"p_user_id": string }; Returns: string
+                           },
 "community_archive_monitoring_digest":
 { Args: Record<PropertyKey, never>; Returns: {
               "automated_run_failed": number,"expected_date_published": number,"healthy": number,"publication_age_seconds": number
+            }[]
+                           },
+"community_archive_monitoring_search_alerts":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "alerts_with_errors": number,"healthy": number,"live_alerts": number,"stalest_check_age_seconds": number,"unsent_email_backlog_age_seconds": number
             }[]
                            },
 "community_archive_monitoring_weekly_digest":
@@ -1531,6 +1613,9 @@ isOneToOne: false
                            },
 "record_digest_weekly_view":
 { Args: { "p_week_start": string }; Returns: number
+                           },
+"record_search_alert_check":
+{ Args: { "p_alert_id": string,"p_checked_at": string,"p_tweets": Json }; Returns: number
                            },
 "refresh_global_activity_summary":
 { Args: Record<PropertyKey, never>; Returns: undefined

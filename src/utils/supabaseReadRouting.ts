@@ -5,20 +5,13 @@ export type ReadRole = 'anon' | 'service_role'
 import { isReadRpc } from './supabaseReadPolicy'
 export { isReadRpc } from './supabaseReadPolicy'
 
+// Corpus tables (tweets and siblings) are not listed: anonymous corpus access
+// was retired on 2026-11-19, so the anonymous bridge never relays them.
 const PUBLIC_BROWSER_TABLES = new Set([
   'user_directory',
   'all_account',
   'account',
   'all_profile',
-  'tweets',
-  'enriched_tweets',
-  'tweet_media',
-  'tweet_urls',
-  'user_mentions',
-  'mentioned_users',
-  'quote_tweets',
-  'followers',
-  'following',
   'digest_editions',
   'digest_edition_likes',
   'digest_edition_comments',

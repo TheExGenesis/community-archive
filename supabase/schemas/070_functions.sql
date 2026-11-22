@@ -3558,6 +3558,72 @@ REVOKE ALL ON FUNCTION "public"."community_archive_monitoring_digest"()
 GRANT EXECUTE ON FUNCTION "public"."community_archive_monitoring_digest"()
   TO "readclient";
 
+-- Search alerts health for Grafana: one row of aggregates, no ids, queries,
+-- emails or user data. The hourly cron checks the stalest alerts first, so
+-- any live alert unchecked for three hours means the cron is not running or
+-- is failing. The daily email claims every unsent match, so one left unsent
+-- for 36 hours means the email cron is not running. With no alerts the
+-- feature is idle and healthy.
+CREATE OR REPLACE FUNCTION "public"."community_archive_monitoring_search_alerts"()
+RETURNS TABLE (
+  "live_alerts" double precision,
+  "stalest_check_age_seconds" double precision,
+  "alerts_with_errors" double precision,
+  "unsent_email_backlog_age_seconds" double precision,
+  "healthy" double precision
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH live AS (
+    SELECT
+      count(*) AS live_alerts,
+      count(*) FILTER (WHERE a.last_error IS NOT NULL) AS alerts_with_errors,
+      min(a.last_checked_at) AS stalest_checked_at
+    FROM public.search_alerts AS a
+    WHERE a.deleted_at IS NULL
+  ), backlog AS (
+    SELECT min(m.created_at) AS oldest_unsent_at
+    FROM public.search_alert_matches AS m
+    JOIN public.search_alerts AS a ON a.id = m.alert_id
+    WHERE m.email_send_id IS NULL
+      AND m.created_at > current_timestamp - interval '7 days'
+      AND a.deleted_at IS NULL
+      AND a.email_enabled
+  ), ages AS (
+    SELECT
+      live.live_alerts,
+      live.alerts_with_errors,
+      greatest(
+        coalesce(extract(epoch FROM (current_timestamp - live.stalest_checked_at)), 0),
+        0
+      ) AS stalest_check_age_seconds,
+      greatest(
+        coalesce(extract(epoch FROM (current_timestamp - backlog.oldest_unsent_at)), 0),
+        0
+      ) AS unsent_email_backlog_age_seconds
+    FROM live, backlog
+  )
+  SELECT
+    ages.live_alerts::double precision AS live_alerts,
+    ages.stalest_check_age_seconds::double precision AS stalest_check_age_seconds,
+    ages.alerts_with_errors::double precision AS alerts_with_errors,
+    ages.unsent_email_backlog_age_seconds::double precision
+      AS unsent_email_backlog_age_seconds,
+    (
+      ages.stalest_check_age_seconds <= 10800
+      AND ages.unsent_email_backlog_age_seconds <= 129600
+    )::integer::double precision AS healthy
+  FROM ages;
+$$;
+ALTER FUNCTION "public"."community_archive_monitoring_search_alerts"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."community_archive_monitoring_search_alerts"()
+  FROM PUBLIC, "anon", "authenticated", "service_role";
+GRANT EXECUTE ON FUNCTION "public"."community_archive_monitoring_search_alerts"()
+  TO "readclient";
+
 CREATE OR REPLACE FUNCTION "public"."search_user_suggestions"(
   "search_text" text,
   "result_limit" integer DEFAULT 30
@@ -3822,6 +3888,81 @@ $$;
 
 ALTER FUNCTION private.community_archive_monitoring_graph_purge() OWNER TO postgres;
 
+-- Aggregate-only counts of public API consumers and keys for the Grafana
+-- exporter role. No key ID, consumer ID, label, or owner leaves the database.
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_public_api_keys()
+RETURNS TABLE (
+  consumers double precision,
+  suspended_consumers double precision,
+  consumers_with_active_key double precision,
+  active_keys double precision,
+  revoked_keys double precision,
+  expired_keys double precision,
+  active_keys_never_used double precision,
+  active_keys_used_24h double precision,
+  active_keys_used_7d double precision,
+  active_keys_used_30d double precision,
+  keys_created_24h double precision,
+  keys_created_7d double precision,
+  keys_created_30d double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF session_user <> 'archive_metrics_exporter' THEN
+    RAISE EXCEPTION 'monitoring function is restricted'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- A key is active when the gateway would accept it: not revoked, not
+  -- expired, and owned by an active consumer. last_used_at is approximate
+  -- (refreshed on gateway re-verification), which is enough for day windows.
+  RETURN QUERY
+  WITH keys AS (
+    SELECT
+      k.consumer_id,
+      k.created_at,
+      k.last_used_at,
+      CASE
+        WHEN k.revoked_at IS NOT NULL THEN 'revoked'
+        WHEN k.expires_at IS NOT NULL AND k.expires_at <= now() THEN 'expired'
+        WHEN c.status <> 'active' THEN 'suspended'
+        ELSE 'active'
+      END AS state
+    FROM private.public_api_keys AS k
+    JOIN private.public_api_consumers AS c ON c.id = k.consumer_id
+  )
+  SELECT
+    (SELECT COUNT(*) FROM private.public_api_consumers)::double precision,
+    (SELECT COUNT(*) FROM private.public_api_consumers AS c
+      WHERE c.status = 'suspended')::double precision,
+    COUNT(DISTINCT keys.consumer_id) FILTER (WHERE keys.state = 'active')::double precision,
+    COUNT(*) FILTER (WHERE keys.state = 'active')::double precision,
+    COUNT(*) FILTER (WHERE keys.state = 'revoked')::double precision,
+    COUNT(*) FILTER (WHERE keys.state = 'expired')::double precision,
+    COUNT(*) FILTER (
+      WHERE keys.state = 'active' AND keys.last_used_at IS NULL
+    )::double precision,
+    COUNT(*) FILTER (
+      WHERE keys.state = 'active' AND keys.last_used_at > now() - interval '24 hours'
+    )::double precision,
+    COUNT(*) FILTER (
+      WHERE keys.state = 'active' AND keys.last_used_at > now() - interval '7 days'
+    )::double precision,
+    COUNT(*) FILTER (
+      WHERE keys.state = 'active' AND keys.last_used_at > now() - interval '30 days'
+    )::double precision,
+    COUNT(*) FILTER (WHERE keys.created_at > now() - interval '24 hours')::double precision,
+    COUNT(*) FILTER (WHERE keys.created_at > now() - interval '7 days')::double precision,
+    COUNT(*) FILTER (WHERE keys.created_at > now() - interval '30 days')::double precision
+  FROM keys;
+END;
+$$;
+ALTER FUNCTION private.community_archive_monitoring_public_api_keys() OWNER TO postgres;
+
 CREATE OR REPLACE FUNCTION private.community_archive_monitoring_membership()
 RETURNS TABLE (currently_opted_in double precision)
 LANGUAGE plpgsql
@@ -3908,6 +4049,8 @@ REVOKE ALL ON FUNCTION private.community_archive_monitoring_activity_day(integer
   FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_graph_purge()
   FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_public_api_keys()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 DO $$
 BEGIN
@@ -3925,6 +4068,9 @@ BEGIN
       TO archive_metrics_exporter;
     GRANT EXECUTE
       ON FUNCTION private.community_archive_monitoring_graph_purge()
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_public_api_keys()
       TO archive_metrics_exporter;
   END IF;
 END;
@@ -4645,3 +4791,165 @@ END;
 $$;
 
 ALTER FUNCTION private.guard_all_account_owner_write() OWNER TO postgres;
+
+
+-- At most 10 live alerts per user. The per-user advisory lock makes the count
+-- and the insert one step, so parallel creates cannot overshoot.
+CREATE OR REPLACE FUNCTION "public"."enforce_search_alert_cap"()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
+BEGIN
+  IF NEW.deleted_at IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('search_alerts:' || NEW.user_id::text, 0));
+  IF (
+    SELECT count(*) FROM public.search_alerts
+    WHERE user_id = NEW.user_id AND deleted_at IS NULL
+      AND id IS DISTINCT FROM NEW.id
+  ) >= 10 THEN
+    RAISE EXCEPTION 'search alert limit reached' USING ERRCODE = 'P0001', HINT = 'search_alert_cap';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+ALTER FUNCTION "public"."enforce_search_alert_cap"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."enforce_search_alert_cap"() FROM PUBLIC, "anon", "authenticated";
+
+-- Records one successful check of one alert in a single transaction: inserts
+-- the tweets not yet recorded for it (never ones created before the alert),
+-- folds the newly inserted ones into the alert's unread notification, and
+-- stamps the check. p_tweets is [{id, replyToId, createdAt}]. Overlapping
+-- runs are harmless: the (alert_id, tweet_id) key lets each tweet in once.
+-- Returns how many tweets were new, or -1 when the alert no longer exists.
+CREATE OR REPLACE FUNCTION "public"."record_search_alert_check"(
+  "p_alert_id" uuid,
+  "p_checked_at" timestamptz,
+  "p_tweets" jsonb
+)
+RETURNS integer
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
+DECLARE
+  v_alert public.search_alerts%ROWTYPE;
+  v_inserted integer;
+  v_new_ids jsonb;
+BEGIN
+  SELECT * INTO v_alert
+  FROM public.search_alerts
+  WHERE id = p_alert_id AND deleted_at IS NULL
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN -1;
+  END IF;
+
+  WITH incoming AS (
+    SELECT t.value ->> 'id' AS tweet_id,
+           nullif(t.value ->> 'replyToId', '') AS reply_to_tweet_id,
+           (t.value ->> 'createdAt')::timestamptz AS tweet_created_at
+    FROM jsonb_array_elements(coalesce(p_tweets, '[]'::jsonb)) AS t(value)
+  ),
+  inserted AS (
+    INSERT INTO public.search_alert_matches
+      (alert_id, user_id, tweet_id, reply_to_tweet_id, tweet_created_at)
+    SELECT v_alert.id, v_alert.user_id, i.tweet_id, i.reply_to_tweet_id, i.tweet_created_at
+    FROM incoming i
+    WHERE i.tweet_created_at >= v_alert.created_at
+    ON CONFLICT ("alert_id", "tweet_id") DO NOTHING
+    RETURNING tweet_id, tweet_created_at
+  )
+  SELECT count(*)::integer,
+         coalesce(
+           (SELECT jsonb_agg(n.tweet_id ORDER BY n.tweet_created_at DESC, n.tweet_id DESC)
+            FROM (SELECT * FROM inserted ORDER BY tweet_created_at DESC, tweet_id DESC LIMIT 5) n),
+           '[]'::jsonb)
+  INTO v_inserted, v_new_ids
+  FROM inserted;
+
+  UPDATE public.search_alerts
+  SET last_checked_at = greatest(last_checked_at, p_checked_at),
+      last_seen_tweet_id = coalesce(v_new_ids ->> 0, last_seen_tweet_id),
+      last_error = NULL,
+      last_error_at = NULL
+  WHERE id = v_alert.id;
+
+  IF v_inserted = 0 THEN
+    RETURN 0;
+  END IF;
+
+  INSERT INTO public.notifications (user_id, kind, alert_id, payload)
+  VALUES (
+    v_alert.user_id,
+    'search_alert',
+    v_alert.id,
+    jsonb_build_object(
+      'count', v_inserted,
+      'tweetIds', v_new_ids,
+      'firstMatchedAt', now(),
+      'latestAt', p_checked_at
+    )
+  )
+  ON CONFLICT ("alert_id") WHERE "read_at" IS NULL DO UPDATE
+  SET payload = jsonb_build_object(
+        'count', coalesce((public.notifications.payload ->> 'count')::integer, 0) + v_inserted,
+        'tweetIds', (
+          SELECT coalesce(jsonb_agg(ids.value ORDER BY ids.ordinality), '[]'::jsonb)
+          FROM jsonb_array_elements(
+            v_new_ids || coalesce(public.notifications.payload -> 'tweetIds', '[]'::jsonb)
+          ) WITH ORDINALITY AS ids(value, ordinality)
+          WHERE ids.ordinality <= 5
+        ),
+        'firstMatchedAt', coalesce(public.notifications.payload -> 'firstMatchedAt', to_jsonb(now())),
+        'latestAt', p_checked_at
+      ),
+      updated_at = now();
+  RETURN v_inserted;
+END;
+$$;
+ALTER FUNCTION "public"."record_search_alert_check"(uuid, timestamptz, jsonb) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."record_search_alert_check"(uuid, timestamptz, jsonb) FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."record_search_alert_check"(uuid, timestamptz, jsonb) TO "service_role";
+
+-- Claims one user's unsent matches on email-enabled live alerts from the last
+-- p_max_age for a roll-up email. Returns the send id, or NULL when there is
+-- nothing new (no row is left behind).
+CREATE OR REPLACE FUNCTION "public"."claim_search_alert_email"(
+  "p_user_id" uuid,
+  "p_max_age" interval DEFAULT interval '7 days'
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
+DECLARE
+  v_send_id uuid;
+  v_claimed integer;
+BEGIN
+  INSERT INTO public.search_alert_email_sends (user_id)
+  VALUES (p_user_id)
+  RETURNING id INTO v_send_id;
+
+  UPDATE public.search_alert_matches m
+  SET email_send_id = v_send_id
+  FROM public.search_alerts a
+  WHERE m.alert_id = a.id
+    AND m.user_id = p_user_id
+    AND m.email_send_id IS NULL
+    AND m.created_at > now() - p_max_age
+    AND a.deleted_at IS NULL
+    AND a.email_enabled;
+  GET DIAGNOSTICS v_claimed = ROW_COUNT;
+
+  IF v_claimed = 0 THEN
+    DELETE FROM public.search_alert_email_sends WHERE id = v_send_id;
+    RETURN NULL;
+  END IF;
+  RETURN v_send_id;
+END;
+$$;
+ALTER FUNCTION "public"."claim_search_alert_email"(uuid, interval) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."claim_search_alert_email"(uuid, interval) FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."claim_search_alert_email"(uuid, interval) TO "service_role";

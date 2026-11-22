@@ -10,6 +10,11 @@ import { createServerServiceRoleClient } from '@/utils/supabase'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { createHash } from 'crypto'
 import { measureServerRead } from '@/lib/performance/server'
+import { after } from 'next/server'
+import { unstable_cache } from 'next/cache'
+import { gunzipSync, gzipSync } from 'zlib'
+import { createSharedCache } from './sharedCache'
+import { readBulletinTitles } from './titles'
 import type { Notice, RunDashboard } from './types'
 
 export const BULLETIN_LIMIT = 2000
@@ -46,79 +51,103 @@ export async function hydrateBulletinNotices({
   notices: StoredNotice[]
   allowedAccounts?: string[]
 }): Promise<Notice[]> {
-  const result: Notice[] = []
-  for (let offset = 0; offset < notices.length; offset += 100) {
-    const batch = notices.slice(offset, offset + 100)
-    const response = await fetchAnalyticsGatewayJson<{
-      data: Array<{
-        tweet_id: string
-        account_id: string
-        full_text: string
-        reply_to_tweet_id: string | null
-        retweet: boolean
-        created_at: string
-        username: string
-        display_name: string
-        account_created_at: string | null
-        avatar_url: string | null
-        replies: number
-        quotes: number
-        reply_account_ids: string[]
-        renewed_at: string | null
-      }>
-    }>(
-      ['bulletin-sources'],
-      new URLSearchParams({
-        ids: batch.map((o) => o.tweet_id).join(','),
-        enrich: 'true',
-      }),
-      { timeoutMs: 60000 },
-    )
-    const sources = new Map(response.data.map((row) => [row.tweet_id, row]))
-    for (const notice of batch) {
-      const source = sources.get(notice.tweet_id)
-      if (
-        !source ||
-        (notice.account_id
-          ? source.account_id !== notice.account_id
-          : !allowedAccounts?.includes(source.account_id)) ||
-        source.reply_to_tweet_id ||
-        source.retweet ||
-        source.full_text.startsWith('RT @') ||
-        createHash('sha256').update(source.full_text).digest('hex') !==
-          notice.content_hash
-      )
-        continue
-      result.push({
-        tweet_id: notice.tweet_id,
-        account_id: source.account_id,
-        username: source.username,
-        posted_at: utc(source.created_at),
-        preview_text: source.full_text,
-        side: notice.side,
-        kind: notice.kind,
-        summary: notice.summary,
-        evidence: notice.evidence,
-        topics: notice.topics,
-        respond: notice.respond,
-        standing: notice.standing,
-        expires_at: notice.expires_at,
-        place: notice.place,
-        display_name: source.display_name,
-        account_created_at: source.account_created_at,
-        avatar_url: source.avatar_url,
-        replies: source.replies,
-        quotes: source.quotes,
-        reply_account_ids: source.reply_account_ids,
-        renewed_at: source.renewed_at ? utc(source.renewed_at) : null,
-        resolution_state: notice.resolution_state,
-        resolution_tweet_id: notice.resolution_tweet_id,
-        p_opportunity: notice.p_opportunity,
-        p_direct: notice.p_direct,
-        p_joke: notice.p_joke,
-        value_score: notice.value_score,
-      })
+  const batches: StoredNotice[][] = []
+  for (let offset = 0; offset < notices.length; offset += 100)
+    batches.push(notices.slice(offset, offset + 100))
+  const results: Notice[][] = new Array(batches.length)
+  let next = 0
+  // A few batches at a time: a whole board is ~20 batches, and one at a time
+  // took most of a page view. Output keeps the input order.
+  async function worker() {
+    while (next < batches.length) {
+      const index = next++
+      results[index] = await hydrateBatch(batches[index], allowedAccounts)
     }
+  }
+  await Promise.all(
+    Array.from(
+      { length: Math.min(HYDRATE_CONCURRENCY, batches.length) },
+      worker,
+    ),
+  )
+  return results.flat()
+}
+const HYDRATE_CONCURRENCY = 4
+
+async function hydrateBatch(
+  batch: StoredNotice[],
+  allowedAccounts?: string[],
+): Promise<Notice[]> {
+  const result: Notice[] = []
+  const response = await fetchAnalyticsGatewayJson<{
+    data: Array<{
+      tweet_id: string
+      account_id: string
+      full_text: string
+      reply_to_tweet_id: string | null
+      retweet: boolean
+      created_at: string
+      username: string
+      display_name: string
+      account_created_at: string | null
+      avatar_url: string | null
+      replies: number
+      quotes: number
+      reply_account_ids: string[]
+      renewed_at: string | null
+    }>
+  }>(
+    ['bulletin-sources'],
+    new URLSearchParams({
+      ids: batch.map((o) => o.tweet_id).join(','),
+      enrich: 'true',
+    }),
+    { timeoutMs: 60000 },
+  )
+  const sources = new Map(response.data.map((row) => [row.tweet_id, row]))
+  for (const notice of batch) {
+    const source = sources.get(notice.tweet_id)
+    if (
+      !source ||
+      (notice.account_id
+        ? source.account_id !== notice.account_id
+        : !allowedAccounts?.includes(source.account_id)) ||
+      source.reply_to_tweet_id ||
+      source.retweet ||
+      source.full_text.startsWith('RT @') ||
+      createHash('sha256').update(source.full_text).digest('hex') !==
+        notice.content_hash
+    )
+      continue
+    result.push({
+      tweet_id: notice.tweet_id,
+      account_id: source.account_id,
+      username: source.username,
+      posted_at: utc(source.created_at),
+      preview_text: source.full_text,
+      side: notice.side,
+      kind: notice.kind,
+      summary: notice.summary,
+      evidence: notice.evidence,
+      topics: notice.topics,
+      respond: notice.respond,
+      standing: notice.standing,
+      expires_at: notice.expires_at,
+      place: notice.place,
+      display_name: source.display_name,
+      account_created_at: source.account_created_at,
+      avatar_url: source.avatar_url,
+      replies: source.replies,
+      quotes: source.quotes,
+      reply_account_ids: source.reply_account_ids,
+      renewed_at: source.renewed_at ? utc(source.renewed_at) : null,
+      resolution_state: notice.resolution_state,
+      resolution_tweet_id: notice.resolution_tweet_id,
+      p_opportunity: notice.p_opportunity,
+      p_direct: notice.p_direct,
+      p_joke: notice.p_joke,
+      value_score: notice.value_score,
+    })
   }
   return result
 }
@@ -188,9 +217,15 @@ async function bulletinViewer() {
 export async function loadBulletinDismissals(): Promise<string[]> {
   const user = await requireBulletinUser()
   if (!user) return []
+  return loadBulletinDismissalsForUser(user.id)
+}
+/** Server-only: the caller has already established who `userId` is. */
+export async function loadBulletinDismissalsForUser(
+  userId: string,
+): Promise<string[]> {
   const { data, error } = await createServerServiceRoleClient().rpc(
     'get_bulletin_dismissals',
-    { viewer_id: user.id },
+    { viewer_id: userId },
   )
   if (error) throw new Error('Bulletin dismissals could not be loaded')
   return data ?? []
@@ -230,7 +265,33 @@ export async function loadBulletinViewer() {
 }
 
 /** Recommendations use ClickHouse outgoing interactions, never follow lists. */
+// Who a reader interacts with changes slowly; reuse a successful lookup on
+// this instance instead of repeating it on every Bulletin and homepage view.
+const RELATIONSHIPS_TTL_MS = 15 * 60_000
+const RELATIONSHIPS_MAX_ENTRIES = 1000
+const relationshipCache = new Map<
+  string,
+  { at: number; value: Awaited<ReturnType<typeof readOutgoingInteractions>> }
+>()
+
 async function outgoingInteractions(
+  identifier: string,
+  expectedAccountId: string,
+) {
+  const key = `${identifier}:${expectedAccountId}`
+  const hit = relationshipCache.get(key)
+  if (hit && Date.now() - hit.at < RELATIONSHIPS_TTL_MS) return hit.value
+  const value = await readOutgoingInteractions(identifier, expectedAccountId)
+  if (value.available) {
+    relationshipCache.delete(key)
+    relationshipCache.set(key, { at: Date.now(), value })
+    if (relationshipCache.size > RELATIONSHIPS_MAX_ENTRIES)
+      relationshipCache.delete(relationshipCache.keys().next().value!)
+  }
+  return value
+}
+
+async function readOutgoingInteractions(
   identifier: string,
   expectedAccountId: string,
 ) {
@@ -313,20 +374,35 @@ export async function loadBulletinBoardState(verifyResolution = true): Promise<{
   allowedAccounts?: string[]
 }> {
   await requireBulletinUser()
+  const local = await readLocalBoardPreview()
+  if (local) return local
+  const notices = await readBulletinBoardSource()
+  if (verifyResolution) await verifyBulletinResolutions(notices)
+  return { notices }
+}
+
+async function readLocalBoardPreview(): Promise<{
+  notices: StoredNotice[]
+  allowedAccounts?: string[]
+} | null> {
   if (
-    (await getLocalAdminPreview()) === 'admin' &&
-    process.env.BULLETIN_LOCAL_BOARD_PREVIEW_URL
-  ) {
-    const url = new URL(process.env.BULLETIN_LOCAL_BOARD_PREVIEW_URL)
-    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1')
-      throw new Error('Invalid local board preview URL')
-    const response = await fetch(url, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(20000),
-    })
-    if (!response.ok) throw new Error('Local board snapshot unavailable')
-    return response.json()
-  }
+    !process.env.BULLETIN_LOCAL_BOARD_PREVIEW_URL ||
+    (await getLocalAdminPreview()) !== 'admin'
+  )
+    return null
+  const url = new URL(process.env.BULLETIN_LOCAL_BOARD_PREVIEW_URL)
+  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1')
+    throw new Error('Invalid local board preview URL')
+  const response = await fetch(url, {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!response.ok) throw new Error('Local board snapshot unavailable')
+  return response.json()
+}
+
+/** The stored notices for this deployment, without any viewer check. */
+async function readBulletinBoardSource(): Promise<StoredNotice[]> {
   const previewUrl = process.env.BULLETIN_PRODUCTION_BOARD_URL
   let notices: StoredNotice[]
   if (process.env.VERCEL_ENV === 'preview' && previewUrl) {
@@ -359,8 +435,169 @@ export async function loadBulletinBoardState(verifyResolution = true): Promise<{
   } else {
     notices = await loadBulletinBoardSnapshot()
   }
-  if (verifyResolution) await verifyBulletinResolutions(notices)
-  return { notices }
+  return notices
+}
+
+/** What the board keeps of each stored notice once its card is built. */
+export type BoardNotice = Pick<
+  StoredNotice,
+  'tweet_id' | 'account_id' | 'content_hash' | 'kind' | 'side'
+>
+
+export type VerifiedBulletinBoard = {
+  /** Every stored notice, in stored order, including ones whose check failed. */
+  notices: BoardNotice[]
+  /** Source-checked cards by tweet ID; a notice missing here failed its check. */
+  sources: Map<string, Notice>
+  allowedAccounts?: string[]
+}
+
+async function verifyBoard(
+  notices: StoredNotice[],
+  allowedAccounts?: string[],
+): Promise<VerifiedBulletinBoard> {
+  const [, rows, titles] = await Promise.all([
+    verifyBulletinResolutions(notices),
+    hydrateBulletinNotices({ notices, allowedAccounts }),
+    readBulletinTitles(notices.map((o) => o.tweet_id)),
+  ])
+  // Resolution checks may finish after hydration; use their final state.
+  const byId = new Map(notices.map((o) => [o.tweet_id, o]))
+  const sources = new Map<string, Notice>()
+  for (const row of rows) {
+    const stored = byId.get(row.tweet_id)
+    sources.set(row.tweet_id, {
+      ...row,
+      resolution_state: stored?.resolution_state,
+      resolution_tweet_id: stored?.resolution_tweet_id,
+      title: titles.get(row.tweet_id) ?? null,
+    })
+  }
+  return {
+    notices: notices.map(
+      ({ tweet_id, account_id, content_hash, kind, side }) => ({
+        tweet_id,
+        account_id,
+        content_hash,
+        kind,
+        side,
+      }),
+    ),
+    sources,
+    allowedAccounts,
+  }
+}
+
+/**
+ * Every reader sees the same notices and the same source checks, so the
+ * verified board is built once and shared, never per page view (building it
+ * reads ~2,000 stored notices and rechecks every source: several seconds).
+ *
+ * Two layers keep a page view under a second, even on a fresh server:
+ * - Vercel's Data Cache holds the built board, gzip-compressed to fit its
+ *   2 MB item limit, for every server and deployment. Past BOARD_REBUILD_S
+ *   it is rebuilt in the background while readers get the previous copy.
+ * - Each server keeps the decoded board in memory for BOARD_MEMORY_FRESH_MS.
+ *
+ * A card can lag a deletion, edit or opt-out by at most BOARD_MAX_STALE_MS:
+ * an older shared copy is refused and rebuilt in the request. The stored
+ * board itself already applies membership and opt-out policy.
+ */
+export const BOARD_REBUILD_S = 120
+export const BOARD_MAX_STALE_MS = 10 * 60_000
+const BOARD_MEMORY_FRESH_MS = 30_000
+const BOARD_MEMORY_STALE_MS = 60_000
+
+type EncodedBoard = { builtAt: number; data: string }
+
+export function encodeBoard(
+  board: VerifiedBulletinBoard,
+  builtAt: number,
+): EncodedBoard {
+  const json = JSON.stringify({
+    notices: board.notices,
+    cards: Array.from(board.sources.values()),
+  })
+  return { builtAt, data: gzipSync(json).toString('base64') }
+}
+
+export function decodeBoard(encoded: EncodedBoard): VerifiedBulletinBoard {
+  const { notices, cards } = JSON.parse(
+    gunzipSync(Buffer.from(encoded.data, 'base64')).toString('utf8'),
+  ) as { notices: BoardNotice[]; cards: Notice[] }
+  return { notices, sources: new Map(cards.map((o) => [o.tweet_id, o])) }
+}
+
+async function buildEncodedBoard(): Promise<EncodedBoard> {
+  const builtAt = Date.now()
+  const board = await verifyBoard(await readBulletinBoardSource())
+  const encoded = encodeBoard(board, builtAt)
+  // Sizes only: the encoded copy must stay under the Data Cache's 2 MB limit.
+  if (process.env.NODE_ENV !== 'test')
+    console.info(
+      JSON.stringify({
+        message: 'Bulletin board built',
+        notices: board.notices.length,
+        cards: board.sources.size,
+        encodedBytes: encoded.data.length,
+        durationMs: Date.now() - builtAt,
+      }),
+    )
+  return encoded
+}
+
+const persistedBoard = unstable_cache(
+  buildEncodedBoard,
+  ['bulletin-board-v1'],
+  {
+    revalidate: BOARD_REBUILD_S,
+    tags: ['bulletin-board'],
+  },
+)
+
+async function loadPersistedBoard(): Promise<VerifiedBulletinBoard> {
+  let encoded = await measureServerRead('bulletin.board-cache', persistedBoard)
+  // The Data Cache keeps serving its last copy while rebuilds fail. Past the
+  // staleness bound, rebuild here instead of showing it.
+  if (Date.now() - encoded.builtAt > BOARD_MAX_STALE_MS - BOARD_MEMORY_STALE_MS)
+    encoded = await measureServerRead('bulletin.board-build', buildEncodedBoard)
+  return decodeBoard(encoded)
+}
+
+const sharedBoard = createSharedCache(loadPersistedBoard, {
+  freshMs: BOARD_MEMORY_FRESH_MS,
+  maxStaleMs: BOARD_MEMORY_STALE_MS,
+  background(work) {
+    const quiet = work.catch(() => {})
+    try {
+      after(() => quiet)
+    } catch {
+      // Outside a request (tests, static generation) the promise just runs.
+    }
+  },
+})
+
+/** Tests only: forget instance-level caches between cases. */
+export function clearBulletinCaches() {
+  sharedBoard.clear()
+  relationshipCache.clear()
+}
+
+/** The verified board for a signed-in, opted-in reader. */
+export async function loadVerifiedBulletinBoard(): Promise<VerifiedBulletinBoard> {
+  await requireBulletinUser()
+  const local = await readLocalBoardPreview()
+  if (local) return verifyBoard(local.notices, local.allowedAccounts)
+  return sharedBoard.get()
+}
+
+/**
+ * The same verified board without a viewer check, for surfaces that show
+ * public picks to everyone, as the published digest already does. Preview
+ * deployments read the production board but stay behind Vercel protection.
+ */
+export function loadPublicBulletinBoard(): Promise<VerifiedBulletinBoard> {
+  return sharedBoard.get()
 }
 
 /** Callers deferring this check must await it before selecting visible cards. */

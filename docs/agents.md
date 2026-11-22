@@ -1,5 +1,7 @@
 # Agents Guide
 
+> If you use Community Archive data, please cite it: see [how to cite](https://www.community-archive.org/cite).
+
 Guide for AI agents working with the Community Archive database.
 
 **Canonical agent entry point:**

@@ -41,6 +41,13 @@ export default async function ApiKeysPage() {
           code. Create a separate key for each project so you can revoke one
           without breaking the others.
         </p>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          If you publish or build something with this data, please{' '}
+          <Link href="/cite" className="underline">
+            cite the archive
+          </Link>
+          .
+        </p>
         <ApiKeysManager
           initialKeys={initialKeys}
           initialError={loadError}

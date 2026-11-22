@@ -192,9 +192,12 @@ still match them) and how fresh its index is.
 Spend is recorded as it happens, so the global daily cap counts runs still in
 progress and a stopped or failed run keeps what it spent (`usage.ts`):
 
-- Each planner call adds its tokens and estimated cost to the run inside the
-  model step, as soon as the provider reports usage (`EnvLanguageModel` with a
-  run id). A failed write fails the call.
+- Each planner call adds its tokens and cost to the run inside the model step,
+  as soon as the provider reports usage (`EnvLanguageModel` with a run id). A
+  failed write fails the call. The cost is what OpenRouter charged when the
+  streamed call reports it (`usage.cost`), else the price-table estimate. For
+  DeepSeek V4.1 Flash the table holds the dearest endpoints' price, so an
+  estimate can be several times the real charge.
 - The shell's `score` (and the typed `collect_and_score` and `score_tweets`)
   add their scorer cost before they return or throw. A scorer that fails
   part-way throws a `ScoringError` carrying the cost of the calls that

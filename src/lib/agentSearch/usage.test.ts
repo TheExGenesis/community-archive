@@ -97,6 +97,39 @@ describe('agent search usage recording', () => {
     )
   })
 
+  test('adds what OpenRouter charged when the call reports it', async () => {
+    const usage = {
+      inputTokens: 1_000_000,
+      cachedInputTokens: 0,
+      outputTokens: 100_000,
+    }
+    await recordModelUsage('wrun_1', 'openai:gpt-6.1-sol', usage, {
+      ms: 10,
+      providerCostUsd: 0.07,
+    })
+    expect(mockAddUsage).toHaveBeenCalledWith('wrun_1', {
+      inputTokens: 1_000_000,
+      outputTokens: 100_000,
+      costUsd: 0.07,
+    })
+    // The log keeps the estimate beside the charge.
+    expect(mockLogModelCall).toHaveBeenCalledWith(
+      'wrun_1',
+      expect.objectContaining({ providerCostUsd: 0.07, estimatedCostUsd: 3 }),
+    )
+
+    // A malformed charge falls back to the estimate.
+    mockAddUsage.mockClear()
+    await recordModelUsage('wrun_1', 'openai:gpt-6.1-sol', usage, {
+      ms: 10,
+      providerCostUsd: Number.NaN,
+    })
+    expect(mockAddUsage).toHaveBeenCalledWith(
+      'wrun_1',
+      expect.objectContaining({ costUsd: 3 }),
+    )
+  })
+
   test('logs a call with its details, and a failed log line does not fail it', async () => {
     const usage = { inputTokens: 1000, cachedInputTokens: 0, outputTokens: 10 }
     const detail = { ms: 900, servedBy: 'DeepInfra', providerCostUsd: 0.0001 }

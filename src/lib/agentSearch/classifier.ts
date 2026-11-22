@@ -134,13 +134,19 @@ async function scoreWithDecisions(
   let inputTokens = 0
   let failures = 0
   let lastError = ''
+  let authFailed = false
   await eachWithConcurrency(items, DECISIONS_CONCURRENCY, async (item) => {
+    if (authFailed) {
+      failures++
+      return
+    }
     for (let attempt = 1; attempt <= DECISIONS_ATTEMPTS; attempt++) {
       // Past the run's deadline no new call starts; the post counts as lost.
       if (deadlinePassed(limits)) {
         lastError = new RunDeadlineError().message
         break
       }
+      if (authFailed) break
       const response = await fetch('https://api.openai.com/v1/decisions', {
         method: 'POST',
         headers: {
@@ -174,7 +180,15 @@ async function scoreWithDecisions(
         inputTokens += body?.usage?.input_tokens ?? 0
         return
       }
-      if (response) lastError = `status ${response.status}`
+      if (response) {
+        lastError = `status ${response.status}`
+        // A bad or expired key will fail every post; stop starting more calls
+        // immediately so fallback can run without burning time on doomed calls.
+        if (response.status === 401 || response.status === 403) {
+          authFailed = true
+          break
+        }
+      }
       const retryable =
         !response || response.status === 429 || response.status >= 500
       if (!retryable || attempt === DECISIONS_ATTEMPTS) break
@@ -339,7 +353,12 @@ async function scoreWithLlm(
   return { scores, scorer: 'llm', costUsd }
 }
 
-/** Scores the items; no call starts after the run's deadline in `limits`. */
+/**
+ * Scores the items; no call starts after the run's deadline in `limits`.
+ * When OpenAI Decisions fails (e.g. expired key, outage, or rate limit) and an
+ * OpenRouter key is configured, falls back to Jev so scoring still completes
+ * and preserves any spend already incurred.
+ */
 export async function scoreTweets(
   criterion: string,
   items: ScoreItem[],
@@ -351,14 +370,41 @@ export async function scoreTweets(
   if (unique.length === 0)
     return { scores: new Map(), scorer: agentSearchScorer(), costUsd: 0 }
   const scorer = agentSearchScorer()
-  return traced(limits, 'scorer', scorer, () => {
-    if (scorer === 'decisions')
-      return scoreWithDecisions(
-        criterion,
-        unique,
-        process.env.OPENAI_API_KEY!,
-        limits,
+  if (scorer === 'decisions') {
+    try {
+      return await traced(limits, 'scorer', 'decisions', () =>
+        scoreWithDecisions(
+          criterion,
+          unique,
+          process.env.OPENAI_API_KEY!,
+          limits,
+        ),
       )
+    } catch (error) {
+      const openRouterKey = process.env.OPENROUTER_API_KEY?.trim()
+      if (
+        !(error instanceof ScoringError) ||
+        !openRouterKey ||
+        deadlinePassed(limits)
+      ) {
+        throw error
+      }
+      const priorCost = error.costUsd
+      try {
+        const fallback = await traced(limits, 'scorer', 'jev', () =>
+          scoreWithJev(criterion, unique, openRouterKey, limits),
+        )
+        return { ...fallback, costUsd: priorCost + fallback.costUsd }
+      } catch (jevError) {
+        const jevCost = jevError instanceof ScoringError ? jevError.costUsd : 0
+        throw new ScoringError(
+          `${error.message}; fallback ${errorMessage(jevError)}`,
+          priorCost + jevCost,
+        )
+      }
+    }
+  }
+  return traced(limits, 'scorer', scorer, () => {
     if (scorer === 'jev')
       return scoreWithJev(
         criterion,

@@ -47,6 +47,8 @@ const SHELL_COMMANDS: CommandName[] = [
   'mv',
   'rm',
   'tee',
+  // The prompt tells the agent to split a file of over 1,000 tweets.
+  'split',
   'xargs',
   'comm',
   'join',

@@ -297,6 +297,26 @@ describe('the bash workspace', () => {
     expect(getTweetsByIds).not.toHaveBeenCalled()
   })
 
+  test('split cuts a tweet file into parts the next command can use', async () => {
+    const first = await run('search singapore > s1.jsonl')
+    const out = await run(
+      'split -l 3 s1.jsonl part_ && ls part_* && wc -l part_aa part_ab',
+      applyChanges({}, first.workspace),
+    )
+    expect(out.exitCode).toBe(0)
+    expect(out.stdout).toContain('part_aa')
+    // The parts are tweet files in the manifest, by reference like any other.
+    expect(out.files).toEqual({
+      part_aa: ['1', '2', '3'],
+      part_ab: ['4'],
+    })
+    const next = await run(
+      'jq -r .id part_ab',
+      applyChanges(applyChanges({}, first.workspace), out.workspace),
+    )
+    expect(next.stdout.trim()).toBe('4')
+  })
+
   test('agent-added fields are kept, long strings are not', async () => {
     const out = await run(
       `echo '{"id":"1","group":"expat","note":"${'x'.repeat(80)}","text":"t"}' > g.jsonl`,

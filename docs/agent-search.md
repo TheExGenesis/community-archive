@@ -80,7 +80,8 @@ preview's `dev` account, the question runs without it.
    lost post, and a score that loses fewer than a tenth of its posts returns
    the rest. When Decisions or Jev fails and the other's key is set, the
    other scores every post instead. Replies are scored with their parent's
-   text.
+   text, taken from the tweets being scored or the run's fetched tweets
+   before the gateway is asked.
 4. The answer cites single tweets as `[[t:<id>]]` (alone on a line, the tweet
    shows whole), quotes them as `[[q:<id> | exact words]]` (checked word for
    word), and shows sets of tweets as lists,
@@ -102,6 +103,33 @@ preview's `dev` account, the question runs without it.
    Two steps in a row in which every tool call failed (the archive is down)
    end the run with that error.
 
+### Fast and deep
+
+A question is searched at one of two depths (`depth.ts`), chosen with the
+Fast / Deep toggle in the composer and sent as `depth` in the request body:
+
+| Depth  | Reasoning effort                       | Steps | Semantic searches | Prompt                                     |
+| ------ | -------------------------------------- | ----- | ----------------- | ------------------------------------------ |
+| `fast` | `low`                                  | 8     | 2                 | One round of gathering, then the answer    |
+| `deep` | the model's (`MODEL_REASONING_EFFORT`) | 20    | 6                 | Several rounds, `expand`, as before depths |
+
+Fast is the default: a request with no `depth` runs fast, and any other
+value is refused with 400. There is one workflow, one `bash` tool and one
+prompt base; the fast prompt is the v2 prompt with its working text and
+survey example cut to a single round and its own counts (`agent.ts`), and
+the deep prompt is unchanged. The `v1` prompt and the typed tools take only
+the counts. A workflow run whose input carries no depth started before
+depths existed; it replays as deep, so it keeps its 20 steps and its effort.
+
+The page remembers the toggle in the browser (`localStorage`). An answer
+searched fast in this visit offers "Search deeper", which asks
+`Search deeper: <the question>` as a deep follow-up in the same
+conversation, so it starts from the files the fast run left in `/work`. It
+counts as a question like any other and does not move the toggle. The depth
+of a stored answer is not recorded, so a reopened conversation offers none.
+Both controls send a product event (`depth_changed`, `searched_deeper`
+under `ask_archive`) with no content.
+
 ## The workspace
 
 The shell is [just-bash](https://www.npmjs.com/package/just-bash), a bash
@@ -121,7 +149,7 @@ work on files under `/work`, and archive commands are added
 | `score <file> "<yes/no question>" [--yes-if "..."] [--no-if "..."] [--no-parent]`                                                  | Scores every tweet in a file; rows gain `p`, best first. `--yes-if` and `--no-if` say what counts as yes and as no                                                                                                                                                                                                                                                                                                                                                                           |
 | `expand <file> [--min-p P] [--seeds N] [--limit N]`                                                                                | The threads and quote posts around a scored file's best tweets (`p` ≥ 0.7, 15 by default, up to 40, four at a time); prints the tweets not already in the file (300 by default, up to 1,000), to score next                                                                                                                                                                                                                                                                                  |
 | `thread <id>`, `quotes <id>`, `tweets <id…>`, `show <id>`                                                                          | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet                                                                                                                                                                                                                                                                                                                                                                                               |
-| `par '<command with {}>' word…` or `par '<command>' '<command>'…`                                                                  | Runs up to 30 command lines, 6 at a time, output in the order given (a `for` loop runs them one after another)                                                                                                                                                                                                                                                                                                                                                                               |
+| `par '<command with {}>' word…` or `par '<command>' '<command>'…`                                                                  | Runs up to 30 command lines, 6 at a time, output in the order given (a `for` loop runs them one after another). Their searches share one command's three search slots                                                                                                                                                                                                                                                                                                                        |
 
 A tweet file is JSONL, one tweet per line: `id`, `author`, `date`, `likes`,
 `reposts`, `replyTo`, `quotes`, `media`, `p` when scored, and `text`. Each
@@ -132,7 +160,11 @@ shorter one for the page (`Searched “x” · 120 tweets`).
 `search` with `--or` or `--with` (and `collect_and_score`) runs one gateway
 search per term, three terms at a time (`SEARCH_CONCURRENCY` in
 `toolImpl.ts`), each reading its pages one at a time, and returns once every
-term is done, so the agent sees one combined result. The gateway
+term is done, so the agent sees one combined result. One shell command
+line never has more than those three searches in flight, whatever it runs:
+its searches share three slots (`slots.ts`, carried on the run's limits
+into `searchTweets`), so `par` over several searches queues them instead of
+stacking up to 18 on the gateway. The gateway
 shares two running and four queued searches across the whole site and
 answers `503 Search is busy` past that; a search retries a busy answer twice
 (after 0.5 s and 1.5 s) while the run has time left. Gateway-side queueing
@@ -302,7 +334,7 @@ cite, never who asked; a run still answering is left out.
 
 ### Follow-up questions
 
-The page sends only `{ id, question }`. The server never takes earlier turns
+The page sends only `{ id, question, depth }`. The server never takes earlier turns
 from the browser: the workflow's first step (`context.ts`) rebuilds them from
 the asker's stored runs of that conversation, fetching their tweets again
 through the gateway. Tool outputs are converted with the tool definitions, so
@@ -315,40 +347,40 @@ workspace is rebuilt from every earlier turn's tweet files, so a follow-up
 can work on `lists/` from the last answer.
 
 Models cross Workflow step boundaries as `EnvLanguageModel`, which serializes
-only its `provider:model` spec. Provider models would otherwise serialize their
+only its `provider:model` spec (and a fast run's reasoning effort). Provider models would otherwise serialize their
 resolved headers, including the API key, into the event log.
 
 ## Configuration
 
-| Variable                                                                                                        | Default                                          | Purpose                                                                                                                                                                           |
-| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AGENT_SEARCH_MODEL`                                                                                            | `openrouter:deepseek/deepseek-v4.1-flash`        | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative                                                                                                |
-| `AGENT_SEARCH_REASONING_EFFORT`                                                                                 | per model (`MODEL_REASONING_EFFORT`)             | Planner effort: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`; `default` sends none. Unlisted models get their provider's default                                  |
-| `AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90`                                                                         | `2`                                              | Planner's OpenRouter `preferred_max_latency` in seconds at p90; slower providers move down the list but are never blocked. `off` sends none                                       |
-| `AGENT_SEARCH_PROVIDER_ONLY`                                                                                    |                                                  | Comma-separated OpenRouter provider slugs the planner may use (`together`, `baseten/fast`), for pinned pilots. A pinned host must still be ZDR, or the call fails                 |
-| `AGENT_SEARCH_PROVIDER_IGNORE`                                                                                  |                                                  | Comma-separated OpenRouter provider slugs the planner skips                                                                                                                       |
-| `AGENT_SEARCH_TOOLS`                                                                                            | `bash`                                           | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with                                                                        |
-| `AGENT_SEARCH_PROMPT`                                                                                           | `v2-examples`                                    | `v1` (numbered procedure) or `v2` (goal and definition of done, no examples) instead of the default. The route passes it to the run, which keeps it                               |
-| `AGENT_SEARCH_KEEP_REASONING`                                                                                   | on                                               | `off` stops putting each step's reasoning back on its tool call (the workflow agent drops it between steps; DeepSeek expects it back)                                             |
-| `AGENT_SEARCH_STALL_REMINDER`                                                                                   | on                                               | `off` stops the reminder to take stock after a repeated command or three commands in a row that found nothing new                                                                 |
-| `COMMUNITY_ARCHIVE_API_V1_URL`, `COMMUNITY_ARCHIVE_API_KEY`                                                     | `/v1` on the gateway host; the gateway token     | Where `timeline` reads API v1, and with which key                                                                                                                                 |
-| `SEMANTIC_SEARCH_URL`                                                                                           | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint                                                                                                                                                          |
-| `OPENROUTER_API_BASE_URL`                                                                                       | `https://openrouter.ai/api/v1`                   | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default                                                                              |
-| `AGENT_SEARCH_SCORER`                                                                                           | unset                                            | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM. Decisions and Jev fall back to each other when both keys are set |
-| `AGENT_SEARCH_SCORER_MODEL`                                                                                     | `openai:gpt-6-luna`                              | Model for the `llm` scorer                                                                                                                                                        |
-| `AGENT_SEARCH_SCORER_REASONING`                                                                                 | `low`                                            | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`)                                                                                                                   |
-| `OPENAI_API_KEY` / `OPENROUTER_API_KEY`                                                                         |                                                  | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true`                                                                                                           |
-| `AGENT_SEARCH_DAILY_LIMIT`                                                                                      | `10`                                             | Questions per member per UTC day                                                                                                                                                  |
-| `AGENT_SEARCH_MONTHLY_LIMIT`                                                                                    | `30`                                             | Questions per member per UTC month, counted like the daily limit; the page shows whichever runs out first                                                                         |
-| `AGENT_SEARCH_LAUNCHED`                                                                                         | off                                              | Set to `true` to show Ask the archive to members; until then only admins see it (see below)                                                                                       |
-| `AGENT_SEARCH_ENABLED`                                                                                          | on                                               | Set to `false` to pause new questions (history still works); see below                                                                                                            |
-| `AGENT_SEARCH_GLOBAL_DAILY_USD`                                                                                 | `25`                                             | Global daily spend kill switch                                                                                                                                                    |
-| `AGENT_SEARCH_RUN_DEADLINE_MS`                                                                                  | `300000`                                         | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools                     |
-| `AGENT_SEARCH_STALE_RUN_MS`                                                                                     | `600000`                                         | When a running run stops blocking a new one; never less than the deadline plus 2 minutes. A run whose workflow has ended stops blocking at once                                   |
-| `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table                                      | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set |
-| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...`                              | price table                                      | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost)                                                                       |
-| `AGENT_SEARCH_RUN_STORE`                                                                                        | file outside production                          | `file` forces the local JSON store                                                                                                                                                |
-| `AGENT_SEARCH_KEY_SECRET`                                                                                       | unset                                            | At least 32 characters. Seals members' own OpenRouter keys (below); unset, own keys are refused                                                                                   |
+| Variable                                                                                                        | Default                                          | Purpose                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AGENT_SEARCH_MODEL`                                                                                            | `openrouter:deepseek/deepseek-v4.1-flash`        | Planner (`openai:` or `openrouter:` spec); `openai:gpt-6.1-sol` is the alternative                                                                                                               |
+| `AGENT_SEARCH_REASONING_EFFORT`                                                                                 | per model (`MODEL_REASONING_EFFORT`)             | Planner effort for every run, over the depth's and the model's: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`; `default` sends none. Unlisted models get their provider's default |
+| `AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90`                                                                         | `2`                                              | Planner's OpenRouter `preferred_max_latency` in seconds at p90; slower providers move down the list but are never blocked. `off` sends none                                                      |
+| `AGENT_SEARCH_PROVIDER_ONLY`                                                                                    |                                                  | Comma-separated OpenRouter provider slugs the planner may use (`together`, `baseten/fast`), for pinned pilots. A pinned host must still be ZDR, or the call fails                                |
+| `AGENT_SEARCH_PROVIDER_IGNORE`                                                                                  |                                                  | Comma-separated OpenRouter provider slugs the planner skips                                                                                                                                      |
+| `AGENT_SEARCH_TOOLS`                                                                                            | `bash`                                           | `typed` gives the agent the earlier typed tools instead of the shell. A run keeps the mode it started with                                                                                       |
+| `AGENT_SEARCH_PROMPT`                                                                                           | `v2-examples`                                    | `v1` (numbered procedure) or `v2` (goal and definition of done, no examples) instead of the default. The route passes it to the run, which keeps it                                              |
+| `AGENT_SEARCH_KEEP_REASONING`                                                                                   | on                                               | `off` stops putting each step's reasoning back on its tool call (the workflow agent drops it between steps; DeepSeek expects it back)                                                            |
+| `AGENT_SEARCH_STALL_REMINDER`                                                                                   | on                                               | `off` stops the reminder to take stock after a repeated command or three commands in a row that found nothing new                                                                                |
+| `COMMUNITY_ARCHIVE_API_V1_URL`, `COMMUNITY_ARCHIVE_API_KEY`                                                     | `/v1` on the gateway host; the gateway token     | Where `timeline` reads API v1, and with which key                                                                                                                                                |
+| `SEMANTIC_SEARCH_URL`                                                                                           | `https://embed.tweetstack.app/embeddings/search` | Semantic search endpoint                                                                                                                                                                         |
+| `OPENROUTER_API_BASE_URL`                                                                                       | `https://openrouter.ai/api/v1`                   | OpenRouter base URL (the Daily Digest's name); falls back to `OPENROUTER_BASE_URL`, then the default                                                                                             |
+| `AGENT_SEARCH_SCORER`                                                                                           | unset                                            | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM. Decisions and Jev fall back to each other when both keys are set                |
+| `AGENT_SEARCH_SCORER_MODEL`                                                                                     | `openai:gpt-6-luna`                              | Model for the `llm` scorer                                                                                                                                                                       |
+| `AGENT_SEARCH_SCORER_REASONING`                                                                                 | `low`                                            | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`)                                                                                                                                  |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY`                                                                         |                                                  | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true`                                                                                                                          |
+| `AGENT_SEARCH_DAILY_LIMIT`                                                                                      | `10`                                             | Questions per member per UTC day                                                                                                                                                                 |
+| `AGENT_SEARCH_MONTHLY_LIMIT`                                                                                    | `30`                                             | Questions per member per UTC month, counted like the daily limit; the page shows whichever runs out first                                                                                        |
+| `AGENT_SEARCH_LAUNCHED`                                                                                         | off                                              | Set to `true` to show Ask the archive to members; until then only admins see it (see below)                                                                                                      |
+| `AGENT_SEARCH_ENABLED`                                                                                          | on                                               | Set to `false` to pause new questions (history still works); see below                                                                                                                           |
+| `AGENT_SEARCH_GLOBAL_DAILY_USD`                                                                                 | `25`                                             | Global daily spend kill switch                                                                                                                                                                   |
+| `AGENT_SEARCH_RUN_DEADLINE_MS`                                                                                  | `300000`                                         | A run's time limit: after it no gateway or scorer call starts, each call's timeout is cut to the time left, and the next model step must answer without tools                                    |
+| `AGENT_SEARCH_STALE_RUN_MS`                                                                                     | `600000`                                         | When a running run stops blocking a new one; never less than the deadline plus 2 minutes. A run whose workflow has ended stops blocking at once                                                  |
+| `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK`, `AGENT_SEARCH_CACHED_INPUT_USD_PER_MTOK` | price table                                      | Planner prices. Required for any model not in `MODEL_PRICES_USD_PER_MTOK`, including every `openrouter:` model. Cached input defaults to the input override when only that is set                |
+| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...`, `..._CACHED_INPUT_...`                              | price table                                      | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens; Jev reports its own cost)                                                                                      |
+| `AGENT_SEARCH_RUN_STORE`                                                                                        | file outside production                          | `file` forces the local JSON store                                                                                                                                                               |
+| `AGENT_SEARCH_KEY_SECRET`                                                                                       | unset                                            | At least 32 characters. Seals members' own OpenRouter keys (below); unset, own keys are refused                                                                                                  |
 
 The default planner runs on OpenRouter, so `OPENROUTER_API_KEY` must be set in
 Production and Preview. It is the same key the Daily Digest uses
@@ -419,8 +451,9 @@ The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_UR
 
 ## Planner reasoning
 
-Each planner model runs at a reasoning effort set in `MODEL_REASONING_EFFORT`
-(`model.ts`), or at `AGENT_SEARCH_REASONING_EFFORT`. A model with no entry runs
+The planner's reasoning effort is `AGENT_SEARCH_REASONING_EFFORT` when set,
+else the run's own (a fast run asks for `low`), else the model's entry in
+`MODEL_REASONING_EFFORT` (`model.ts`). A model with no entry runs
 at its provider's default, which can be far from what was meant: on OpenRouter
 Gemini 3.5 Flash-Lite defaults to `minimal`.
 
@@ -510,4 +543,5 @@ them into a time budget for the run.
 
 `scripts/agent-search/` holds a 30-question set across six kinds of question
 (answer keys are tweet ids) and a runner that uses the same agent in-process.
-See `scripts/agent-search/README.md`.
+It runs deep unless given `--depth fast`, so results stay comparable with
+earlier ones. See `scripts/agent-search/README.md`.

@@ -3,6 +3,7 @@
 import { Check, ChevronRight, Copy } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { PortalTweet } from '@/lib/portal/types'
 import { AnswerMarkdown } from './AnswerMarkdown'
 import { CitationContext, type CitationLinks } from './CitationContext'
 import {
@@ -20,7 +21,14 @@ import {
   useCitationSidebar,
 } from './citationSidebarStore'
 import { EvidenceBoundary } from './EvidenceBoundary'
-import { logSummary, type TurnView } from './messageView'
+import { DEFAULT_SORT, sortPeople, sortTweets } from './listSort'
+import {
+  logSummary,
+  type AnswerBlock,
+  type AnswerView,
+  type Citation,
+  type TurnView,
+} from './messageView'
 import { peopleFromTweets } from './profileLinks'
 import { EmbeddedTweet, ResultList } from './ResultList'
 import { Sources } from './Sources'
@@ -30,28 +38,125 @@ import { RETRY_BUTTON } from './TweetPlaceholder'
 const plural = (n: number, word: string) =>
   `${n.toLocaleString('en-US')} ${n === 1 ? word : `${word}s`}`
 
-/** Clean markdown copy of an answer, turning internal citation links into readable references. */
-function copyableAnswer(
-  markdown: string,
-  citations: ReadonlyArray<{
-    n: number
-    id: string
-    anchor: string
-    tweet: { username: string } | null
-  }>,
-) {
-  const body = markdown
+const tweetUrl = (id: string, username?: string | null) =>
+  username
+    ? `https://x.com/${username}/status/${id}`
+    : `https://x.com/i/web/status/${id}`
+
+const tweetDate = (iso?: string | null) => {
+  if (!iso) return ''
+  const parsed = Date.parse(iso)
+  return Number.isFinite(parsed)
+    ? new Date(parsed).toISOString().slice(0, 10)
+    : ''
+}
+
+const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
+
+function cleanProse(markdown: string) {
+  return markdown
     .replace(/\[([^\]]+)\]\(#quote-[^)]+\)/g, '“$1”')
     .replace(/\[(\d+)\]\(#ask-[^)]+\)/g, '[$1]')
-    .replace(/\[([^\]]+)\]\(#ask-unverified-[^)]+\)/g, '')
+    .replace(/[ \t]+\[[^\]]+\]\(#ask-unverified-[^)]+\)/g, '')
+    .replace(/\[[^\]]+\]\(#ask-unverified-[^)]+\)[ \t]?/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-  const refs = citations.map((c) => {
+}
+
+function formatEmbeddedTweet(citation: Citation) {
+  const { tweet } = citation
+  if (!tweet) return `[${citation.n}]`
+  const date = tweetDate(tweet.createdAt)
+  const meta = date ? ` (${date})` : ''
+  const header = `> **@${tweet.username}**${meta} [${citation.n}]`
+  const body = tweet.text.trim()
+  if (!body) return header
+  const lines = body
+    .split('\n')
+    .map((line) => (line.trim() ? `> ${line}` : '>'))
+  return [header, ...lines].join('\n')
+}
+
+function formatListTweet(
+  tweet: PortalTweet,
+  citationNumber: number | undefined,
+  nested: boolean,
+) {
+  const date = tweetDate(tweet.createdAt)
+  const badge = citationNumber !== undefined ? `[${citationNumber}]` : ''
+  const body = oneLine(tweet.text)
+  const url = tweetUrl(tweet.id, tweet.username)
+  if (nested) {
+    const prefix = [date, badge].filter(Boolean).join(' ')
+    const content = prefix && body ? `${prefix}: ${body}` : prefix || body
+    return content ? `  - ${content} — ${url}` : `  - ${url}`
+  }
+  const meta = [date ? `(${date})` : '', badge].filter(Boolean).join(' ')
+  const head = meta
+    ? `**@${tweet.username}** ${meta}`
+    : `**@${tweet.username}**`
+  return body ? `- ${head}: ${body} — ${url}` : `- ${head} — ${url}`
+}
+
+function formatListBlock(
+  block: Extract<AnswerBlock, { kind: 'list' }>,
+  citationNumbers: ReadonlyMap<string, number>,
+) {
+  if (block.tweets.length === 0) return ''
+  const authors = new Set(block.tweets.map((tweet) => tweet.username)).size
+  const byPeople = block.view.kind === 'people' && authors > 1
+  const lines: string[] = []
+  if (byPeople) {
+    const groups = new Map<string, PortalTweet[]>()
+    for (const tweet of block.tweets) {
+      const list = groups.get(tweet.username)
+      if (list) list.push(tweet)
+      else groups.set(tweet.username, [tweet])
+    }
+    const people = sortPeople(
+      Array.from(groups.entries()).map(([username, tweets]) => ({
+        username,
+        tweets,
+      })),
+      DEFAULT_SORT,
+      block.scores,
+    )
+    for (const person of people) {
+      lines.push(
+        `- **@${person.username}** (${plural(person.tweets.length, 'tweet')})`,
+      )
+      for (const tweet of person.tweets) {
+        lines.push(formatListTweet(tweet, citationNumbers.get(tweet.id), true))
+      }
+    }
+  } else {
+    for (const tweet of sortTweets(block.tweets, DEFAULT_SORT, block.scores)) {
+      lines.push(formatListTweet(tweet, citationNumbers.get(tweet.id), false))
+    }
+  }
+  const body = lines.join('\n')
+  return block.label ? `### ${block.label}\n\n${body}` : body
+}
+
+/** Clean markdown copy of an answer, including embedded tweets, post lists, and references. */
+export function copyableAnswer(answer: AnswerView) {
+  if (answer.withheld || answer.checking) return ''
+  const citationNumbers = new Map(answer.citations.map((c) => [c.id, c.n]))
+  const sections: string[] = []
+  for (const block of answer.blocks) {
+    const part =
+      block.kind === 'text'
+        ? cleanProse(block.markdown)
+        : block.kind === 'tweet'
+          ? formatEmbeddedTweet(block.citation)
+          : formatListBlock(block, citationNumbers)
+    if (part) sections.push(part)
+  }
+  const body = sections.join('\n\n').trim()
+  if (!body) return ''
+  const refs = answer.citations.map((c) => {
     const handle = c.tweet?.username ? `@${c.tweet.username} ` : ''
-    const url = c.tweet?.username
-      ? `https://x.com/${c.tweet.username}/status/${c.id}`
-      : `https://x.com/i/web/status/${c.id}`
-    return `[${c.n}] ${handle}${url}`
+    return `[${c.n}] ${handle}${tweetUrl(c.id, c.tweet?.username)}`
   })
   return refs.length ? `${body}\n\n${refs.join('\n')}` : body
 }
@@ -214,11 +319,14 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(copyTimer.current), [])
+  const copyText = useMemo(
+    () => (active ? '' : copyableAnswer(answer)),
+    [active, answer],
+  )
   const copyAnswer = async () => {
-    const text = copyableAnswer(answer.markdown, answer.citations)
-    if (!text || !navigator.clipboard?.writeText) return
+    if (!copyText || !navigator.clipboard?.writeText) return
     try {
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard.writeText(copyText)
       setCopied(true)
       clearTimeout(copyTimer.current)
       copyTimer.current = setTimeout(() => setCopied(false), 2000)
@@ -378,25 +486,22 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
                   Unfinished answer
                 </p>
               )}
-              {!active &&
-                !answer.checking &&
-                !answer.withheld &&
-                answer.markdown.trim().length > 0 && (
-                  <div className="mt-3 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => void copyAnswer()}
-                      className="-ml-2 inline-flex h-7 items-center gap-1.5 rounded-[8px] px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/55 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {copied ? (
-                        <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                      ) : (
-                        <Copy aria-hidden="true" className="h-3.5 w-3.5" />
-                      )}
-                      {copied ? 'Copied' : 'Copy answer'}
-                    </button>
-                  </div>
-                )}
+              {copyText.length > 0 && (
+                <div className="mt-3 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => void copyAnswer()}
+                    className="-ml-2 inline-flex h-7 items-center gap-1.5 rounded-[8px] px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/55 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {copied ? (
+                      <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                    ) : (
+                      <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                    )}
+                    {copied ? 'Copied' : 'Copy answer'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

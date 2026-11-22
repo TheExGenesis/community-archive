@@ -9,7 +9,7 @@ import {
 } from '@testing-library/react'
 import type { UIMessage } from 'ai'
 import type { PortalTweet } from '@/lib/portal/types'
-import { AgentSearchTurn } from './AgentSearchTurn'
+import { AgentSearchTurn, copyableAnswer } from './AgentSearchTurn'
 import {
   closeCitationSidebar,
   openCitationSidebar,
@@ -542,5 +542,147 @@ describe('a reopened conversation, its tweets still loading', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Ask again' }))
     expect(onAskAgain).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Copy answer' })).toBeNull()
+  })
+})
+
+describe('Copy answer', () => {
+  const originalClipboard = navigator.clipboard
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: originalClipboard,
+    })
+  })
+
+  test('copies prose, standalone embedded tweets, labeled lists, and references', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const richFound = {
+      tweets: [
+        { ...tweet('1', 'alice'), text: 'First line\n\nSecond line' },
+        { ...tweet('2', 'shared'), text: 'Post 2', p: 0.8 },
+        { ...tweet('3', 'bob'), text: 'Post 3\nwith break' },
+      ],
+      nextOffset: null,
+    }
+    const messages: UIMessage[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          search('output-available', richFound),
+          {
+            type: 'text',
+            text: [
+              'Here is what @alice wrote [[t:777]]:',
+              '',
+              '[[t:1]]',
+              '',
+              'Others echoed [[q:2 | Post 2]].',
+              '',
+              '[[posts: Shared | 1, 2, 3]]',
+            ].join('\n'),
+          },
+        ],
+      },
+    ]
+    render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy answer' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        'Here is what @alice wrote:',
+        '',
+        '> **@alice** (2025-01-01) [1]',
+        '> First line',
+        '>',
+        '> Second line',
+        '',
+        'Others echoed “Post 2” [2].',
+        '',
+        '### Shared',
+        '',
+        '- **@shared** (2025-01-01) [2]: Post 2 — https://x.com/shared/status/2',
+        '- **@alice** (2025-01-01) [1]: First line Second line — https://x.com/alice/status/1',
+        '- **@bob** (2025-01-01): Post 3 with break — https://x.com/bob/status/3',
+        '',
+        '[1] @alice https://x.com/alice/status/1',
+        '[2] @shared https://x.com/shared/status/2',
+      ].join('\n'),
+    )
+  })
+
+  test('formats people-grouped and unlabeled lists cleanly', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          search('output-available', found),
+          {
+            type: 'text',
+            text: [
+              'Key voices [[t:1]]:',
+              '',
+              '[[posts: Voices | 1, 2, 3 | people]]',
+              '',
+              '[[posts: | 4]]',
+            ].join('\n'),
+          },
+        ],
+      },
+    ]
+    const view = buildTurnView(messages, 0)
+    expect(copyableAnswer(view.answer)).toBe(
+      [
+        'Key voices [1]:',
+        '',
+        '### Voices',
+        '',
+        '- **@shared** (2 tweets)',
+        '  - 2025-01-01: Post 2 — https://x.com/shared/status/2',
+        '  - 2025-01-01: Post 3 — https://x.com/shared/status/3',
+        '- **@user1** (1 tweet)',
+        '  - 2025-01-01 [1]: Post 1 — https://x.com/user1/status/1',
+        '',
+        '- **@user4** (2025-01-01): Post 4 — https://x.com/user4/status/4',
+        '',
+        '[1] @user1 https://x.com/user1/status/1',
+      ].join('\n'),
+    )
+  })
+
+  test('shows Copy answer for list-only answers with no prose', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const messages: UIMessage[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          search('output-available', found),
+          { type: 'text', text: '[[posts: Shared | 1, 2]]' },
+        ],
+      },
+    ]
+    render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy answer' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        '### Shared',
+        '',
+        '- **@shared** (2025-01-01): Post 2 — https://x.com/shared/status/2',
+        '- **@user1** (2025-01-01): Post 1 — https://x.com/user1/status/1',
+      ].join('\n'),
+    )
   })
 })

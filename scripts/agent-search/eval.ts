@@ -76,7 +76,12 @@ interface QuestionResult {
   toolCalls: ToolCallRecord[]
   inputTokens: number
   outputTokens: number
+  /** What OpenRouter charged when every call reported it, else the estimate. */
   plannerCostUsd: number
+  /** Where plannerCostUsd comes from. */
+  plannerCostSource: 'openrouter' | 'estimate'
+  /** Tokens times the price table (model.ts), for comparison with older runs. */
+  plannerCostEstimateUsd: number
   classifierCostUsd: number
   /** Tool calls that threw or (bash) exited non-zero. */
   commandErrors: number
@@ -547,6 +552,10 @@ async function runQuestion(
   let usage: Partial<LanguageModelUsage> = {}
   let error: string | null = null
   const toolErrors: unknown[] = []
+  // Planner calls, and those whose charge OpenRouter reported.
+  let modelCalls = 0
+  let reportedCalls = 0
+  let reportedCostUsd = 0
   // As production: a deadline the agent answers at, and a hard stop after it.
   const deadlineMs = args.deadlineMs ?? mods.deadline.agentSearchRunDeadlineMs()
   const deadlineAt = started + deadlineMs
@@ -568,13 +577,21 @@ async function runQuestion(
       // The depth's profile, applied as the workflow applies it.
       const profile = mods.depth.AGENT_SEARCH_PROFILES[args.depth]
       const agent = new mods.ai.ToolLoopAgent({
-        // Its own OpenRouter session, as a production run has (its run id).
+        // Its own OpenRouter session, as a production run has (its run id),
+        // and each call's charge as OpenRouter reports it.
         model: mods.model.agentSearchModel(
           modelSpec,
           null,
           null,
           `eval-${randomUUID()}`,
           profile.reasoningEffort,
+          (detail) => {
+            modelCalls += 1
+            if (typeof detail.providerCostUsd === 'number') {
+              reportedCalls += 1
+              reportedCostUsd += detail.providerCostUsd
+            }
+          },
         ),
         instructions: mods.agent.agentSearchInstructions(
           undefined,
@@ -699,7 +716,17 @@ async function runQuestion(
     toolCalls,
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,
-    plannerCostUsd: plannerCost(mods, modelSpec, usage),
+    ...(() => {
+      const estimate = plannerCost(mods, modelSpec, usage)
+      const reported = modelCalls > 0 && reportedCalls === modelCalls
+      return {
+        plannerCostUsd: reported ? reportedCostUsd : estimate,
+        plannerCostSource: reported
+          ? ('openrouter' as const)
+          : ('estimate' as const),
+        plannerCostEstimateUsd: estimate,
+      }
+    })(),
     classifierCostUsd,
     commandErrors,
     semanticCalls,
@@ -782,7 +809,7 @@ function markdownReport(
     '## Totals',
     '',
     `- Input tokens ${results.reduce((n, r) => n + r.inputTokens, 0)}, output tokens ${results.reduce((n, r) => n + r.outputTokens, 0)}`,
-    `- Planner cost $${results.reduce((n, r) => n + r.plannerCostUsd, 0).toFixed(4)}, scorer cost $${results.reduce((n, r) => n + r.classifierCostUsd, 0).toFixed(4)} (list prices, src/lib/agentSearch/model.ts)`,
+    `- Planner cost $${results.reduce((n, r) => n + r.plannerCostUsd, 0).toFixed(4)}, scorer cost $${results.reduce((n, r) => n + r.classifierCostUsd, 0).toFixed(4)} (planner: OpenRouter's charge for ${results.filter((r) => r.plannerCostSource === 'openrouter').length} of ${results.length} questions, else tokens at list prices; list-price estimate $${results.reduce((n, r) => n + r.plannerCostEstimateUsd, 0).toFixed(4)})`,
     `- Wall time p50 ${((quantile(wall, 0.5) ?? 0) / 1000).toFixed(1)}s, p95 ${((quantile(wall, 0.95) ?? 0) / 1000).toFixed(1)}s`,
     `- Tool calls ${results.reduce((n, r) => n + r.toolCalls.length, 0)}, failed or non-zero exits ${results.reduce((n, r) => n + r.commandErrors, 0)}, semantic searches ${results.reduce((n, r) => n + r.semanticCalls, 0)}, run errors ${results.filter((r) => r.error).length}`,
     `- Key ids dropped by gateway re-validation: ${results.reduce((n, r) => n + r.keyDropped.length, 0)}`,

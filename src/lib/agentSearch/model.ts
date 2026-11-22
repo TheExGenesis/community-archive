@@ -613,6 +613,12 @@ function ownKeyCallError(error: unknown): unknown {
 export class EnvLanguageModel {
   readonly specificationVersion = 'v4' as const
   private resolved?: ProviderModel
+  /**
+   * Called after each model call with what it cost and who served it, for
+   * scripts with no run to record on (the eval sums OpenRouter's charge).
+   * In-process only: never serialized into a workflow.
+   */
+  onCall?: (detail: ModelCallDetail) => void
 
   constructor(
     readonly spec: string,
@@ -727,21 +733,28 @@ export class EnvLanguageModel {
         content: withStepReasoning(result.content, details),
       }
     }
+    const detail: ModelCallDetail = {
+      ms: Date.now() - startedAt,
+      startedAt: new Date(startedAt).toISOString(),
+      finishReason: finishReasonText(result?.finishReason),
+      ...(this.sealedKey ? { ownKey: true } : {}),
+    }
+    // A whole OpenRouter response names its provider and, with usage
+    // accounting on, its charge, as the last streamed chunk does.
+    if (this.provider === 'openrouter')
+      readOpenRouterChunk(result?.response?.body, detail)
     if (this.runId)
-      await recordModelCallUsage(this.runId, this.spec, result?.usage, {
-        ms: Date.now() - startedAt,
-        startedAt: new Date(startedAt).toISOString(),
-        finishReason: finishReasonText(result?.finishReason),
-        ...(this.sealedKey ? { ownKey: true } : {}),
-      })
+      await recordModelCallUsage(this.runId, this.spec, result?.usage, detail)
+    this.onCall?.(detail)
     return result
   }
 
   async doStream(options: any) {
     const runId = this.runId
+    const onCall = this.onCall
     const openRouter = this.provider === 'openrouter'
     const callOptions = this.prepareCall(options)
-    if (!runId && !openRouter) {
+    if (!runId && !openRouter && !onCall) {
       return this.call<any>((model) => model.doStream(callOptions))
     }
     const spec = this.spec
@@ -808,10 +821,10 @@ export class EnvLanguageModel {
         // A failed write fails the call: the cap must not miss spend.
         async flush(controller) {
           releaseToolCalls(controller)
-          if (runId && usage) {
-            detail.ms = Date.now() - startedAt
+          detail.ms = Date.now() - startedAt
+          if (runId && usage)
             await recordModelCallUsage(runId, spec, usage, detail)
-          }
+          onCall?.(detail)
         },
       }),
     )
@@ -860,12 +873,15 @@ export function agentSearchModel(
   sealedKey: string | null = null,
   sessionId: string | null = null,
   reasoningEffort: ReasoningEffort | null = null,
+  onCall?: (detail: ModelCallDetail) => void,
 ): LanguageModel {
-  return new EnvLanguageModel(
+  const model = new EnvLanguageModel(
     spec,
     runId,
     sealedKey,
     sessionId,
     reasoningEffort,
-  ) as unknown as LanguageModel
+  )
+  if (onCall) model.onCall = onCall
+  return model as unknown as LanguageModel
 }

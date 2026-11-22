@@ -1892,13 +1892,11 @@ export function buildTurnView(
 }
 
 /** Tweets the side column shows while the answer is written. */
-const TOP_FOUND = 5
-
 /**
- * The side column's tweets while a turn runs. Before the relevance check has
- * scored anything, search order says little about quality, so the column
- * shows the latest command's matches and names the command; once scores
- * exist it shows the highest scored.
+ * The tweets found so far while a turn runs. Before the relevance check has
+ * scored anything, search order says little about quality, so the list leads
+ * with the latest command's matches and names the command; once scores exist
+ * it orders highest-scored first.
  */
 function foundSoFar(
   calls: ToolCallView[],
@@ -1915,14 +1913,12 @@ function foundSoFar(
       if (p >= KEPT_P) relevant += 1
     })
     return {
-      topFound: orderByScore(own.results, own.scores)
-        .slice(0, TOP_FOUND)
-        .map(item),
+      topFound: orderByScore(own.results, own.scores).map(item),
       foundPhase: { kind: 'relevant', relevant },
     }
   }
   // The newest call that returned tweets, in its own order; earlier
-  // results fill the column if it returned fewer.
+  // results follow.
   for (let i = calls.length - 1; i >= 0; i--) {
     const call = calls[i]
     if (call.state !== 'output-available') continue
@@ -1934,7 +1930,7 @@ function foundSoFar(
     const rest = own.results.filter((id) => !inLatest.has(id))
     const text = progressFor([call])[0]?.text ?? ''
     return {
-      topFound: [...latest, ...rest].slice(0, TOP_FOUND).map(item),
+      topFound: [...latest, ...rest].map(item),
       foundPhase: { kind: 'latest', source: text.split(' · ')[0] || null },
     }
   }

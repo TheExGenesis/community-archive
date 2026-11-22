@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react'
 import type { MouseEvent } from 'react'
-import { ChevronRight, X } from 'lucide-react'
+import { ChevronRight, Plus, X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { TweetAvatar } from '@/components/TweetAvatar'
 import type { PortalTweet } from '@/lib/portal/types'
@@ -28,15 +28,16 @@ const railActive = () =>
 
 /** How long a tweet that just entered the column stays highlighted. */
 const FRESH_MS = 1600
-/** Tweets the column shows while the answer is written. */
-const FOUND_SHOWN = 5
+/** Tweets shown initially when expanding matches while a run is still searching. */
+const FOUND_FIRST = 25
+/** Additional tweets revealed on each "Show more" click. */
+const FOUND_MORE = 50
 
 /**
- * Keeps the found tweets on screen in place as the set changes: tweets
- * already shown keep their order, new ones enter at the top, and earlier
- * ones move down until pushed past the last place. A change of phase (latest
- * matches to most relevant) starts over, since the heading changes with it.
- * Returns the tweets to show and the ids that just entered.
+ * Keeps the found tweets in steady order as the set grows: tweets already
+ * seen keep their order, newcomers enter at the top, and a change of phase
+ * (latest matches to most relevant) starts over in score order.
+ * Returns the full ordered list and the ids that just entered.
  */
 function useSteadyFound(found: FoundTweet[], phase: FoundPhase['kind']) {
   const memory = useRef<{
@@ -56,14 +57,14 @@ function useSteadyFound(found: FoundTweet[], phase: FoundPhase['kind']) {
     let shown: FoundTweet[]
     let entered: string[] = []
     if (last.phase !== phase || !last.shown.length) {
-      shown = found.slice(0, FOUND_SHOWN)
+      shown = found
     } else {
       const before = new Set(last.shown.map((item) => item.tweet.id))
       const newcomers = found.filter((item) => !before.has(item.tweet.id))
       // Kept tweets take their latest score.
       const kept = last.shown.map((item) => fresh.get(item.tweet.id) ?? item)
-      shown = [...newcomers, ...kept].slice(0, FOUND_SHOWN)
-      entered = newcomers.slice(0, FOUND_SHOWN).map((item) => item.tweet.id)
+      shown = [...newcomers, ...kept]
+      entered = newcomers.slice(0, FOUND_FIRST).map((item) => item.tweet.id)
     }
     memory.current = {
       found,
@@ -325,7 +326,15 @@ export const CitationRail = forwardRef<
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   const [position, setPosition] = useState(1)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [foundLimit, setFoundLimit] = useState(FOUND_FIRST)
   const foundListId = useId()
+
+  useEffect(() => {
+    setFoundLimit(FOUND_FIRST)
+  }, [foundPhase.kind])
+
+  const visibleFound = steady.shown.slice(0, foundLimit)
+  const remainingFound = steady.shown.length - visibleFound.length
 
   const setRefs = (node: HTMLElement | null) => {
     railRef.current = node
@@ -491,8 +500,8 @@ export const CitationRail = forwardRef<
                 {sourceDetail}
               </p>
             )}
-            <ul className="max-h-72 overflow-y-auto overscroll-contain">
-              {steady.shown.map(({ tweet }) => (
+            <ul className="max-h-96 overflow-y-auto overscroll-contain">
+              {visibleFound.map(({ tweet }) => (
                 <TweetRow
                   key={tweet.id}
                   tweet={tweet}
@@ -501,11 +510,25 @@ export const CitationRail = forwardRef<
                   }`}
                 />
               ))}
+              {remainingFound > 0 && (
+                <li className="border-t border-border/60">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFoundLimit((current) => current + FOUND_MORE)
+                    }
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    Show more · {count(remainingFound)} remaining
+                  </button>
+                </li>
+              )}
             </ul>
-            {foundCount > steady.shown.length && (
+            {remainingFound === 0 && foundCount > steady.shown.length && (
               <p className="px-3 py-1.5 text-xs text-muted-foreground">
-                Showing a sample of {steady.shown.length} from {count(foundCount)}{' '}
-                found — browse all matches once the answer finishes.
+                Showing {count(steady.shown.length)} of {count(foundCount)}{' '}
+                found — the rest will appear once the answer finishes.
               </p>
             )}
           </div>
@@ -577,7 +600,7 @@ export const CitationRail = forwardRef<
         // Interim evidence, drawn lighter than the answer that replaces it:
         // the list's rows, best first, without scores.
         <ul>
-          {steady.shown.map(({ tweet }) => (
+          {visibleFound.map(({ tweet }) => (
             <TweetRow
               key={tweet.id}
               tweet={tweet}
@@ -586,6 +609,18 @@ export const CitationRail = forwardRef<
               }`}
             />
           ))}
+          {remainingFound > 0 && (
+            <li className="border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setFoundLimit((current) => current + FOUND_MORE)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                Show more · {count(remainingFound)} remaining
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </aside>

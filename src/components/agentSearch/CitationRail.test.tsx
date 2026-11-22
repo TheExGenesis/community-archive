@@ -46,7 +46,7 @@ const openPreview = () => {
 
 const shown = () =>
   within(screen.getByRole('complementary'))
-    .getAllByText(/^Tweet \d$/)
+    .getAllByText(/^Tweet \d+$/)
     .map((el) => el.textContent)
 
 test('names the phase, starts collapsed by default, and keeps tweets in place once opened', () => {
@@ -100,11 +100,23 @@ test('a newcomer’s highlight clears even when the same tweets come again', () 
   }
 })
 
-test('shows at most five when opened', () => {
-  const many = ['1', '2', '3', '4', '5', '6'].map((id) => item(id))
-  render(rail(many, { kind: 'latest', source: null }, 6))
+test('shows 25 initially when opened and reveals more on demand', () => {
+  const many = Array.from({ length: 80 }, (_, i) => item(String(i + 1)))
+  render(rail(many, { kind: 'latest', source: null }, 80))
   openPreview()
-  expect(shown()).toHaveLength(5)
+  expect(shown()).toHaveLength(25)
+
+  const moreButton = screen.getByRole('button', {
+    name: /Show more · 55 remaining/i,
+  })
+  fireEvent.click(moreButton)
+  expect(shown()).toHaveLength(75)
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /Show more · 5 remaining/i }),
+  )
+  expect(shown()).toHaveLength(80)
+  expect(screen.queryByRole('button', { name: /Show more/i })).toBeNull()
 })
 
 test('a chosen citation opens once: rebuilt citations do not reopen a tweet the reader closed', () => {

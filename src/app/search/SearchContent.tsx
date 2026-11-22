@@ -52,9 +52,15 @@ export function SearchPageContent({ canSearch }: { canSearch: boolean }) {
     formattedQuery = words.join(' & ')
   }
 
+  // `match=all` (a link from Ask the archive): every word, in any order.
+  const matchAllWords =
+    normalizedSearchParams.get('match') === 'all' &&
+    Boolean(cleanRawText && /\s/.test(cleanRawText))
+
   const filterCriteria: FilterCriteria = {
     searchQuery: formattedQuery,
     rawSearchQuery: cleanRawText,
+    matchAllWords: matchAllWords || undefined,
     fromUsername: normalizedSearchParams.get('fromUser') || undefined,
     replyToUsername: normalizedSearchParams.get('replyToUser') || undefined,
     startDate: normalizedSearchParams.get('sinceDate') || undefined,
@@ -85,7 +91,9 @@ export function SearchPageContent({ canSearch }: { canSearch: boolean }) {
   const hasSearch = tweetListKey.length > 0
   const canSortSearchResults = Boolean(cleanRawText)
   const searchDescription = cleanRawText
-    ? `Matching “${cleanRawText}” and the filters above`
+    ? matchAllWords
+      ? `Matching every word of “${cleanRawText}” in any order, and the filters above`
+      : `Matching “${cleanRawText}” and the filters above`
     : 'Matching the filters above'
 
   return (

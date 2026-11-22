@@ -74,6 +74,24 @@ describe('search parameter helpers', () => {
     ).toBe('q=archive&fromUser=alice')
   })
 
+  it('keeps the any-order match only as `all` and only beside a query', () => {
+    expect(
+      normalizeSearchParams(
+        new URLSearchParams('q=comm+archive&match=all&sort=likes'),
+      ).toString(),
+    ).toBe('q=comm+archive&sort=likes&match=all')
+    expect(
+      normalizeSearchParams(
+        new URLSearchParams('q=comm+archive&match=fuzzy'),
+      ).toString(),
+    ).toBe('q=comm+archive')
+    expect(
+      normalizeSearchParams(
+        new URLSearchParams('fromUser=alice&match=all'),
+      ).toString(),
+    ).toBe('fromUser=alice')
+  })
+
   it('preserves only supported server-side sort values', () => {
     expect(
       normalizeSearchParams(

@@ -83,6 +83,25 @@ describe('searchTweetsWithClickHouse', () => {
     ])
   })
 
+  test('several words are a phrase unless the search asks for every word in any order', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      text: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ data: { tweets: [] } })),
+    })
+    await searchTweetsWithClickHouse(
+      { rawSearchQuery: 'comm archive', matchAllWords: true },
+      1,
+      20,
+      fetchImpl as any,
+    )
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/tweet-search?q=comm+archive&mode=all&limit=20&offset=0',
+      { cache: 'no-store' },
+    )
+  })
+
   test('stops cleanly before requesting an offset beyond the gateway cap', async () => {
     const fetchImpl = jest.fn()
 

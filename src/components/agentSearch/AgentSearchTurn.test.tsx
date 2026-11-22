@@ -289,6 +289,47 @@ test('a stopped turn keeps its steps and found tweets, and asks again', () => {
   ).toBeInTheDocument()
 })
 
+test('a finished fast answer offers a deeper search; a running or stopped one does not', () => {
+  const onSearchDeeper = jest.fn()
+  const messages: UIMessage[] = [
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [
+        search('output-available', found),
+        { type: 'text', text: 'Here is what they said.' },
+      ],
+    },
+  ]
+  const view = buildTurnView(messages, 0)
+  const { rerender } = render(
+    <AgentSearchTurn
+      view={view}
+      active={false}
+      onSearchDeeper={onSearchDeeper}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Search deeper' }))
+  expect(onSearchDeeper).toHaveBeenCalledTimes(1)
+
+  rerender(
+    <AgentSearchTurn view={view} active onSearchDeeper={onSearchDeeper} />,
+  )
+  expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+  rerender(
+    <AgentSearchTurn
+      view={view}
+      active={false}
+      interrupted={{ kind: 'stopped', elapsedMs: 1000 }}
+      onSearchDeeper={onSearchDeeper}
+    />,
+  )
+  expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+  // Without the handler (a stored or deep answer) there is nothing to offer.
+  rerender(<AgentSearchTurn view={view} active={false} />)
+  expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+})
+
 test('a run whose searches all failed says the archive is not responding', () => {
   const messages: UIMessage[] = [
     { id: 'a1', role: 'assistant', parts: [search('output-error')] },

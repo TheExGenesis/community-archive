@@ -45,6 +45,8 @@ export const productActions = [
   'alert_deleted',
   'notifications_opened',
   'notification_opened',
+  'depth_changed',
+  'searched_deeper',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]

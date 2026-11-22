@@ -24,10 +24,17 @@ import {
   type AskFilter,
   type AskPrefill,
 } from '@/lib/askFromSearch'
+import {
+  DEFAULT_AGENT_SEARCH_DEPTH,
+  parseAgentSearchDepth,
+  type AgentSearchDepth,
+} from '@/lib/agentSearch/depth'
 import { OWN_KEY_HEADER } from '@/lib/agentSearch/ownKey'
+import { captureProductAction } from '@/lib/productAnalytics'
 import { ownKeyRefusalMessage } from './OwnKeyControl'
 import { readOwnKey, useOwnKey } from './ownKeyStore'
 import { QuestionsLeft, type QuestionsToday } from './QuestionsLeft'
+import { DepthToggle } from './DepthToggle'
 import { QuestionHandling } from './QuestionHandling'
 import { AgentSearchTurn, type TurnInterruption } from './AgentSearchTurn'
 import { EvidenceBoundary } from './EvidenceBoundary'
@@ -70,6 +77,11 @@ export const EXAMPLE_QUESTIONS = [
 ]
 
 const MAX_QUESTION_LENGTH = 1000
+/** Where the composer's Fast or Deep choice is kept between visits. */
+const DEPTH_STORAGE_KEY = 'ask-archive-depth'
+/** The follow-up a fast answer's "Search deeper" sends, as a deep search. */
+const deeperQuestion = (question: string) =>
+  `Search deeper: ${question}`.slice(0, MAX_QUESTION_LENGTH)
 /** Failed reads of a run's stream in a row before the transport gives up. */
 const STREAM_READ_ATTEMPTS = 8
 /** Times one run is picked up again after its stream ended early. */
@@ -338,6 +350,37 @@ export default function AgentSearch({
   const [stopped, setStopped] = useState<Record<string, number | null>>({})
   // How long each answer finished in this visit took, by its message id.
   const [took, setTook] = useState<Record<string, number>>({})
+  // The composer's choice, kept between visits, and the depth each answer
+  // finished in this visit was searched at, by its message id. A fast one
+  // offers "Search deeper"; nothing is stored on the server.
+  const [depth, setDepth] = useState<AgentSearchDepth>(
+    DEFAULT_AGENT_SEARCH_DEPTH,
+  )
+  const [answerDepth, setAnswerDepth] = useState<
+    Record<string, AgentSearchDepth>
+  >({})
+  // The depth of the question being sent; the transport reads it.
+  const sendDepthRef = useRef<AgentSearchDepth>(DEFAULT_AGENT_SEARCH_DEPTH)
+  useEffect(() => {
+    try {
+      const kept = parseAgentSearchDepth(
+        window.localStorage.getItem(DEPTH_STORAGE_KEY),
+      )
+      if (kept) setDepth(kept)
+    } catch {
+      // No storage (private mode): the choice lasts for this visit.
+    }
+  }, [])
+  const changeDepth = (next: AgentSearchDepth) => {
+    if (next === depth) return
+    setDepth(next)
+    captureProductAction('ask_archive', 'depth_changed')
+    try {
+      window.localStorage.setItem(DEPTH_STORAGE_KEY, next)
+    } catch {
+      // As above.
+    }
+  }
   const ranRef = useRef(false)
   // The run under way was picked up from a reload, so its start is unknown.
   const resumedRef = useRef(false)
@@ -408,7 +451,11 @@ export default function AgentSearch({
         prepareSendMessagesRequest: ({ id, messages }) => {
           stopPendingRef.current = false
           const last = [...messages].reverse().find((m) => m.role === 'user')
-          const body = { id, question: last ? messageText(last) : '' }
+          const body = {
+            id,
+            question: last ? messageText(last) : '',
+            depth: sendDepthRef.current,
+          }
           // The member's own key, if this browser holds one, pays for the
           // question; it travels in a header and the server never stores it.
           const ownKey = ownKeyEnabledRef.current ? readOwnKey() : null
@@ -880,11 +927,16 @@ export default function AgentSearch({
     if (resumedRef.current) return
     const ms = Date.now() - runStartedAt
     setTook((current) => ({ ...current, [last.id]: ms }))
+    const searched = sendDepthRef.current
+    setAnswerDepth((current) => ({ ...current, [last.id]: searched }))
   }, [busy, messages, runStartedAt])
 
-  const ask = (question: string) => {
+  // `askDepth` is the composer's choice unless the question names its own
+  // (Search deeper), which leaves the composer's choice as it was.
+  const ask = (question: string, askDepth: AgentSearchDepth = depth) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
     if (!text || busy || loading) return
+    sendDepthRef.current = askDepth
     if (error) clearError()
     setLoadError(null)
     setInput('')
@@ -1162,6 +1214,20 @@ export default function AgentSearch({
     }
     return handler
   }
+  // A fast answer's deeper search: the same question as a deep follow-up,
+  // which finds the files the fast run left in /work.
+  const searchDeeperHandlers = useRef(new Map<string, () => void>())
+  const searchDeeperFor = (question: string) => {
+    let handler = searchDeeperHandlers.current.get(question)
+    if (!handler) {
+      handler = () => {
+        captureProductAction('ask_archive', 'searched_deeper')
+        askRef.current(deeperQuestion(question), 'deep')
+      }
+      searchDeeperHandlers.current.set(question, handler)
+    }
+    return handler
+  }
 
   const quotaLow = quota !== null && quota.remaining <= 3
   const today: QuestionsToday | null = quota && {
@@ -1219,6 +1285,9 @@ export default function AgentSearch({
           `block min-h-[4.25rem] w-full px-4 pb-2 ${filterChips ? 'pt-2' : 'pt-3.5'}`,
         )}
         <div className="flex items-center justify-end gap-3 px-4 pb-3 pt-1 text-xs text-muted-foreground">
+          <div className="mr-auto">
+            <DepthToggle value={depth} onChange={changeDepth} />
+          </div>
           {today ? (
             <QuestionsLeft today={today} />
           ) : (
@@ -1258,6 +1327,7 @@ export default function AgentSearch({
           'Ask a follow-up',
           'min-h-[2.25rem] flex-1 py-1.5',
         )}
+        <DepthToggle value={depth} onChange={changeDepth} />
         <button
           type="submit"
           aria-label="Ask"
@@ -1651,6 +1721,14 @@ export default function AgentSearch({
                             : undefined
                         }
                         canAskAgain={canAskAgain}
+                        onSearchDeeper={
+                          asked &&
+                          !readOnly &&
+                          index === lastIndex &&
+                          answerDepth[message.id] === 'fast'
+                            ? searchDeeperFor(messageText(asked))
+                            : undefined
+                        }
                         showSources={
                           index === lastIndex ||
                           interrupted?.kind === 'stopped' ||

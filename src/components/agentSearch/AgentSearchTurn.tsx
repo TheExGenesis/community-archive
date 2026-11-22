@@ -74,6 +74,8 @@ interface AgentSearchTurnProps {
   stopState?: StopState | null
   onAskAgain?: () => void
   canAskAgain?: boolean
+  /** A fast answer from this visit: asks the same question as a deep search. */
+  onSearchDeeper?: () => void
   /** The latest turn, or one that was stopped: earlier ones keep the rest. */
   showSources?: boolean
   /** A reopened conversation: fetches again the tweets that failed to load. */
@@ -91,6 +93,7 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
   stopState = null,
   onAskAgain,
   canAskAgain = true,
+  onSearchDeeper,
   showSources = true,
   onRetryTweets,
   durationMs = null,
@@ -468,6 +471,18 @@ export const AgentSearchTurn = memo(function AgentSearchTurn({
                 : `${answer.missingLists.length} lists the answer referred to could not be found.`}
             </p>
           )}
+          {!active && !ended && hasAnswer && onSearchDeeper && canAskAgain && (
+            <p className="text-sm text-muted-foreground">
+              This was a fast search.{' '}
+              <button
+                type="button"
+                onClick={onSearchDeeper}
+                className={RETRY_BUTTON}
+              >
+                Search deeper
+              </button>
+            </p>
+          )}
         </div>
 
         {cited > 0 ? (
@@ -580,6 +595,7 @@ function sameTurn(a: AgentSearchTurnProps, b: AgentSearchTurnProps) {
     a.stopState === b.stopState &&
     a.onAskAgain === b.onAskAgain &&
     a.canAskAgain === b.canAskAgain &&
+    a.onSearchDeeper === b.onSearchDeeper &&
     a.showSources === b.showSources &&
     a.onRetryTweets === b.onRetryTweets &&
     a.durationMs === b.durationMs &&

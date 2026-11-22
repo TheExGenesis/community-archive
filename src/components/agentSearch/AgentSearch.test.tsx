@@ -46,6 +46,7 @@ jest.mock('./AnswerMarkdown', () => ({
 }))
 
 import AgentSearch, { EXAMPLE_QUESTIONS } from './AgentSearch'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { writeOwnKey } from './ownKeyStore'
 
 const quota = (remaining: number) => {
@@ -412,7 +413,7 @@ describe('the member’s own OpenRouter key', () => {
     ).toBeInTheDocument()
     expect(screen.getByLabelText('On your key')).toBeInTheDocument()
     expect(prepare()).toEqual({
-      body: { id: 'conv-1234', question: 'Who?' },
+      body: { id: 'conv-1234', question: 'Who?', depth: 'fast' },
       headers: { 'x-openrouter-key': KEY },
     })
   })
@@ -720,5 +721,97 @@ describe('a shared conversation', () => {
     expect(
       await screen.findByText('Share this conversation'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('how hard a question is searched', () => {
+  const sentBody = () =>
+    (
+      mockTransport.options as unknown as {
+        prepareSendMessagesRequest: (input: {
+          id: string
+          messages: UIMessage[]
+        }) => { body: { depth?: string } }
+      }
+    ).prepareSendMessagesRequest({
+      id: 'conv-1234',
+      messages: [
+        { id: 'u', role: 'user', parts: [{ type: 'text', text: 'Who?' }] },
+      ],
+    }).body
+  const pressed = (name: string) =>
+    screen.getByRole('button', { name }).getAttribute('aria-pressed')
+
+  beforeEach(() => {
+    window.localStorage.clear()
+    jest.mocked(capturePostHogEvent).mockClear()
+  })
+  afterAll(() => window.localStorage.clear())
+
+  test('the composer starts on Fast; Deep is one press away and is remembered', async () => {
+    quota(5)
+    const { unmount } = render(<AgentSearch />)
+    expect(
+      screen.getByRole('group', { name: 'Search depth' }),
+    ).toBeInTheDocument()
+    expect(pressed('Fast')).toBe('true')
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(sentBody().depth).toBe('fast')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deep' }))
+    expect(pressed('Deep')).toBe('true')
+    // The event says a depth changed, never which question or to what.
+    expect(capturePostHogEvent).toHaveBeenCalledWith('product_action', {
+      feature: 'ask_archive',
+      action: 'depth_changed',
+    })
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(sentBody().depth).toBe('deep')
+    unmount()
+
+    // The next visit opens on the member's choice.
+    render(<AgentSearch />)
+    await waitFor(() => expect(pressed('Deep')).toBe('true'))
+  })
+
+  test('a fast answer from this visit offers a deeper search, which leaves the toggle alone', () => {
+    quota(5)
+    const { rerender } = render(<AgentSearch />)
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(mockChat.sendMessage).toHaveBeenCalledWith({ text: 'Who?' })
+    // The run streams, then ends with an answer.
+    mockChat.messages = thread
+    mockChat.status = 'streaming'
+    rerender(<AgentSearch />)
+    expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+    mockChat.status = 'ready'
+    rerender(<AgentSearch />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search deeper' }))
+    expect(mockChat.sendMessage).toHaveBeenLastCalledWith({
+      text: 'Search deeper: Who?',
+    })
+    expect(sentBody().depth).toBe('deep')
+    expect(capturePostHogEvent).toHaveBeenCalledWith('product_action', {
+      feature: 'ask_archive',
+      action: 'searched_deeper',
+    })
+    expect(pressed('Fast')).toBe('true')
+  })
+
+  test('a stored answer, whose depth the page does not know, offers none', () => {
+    mockChat.messages = thread
+    quota(5)
+    render(<AgentSearch />)
+    expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
   })
 })

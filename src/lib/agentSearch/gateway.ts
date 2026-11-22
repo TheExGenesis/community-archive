@@ -33,13 +33,10 @@ export async function retryWhileBusy<T>(
         error instanceof AnalyticsGatewayError && error.status === 503
       const delay = delays[attempt]
       if (!busy || delay === undefined) throw error
-      if (
-        limits.deadlineAt !== undefined &&
-        Date.now() + delay >= limits.deadlineAt
-      ) {
-        throw error
-      }
-      await new Promise((resolve) => setTimeout(resolve, delay))
+      // No retry after the deadline or a stop, and the wait ends at once
+      // when the run is stopped during it.
+      if (deadlinePassed(limits, Date.now() + delay)) throw error
+      await pause(delay, limits.abortSignal)
     }
   }
 }

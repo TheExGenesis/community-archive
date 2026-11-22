@@ -148,8 +148,8 @@ work on files under `/work`, and archive commands are added
 | `timeline @handle [--since D] [--until D] [--oldest] [--no-replies] [--retweets] [--limit N]`                                      | That person's own tweets by date, newest first (200 by default, up to 3,000; no retweets unless asked), from API v1                                                                                                                                                                                                                                                                                                                                                                          |
 | `score <file> "<yes/no question>" [--yes-if "..."] [--no-if "..."] [--no-parent]`                                                  | Scores every tweet in a file; rows gain `p`, best first. `--yes-if` and `--no-if` say what counts as yes and as no                                                                                                                                                                                                                                                                                                                                                                           |
 | `expand <file> [--min-p P] [--seeds N] [--limit N]`                                                                                | The threads and quote posts around a scored file's best tweets (`p` ≥ 0.7, 15 by default, up to 40, four at a time); prints the tweets not already in the file (300 by default, up to 1,000), to score next                                                                                                                                                                                                                                                                                  |
-| `thread <id>`, `quotes <id>`, `tweets <id…>`, `show <id>`                                                                          | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet                                                                                                                                                                                                                                                                                                                                                                                               |
-| `par '<command with {}>' word…` or `par '<command>' '<command>'…`                                                                  | Runs up to 30 command lines, 6 at a time, output in the order given (a `for` loop runs them one after another). Their searches share one command's three search slots                                                                                                                                                                                                                                                                                                                        |
+| `thread <id>`, `quotes <id>`, `tweets <id…>`, `show <id>`                                                                          | A thread, quote posts, tweets by id (also from stdin), one tweet in full with its quoted tweet (`show` prints text, not rows; both tweets can be cited)                                                                                                                                                                                                                                                                                                                                      |
+| `par '<command with {}>' word…` or `par '<command>' '<command>'…`                                                                  | Runs up to 30 command lines, 6 at a time, output in the order given (a `for` loop runs them one after another). Their searches share one command's three search slots, and each line runs with `pipefail`                                                                                                                                                                                                                                                                                    |
 
 A tweet file is JSONL, one tweet per line: `id`, `author`, `date`, `likes`,
 `reposts`, `replyTo`, `quotes`, `media`, `p` when scored, and `text`. Each
@@ -180,6 +180,14 @@ reads it, by fetching its ids through the gateway again, so a tweet whose
 author has opted out since drops out. Other files (counts, notes) are carried
 as text for the rest of the run (up to 20,000 characters) but are never
 stored with the answer, since they may hold tweet text.
+
+The agent's tool calls of one turn are started together, so shell commands
+run one at a time in call order (`createSlots(1)` in the workflow and in the
+eval's in-process shell): two at once would both start from the same files
+and the same count of semantic searches, and each would get its own search
+slots. The prompt tells the agent to use `par` inside one call instead. A
+search waiting for a slot gives up as soon as the run's deadline passes or
+the run is stopped, and so does the wait before a busy-gateway retry.
 
 Each command's output reports the changes it made (`workspace`) and the ids in
 each tweet file it wrote (`files`). The stored run keeps the summary, exit
@@ -290,8 +298,8 @@ its id. Workflow keeps a run's own data only 7 days after it ends on Vercel Pro
   reconnected through its stream.
 - `POST /api/agent-search/conversations/{id}/tweets` `{ ids }` (up to 100)
   fetches those tweets through the gateway, so a post whose author opted out
-  since drops out of old answers. Prose-cited ids get full cards, the rest
-  the batch lookup. Only the asker may call it, and only with ids the
+  since drops out of old answers. Every id reads the same tweet-cards route,
+  100 a call, prose-cited ids first. Only the asker may call it, and only with ids the
   conversation's stored runs hold; a deleted conversation has none. It
   answers `{ tweets, failed }`: an id in neither is gone (deleted, or opted
   out).
@@ -336,8 +344,11 @@ cite, never who asked; a run still answering is left out.
 
 The page sends only `{ id, question, depth }`. The server never takes earlier turns
 from the browser: the workflow's first step (`context.ts`) rebuilds them from
-the asker's stored runs of that conversation, fetching their tweets again
-through the gateway. Tool outputs are converted with the tool definitions, so
+the asker's stored runs of that conversation. The typed tools' tweets are
+fetched again through the gateway; a shell command's are not, since a stored
+command reaches the model as its summary and file names only (fetching the
+hundreds or thousands of tweets it touched was 15 to 35 gateway calls per
+follow-up, all discarded). Tool outputs are converted with the tool definitions, so
 each one is compacted by its `toModelOutput` as when the model first saw it,
 and a tool call left without a result by a Stop is ignored. The model sees the
 last 3 earlier turns (`MAX_CONTEXT_TURNS`); the page shows the whole

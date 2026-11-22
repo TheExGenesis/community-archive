@@ -529,6 +529,16 @@ function shortCommand(command: string) {
     : line || 'a command'
 }
 
+/** Options of the archive commands that take no value (workspace/commands.ts). */
+const BOOLEAN_FLAGS = new Set([
+  'phrase',
+  'all',
+  'oldest',
+  'no-replies',
+  'retweets',
+  'no-parent',
+])
+
 // The words of a shell segment, with quotes removed and options dropped.
 function commandWords(segment: string): string[] {
   const words = Array.from(segment.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)).map(
@@ -539,9 +549,11 @@ function commandWords(segment: string): string[] {
     const word = words[i]
     if (word === '>' || word === '>>') break
     if (word.startsWith('--')) {
-      // An option and its value: --limit 300, --from @x.
+      // An option and its value: --limit 300, --from @x. An option that
+      // takes none (--phrase) leaves the next word where it is.
       if (
         !word.includes('=') &&
+        !BOOLEAN_FLAGS.has(word.slice(2)) &&
         words[i + 1] &&
         !words[i + 1].startsWith('-')
       ) {

@@ -964,6 +964,30 @@ describe('workspace steps and the folded log line', () => {
     ).toBe('Looking through the results')
   })
 
+  test('an option that takes no value does not swallow the word after it', () => {
+    expect(describeCommand('search --phrase "coffee shop" --from @alice')).toBe(
+      'Searching “coffee shop”',
+    )
+    expect(describeCommand('search --all tea ceremony --limit 200')).toBe(
+      'Searching “tea ceremony”',
+    )
+    expect(describeCommand('timeline --no-replies @alice --limit 50')).toBe(
+      "Reading @alice's tweets",
+    )
+    expect(describeCommand('timeline --oldest --retweets @alice')).toBe(
+      "Reading @alice's tweets",
+    )
+    expect(
+      describeCommand(
+        'score --no-parent s1.jsonl "Does the author say they moved?" --yes-if "they say so" --no-if "they only visit"',
+      ),
+    ).toBe('Checking tweets against “Does the author say they moved?”')
+    // An option that does take a value still takes it.
+    expect(describeCommand('search tea --from @alice --limit 300')).toBe(
+      'Searching “tea”',
+    )
+  })
+
   test('describes interaction lookups and shows them as people steps', () => {
     expect(
       describeCommand('interactions @visakanv --since 2023-01 > p.jsonl'),

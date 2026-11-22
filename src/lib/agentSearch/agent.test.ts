@@ -12,6 +12,7 @@ import {
   bashInstructions,
   bashInstructionsV2,
   agentSearchToolMode,
+  createAgentSearchTools,
   ARCHIVE_UNAVAILABLE_ERROR,
   createBashAgentTools,
   FINAL_STEP_NOTE,
@@ -261,9 +262,30 @@ describe('the fast instructions', () => {
     expect(v1).toContain('a question gets 2,')
     expect(v1).toContain('You have about 8 commands in all')
     expect(v1).toContain('How to work:')
-    expect(
-      agentSearchInstructions('2026-10-14', 'typed', 'v1', null, 'fast'),
-    ).toBe(agentSearchInstructions('2026-10-14', 'typed', 'v1'))
+    const typedFast = agentSearchInstructions(
+      '2026-10-14',
+      'typed',
+      'v1',
+      null,
+      'fast',
+    )
+    const typedDeep = agentSearchInstructions('2026-10-14', 'typed', 'v1')
+    expect(typedFast).toContain('at most 2 times per question')
+    expect(typedDeep).toContain('at most 6 times per question')
+    expect(typedFast.replace('at most 2 times', 'at most 6 times')).toBe(
+      typedDeep,
+    )
+  })
+
+  test('the typed semantic tool states the run’s own limit', () => {
+    const description = (tools: Record<string, any>) =>
+      tools.semantic_search.description as string
+    expect(description(createAgentSearchTools())).toContain(
+      'Limited to 6 per question',
+    )
+    expect(description(createAgentSearchTools({}, 2))).toContain(
+      'Limited to 2 per question',
+    )
   })
 })
 
@@ -376,7 +398,12 @@ describe('tool modes', () => {
     expect(bash).toContain('semantic')
     expect(bashV1).toContain('Combine fetching and inspecting in one bash call')
     expect(bashV2).toContain('Combine fetching and inspecting in one bash call')
-    expect(bashV2).toContain('parallel bash calls')
+    // Lookups to run together go in one call: the agent's tool calls of a
+    // turn run one after another.
+    expect(bashV2).toContain('use par inside one bash call')
+    expect(bashV2).not.toContain('multiple bash calls in the same turn')
+    expect(bashV2).toContain('not a JSON row, so do not pipe it to jq')
+    expect(bashV2).toContain('sed, split, mkdir')
     expect(bashV2).toContain('author includes the leading @')
     expect(bashV2).toContain('{id,p,author,date,text:.text[:160]}')
     expect(typed).toContain('semantic_search')

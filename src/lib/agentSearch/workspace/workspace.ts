@@ -155,8 +155,9 @@ export function scoresInOutput(stdout: string): Record<string, number> {
  * Tweet ids in command output: `"id":"…"` in rows, a bare id on a line, an id
  * leading a line of fields (`jq`'s `"\(.id)\t\(.date)…"`, CSV, columns), or a
  * standalone 15–20 digit id in a tab-, comma-, or pipe-delimited column (e.g.
- * `[.p, .id, .author, .text] | @tsv`). A long number inside a sentence is not
- * taken for one.
+ * `[.p, .id, .author, .text] | @tsv`). A tab may also be the two characters
+ * `\\t`, as `jq -c` prints a tab inside a JSON string. A long number inside a
+ * sentence is not taken for one.
  */
 export function idsInOutput(stdout: string): string[] {
   const ids = new Set<string>()
@@ -164,12 +165,14 @@ export function idsInOutput(stdout: string): string[] {
     ids.add(match[1])
   }
   for (const match of Array.from(
-    stdout.matchAll(/^\s*"?(\d{15,20})"?(?=\s*$|[\t ,|])/gm),
+    stdout.matchAll(/^\s*"?(\d{15,20})"?(?=\s*$|[\t ,|]|\\t)/gm),
   )) {
     ids.add(match[1])
   }
   for (const match of Array.from(
-    stdout.matchAll(/[\t,|]\s*"?(\d{15,20})"?(?=\s*(?:$|[\t,|]))/gm),
+    stdout.matchAll(
+      /(?:[\t,|]|\\t)\s*"?(\d{15,20})"?(?=\s*(?:$|[\t,|]|\\t))/gm,
+    ),
   )) {
     ids.add(match[1])
   }
@@ -296,6 +299,7 @@ export async function runBashCommand({
   const ids = Array.from(
     new Set([
       ...idsInOutput(result.stdout),
+      ...state.shownIds,
       ...Object.values(changedFiles).flat(),
     ]),
   ).slice(0, MAX_PAGE_TWEETS)

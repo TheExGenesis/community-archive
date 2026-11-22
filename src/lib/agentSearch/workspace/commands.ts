@@ -46,6 +46,11 @@ export interface CommandState {
   limits: RunLimits
   /** Every tweet fetched in this execution, by id. */
   cache: Map<string, AgentTweet>
+  /**
+   * Tweets `show` printed, and the tweets they quote. It prints text, not
+   * rows, so the page cannot read their ids from stdout (workspace.ts).
+   */
+  shownIds: string[]
   /** Scorer spend in this execution. */
   costUsd: number
   /** One line per archive command, for the page. */
@@ -68,6 +73,7 @@ export function createCommandState(
   return {
     limits,
     cache,
+    shownIds: [],
     costUsd: 0,
     summaries: [],
     calls: 0,
@@ -667,7 +673,7 @@ async function score(
   const ids = await readIds(path, readFile)
   if (ids.length > MAX_IDS_PER_COMMAND) {
     throw new UsageError(
-      `${path} has ${ids.length} tweets; score at most ${MAX_IDS_PER_COMMAND} (use head)`,
+      `${path} has ${ids.length} tweets; score at most ${MAX_IDS_PER_COMMAND} at a time (split -l ${MAX_IDS_PER_COMMAND} ${path} part_ and score the parts)`,
     )
   }
   state.calls += 1
@@ -911,9 +917,15 @@ async function show(
     (await getTweetDetails([id], state.limits))[0] ??
     state.cache.get(id) ??
     null
-  if (!tweet)
+  if (!tweet) {
+    state.summaries.push('Tweet not found')
     return { stdout: '', stderr: `show ${id}: not found\n`, exitCode: 1 }
+  }
   remember(state, [tweet])
+  // The model may cite what it read here: the tweet and the one it quotes.
+  state.shownIds.push(tweet.id)
+  if (tweet.quotedTweet?.id) state.shownIds.push(tweet.quotedTweet.id)
+  state.summaries.push(`Read a tweet by @${tweet.username}`)
   const lines = [
     `@${tweet.username} · ${tweet.createdAt.slice(0, 10)} · ${tweet.likes} likes · id ${tweet.id}`,
     tweet.replyToTweetId
@@ -1200,8 +1212,11 @@ const par = defineCommand('par', async (args, ctx) => {
   if (!lines.length) return usage('give the words to fill {} with')
   if (lines.length > MAX_PAR) return usage(`at most ${MAX_PAR} commands`)
   const exec = ctx.exec
+  // Each line is its own shell, so it needs pipefail set again: without it
+  // a failure inside a pipe exited 0. The run's signal is passed on, as the
+  // shell asks of commands that run others.
   const results = await inPool(lines, PAR_CONCURRENCY, (line) =>
-    exec(line, { cwd: ctx.cwd }),
+    exec(`set -o pipefail; ${line}`, { cwd: ctx.cwd, signal: ctx.signal }),
   )
   return {
     stdout: results.map((r) => r.stdout).join(''),

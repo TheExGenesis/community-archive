@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai'
 const mockChat: {
   messages: UIMessage[]
   status: 'ready' | 'submitted' | 'streaming' | 'error'
+  error?: Error
   resumeStream: jest.Mock
   sendMessage: jest.Mock
   setMessages: jest.Mock
@@ -25,7 +26,7 @@ jest.mock('@ai-sdk/react', () => ({
   useChat: () => ({
     messages: mockChat.messages,
     status: mockChat.status,
-    error: undefined,
+    error: mockChat.error,
     setMessages: mockChat.setMessages,
     sendMessage: mockChat.sendMessage,
     resumeStream: mockChat.resumeStream,
@@ -82,6 +83,7 @@ beforeAll(() => {
 beforeEach(() => {
   mockChat.messages = []
   mockChat.status = 'ready'
+  mockChat.error = undefined
   mockChat.resumeStream = jest.fn()
   mockChat.sendMessage = jest.fn()
   mockChat.setMessages = jest.fn()
@@ -806,6 +808,89 @@ describe('how hard a question is searched', () => {
       action: 'searched_deeper',
     })
     expect(pressed('Fast')).toBe('true')
+  })
+
+  /** Asks "Who?" on Fast and lets its answer stream to the end. */
+  const askFastAndFinish = () => {
+    const view = render(<AgentSearch />)
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    mockTransport.options?.onChatSendMessage(
+      new Response(null, { headers: { 'x-workflow-run-id': 'asr_1' } }),
+      { chatId: lastConversationId },
+    )
+    mockChat.messages = thread
+    mockChat.status = 'streaming'
+    view.rerender(<AgentSearch />)
+    mockChat.status = 'ready'
+    view.rerender(<AgentSearch />)
+    return view
+  }
+
+  test('the offer survives the answer settling to the server’s copy, which has the run’s id', async () => {
+    // The server kept more than the stream delivered, so its copy takes over.
+    const stored = [
+      thread[0],
+      {
+        id: 'asr_1',
+        role: 'assistant',
+        metadata: { outcome: 'done' },
+        parts: [{ type: 'text', text: 'Them. And two more.' }],
+      },
+    ] as UIMessage[]
+    global.fetch = jest.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('/conversations/')
+          ? { messages: stored, runningRunId: null }
+          : { conversations: [], dailyLimit: 10, remainingToday: 5 },
+    })) as unknown as typeof fetch
+    const { rerender } = askFastAndFinish()
+    await waitFor(() => expect(mockChat.setMessages).toHaveBeenCalled())
+    mockChat.messages = stored
+    rerender(<AgentSearch />)
+    expect(
+      screen.getByRole('button', { name: 'Search deeper' }),
+    ).toBeInTheDocument()
+  })
+
+  test('a refused deeper search puts the plain question back, not its "Search deeper" text', () => {
+    quota(5)
+    const { rerender } = askFastAndFinish()
+    fireEvent.click(screen.getByRole('button', { name: 'Search deeper' }))
+    expect(mockChat.sendMessage).toHaveBeenLastCalledWith({
+      text: 'Search deeper: Who?',
+    })
+    // The server refuses it (a limit): the question is left with no reply.
+    mockChat.messages = [
+      ...thread,
+      {
+        id: 'u2',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Search deeper: Who?' }],
+      },
+    ]
+    mockChat.status = 'error'
+    mockChat.error = new Error('rate_limited')
+    rerender(<AgentSearch />)
+    // Sent again from the box it would run at the box's depth, so the box
+    // gets the question as the member asked it.
+    expect(screen.getByLabelText('Ask a follow-up')).toHaveValue('Who?')
+  })
+
+  test('paused, Ask again on a failed answer is disabled', () => {
+    mockChat.messages = [
+      thread[0],
+      { ...thread[1], metadata: { outcome: 'failed' } },
+    ] as UIMessage[]
+    quota(5)
+    const { unmount } = render(<AgentSearch />)
+    expect(screen.getByRole('button', { name: 'Ask again' })).toBeEnabled()
+    unmount()
+    render(<AgentSearch paused />)
+    expect(screen.getByRole('button', { name: 'Ask again' })).toBeDisabled()
   })
 
   test('a stored answer, whose depth the page does not know, offers none', () => {

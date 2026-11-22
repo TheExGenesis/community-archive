@@ -42,7 +42,7 @@ export const bashInstructions = (
 
 The shell:
 - Each bash call runs one command line (pipes, && and ; work). The working directory is /work, and files you write there stay for the rest of the conversation, including later questions.
-- Combine fetching and inspecting in one bash call (search ... > s1.jsonl && wc -l s1.jsonl && jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20) instead of spending another turn just to inspect what you wrote. For independent lookups that do not read each other's files, use par or issue multiple bash calls in the same turn (parallel bash calls in one turn start from the same files and cannot see each other's writes).
+- Combine fetching and inspecting in one bash call (search ... > s1.jsonl && wc -l s1.jsonl && jq -c '{id,author,date,text:.text[:160]}' s1.jsonl | head -20) instead of spending another turn just to inspect what you wrote. For independent lookups that do not read each other's files, use par inside one bash call. Several bash calls in one turn run one after another, so they save no time.
 - Tweet files are JSON Lines, one tweet per line: {"id","author","date","likes","reposts","replyTo","replyToAuthor","quotes","media","p","text"}. The text is always the full tweet; author includes the leading @ (e.g. "@alice").
 - Output longer than about 4,000 characters is cut, so never cat a big file: count with wc -l, summarise with jq, and always include id in jq previews (jq -c '{id,author,date,text:.text[:200]}' file | head) so you never need extra turns to recover tweet ids.
 
@@ -52,12 +52,12 @@ Archive commands (rows on stdout, a one-line summary on stderr, so you see the s
 - people <name or handle>: matching members, to get the right handle.
 - timeline @handle [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--oldest] [--no-replies] [--retweets] [--limit N]: that person's own tweets, newest first (200 by default, up to 3000; retweets only with --retweets). Use it to read what someone posts and whom they reply to, rather than searching their tweets for common words.
 - score <file> "<yes/no question about one tweet>" [--yes-if "<what counts as yes>"] [--no-if "<what counts as no>"]: asks the question of every tweet in the file (a reply is read with its parent) and prints the rows with p, the probability that the answer is yes, highest first. p ≥ 0.5 means yes; p says how sure the scorer is, not how strongly the tweet says it. Use it when a search returns more tweets than you can read. The scorer is a small, fast model that sees one tweet's text and your question, nothing else (not the user's question, the author, the date, pictures or other tweets), and takes your words literally. So ask one plain condition a reader could settle from the tweet alone, and name its subject in full rather than "it" or "the project". It cannot count, compare dates or numbers, or know who is writing: use jq on author, date and likes for those. When the line between yes and no needs saying, leave "rather than" and "not just" out of the question and state the line with --yes-if and --no-if, as in score books.jsonl "Does the author say they have read Dune?" --yes-if "they say they read or finished it" --no-if "they only mention it, plan to read it, or saw the film". These are read literally too: a --yes-if wider than the question lets more tweets in.
-- thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), show <id> (one tweet in full, with what it quotes).
+- thread <id> (the conversation a tweet is in), quotes <id> (tweets quoting it), tweets <id>... (by id), show <id> (one tweet in full, with what it quotes; it prints readable text, not a JSON row, so do not pipe it to jq).
 - expand <scored file> [--min-p 0.7] [--seeds N] [--limit N]: the conversations around the file's strongest tweets (p at least --min-p, the best 15 by default): the threads they sit in and the tweets quoting them, leaving out tweets already in the file, up to 300. People often answer a post without naming its topic, so score what expand finds with the same question.
 - interactions @handle [@other] [--since YYYY-MM] [--until YYYY-MM] [--limit N]: who an account was in conversation with, and when: replies, mentions and quotes in both directions, counted by month (out = from @handle, in = back to it), members marked, accounts with a back-and-forth first. With @other, the month-by-month timeline between the two. Use it to see whether someone was talking with an account or with members, for example before they used a phrase.
 - ties @handle... --before YYYY-MM [--months 12] [--peers 5]: for each account, how many people and how many members it had a back-and-forth with (each replied to, mentioned or quoted the other) in the months before that month, and the strongest of those ties. To give each account its own month, such as the month it first used a phrase, pipe "@handle YYYY-MM" lines instead: jq -r '[.author, .date[:7]] | @tsv' s1.jsonl | sort | awk '!seen[$1]++' | ties
 - par runs archive commands at the same time, while a for loop runs them one after another. par 'search {} --limit 100 > s_{}.jsonl' rust golang zig fills {} with each word; par 'timeline @a > a.jsonl' 'timeline @b > b.jsonl' runs each line. Output comes back in the order given.
-- Also: jq, grep, sort, uniq, head, tail, wc, cut, awk, sed, mkdir.
+- Also: jq, grep, sort, uniq, head, tail, wc, cut, awk, sed, split, mkdir.
 
 How to work:
 1. Work out what the question is about. If it names a person or account, run people first. A project may have its own account (the archive's is @comm_archive).
@@ -111,6 +111,7 @@ export function questionWithWorkspace(question: string, files: string[]) {
 /** Instructions for the typed tools, with an explicit date. */
 export const typedInstructions = (
   date: string = today(),
+  depth: AgentSearchDepth = 'deep',
 ) => `You answer questions about the Community Archive: tweets that members uploaded or opted in to share. You have search tools over that archive only. Today is ${date}.
 
 How to work:
@@ -119,7 +120,7 @@ How to work:
    Search matches text, not meaning, so try the forms people actually write: word variants (Greek and Greece, ban and banned), abbreviations, handles, and the specific names or jargon the topic would use. If a search finds nothing, rephrase before concluding.
    Leave optional fields out unless you need them. Add since/until only when the question asks about a time period.
 3. Use collect_and_score only when the answer is a set of posts spread across the archive (who criticised something, what people think about a topic) and searches show more matching posts than you can read, many of them off-topic. Give 2 to 8 terms that signal the answer and a precise yes/no criterion. It checks up to 300 posts by default; raise maxTweets (up to 1000) only when the question needs the long tail. If the result says capped, posts past the limit were not checked: narrow the terms or dates, or say so in the answer. Do not use it to find one remembered tweet or when a few searches already answer the question.
-4. Use semantic_search for ideas people express in their own words (survey and investigative questions), at most ${MAX_SEMANTIC_CALLS_PER_RUN} times per question; keep search_tweets for names, handles, exact phrases and dates. Score semantic results with score_tweets when precision matters.
+4. Use semantic_search for ideas people express in their own words (survey and investigative questions), at most ${AGENT_SEARCH_PROFILES[depth].maxSemanticCalls} times per question; keep search_tweets for names, handles, exact phrases and dates. Score semantic results with score_tweets when precision matters.
 5. Follow conversations when they matter: get_thread for replies and context, get_quote_posts for reactions. Use score_tweets to score posts you found this way.
    For who talked with whom and when (replies, mentions and quotes by month, both directions), use get_interactions; to check whether accounts had a back-and-forth with members in the months before some month, such as before they first used a phrase, use get_interaction_ties.
 6. Stop searching once more searches stop turning up new relevant posts. Do not repeat the same search.
@@ -277,10 +278,10 @@ export const agentSearchInstructions = (
   depth: AgentSearchDepth = 'deep',
 ) => {
   // The v2 prompts carry the fast run's one-round working text; v1 and the
-  // typed tools only get its lower step and semantic-search counts.
+  // typed tools only get its lower counts.
   const base =
     mode === 'typed'
-      ? typedInstructions(date)
+      ? typedInstructions(date, depth)
       : variant === 'v1'
         ? bashInstructions(date, depth)
         : bashInstructionsV2(date, variant === 'v2-examples', depth)
@@ -595,6 +596,8 @@ type Executors = Partial<AgentSearchToolExecutors>
 
 export function createAgentSearchTools(
   options?: { steps?: boolean } | Executors,
+  /** Semantic searches the run may make; a deep run's when left out. */
+  maxSemanticCalls: number = MAX_SEMANTIC_CALLS_PER_RUN,
 ): ToolSet {
   const run: AgentSearchToolExecutors = {
     ...AGENT_SEARCH_TOOL_EXECUTORS,
@@ -642,7 +645,7 @@ export function createAgentSearchTools(
         }),
     }),
     semantic_search: tool({
-      description: `Search tweets by meaning, for ideas people express in different words. Limited to ${MAX_SEMANTIC_CALLS_PER_RUN} per question; use search_tweets for names, handles, exact phrases and dates.`,
+      description: `Search tweets by meaning, for ideas people express in different words. Limited to ${maxSemanticCalls} per question; use search_tweets for names, handles, exact phrases and dates.`,
       inputSchema: z.object({
         query: z.string().min(3).max(300),
         fromUser: z.string().max(40).optional(),

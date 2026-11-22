@@ -14,9 +14,7 @@ export const CONVERSATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,100}$/
  * out). Earlier turns are never taken from the browser; the workflow rebuilds
  * them from the run store (context.ts).
  */
-export function parseAgentSearchRequest(
-  body: unknown,
-): {
+export function parseAgentSearchRequest(body: unknown): {
   conversationId: string
   question: string
   depth: AgentSearchDepth

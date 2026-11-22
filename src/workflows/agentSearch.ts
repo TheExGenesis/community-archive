@@ -31,6 +31,7 @@ import {
 import { buildRunParts } from '@/lib/agentSearch/history'
 import { agentSearchModel } from '@/lib/agentSearch/model'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
+import { createSlots } from '@/lib/agentSearch/slots'
 import type { AgentSearchRun } from '@/lib/agentSearch/types'
 import { logCommandTiming, withRecordedCost } from '@/lib/agentSearch/usage'
 import {
@@ -334,40 +335,54 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   let semanticUsed = 0
   // Tweets already sent to the page in this run (streamedBashOutput).
   const sentTweetIds = new Set<string>()
+  // The agent starts the tool calls of one turn together. Two shell commands
+  // at once would both begin from the same files and the same count of
+  // semantic searches, and each would get its own search slots, so they run
+  // one at a time, in the order the model called them.
+  const bashTurn = createSlots(1)
   const tools =
     toolMode === 'bash'
-      ? createBashAgentTools(async (args) => {
-          const output = await bashStep(
-            args,
-            workspace,
-            semanticUsed,
-            runId,
-            deadlineAt,
-            profile.maxSemanticCalls,
-          )
-          workspace = applyChanges(workspace, output.workspace)
-          semanticUsed += output.semanticCalls ?? 0
-          return streamedBashOutput(output, sentTweetIds)
-        })
-      : createAgentSearchTools({
-          find_people: (args) => findPeopleStep(args, deadlineAt),
-          search_tweets: (args) => searchTweetsStep(args, deadlineAt),
-          collect_and_score: (args) =>
-            collectAndScoreStep(args, runId, deadlineAt),
-          score_tweets: (args) => scoreTweetsStep(args, runId, deadlineAt),
-          get_thread: (args) => getThreadStep(args, deadlineAt),
-          get_quote_posts: (args) => getQuotePostsStep(args, deadlineAt),
-          get_tweets: (args) => getTweetsStep(args, deadlineAt),
-          get_interactions: (args) => interactionsStep(args, deadlineAt),
-          get_interaction_ties: (args) => interactionTiesStep(args, deadlineAt),
-          semantic_search: async (args) => {
-            if (semanticUsed >= profile.maxSemanticCalls) {
-              return semanticLimitReached(args.query, profile.maxSemanticCalls)
-            }
-            semanticUsed += 1
-            return semanticSearchStep(args, deadlineAt)
+      ? createBashAgentTools((args) =>
+          bashTurn.run(async () => {
+            const output = await bashStep(
+              args,
+              workspace,
+              semanticUsed,
+              runId,
+              deadlineAt,
+              profile.maxSemanticCalls,
+            )
+            workspace = applyChanges(workspace, output.workspace)
+            semanticUsed += output.semanticCalls ?? 0
+            return streamedBashOutput(output, sentTweetIds)
+          }),
+        )
+      : createAgentSearchTools(
+          {
+            find_people: (args) => findPeopleStep(args, deadlineAt),
+            search_tweets: (args) => searchTweetsStep(args, deadlineAt),
+            collect_and_score: (args) =>
+              collectAndScoreStep(args, runId, deadlineAt),
+            score_tweets: (args) => scoreTweetsStep(args, runId, deadlineAt),
+            get_thread: (args) => getThreadStep(args, deadlineAt),
+            get_quote_posts: (args) => getQuotePostsStep(args, deadlineAt),
+            get_tweets: (args) => getTweetsStep(args, deadlineAt),
+            get_interactions: (args) => interactionsStep(args, deadlineAt),
+            get_interaction_ties: (args) =>
+              interactionTiesStep(args, deadlineAt),
+            semantic_search: async (args) => {
+              if (semanticUsed >= profile.maxSemanticCalls) {
+                return semanticLimitReached(
+                  args.query,
+                  profile.maxSemanticCalls,
+                )
+              }
+              semanticUsed += 1
+              return semanticSearchStep(args, deadlineAt)
+            },
           },
-        })
+          profile.maxSemanticCalls,
+        )
   // Built once the context step says who is asking.
   const createAgent = (asker: AskerProfile | null) =>
     new WorkflowAgent({

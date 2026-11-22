@@ -52,6 +52,22 @@ export function priorRuns(
     .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
 }
 
+/**
+ * A run without its shell commands, for choosing which tweets to fetch. A
+ * stored command reaches the model as its summary and file names
+ * (bashModelOutput), never as tweets, so fetching the hundreds or thousands
+ * it touched would be thrown away.
+ */
+function withoutBashParts(run: AgentSearchRun): AgentSearchRun {
+  if (!Array.isArray(run.parts)) return run
+  return {
+    ...run,
+    parts: run.parts.filter(
+      (part) => (part as { type?: unknown } | null)?.type !== 'tool-bash',
+    ),
+  }
+}
+
 const isToolPart = (part: { type: string }) =>
   part.type === 'dynamic-tool' || part.type.startsWith('tool-')
 
@@ -107,7 +123,9 @@ export async function buildConversationContext(
   if (recent.length === 0) {
     return { messages: [], priorTweetIds: Array.from(priorTweetIds), workspace }
   }
-  const tweets = await loadTweets(recent)
+  // Citations stay valid for every earlier tweet (priorTweetIds above); only
+  // the typed tools' outputs need their tweets back for the model to read.
+  const tweets = await loadTweets(recent.map(withoutBashParts))
   const messages: ModelMessage[] = []
   for (const run of recent) {
     const turn = conversationMessages([run], tweets).map(withStepBoundary)

@@ -532,3 +532,23 @@ describe('search slots', () => {
     expect(await peakOf({})).toBe(12)
   })
 })
+
+describe('retryWhileBusy and a stopped run', () => {
+  test('does not wait once the run is stopped, and ends a wait when it is', async () => {
+    const stopped = new AbortController()
+    stopped.abort(new Error('stopped'))
+    const call = jest.fn().mockRejectedValue(busy())
+    await expect(
+      retryWhileBusy({ abortSignal: stopped.signal }, call, [5_000]),
+    ).rejects.toThrow('(503)')
+    expect(call).toHaveBeenCalledTimes(1)
+
+    const stop = new AbortController()
+    const started = Date.now()
+    const waiting = retryWhileBusy({ abortSignal: stop.signal }, call, [5_000])
+    setTimeout(() => stop.abort(new Error('stopped mid-wait')), 10)
+    await expect(waiting).rejects.toThrow('stopped mid-wait')
+    expect(Date.now() - started).toBeLessThan(1_000)
+    expect(call).toHaveBeenCalledTimes(2)
+  })
+})

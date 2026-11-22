@@ -398,6 +398,51 @@ describe('the bash workspace', () => {
     expect(semanticSearch).toHaveBeenCalledTimes(1)
   })
 
+  test('commands the model starts together run one at a time, each seeing the last', async () => {
+    ;(semanticSearch as jest.Mock).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return {
+        query: 'q',
+        matched: 1,
+        tweets: [{ ...tweet('3'), distance: 0.9 }],
+      }
+    })
+    // One semantic search allowed: two started together must not both run.
+    const capped = createInProcessBash({}, {}, 1)
+    const [first, second] = await Promise.all([
+      capped.execute({ command: 'semantic "moving there"' }),
+      capped.execute({ command: 'semantic "leaving there"' }),
+    ])
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect([first.exitCode, second.exitCode]).toEqual([0, 1])
+    expect(second.stderr).toContain('has used its 1 semantic search;')
+
+    // And the second reads the file the first wrote.
+    const shell = createInProcessBash()
+    const [, counted] = await Promise.all([
+      shell.execute({ command: 'search singapore > s1.jsonl' }),
+      shell.execute({ command: 'wc -l < s1.jsonl' }),
+    ])
+    expect(counted.exitCode).toBe(0)
+    expect(counted.stdout.trim()).toBe('4')
+  })
+
+  test('score says to split a file that is too large', async () => {
+    const big = Array.from({ length: 1001 }, (_, i) => ({ id: String(i + 1) }))
+    // The file's tweets, as the gateway would return them.
+    ;(getTweetsByIds as jest.Mock).mockImplementation(async (ids: string[]) =>
+      ids.map((id) => tweet(id)),
+    )
+    const out = await run(
+      'score big.jsonl "Does this tweet talk about living there?"',
+      {
+        'big.jsonl': { kind: 'tweets', rows: big },
+      },
+    )
+    expect(out.exitCode).not.toBe(0)
+    expect(out.stderr).toContain('split -l 1000 big.jsonl part_')
+  })
+
   test('a failed semantic search is not an archive outage', async () => {
     ;(semanticSearch as jest.Mock).mockRejectedValue(new Error('timeout'))
     const out = await run('semantic "anything at all"')
@@ -569,6 +614,22 @@ describe('the tweet ids a command printed', () => {
     ])
   })
 
+  test('ids beside a tab that jq -c printed as the two characters \\t', () => {
+    // jq -c '[.id, .author, .text] | @tsv' prints a JSON string per row.
+    const stdout = [
+      '"1111111111111111111\\t@alice\\tfirst"',
+      '"0.91\\t2222222222222222222\\t@bob"',
+      '"@carol\\t0.4\\t3333333333333333333"',
+    ].join('\n')
+    expect(idsInOutput(stdout).sort()).toEqual([
+      '1111111111111111111',
+      '2222222222222222222',
+      '3333333333333333333',
+    ])
+    // A long number in running text is still not an id.
+    expect(idsInOutput('"note\\tsaw 1234567890123456789 times"')).toEqual([])
+  })
+
   test('but not a long number inside a sentence or a count', () => {
     expect(
       idsInOutput('found 1234567890123456789 matches\n2026-10-06 300 tweets'),
@@ -620,6 +681,24 @@ describe('the archive command names', () => {
     )
     // The page never receives it.
     expect(streamedBashOutput(result, new Set()).timing).toBeUndefined()
+  })
+
+  test('a tweet read with show, and the one it quotes, can be cited', async () => {
+    ;(getTweetDetails as jest.Mock).mockResolvedValue([
+      {
+        ...tweet('3'),
+        quotedTweet: { id: '2', username: 'alice', text: 'tweet 2' },
+      },
+    ])
+    const result = await run('show 3')
+    // The text it prints carries no row for the page to read ids from.
+    expect(idsInOutput(result.stdout)).toEqual([])
+    expect(result.tweets.map((t) => t.id).sort()).toEqual(['2', '3'])
+    expect(result.summary).toBe('Read a tweet by @alice')
+    ;(getTweetDetails as jest.Mock).mockResolvedValue([])
+    const missing = await run('show 999; echo after')
+    expect(missing.summary).toBe('Tweet not found')
+    expect(missing.tweets).toEqual([])
   })
 
   test('show prints one tweet in full', async () => {
@@ -990,6 +1069,31 @@ describe('par', () => {
     expect(result.stderr.indexOf('“singapore”')).toBeLessThan(
       result.stderr.indexOf('“about”'),
     )
+  })
+
+  test('a failure inside a pipe on a par line is not hidden', async () => {
+    const piped = await run(`par 'false | cat' 'echo ok'`)
+    expect(piped.stdout).toBe('ok\n')
+    expect(piped.exitCode).toBe(1)
+    const fine = await run(`par 'echo a | cat' 'echo b'`)
+    expect(fine.exitCode).toBe(0)
+  })
+
+  test('a stopped run starts none of the lines par has yet to run', async () => {
+    const stop = new AbortController()
+    ;(searchTweets as jest.Mock).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      return { tweets: [], nextOffset: null }
+    })
+    // Eight lines, six at a time: the stop lands while the first six run.
+    const words = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].join(' ')
+    setTimeout(() => stop.abort(), 10)
+    await runBashCommand({
+      command: `par 'search word{}' ${words}`,
+      manifest: {},
+      limits: { abortSignal: stop.signal },
+    }).catch(() => undefined)
+    expect((searchTweets as jest.Mock).mock.calls.length).toBeLessThanOrEqual(6)
   })
 
   test('runs each argument as its own line, and refuses an empty or oversized call', async () => {

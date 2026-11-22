@@ -481,15 +481,21 @@ function toolsFor(
     )
   }
   let semanticUsed = 0
-  return mods.agent.createAgentSearchTools({
-    semantic_search: async (input, options) => {
-      if (semanticUsed >= maxSemanticCalls) {
-        return mods.toolImpl.semanticLimitReached(input.query, maxSemanticCalls)
-      }
-      semanticUsed += 1
-      return mods.toolImpl.semanticSearchImpl(input, options)
+  return mods.agent.createAgentSearchTools(
+    {
+      semantic_search: async (input, options) => {
+        if (semanticUsed >= maxSemanticCalls) {
+          return mods.toolImpl.semanticLimitReached(
+            input.query,
+            maxSemanticCalls,
+          )
+        }
+        semanticUsed += 1
+        return mods.toolImpl.semanticSearchImpl(input, options)
+      },
     },
-  })
+    maxSemanticCalls,
+  )
 }
 
 async function runQuestion(

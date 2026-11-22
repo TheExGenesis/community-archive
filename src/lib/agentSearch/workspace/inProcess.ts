@@ -1,5 +1,6 @@
 import type { BashExecutor } from '../agent'
 import type { RunLimits } from '../deadline'
+import { createSlots } from '../slots'
 import { applyChanges, type WorkspaceManifest } from './manifest'
 import { BoundedTweetMap } from './runCache'
 import { runBashCommand } from './workspace'
@@ -19,20 +20,23 @@ export function createInProcessBash(
   let manifest = initial
   let semanticUsed = 0
   const tweetCache = new BoundedTweetMap()
+  // One command at a time, as in the workflow (agentSearch.ts).
+  const turn = createSlots(1)
   return {
-    execute: async ({ command }) => {
-      const output = await runBashCommand({
-        command,
-        manifest,
-        limits,
-        semanticUsed,
-        maxSemanticCalls,
-        tweetCache,
-      })
-      manifest = applyChanges(manifest, output.workspace)
-      semanticUsed += output.semanticCalls
-      return output
-    },
+    execute: ({ command }) =>
+      turn.run(async () => {
+        const output = await runBashCommand({
+          command,
+          manifest,
+          limits,
+          semanticUsed,
+          maxSemanticCalls,
+          tweetCache,
+        })
+        manifest = applyChanges(manifest, output.workspace)
+        semanticUsed += output.semanticCalls
+        return output
+      }),
     manifest: () => manifest,
   }
 }

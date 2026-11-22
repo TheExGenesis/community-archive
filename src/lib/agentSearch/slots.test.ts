@@ -1,3 +1,4 @@
+import { RunDeadlineError } from './deadline'
 import { createSlots, inSearchSlot } from './slots'
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 2))
@@ -41,4 +42,52 @@ test('inSearchSlot runs the task directly when the limits carry no slots', async
     inSearchSlot({ searchSlots: slots as never }, async () => 3),
   ).resolves.toBe(3)
   expect(slots.run).toHaveBeenCalledTimes(1)
+})
+
+describe('a task waiting for its turn', () => {
+  const hold = (ms: number) => () =>
+    new Promise<string>((resolve) => setTimeout(() => resolve('held'), ms))
+
+  test('gives up when the run’s deadline passes, and its place goes to the next', async () => {
+    const slots = createSlots(1)
+    const first = slots.run(hold(60))
+    const started = Date.now()
+    const late = slots.run(async () => 'late', { deadlineAt: Date.now() + 15 })
+    const patient = slots.run(async () => 'patient')
+    await expect(late).rejects.toBeInstanceOf(RunDeadlineError)
+    // It did not wait for the slot to come free.
+    expect(Date.now() - started).toBeLessThan(55)
+    await expect(first).resolves.toBe('held')
+    await expect(patient).resolves.toBe('patient')
+    // The slot is free again afterwards.
+    await expect(slots.run(async () => 'after')).resolves.toBe('after')
+  })
+
+  test('gives up as soon as the run is stopped', async () => {
+    const slots = createSlots(1)
+    const first = slots.run(hold(60))
+    const stop = new AbortController()
+    const waiting = slots.run(async () => 'never', { abortSignal: stop.signal })
+    const ran = jest.fn(async () => 'never')
+    stop.abort(new Error('stopped'))
+    await expect(waiting).rejects.toThrow('stopped')
+    // Already stopped or out of time: it never joins the queue.
+    await expect(slots.run(ran, { abortSignal: stop.signal })).rejects.toThrow(
+      'stopped',
+    )
+    await expect(
+      slots.run(ran, { deadlineAt: Date.now() - 1 }),
+    ).rejects.toBeInstanceOf(RunDeadlineError)
+    expect(ran).not.toHaveBeenCalled()
+    await expect(first).resolves.toBe('held')
+  })
+
+  test('a task that gets its turn in time is not interrupted by the deadline', async () => {
+    const slots = createSlots(1)
+    const first = slots.run(hold(10))
+    const second = slots.run(hold(40), { deadlineAt: Date.now() + 25 })
+    await expect(first).resolves.toBe('held')
+    // It started before the deadline; what it then does is its own business.
+    await expect(second).resolves.toBe('held')
+  })
 })

@@ -361,6 +361,9 @@ export default function AgentSearch({
   >({})
   // The depth of the question being sent; the transport reads it.
   const sendDepthRef = useRef<AgentSearchDepth>(DEFAULT_AGENT_SEARCH_DEPTH)
+  // What goes back in the box if the server refuses the question being sent,
+  // when that is not the question's own text (Search deeper).
+  const restoreAsRef = useRef<string | null>(null)
   useEffect(() => {
     try {
       const kept = parseAgentSearchDepth(
@@ -765,7 +768,7 @@ export default function AgentSearch({
     const last = messages[messages.length - 1]
     if (last?.role !== 'user') return
     setMessages((current) => current.slice(0, -1))
-    setInput((value) => value || messageText(last))
+    setInput((value) => value || restoreAsRef.current || messageText(last))
     textareaRef.current?.focus()
   }, [error, messages, setMessages])
 
@@ -839,6 +842,13 @@ export default function AgentSearch({
         )
         if (!stored || !storedSettles(last, stored, broke)) return
         clearError()
+        // The stored answer has the run's id, not the live message's: carry
+        // its depth over, or a fast answer would lose "Search deeper".
+        setAnswerDepth((current) =>
+          last.id in current
+            ? { ...current, [stored.id]: current[last.id] }
+            : current,
+        )
         installStored(ended.conversationId, body)
       } catch {
         // The answer stays as it is; Ask again still works.
@@ -932,11 +942,18 @@ export default function AgentSearch({
   }, [busy, messages, runStartedAt])
 
   // `askDepth` is the composer's choice unless the question names its own
-  // (Search deeper), which leaves the composer's choice as it was.
-  const ask = (question: string, askDepth: AgentSearchDepth = depth) => {
+  // (Search deeper), which leaves the composer's choice as it was. Search
+  // deeper also names the plain question to put back if it is refused: its
+  // own text, sent again from the box, would run at the box's depth.
+  const ask = (
+    question: string,
+    askDepth: AgentSearchDepth = depth,
+    restoreAs: string | null = null,
+  ) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
     if (!text || busy || loading) return
     sendDepthRef.current = askDepth
+    restoreAsRef.current = restoreAs
     if (error) clearError()
     setLoadError(null)
     setInput('')
@@ -1222,7 +1239,7 @@ export default function AgentSearch({
     if (!handler) {
       handler = () => {
         captureProductAction('ask_archive', 'searched_deeper')
-        askRef.current(deeperQuestion(question), 'deep')
+        askRef.current(deeperQuestion(question), 'deep', question)
       }
       searchDeeperHandlers.current.set(question, handler)
     }
@@ -1245,7 +1262,7 @@ export default function AgentSearch({
       ? `You’ve used this month’s ${quota.limit} questions. You can ask again on ${resetLabel(quota)}.`
       : `You’ve used today’s ${quota.limit} questions. You can ask again at ${resetLabel(quota)}.`
     : null
-  const canAskAgain = !busy && !loading && !outOfQuestions
+  const canAskAgain = !busy && !loading && !outOfQuestions && !paused
 
   const errorNote = errorMessage && (
     <p

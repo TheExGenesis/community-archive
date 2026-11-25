@@ -8,6 +8,7 @@ import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import type { TweetLinkPreview } from './linkPreviewTypes'
+import { fetchTweetCards } from './clickhouseCorpusReads'
 import { xVideoFromUrl } from './xVideoUrl'
 import {
   fetchSyndicatedTweet,
@@ -687,32 +688,31 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
   const result = new Map<string, TweetLinkPreview[]>()
   if (safeTweetIds.length === 0) return result
 
-  const supabase = createServerServiceRoleClient()
-  const { data: urlRows, error: urlError } = await supabase
-    .from('tweet_urls')
-    .select('tweet_id, url, expanded_url')
-    .in('tweet_id', safeTweetIds)
-  // Throw rather than return an empty map, so a failed read is never cached.
-  if (urlError)
-    throw new Error(`Failed to load tweet URLs: ${urlError.message}`)
-  const candidateRows = [...(urlRows ?? [])]
-
-  // Some ingestion paths saved the link only in full_text, without tweet_urls.
-  // Fetch only those archived tweets, bounded by the existing request ID limit.
-  const missingUrlIds = safeTweetIds.filter(
-    (id) => !candidateRows.some((row) => row.tweet_id === id),
-  )
-  if (missingUrlIds.length) {
-    const { data: tweets, error: tweetsError } = await supabase
-      .from('tweets')
-      .select('tweet_id, full_text')
-      .in('tweet_id', missingUrlIds)
-    if (tweetsError)
-      throw new Error(`Failed to load tweet text: ${tweetsError.message}`)
-    for (const tweet of tweets ?? []) {
-      for (const url of tweet.full_text.match(/https?:\/\/[^\s<>"']+/g) ?? []) {
-        candidateRows.push({ tweet_id: tweet.tweet_id, url, expanded_url: url })
+  // Links come from the ClickHouse tweet cards; only the preview cache
+  // (tweet_link_previews) stays in Supabase. A gateway failure throws, so a
+  // failed read is never cached as "no previews".
+  const cards = await fetchTweetCards(safeTweetIds)
+  const candidateRows: Array<{
+    tweet_id: string
+    url: string
+    expanded_url: string | null
+  }> = []
+  for (const tweetId of safeTweetIds) {
+    const card = cards.get(tweetId)
+    if (!card) continue
+    if (card.urls.length) {
+      for (const url of card.urls) {
+        candidateRows.push({
+          tweet_id: tweetId,
+          url: url.url,
+          expanded_url: url.expandedUrl,
+        })
       }
+      continue
+    }
+    // Some ingestion paths saved the link only in the text, without URL rows.
+    for (const url of card.fullText.match(/https?:\/\/[^\s<>"']+/g) ?? []) {
+      candidateRows.push({ tweet_id: tweetId, url, expanded_url: url })
     }
   }
 
@@ -742,6 +742,7 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
   if (allCandidates.size === 0) return result
 
   const hashes = Array.from(allCandidates, previewUrlHash)
+  const supabase = createServerServiceRoleClient()
   const { data: cachedRows, error: cacheError } = await supabase
     .from('tweet_link_previews')
     .select(
@@ -788,13 +789,13 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
 /**
  * One tweet's previews, shared from the Data Cache for an hour. The preview
  * route is reachable signed out; without this every uncached request read
- * tweet_urls, tweets and tweet_link_previews. A tweet's links do not change,
+ * the gateway's tweet card and tweet_link_previews. A tweet's links do not change,
  * and preview rows refresh on their own TTLs, so an hour only delays a
  * refreshed card. Failures throw and are not cached.
  */
 export const getCachedTweetLinkPreviews = unstable_cache(
   async (tweetId: string): Promise<TweetLinkPreview[]> =>
     (await getTweetLinkPreviews([tweetId])).get(tweetId) ?? [],
-  ['tweet-link-previews-v1', productionReadCacheKey()],
+  ['tweet-link-previews-v2', productionReadCacheKey()],
   { revalidate: 3600 },
 )

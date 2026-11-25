@@ -1,36 +1,27 @@
-import { productionReadCacheKey } from '@/utils/supabaseReadRouting'
 import 'server-only'
 import { unstable_cache } from 'next/cache'
-import { createServerServiceRoleClient } from '@/utils/supabase'
+import { fetchTweetCards } from '@/lib/clickhouseCorpusReads'
 import { getBirdseyeBangerScores } from './birdseye-bangers'
 import { orderBirdseyeSources, type BirdseyePostSort } from './birdseye-order'
 import { selectBirdseyeSources } from './birdseye-threads'
 
-// Exact-reference metadata only; full tweet payloads still come from the shared reader.
+// Exact-reference metadata from the ClickHouse tweet cards; full tweet
+// payloads still come from the shared reader. Deleted, opted-out and unknown
+// tweets have no card and drop out, as they had no row before.
 const sourceMetadata = unstable_cache(
   async (input: string[]) => {
     const ids = Array.from(new Set(input.filter((id) => /^\d{1,20}$/.test(id))))
-    const rows: {
-      tweet_id: string | null
-      username: string | null
-      account_id: string | null
-      favorite_count: number | null
-      reply_to_tweet_id: string | null
-      conversation_id: string | null
-    }[] = []
-    for (let offset = 0; offset < ids.length; offset += 150) {
-      const { data, error } = await createServerServiceRoleClient()
-        .from('enriched_tweets')
-        .select(
-          'tweet_id,username,account_id,favorite_count,reply_to_tweet_id,conversation_id',
-        )
-        .in('tweet_id', ids.slice(offset, offset + 150))
-      if (error) throw new Error('Unable to group cited posts')
-      rows.push(...(data ?? []))
-    }
+    const rows = Array.from((await fetchTweetCards(ids)).values(), (card) => ({
+      tweet_id: card.tweetId as string | null,
+      username: card.username,
+      account_id: card.accountId as string | null,
+      favorite_count: (Number(card.favoriteCount) || 0) as number | null,
+      reply_to_tweet_id: card.replyToTweetId,
+      conversation_id: card.conversationId,
+    }))
     return { ids, rows }
   },
-  ['birdseye-source-metadata-v3', productionReadCacheKey()],
+  ['birdseye-source-metadata-v4'],
   { revalidate: 300 },
 )
 

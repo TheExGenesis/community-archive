@@ -37,8 +37,7 @@ export function SearchPageContent({ canSearch }: { canSearch: boolean }) {
   )
 
   const rawQuery = normalizedSearchParams.get('q')
-  let formattedQuery: string | undefined
-  // Strip quotes if present, keep the clean text for two-query exact-match-first logic
+  // Strip surrounding quotes; multi-word searches are phrase searches anyway.
   let cleanRawText: string | undefined
 
   if (rawQuery) {
@@ -48,13 +47,9 @@ export function SearchPageContent({ canSearch }: { canSearch: boolean }) {
     } else {
       cleanRawText = trimmedQuery
     }
-    // For single-word queries or fallback, still provide a formatted query
-    const words = cleanRawText.split(/\s+/).filter(Boolean)
-    formattedQuery = words.join(' & ')
   }
 
   const filterCriteria: FilterCriteria = {
-    searchQuery: formattedQuery,
     rawSearchQuery: cleanRawText,
     fromUsername: normalizedSearchParams.get('fromUser') || undefined,
     replyToUsername: normalizedSearchParams.get('replyToUser') || undefined,

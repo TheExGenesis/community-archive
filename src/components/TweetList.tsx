@@ -7,8 +7,6 @@ import UnifiedTweetList from '@/components/UnifiedTweetList'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { createBrowserClient } from '@/utils/supabase'
-import { SupabaseClient } from '@supabase/supabase-js'
 import { TimelineTweet } from '@/lib/types'
 import {
   FilterCriteria,
@@ -73,16 +71,10 @@ export default function TweetList({
   const [failedPage, setFailedPage] = useState(1)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState<number | null>(null)
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const [lastFetchCount, setLastFetchCount] = useState<number>(0)
-
-  useEffect(() => {
-    setSupabase(createBrowserClient())
-  }, [])
 
   const loadTweets = useCallback(
     async (pageToLoad: number, criteria: FilterCriteria) => {
-      if (!supabase) return
       activeRequest.current?.controller.abort()
       activeRequest.current?.previewController.abort()
       const request = {
@@ -169,28 +161,22 @@ export default function TweetList({
           if (!isCurrent() || definitiveEmpty) return
         }
 
-        const result = await fetchTweets(
-          supabase,
-          criteria,
-          pageToLoad,
-          itemsPerPage,
-          {
-            signal,
-            onBaseTweets:
-              pageToLoad === 1
-                ? (baseTweets) => {
-                    if (!isCurrent()) return
-                    reportReceived('canonical', baseTweets.length)
-                    canonicalReady = true
-                    request.previewController.abort()
-                    setTweets(baseTweets)
-                    setIsLoading(false)
-                    setIsCompletingPreview(false)
-                    setIsLoadingQuotes(true)
-                  }
-                : undefined,
-          },
-        )
+        const result = await fetchTweets(criteria, pageToLoad, itemsPerPage, {
+          signal,
+          onBaseTweets:
+            pageToLoad === 1
+              ? (baseTweets) => {
+                  if (!isCurrent()) return
+                  reportReceived('canonical', baseTweets.length)
+                  canonicalReady = true
+                  request.previewController.abort()
+                  setTweets(baseTweets)
+                  setIsLoading(false)
+                  setIsCompletingPreview(false)
+                  setIsLoadingQuotes(true)
+                }
+              : undefined,
+        })
         if (!isCurrent()) return
         if (result.error) throw result.error
         if (!canonicalReady) reportReceived('canonical', result.tweets.length)
@@ -227,16 +213,16 @@ export default function TweetList({
         }
       }
     },
-    [supabase, itemsPerPage],
+    [itemsPerPage],
   )
 
   useEffect(() => {
-    if (supabase) void loadTweets(1, stableCriteria)
+    void loadTweets(1, stableCriteria)
     return () => {
       activeRequest.current?.controller.abort()
       activeRequest.current?.previewController.abort()
     }
-  }, [supabase, stableCriteria, loadTweets])
+  }, [stableCriteria, loadTweets])
 
   const handleLoadMore = () => {
     if (

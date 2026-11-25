@@ -1,5 +1,10 @@
 const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   'bulletin-sources': new Set(['ids', 'enrich']),
+  // Website corpus reads that replaced the PostgreSQL tweets tables.
+  'tweet-cards': new Set(['ids']),
+  'quote-authors': new Set(['ids']),
+  'account-tweet-counts': new Set(['ids']),
+  'top-mentioned': new Set(['limit']),
   'corpus-count': new Set(),
   summary: new Set(),
   'member-directory': new Set([

@@ -17,6 +17,11 @@ export async function searchOwnTweets(search: OwnTweetSearch = {}) {
   const { query, kind, olderThanYears, sort, offset } =
     normalizeOwnTweetSearch(search)
 
+  // Stays on PostgreSQL on purpose. The gateway has the same list
+  // (/analytics/user/:accountId/own-tweets), but tweets a member removes with
+  // delete_own_tweets are deleted from PostgreSQL only; no tombstone reaches
+  // ClickHouse yet, so they would reappear in this cleanup list. Switch once
+  // those deletions propagate.
   let request = supabase
     .from('tweets')
     .select('tweet_id, created_at, full_text, favorite_count, retweet_count')

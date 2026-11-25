@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from '@/utils/supabase'
 import { browsingAuthError, requireBrowsingUser } from '@/lib/browsingAuth'
 import { GET as search } from '@/app/api/tweet-search/route'
+import { GET as searchQuotes } from '@/app/api/tweet-search/quotes/route'
 import { GET as related } from '@/app/api/search/related/route'
 import { GET as directory } from '@/app/api/user-directory/route'
 import { GET as avatar } from '@/app/api/profile/[account_id]/avatar/route'
@@ -32,6 +33,7 @@ beforeEach(() => {
 
 test.each([
   search,
+  searchQuotes,
   related,
   directory,
   avatar,

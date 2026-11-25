@@ -39,6 +39,15 @@ interface ClickHouseSearchRequestOptions {
   excludeRetweets?: boolean
 }
 
+export function hasSearchFilters(criteria: FilterCriteria): boolean {
+  return Boolean(
+    criteria.fromUsername ||
+      criteria.replyToUsername ||
+      criteria.startDate ||
+      criteria.endDate,
+  )
+}
+
 function mapSearchTweets(result: ClickHouseSearchResponse): TimelineTweet[] {
   return result.data.tweets.map((tweet) => ({
     tweet_id: tweet.tweetId,
@@ -74,19 +83,22 @@ async function requestClickHouseSearch(
   options: ClickHouseSearchRequestOptions = {},
 ): Promise<MappedClickHouseSearchResponse> {
   const query = criteria.rawSearchQuery?.trim()
-  if (!query) {
-    throw new Error('ClickHouse text search requires the raw search query')
+  // The website search route also takes no text when an author, reply target
+  // or date bounds the search (newest first only, no preview).
+  if (!query && !hasSearchFilters(criteria)) {
+    throw new Error('ClickHouse search requires text or a filter')
   }
 
   const offset = (page - 1) * pageSize
   if (offset > 5_000) return { tweets: [], definitiveEmpty: false }
 
-  const params = new URLSearchParams({
-    q: query,
-    mode: query.split(/\s+/).length > 1 ? 'phrase' : 'all',
-    limit: String(pageSize),
-    offset: String(offset),
-  })
+  const params = new URLSearchParams()
+  if (query) {
+    params.set('q', query)
+    params.set('mode', query.split(/\s+/).length > 1 ? 'phrase' : 'all')
+  }
+  params.set('limit', String(pageSize))
+  params.set('offset', String(offset))
   if (criteria.fromUsername) params.set('from_user', criteria.fromUsername)
   if (criteria.replyToUsername)
     params.set('reply_to_user', criteria.replyToUsername)

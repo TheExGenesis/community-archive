@@ -41,7 +41,6 @@ describe('searchTweetsWithClickHouse', () => {
 
     const tweets = await searchTweetsWithClickHouse(
       {
-        searchQuery: 'Open & source',
         rawSearchQuery: 'Open source',
         fromUsername: 'alice',
         replyToUsername: 'bob',
@@ -81,6 +80,38 @@ describe('searchTweetsWithClickHouse', () => {
         ],
       }),
     ])
+  })
+
+  test('sends a filter-only search without text', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({ data: { tweets: [], nextOffset: null } }),
+        ),
+    })
+
+    await searchTweetsWithClickHouse(
+      { fromUsername: 'alice', excludeRetweets: true },
+      1,
+      50,
+      fetchImpl as any,
+    )
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/tweet-search?limit=50&offset=0&from_user=alice&exclude_retweets=true',
+      { cache: 'no-store' },
+    )
+  })
+
+  test('refuses a search with neither text nor a filter', async () => {
+    const fetchImpl = jest.fn()
+    await expect(
+      searchTweetsWithClickHouse({ rawSearchQuery: ' ' }, 1, 50, fetchImpl),
+    ).rejects.toThrow('requires text or a filter')
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   test('stops cleanly before requesting an offset beyond the gateway cap', async () => {

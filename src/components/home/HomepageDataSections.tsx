@@ -44,7 +44,7 @@ export async function HomepageStats({
  * New tweets and members in the last 24 hours, pinned to the hero's top-left
  * corner. Reads the same cached summary as the hero line. Renders nothing when
  * the gateway omits both deltas, so a failed read never shows an invented zero.
- * Hidden below sm, where the title needs the hero's top padding.
+ * A zero member delta is dropped. Centred above the title below sm.
  */
 export async function HomepageGrowthCounter({
   data,
@@ -54,7 +54,7 @@ export async function HomepageGrowthCounter({
   const result = await data
   if (result.failed) return null
   const tweets = result.data.addedLast24Hours
-  const members = result.data.membersAddedLast24Hours ?? null
+  const members = result.data.membersAddedLast24Hours || null
   if (tweets == null && members == null) return null
   const parts = [
     tweets != null
@@ -67,7 +67,7 @@ export async function HomepageGrowthCounter({
   return (
     <span
       title="Added to the archive in the last 24 hours"
-      className="absolute left-4 top-3 hidden items-center gap-[7px] whitespace-nowrap rounded-full border border-border bg-background/70 px-2.5 py-1 text-[12px] text-muted-foreground backdrop-blur sm:left-6 sm:inline-flex"
+      className="absolute left-1/2 top-3 inline-flex -translate-x-1/2 items-center gap-[7px] whitespace-nowrap rounded-full border border-border bg-background/70 px-2.5 py-1 text-[12px] text-muted-foreground backdrop-blur sm:left-6 sm:translate-x-0"
     >
       <span
         aria-hidden

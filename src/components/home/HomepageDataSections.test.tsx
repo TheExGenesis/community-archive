@@ -104,6 +104,13 @@ test('growth counter omits missing deltas and hides on failure', async () => {
     }),
   )
   expect(container).toHaveTextContent('+668,600 tweets in 24h')
+  const { container: zeroMembers } = render(
+    await HomepageGrowthCounter({
+      data: growthStats({ membersAddedLast24Hours: 0 }),
+    }),
+  )
+  expect(zeroMembers).toHaveTextContent('+668,600 tweets in 24h')
+  expect(zeroMembers).not.toHaveTextContent('member')
   expect(
     await HomepageGrowthCounter({
       data: growthStats({

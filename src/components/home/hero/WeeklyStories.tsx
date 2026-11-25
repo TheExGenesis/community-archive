@@ -10,7 +10,7 @@ import type {
   WeeklyMapWeek,
 } from '@/lib/hexMap/stories'
 import { captureHomepageMapAction } from '@/lib/posthog'
-import StoryCard from './StoryCard'
+import StoryCard, { StoryPeople } from './StoryCard'
 import styles from './hero.module.css'
 
 export const weeklyStoriesOptions = queryOptions({
@@ -73,7 +73,6 @@ function WeeklyCard({
 }) {
   const highlight = useMemo(() => weeklyHighlight(story), [story])
   const panelId = `weekly-${story.id.replace(/[^a-z0-9-]/gi, '-')}`
-  const days = story.days.length
   return (
     <div className={styles.weeklyStory}>
       <button
@@ -90,16 +89,12 @@ function WeeklyCard({
         onFocus={() => onHover(highlight)}
         onBlur={() => onHover(null)}
       >
-        <div className={styles.meta}>
-          {days ? `${days} ${days === 1 ? 'day' : 'days'} · ` : ''}
-          {story.stories.length}{' '}
-          {story.stories.length === 1 ? 'daily story' : 'daily stories'}
-          <span aria-hidden className={styles.weeklyToggle}>
-            {expanded ? '−' : '+'}
-          </span>
-        </div>
+        <span aria-hidden className={styles.weeklyToggle}>
+          {expanded ? '−' : '+'}
+        </span>
         <h3>{story.title}</h3>
         <p>{story.subtitle}</p>
+        <StoryPeople people={highlight.people} />
       </button>
       {expanded && (
         <div id={panelId} className={styles.weeklyDailies}>

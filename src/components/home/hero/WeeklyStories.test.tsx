@@ -14,6 +14,9 @@ jest.mock('./StoryCard', () => ({
     story: MapStory
     onOpen: (story: MapStory) => void
   }) => <button onClick={() => onOpen(story)}>{story.title}</button>,
+  StoryPeople: ({ people }: { people: MapStory['people'] }) => (
+    <span>{people.map((p) => `@${p.username}`).join(', ')}</span>
+  ),
 }))
 
 const daily = (id: string, cells: number[], people: string[]): MapStory => ({
@@ -98,7 +101,8 @@ it('leads with the week so far and opens one weekly story into its daily stories
   expect(screen.queryByText('Daily 2026-11-10/one')).not.toBeInTheDocument()
   const big = screen.getByRole('button', { name: /The big story/ })
   expect(big).toHaveAttribute('aria-expanded', 'false')
-  expect(big).toHaveTextContent('2 days · 2 daily stories')
+  expect(big).not.toHaveTextContent('daily stories')
+  expect(big).toHaveTextContent('@alice, @bob, @carol')
   fireEvent.click(big)
   expect(big).toHaveAttribute('aria-expanded', 'true')
   expect(captureHomepageMapAction).toHaveBeenCalledWith('weekly_story_expanded')

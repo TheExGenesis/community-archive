@@ -6,6 +6,36 @@ import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { storyDetailOptions, warmStory } from './useStoryDetail'
 import styles from './hero.module.css'
+
+/** Avatars and the first handles of the people in a story. */
+export function StoryPeople({ people }: { people: MapStory['people'] }) {
+  if (!people.length) return null
+  return (
+    <div className={styles.people}>
+      <div className={styles.avatars}>
+        {people.slice(0, 4).map((p) => (
+          <Avatar
+            key={p.username}
+            className="-ml-1 h-[22px] w-[22px] border-2 border-background"
+          >
+            <AvatarImage src={p.avatar ?? undefined} alt="" loading="lazy" />
+            <AvatarFallback className="text-[9px]">
+              {p.username[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        ))}
+      </div>
+      <span>
+        {people
+          .slice(0, 2)
+          .map((p) => `@${p.username}`)
+          .join(', ')}
+        {people.length > 2 ? ` and ${people.length - 2} more` : ''}
+      </span>
+    </div>
+  )
+}
+
 export default function StoryCard({
   story,
   showDate = false,
@@ -41,6 +71,16 @@ export default function StoryCard({
       observer.disconnect()
     }
   }, [client, story])
+  const meta = [
+    story.kind === 'strand'
+      ? `${story.date.slice(0, 10)} · ${story.totalPosts ?? '—'} posts`
+      : showDate
+        ? story.date.slice(0, 10)
+        : '',
+    story.country ?? '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const hover = () => {
     onHover(story)
     void client.prefetchQuery(storyDetailOptions(story))
@@ -59,44 +99,10 @@ export default function StoryCard({
       onFocus={hover}
       onBlur={() => onHover(null)}
     >
-      <div className={styles.meta}>
-        {story.kind === 'strand'
-          ? `${story.date.slice(0, 10)} · ${story.totalPosts ?? '—'} posts`
-          : `${showDate ? `${story.date.slice(0, 10)} · ` : ''}${story.category}`}
-        {story.country ? ` · ${story.country}` : ''}
-      </div>
+      {meta && <div className={styles.meta}>{meta}</div>}
       <h3>{story.title}</h3>
       <p>{story.subtitle}</p>
-      {!!story.people.length && (
-        <div className={styles.people}>
-          <div className={styles.avatars}>
-            {story.people.slice(0, 4).map((p) => (
-              <Avatar
-                key={p.username}
-                className="-ml-1 h-[22px] w-[22px] border-2 border-background"
-              >
-                <AvatarImage
-                  src={p.avatar ?? undefined}
-                  alt=""
-                  loading="lazy"
-                />
-                <AvatarFallback className="text-[9px]">
-                  {p.username[0]?.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-          </div>
-          <span>
-            {story.people
-              .slice(0, 2)
-              .map((p) => `@${p.username}`)
-              .join(', ')}
-            {story.people.length > 2
-              ? ` and ${story.people.length - 2} more`
-              : ''}
-          </span>
-        </div>
-      )}
+      <StoryPeople people={story.people} />
     </button>
   )
 }

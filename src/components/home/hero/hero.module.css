@@ -839,6 +839,7 @@
 }
 .weeklyToggle {
   float: right;
+  margin: 4px 0 0 10px;
   font-size: 14px;
   line-height: 1;
   color: hsl(var(--brand-deep));

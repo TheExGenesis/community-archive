@@ -16,6 +16,7 @@ jest.mock('next/dynamic', () => () => () => null)
 jest.mock('./StoryCard', () => ({
   __esModule: true,
   default: ({ story }: { story: { id: string } }) => <p>{story.id}</p>,
+  StoryPeople: () => null,
 }))
 jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),

@@ -1,4 +1,5 @@
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
+import { reportServerError } from '@/lib/serverErrors'
 import { removeArchiveUploadObject } from '@/lib/upload-archive/removeArchiveUploadObject'
 import {
   createServerClient,
@@ -52,6 +53,12 @@ export async function DELETE(
     .maybeSingle()
   if (uploadError) {
     console.error('Error reading archive upload:', uploadError)
+    await reportServerError(
+      'archive_delete',
+      uploadError,
+      { stage: 'read_upload' },
+      user.id,
+    )
     return NextResponse.json(
       { error: 'Failed to delete archive' },
       { status: 500 },
@@ -68,6 +75,12 @@ export async function DELETE(
   })
   if (deleteError) {
     console.error('Error deleting archive upload:', deleteError)
+    await reportServerError(
+      'archive_delete',
+      deleteError,
+      { stage: 'delete_upload' },
+      user.id,
+    )
     return NextResponse.json(
       { error: 'Failed to delete archive' },
       { status: 500 },
@@ -84,6 +97,12 @@ export async function DELETE(
     return NextResponse.json({ deleted: true, file })
   } catch (error) {
     console.error('Error deleting archive file:', error)
+    await reportServerError(
+      'archive_delete',
+      error,
+      { stage: 'remove_storage_object' },
+      user.id,
+    )
     return NextResponse.json(
       {
         error: 'Archive deleted, but its raw archive file could not be removed',

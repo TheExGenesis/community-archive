@@ -114,7 +114,12 @@ export default function DataPolicyPage() {
         records page views (including URLs, search parameters, referrers, and
         campaign parameters), clicks and other page interactions, manually
         defined product events, browser and device context, Web Vitals, network
-        timing, and unhandled browser errors with diagnostic context.
+        timing, and unhandled browser errors with diagnostic context. When you
+        are not signed in, the only thing sent to PostHog is browser errors (the
+        error type, message, stack trace, and page category), without a link to
+        any account and without session replay. Errors on our servers are also
+        reported to PostHog with the affected route and, for signed-in requests,
+        your account ID.
       </p>
 
       <p className="mb-4">

@@ -8,6 +8,9 @@ import {
 } from '@/utils/supabase'
 import { DELETE } from './route'
 
+jest.mock('@/lib/serverErrors', () => ({
+  reportServerError: jest.fn().mockResolvedValue(false),
+}))
 jest.mock('next/headers', () => ({ cookies: jest.fn() }))
 jest.mock('@/utils/supabase', () => ({
   createServerClient: jest.fn(),

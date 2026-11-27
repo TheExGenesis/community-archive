@@ -4,13 +4,13 @@ import type { Instrumentation } from 'next'
  * Next.js instrumentation hook.
  *
  * `onRequestError` fires for every unhandled error in a route handler,
- * server component, server action or middleware. It is the server-side
- * counterpart of posthog-js `capture_exceptions` in the browser, so API and
- * rendering failures land in PostHog error tracking fingerprinted and
- * grouped, where the triage loop reads them (docs/hyperobservability.md).
- *
- * Only the Node.js runtime reports to PostHog; the edge runtime writes the
- * same structured log line and stops there.
+ * server component, server action or middleware. Every runtime writes one
+ * structured log line (`kind: "unhandled_error"`) so Vercel logs stay the raw
+ * record; the Node.js runtime then reports the error to PostHog error
+ * tracking with bounded context only (analytics route name or API route
+ * template, method, router kind, route type) and, for a verified signed-in
+ * session, the account id. See src/lib/serverErrors.ts,
+ * docs/product-analytics.md ("Error tracking") and docs/hyperobservability.md.
  */
 
 export async function register() {
@@ -61,21 +61,6 @@ export const onRequestError: Instrumentation.onRequestError = async (
 
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
-  const { captureServerException } = await import(
-    '@/lib/observability/serverErrorCapture'
-  )
-  await captureServerException(err, {
-    route,
-    method: request.method,
-    requestId: requestId ?? undefined,
-    userState,
-    upstream: 'unknown',
-    extra: {
-      router_kind: context.routerKind,
-      route_type: context.routeType,
-      render_source: context.renderSource ?? null,
-      revalidate_reason: context.revalidateReason ?? null,
-      kind: 'unhandled_error',
-    },
-  })
+  const { reportRequestError } = await import('@/lib/serverErrors')
+  await reportRequestError(err, request, context)
 }

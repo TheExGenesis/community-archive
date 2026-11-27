@@ -11,6 +11,9 @@ import { sendEmail } from '@/lib/email'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
 
+jest.mock('@/lib/serverErrors', () => ({
+  reportServerError: jest.fn().mockResolvedValue(false),
+}))
 jest.mock('@/lib/digest/data', () => ({ mapDigestEdition: jest.fn() }))
 jest.mock('@/lib/digest/cron', () => ({
   isAuthorizedDigestCronRequest: jest.fn(),

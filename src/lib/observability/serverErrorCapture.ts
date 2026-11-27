@@ -8,10 +8,12 @@ import 'server-only'
  * and the Next.js `onRequestError` hook the same fingerprinted, grouped
  * destination, so an agent can read one inbox for both halves of the app.
  *
- * Privacy contract: no request bodies, headers, cookies, query strings, IPs
- * or user identifiers are ever attached. The only user-related field is a
- * coarse `user_state` (guest / signed_in / unknown). Events are sent with
- * person profiles disabled and GeoIP disabled.
+ * Privacy contract: no request bodies, headers, cookies, query strings or
+ * IPs are ever attached. The user-related fields are a coarse `user_state`
+ * (guest / signed_in / unknown) and, only when the caller verified the
+ * session through Supabase (`src/lib/serverErrors.ts`), the account id as
+ * `distinct_id`. Everything else is sent under a fixed server id with person
+ * profiles disabled. GeoIP is always disabled.
  */
 
 import type { PostHog } from 'posthog-node'
@@ -27,6 +29,12 @@ export type ServerErrorContext = {
   upstream?: string
   requestId?: string
   userState?: UserState
+  /**
+   * Verified account id used as `distinct_id`, so the issue lists the member
+   * it affected. Set only from a Supabase-verified session, never from a raw
+   * header or cookie value. Unset: the fixed, personless server id.
+   */
+  distinctId?: string
   /** Free-form, non-identifying extras (router kind, revalidate reason, ...). */
   extra?: Record<string, string | number | boolean | null | undefined>
 }
@@ -103,7 +111,7 @@ export async function captureServerException(
     if (!ph) return false
     const err =
       error instanceof Error ? error : new Error(errorSummary(error).message)
-    ph.captureException(err, serverDistinctId(), {
+    ph.captureException(err, context.distinctId ?? serverDistinctId(), {
       route: context.route,
       method: context.method ?? null,
       status: context.status ?? null,
@@ -113,7 +121,8 @@ export async function captureServerException(
       side: 'server',
       ...deploymentProperties(),
       ...(context.extra ?? {}),
-      $process_person_profile: false,
+      // The fixed server id must never become a person profile.
+      ...(context.distinctId ? {} : { $process_person_profile: false }),
     })
     await ph.flush()
     return true

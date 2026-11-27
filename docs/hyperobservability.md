@@ -8,16 +8,19 @@ and the canary, below) builds on the contracts here.
 
 ## The three pieces
 
-| Piece                    | Where                                                                   | What it does                                                                                                                                                                                                                                         |
-| ------------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server exception capture | `src/instrumentation.ts`, `src/lib/observability/serverErrorCapture.ts` | Every unhandled error in a route handler, server component, action or middleware is sent to PostHog error tracking, fingerprinted and grouped like browser exceptions already are. Node runtime only; the edge runtime logs the same line and stops. |
-| Replayable API errors    | `src/lib/observability/apiError.ts`                                     | `reportApiError` turns a handled 5xx into one JSON log line (`kind: "api_error"`), a PostHog exception, and a response whose body carries `request_id`.                                                                                              |
-| Signal inbox             | `src/app/api/signals/[source]/route.ts`, `src/lib/signals/`             | Webhooks from PostHog, Grafana, the Vercel log drain, the autorefresh host and scripts become GitHub issues labelled `signal`, one per fingerprint.                                                                                                  |
+| Piece                    | Where                                                                                              | What it does                                                                                                                                                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server exception capture | `src/instrumentation.ts`, `src/lib/serverErrors.ts`, `src/lib/observability/serverErrorCapture.ts` | Every unhandled error in a route handler, server component, action or middleware is sent to PostHog error tracking, fingerprinted and grouped like browser exceptions already are. Node runtime only; the edge runtime logs the same line and stops. |
+| Replayable API errors    | `src/lib/observability/apiError.ts`                                                                | `reportApiError` turns a handled 5xx into one JSON log line (`kind: "api_error"`), a PostHog exception, and a response whose body carries `request_id`.                                                                                              |
+| Signal inbox             | `src/app/api/signals/[source]/route.ts`, `src/lib/signals/`                                        | Webhooks from PostHog, Grafana, the Vercel log drain, the autorefresh host and scripts become GitHub issues labelled `signal`, one per fingerprint.                                                                                                  |
 
 Nothing here changes what PostHog collects from browsers. Server events carry
-no bodies, headers, cookies, query strings, IPs or user ids; the only
-user-related field is `user_state` (`guest`, `signed_in`, `unknown`), read
-from the presence of a Supabase auth cookie and nothing else.
+no bodies, headers, cookies, query strings or IPs. `user_state` (`guest`,
+`signed_in`, `unknown`) is read from the presence of a Supabase auth cookie
+and nothing else. Unhandled errors and the deliberate `reportServerError`
+calls additionally use the account id as `distinct_id` when the session was
+verified through Supabase, so the issue lists the member it affected
+(docs/product-analytics.md, "Error tracking"); `reportApiError` never does.
 
 ## Environment
 

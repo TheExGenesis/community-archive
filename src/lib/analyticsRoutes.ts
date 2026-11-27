@@ -68,6 +68,7 @@ export const analyticsRoutes = {
   '/mission-control': ['mission_control', 'admin'],
   '/admin': ['admin', 'admin'],
   '/admin/keywords': ['admin_keywords', 'admin'],
+  '/admin/backfill': ['admin_backfill', 'admin'],
   '/admin/digest': ['admin_digest', 'admin'],
   '/admin/bulletin': ['admin_opportunities', 'admin'],
   '/login': ['login', 'authentication'],

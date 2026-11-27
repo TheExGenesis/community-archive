@@ -55,6 +55,13 @@ file_size_limit = "5000MiB"
 [storage.buckets.admin-deleted-user-data]
 public = false
 
+# Created on hosted Supabase by migration 20261127160000_admin_snapshots_bucket.sql
+# (admin-only operational snapshots, service role only).
+[storage.buckets.admin-snapshots]
+public = false
+file_size_limit = "20MiB"
+allowed_mime_types = ["application/json"]
+
 
 [auth]
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used

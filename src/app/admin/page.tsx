@@ -194,6 +194,17 @@ export default async function AdminPage({
           </p>
         </Link>
 
+        <Link
+          href="/admin/backfill"
+          className="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
+        >
+          <h2 className="font-semibold">Backfill progress →</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Per-member completeness and where each tweet crawl stands, by
+            priority.
+          </p>
+        </Link>
+
         <Suspense fallback={<SectionSkeleton label="Loading Ask usage" />}>
           <AskUsageSection />
         </Suspense>

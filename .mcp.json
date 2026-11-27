@@ -11,6 +11,14 @@
       "env": {
         "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
       }
+    },
+    "posthog-ca": {
+      "type": "http",
+      "url": "https://mcp.posthog.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${POSTHOG_CA_API_KEY}",
+        "x-posthog-project-id": "546185"
+      }
     }
   }
 }

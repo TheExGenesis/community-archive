@@ -15,6 +15,7 @@ import {
 import { agentSearchVisible } from '@/lib/agentSearch/visibility'
 
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
 

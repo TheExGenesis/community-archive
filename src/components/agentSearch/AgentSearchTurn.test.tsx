@@ -9,7 +9,7 @@ import {
 } from '@testing-library/react'
 import type { UIMessage } from 'ai'
 import type { PortalTweet } from '@/lib/portal/types'
-import { AgentSearchTurn } from './AgentSearchTurn'
+import { AgentSearchTurn, copyableAnswer } from './AgentSearchTurn'
 import {
   closeCitationSidebar,
   openCitationSidebar,
@@ -183,6 +183,12 @@ test('renders the answer with its list, its cited tweets and the sources', () =>
   expect(screen.getByText(/Not searched: live X/)).toBeInTheDocument()
 
   const cited = screen.getByRole('region', { name: 'Cited tweets' })
+  // Cited starts collapsed by default and opens on click.
+  const citedToggle = within(cited).getByRole('button', { name: /Cited/ })
+  expect(citedToggle).toHaveAttribute('aria-expanded', 'false')
+  expect(cited).not.toHaveTextContent('Post 1')
+  fireEvent.click(citedToggle)
+  expect(citedToggle).toHaveAttribute('aria-expanded', 'true')
   expect(cited).toHaveTextContent('Post 1')
   expect(screen.getByText(/marked unverified/)).toHaveTextContent(
     'One reference in this answer couldn’t be checked',
@@ -197,8 +203,11 @@ test('renders the answer with its list, its cited tweets and the sources', () =>
   expect(document.activeElement?.getAttribute('href')).toMatch(/-tweet-1$/)
   expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
 
-  // Sources hold only what the answer neither cites nor lists.
+  // Sources hold only what the answer neither cites nor lists, collapsed by default.
   const sources = screen.getByRole('region', { name: 'Sources' })
+  const sourcesToggle = within(sources).getByRole('button', { name: /Sources/ })
+  expect(sourcesToggle).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(sourcesToggle)
   // Cited tweets sit under the answer, not in a Sources tier.
   expect(within(sources).queryByRole('button', { name: /Cited/ })).toBeNull()
   expect(within(sources).getByText('@shared')).toBeInTheDocument()
@@ -219,9 +228,10 @@ test('a chip opens the cited tweets in a sidebar that closes with its button or 
     },
   ]
   render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
-  // Closed by default: the cited tweets sit under the answer.
+  // Closed by default: the cited tweets sit folded under the answer.
   const cited = screen.getByRole('region', { name: 'Cited tweets' })
   expect(screen.queryByRole('dialog')).toBeNull()
+  fireEvent.click(within(cited).getByRole('button', { name: /Cited/ }))
   const rows = cited.querySelectorAll<HTMLElement>('[data-anchor]')
   expect(rows).toHaveLength(2)
   // What a chip click does on a wide screen (AnswerMarkdown).
@@ -277,6 +287,47 @@ test('a stopped turn keeps its steps and found tweets, and asks again', () => {
   expect(
     screen.getByRole('region', { name: 'Found before you stopped' }),
   ).toBeInTheDocument()
+})
+
+test('a finished fast answer offers a deeper search; a running or stopped one does not', () => {
+  const onSearchDeeper = jest.fn()
+  const messages: UIMessage[] = [
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [
+        search('output-available', found),
+        { type: 'text', text: 'Here is what they said.' },
+      ],
+    },
+  ]
+  const view = buildTurnView(messages, 0)
+  const { rerender } = render(
+    <AgentSearchTurn
+      view={view}
+      active={false}
+      onSearchDeeper={onSearchDeeper}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Search deeper' }))
+  expect(onSearchDeeper).toHaveBeenCalledTimes(1)
+
+  rerender(
+    <AgentSearchTurn view={view} active onSearchDeeper={onSearchDeeper} />,
+  )
+  expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+  rerender(
+    <AgentSearchTurn
+      view={view}
+      active={false}
+      interrupted={{ kind: 'stopped', elapsedMs: 1000 }}
+      onSearchDeeper={onSearchDeeper}
+    />,
+  )
+  expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+  // Without the handler (a stored or deep answer) there is nothing to offer.
+  rerender(<AgentSearchTurn view={view} active={false} />)
+  expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
 })
 
 test('a run whose searches all failed says the archive is not responding', () => {
@@ -374,6 +425,7 @@ describe('a reopened conversation, its tweets still loading', () => {
       screen.getByRole('button', { name: '1 step · 5 tweets in the answer' }),
     ).toBeInTheDocument()
     const cited = screen.getByRole('region', { name: 'Cited tweets' })
+    fireEvent.click(within(cited).getByRole('button', { name: /Cited/ }))
     expect(
       within(cited).getAllByRole('status', { name: 'Loading this tweet' }),
     ).toHaveLength(2)
@@ -451,6 +503,7 @@ describe('a reopened conversation, its tweets still loading', () => {
       />,
     )
     const cited = screen.getByRole('region', { name: 'Cited tweets' })
+    fireEvent.click(within(cited).getByRole('button', { name: /Cited/ }))
     expect(within(cited).getAllByText('Couldn’t load this tweet')).toHaveLength(
       2,
     )
@@ -489,5 +542,147 @@ describe('a reopened conversation, its tweets still loading', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Ask again' }))
     expect(onAskAgain).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Copy answer' })).toBeNull()
+  })
+})
+
+describe('Copy answer', () => {
+  const originalClipboard = navigator.clipboard
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: originalClipboard,
+    })
+  })
+
+  test('copies prose, standalone embedded tweets, labeled lists, and references', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const richFound = {
+      tweets: [
+        { ...tweet('1', 'alice'), text: 'First line\n\nSecond line' },
+        { ...tweet('2', 'shared'), text: 'Post 2', p: 0.8 },
+        { ...tweet('3', 'bob'), text: 'Post 3\nwith break' },
+      ],
+      nextOffset: null,
+    }
+    const messages: UIMessage[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          search('output-available', richFound),
+          {
+            type: 'text',
+            text: [
+              'Here is what @alice wrote [[t:777]]:',
+              '',
+              '[[t:1]]',
+              '',
+              'Others echoed [[q:2 | Post 2]].',
+              '',
+              '[[posts: Shared | 1, 2, 3]]',
+            ].join('\n'),
+          },
+        ],
+      },
+    ]
+    render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy answer' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        'Here is what @alice wrote:',
+        '',
+        '> **@alice** (2025-01-01) [1]',
+        '> First line',
+        '>',
+        '> Second line',
+        '',
+        'Others echoed “Post 2” [2].',
+        '',
+        '### Shared',
+        '',
+        '- **@shared** (2025-01-01) [2]: Post 2 — https://x.com/shared/status/2',
+        '- **@alice** (2025-01-01) [1]: First line Second line — https://x.com/alice/status/1',
+        '- **@bob** (2025-01-01): Post 3 with break — https://x.com/bob/status/3',
+        '',
+        '[1] @alice https://x.com/alice/status/1',
+        '[2] @shared https://x.com/shared/status/2',
+      ].join('\n'),
+    )
+  })
+
+  test('formats people-grouped and unlabeled lists cleanly', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          search('output-available', found),
+          {
+            type: 'text',
+            text: [
+              'Key voices [[t:1]]:',
+              '',
+              '[[posts: Voices | 1, 2, 3 | people]]',
+              '',
+              '[[posts: | 4]]',
+            ].join('\n'),
+          },
+        ],
+      },
+    ]
+    const view = buildTurnView(messages, 0)
+    expect(copyableAnswer(view.answer)).toBe(
+      [
+        'Key voices [1]:',
+        '',
+        '### Voices',
+        '',
+        '- **@shared** (2 tweets)',
+        '  - 2025-01-01: Post 2 — https://x.com/shared/status/2',
+        '  - 2025-01-01: Post 3 — https://x.com/shared/status/3',
+        '- **@user1** (1 tweet)',
+        '  - 2025-01-01 [1]: Post 1 — https://x.com/user1/status/1',
+        '',
+        '- **@user4** (2025-01-01): Post 4 — https://x.com/user4/status/4',
+        '',
+        '[1] @user1 https://x.com/user1/status/1',
+      ].join('\n'),
+    )
+  })
+
+  test('shows Copy answer for list-only answers with no prose', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const messages: UIMessage[] = [
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [
+          search('output-available', found),
+          { type: 'text', text: '[[posts: Shared | 1, 2]]' },
+        ],
+      },
+    ]
+    render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy answer' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    expect(writeText).toHaveBeenCalledWith(
+      [
+        '### Shared',
+        '',
+        '- **@shared** (2025-01-01): Post 2 — https://x.com/shared/status/2',
+        '- **@user1** (2025-01-01): Post 1 — https://x.com/user1/status/1',
+      ].join('\n'),
+    )
   })
 })

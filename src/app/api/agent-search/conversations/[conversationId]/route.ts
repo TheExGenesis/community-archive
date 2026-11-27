@@ -11,6 +11,7 @@ import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 import { isLiveRun } from '@/lib/agentSearch/budget'
 
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
 

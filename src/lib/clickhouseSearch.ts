@@ -83,7 +83,12 @@ async function requestClickHouseSearch(
 
   const params = new URLSearchParams({
     q: query,
-    mode: query.split(/\s+/).length > 1 ? 'phrase' : 'all',
+    // Several words are a phrase unless the search asks for every word in
+    // any order (`match=all` in the page URL).
+    mode:
+      !criteria.matchAllWords && query.split(/\s+/).length > 1
+        ? 'phrase'
+        : 'all',
     limit: String(pageSize),
     offset: String(offset),
   })

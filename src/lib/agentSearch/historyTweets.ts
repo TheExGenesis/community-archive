@@ -1,6 +1,6 @@
 import 'server-only'
 import type { RunLimits } from './deadline'
-import { getTweetDetails, getTweetsByIds } from './gateway'
+import { getTweetsByIds } from './gateway'
 import {
   CITATION_PATTERN,
   QUOTE_PATTERN,
@@ -10,7 +10,6 @@ import {
 import { collectRefs } from './history'
 import type { AgentSearchRun, AgentTweet } from './types'
 
-const DETAIL_BATCH = 30
 const LOOKUP_BATCH = 100
 // Gateway calls in flight at once, so a long conversation does not fire
 // every lookup together.
@@ -83,10 +82,11 @@ export interface FetchedTweets {
 }
 
 /**
- * Fetches tweets by id through the gateway (which applies opt-outs). Ids in
- * `cited` get full cards (counts, media, quoted tweet); the rest, often
- * hundreds of listed tweets shown as rows, use the lighter batch lookup, as
- * the tools did. No call starts after the time budget, and each call's
+ * Fetches tweets by id through the gateway (which applies opt-outs), 100 a
+ * call, with the ids in `cited` first so the prose's chips and quotes fill
+ * in before the lists. Cited and listed tweets read the same tweet-cards
+ * route and get the same card (counts, media, quoted tweet), so they share
+ * one batch size. No call starts after the time budget, and each call's
  * timeout is cut to what is left.
  */
 export async function fetchConversationTweets(
@@ -95,17 +95,14 @@ export async function fetchConversationTweets(
   limits: RunLimits = { deadlineAt: Date.now() + LOAD_BUDGET_MS },
 ): Promise<FetchedTweets> {
   const unique = Array.from(new Set(ids))
-  const detailIds = unique.filter((id) => cited.has(id))
-  const lookupIds = unique.filter((id) => !cited.has(id))
-
+  const ordered = [
+    ...unique.filter((id) => cited.has(id)),
+    ...unique.filter((id) => !cited.has(id)),
+  ]
   const batches: Array<{ ids: string[]; fetch: () => Promise<AgentTweet[]> }> =
     []
-  for (let i = 0; i < detailIds.length; i += DETAIL_BATCH) {
-    const batch = detailIds.slice(i, i + DETAIL_BATCH)
-    batches.push({ ids: batch, fetch: () => getTweetDetails(batch, limits) })
-  }
-  for (let i = 0; i < lookupIds.length; i += LOOKUP_BATCH) {
-    const batch = lookupIds.slice(i, i + LOOKUP_BATCH)
+  for (let i = 0; i < ordered.length; i += LOOKUP_BATCH) {
+    const batch = ordered.slice(i, i + LOOKUP_BATCH)
     batches.push({ ids: batch, fetch: () => getTweetsByIds(batch, limits) })
   }
 

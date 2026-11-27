@@ -118,3 +118,21 @@ test('while the list loads it shows its place; once loaded and empty, nothing', 
   expect(screen.queryByRole('status')).toBeNull()
   expect(screen.queryByRole('heading', { name: 'Recent' })).toBeNull()
 })
+
+test('shows the latest six recent conversations and toggles the rest', () => {
+  const many = Array.from({ length: 8 }, (_, i) => ({
+    id: `c${i + 1}`,
+    title: `Question ${i + 1}`,
+    startedAt: '2026-10-09T10:00:00.000Z',
+    updatedAt: '2026-10-09T10:00:00.000Z',
+    turns: 1,
+    status: 'completed' as const,
+  }))
+  render(<RecentConversations conversations={many} onOpen={jest.fn()} />)
+  expect(screen.getByText('Question 6')).toBeInTheDocument()
+  expect(screen.queryByText('Question 7')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Show all 8' }))
+  expect(screen.getByText('Question 8')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }))
+  expect(screen.queryByText('Question 7')).toBeNull()
+})

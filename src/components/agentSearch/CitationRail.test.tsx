@@ -37,17 +37,27 @@ function rail(found: FoundTweet[], phase: FoundPhase, count: number) {
   )
 }
 
+const openPreview = () => {
+  const toggle = within(screen.getByRole('complementary')).getAllByRole(
+    'button',
+  )[0]
+  if (toggle.getAttribute('aria-expanded') === 'false') fireEvent.click(toggle)
+}
+
 const shown = () =>
   within(screen.getByRole('complementary'))
-    .getAllByText(/^Tweet \d$/)
+    .getAllByText(/^Tweet \d+$/)
     .map((el) => el.textContent)
 
-test('names the phase and keeps tweets on screen in place as new ones arrive', () => {
+test('names the phase, starts collapsed by default, and keeps tweets in place once opened', () => {
   const latest: FoundPhase = { kind: 'latest', source: 'Searched “singapore”' }
   const { rerender } = render(rail([item('1'), item('2')], latest, 300))
-  expect(
-    screen.getByRole('complementary', { name: 'Latest matches' }),
-  ).toHaveTextContent('300 found · newest from searched “singapore”')
+  const aside = screen.getByRole('complementary', { name: 'Latest matches' })
+  // Collapsed pill stays compact (count only; source detail shows inside once opened).
+  expect(aside).toHaveTextContent('Latest matches · 300 found')
+  expect(within(aside).queryByText('Tweet 1')).toBeNull()
+  openPreview()
+  expect(aside).toHaveTextContent('Newest from searched “singapore”')
   expect(shown()).toEqual(['Tweet 1', 'Tweet 2'])
 
   // A new set: the newcomer enters at the top, tweet 2 moves down instead of
@@ -77,6 +87,7 @@ test('a newcomer’s highlight clears even when the same tweets come again', () 
   try {
     const latest: FoundPhase = { kind: 'latest', source: null }
     const { rerender } = render(rail([item('1')], latest, 1))
+    openPreview()
     rerender(rail([item('2'), item('1')], latest, 2))
     const row = () => screen.getByText('Tweet 2').closest('li')
     expect(row()).toHaveClass('bg-brand/10')
@@ -89,10 +100,23 @@ test('a newcomer’s highlight clears even when the same tweets come again', () 
   }
 })
 
-test('shows at most five', () => {
-  const many = ['1', '2', '3', '4', '5', '6'].map((id) => item(id))
-  render(rail(many, { kind: 'latest', source: null }, 6))
-  expect(shown()).toHaveLength(5)
+test('shows 25 initially when opened and reveals more on demand', () => {
+  const many = Array.from({ length: 80 }, (_, i) => item(String(i + 1)))
+  render(rail(many, { kind: 'latest', source: null }, 80))
+  openPreview()
+  expect(shown()).toHaveLength(25)
+
+  const moreButton = screen.getByRole('button', {
+    name: /Show more · 55 remaining/i,
+  })
+  fireEvent.click(moreButton)
+  expect(shown()).toHaveLength(75)
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /Show more · 5 remaining/i }),
+  )
+  expect(shown()).toHaveLength(80)
+  expect(screen.queryByRole('button', { name: /Show more/i })).toBeNull()
 })
 
 test('a chosen citation opens once: rebuilt citations do not reopen a tweet the reader closed', () => {

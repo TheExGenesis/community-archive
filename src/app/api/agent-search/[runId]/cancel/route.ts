@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server'
 import { getRun } from 'workflow/api'
+import { RunExpiredError, WorkflowRunNotFoundError } from 'workflow/errors'
+import { isLiveRun } from '@/lib/agentSearch/budget'
 import { getAgentSearchAccess } from '@/lib/agentSearch/eligibility'
 import { workflowRunIdOf } from '@/lib/agentSearch/runs'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
+import { isTerminalStatus } from '@/lib/agentSearch/stream'
+import { clearRunTweetCache } from '@/lib/agentSearch/workspace/runCache'
 
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
+
+const isGoneError = (error: unknown) =>
+  RunExpiredError.is(error) || WorkflowRunNotFoundError.is(error)
 
 // Stops a running answer. Only the asker may stop it. The workflow's last step
 // never runs after a cancel, so the run record is closed here. Its tokens and
@@ -40,26 +48,45 @@ export async function POST(
   }
   // Without a workflow run yet, the run is still starting: closing the record
   // is enough, since the start route and the workflow's first step both stop
-  // a run that is no longer marked running. A failed cancel leaves the run
-  // running, so the page can try again.
+  // a run that is no longer marked running. A failed cancel on a live run
+  // leaves the run running so the page can try again, unless the workflow is
+  // already gone, terminal, or past the stale window (e.g. a dev recompile).
   const workflowRunId = workflowRunIdOf(stored)
   if (workflowRunId) {
+    const run = getRun(workflowRunId)
     try {
-      await getRun(workflowRunId).cancel({
+      await run.cancel({
         cancelReason: 'Stopped by the member',
       })
     } catch (error) {
-      console.error('[agent-search] cancel failed', error)
-      return NextResponse.json(
-        { error: 'unavailable' },
-        { status: 503, headers: noStore },
-      )
+      let alreadyEnded = isGoneError(error) || !isLiveRun(stored)
+      if (!alreadyEnded) {
+        try {
+          alreadyEnded = isTerminalStatus(await run.status)
+        } catch (statusError) {
+          alreadyEnded = isGoneError(statusError)
+        }
+      }
+      if (!alreadyEnded) {
+        console.error('[agent-search] cancel failed', error)
+        return NextResponse.json(
+          { error: 'unavailable' },
+          { status: 503, headers: noStore },
+        )
+      }
     }
+  }
+  // If the workflow recorded its final answer while Stop was in flight, keep it.
+  const latest = await store.get(runId)
+  if (latest && latest.status !== 'running') {
+    clearRunTweetCache(runId)
+    return NextResponse.json({ status: latest.status }, { headers: noStore })
   }
   await store.update(runId, {
     status: 'failed',
     error: 'Stopped by the member',
     completedAt: new Date().toISOString(),
   })
+  clearRunTweetCache(runId)
   return NextResponse.json({ status: 'failed' }, { headers: noStore })
 }

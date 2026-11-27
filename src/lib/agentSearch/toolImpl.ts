@@ -1,5 +1,5 @@
-import { scoreTweets } from './classifier'
-import type { RunLimits } from './deadline'
+import { scoreTweets, type ScoreDefinitions } from './classifier'
+import { deadlinePassed, type RunLimits } from './deadline'
 import {
   findMembers,
   getInteractionTies,
@@ -8,13 +8,15 @@ import {
   getTweetDetails,
   getTweetThread,
   getTweetsByIds,
+  getTweetsByIdsSettled,
   getUser,
   searchTweets,
   type SearchMode,
   type SearchSort,
+  type SearchTweetsInput,
 } from './gateway'
 import {
-  SEMANTIC_LIMIT_MESSAGE,
+  semanticLimitMessage,
   semanticSearch,
   type SemanticSearchInput,
 } from './semantic'
@@ -24,6 +26,15 @@ import type { AgentTweet, ScoredTweet } from './types'
 // 'use step' function; scripts call them directly. The second argument carries
 // the run's deadline (and, from the AI SDK in scripts, an abort signal); every
 // gateway and scorer call below honours it.
+
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
+
+/** A search term that failed, with why, so the agent can retry only it. */
+export interface FailedTerm {
+  term: string
+  error: string
+}
 
 /** Drops '' / null / [] values that models send for unused optional fields. */
 function present<T extends object>(input: T): T {
@@ -46,6 +57,84 @@ const PAGE = 100
 // Searches one command keeps in flight. The gateway answers 503 "Search is
 // busy" when one caller sends more at once (seen with 7 on 2026-11-02).
 export const SEARCH_CONCURRENCY = 3
+/** The gateway's highest search offset. */
+const MAX_OFFSET = 5000
+
+/**
+ * Up to `want` search results from `from` on. The first page goes alone,
+ * since most searches fit in one; the rest run `concurrency` at a time. A
+ * short or empty page is not the end (the gateway leaves out deleted tweets);
+ * a null `nextOffset` is, and stays null in the result. A non-null one means more
+ * exist, even past the gateway's highest offset, where a later call from it
+ * returns nothing.
+ *
+ * A failed first page fails the search, as does Stop. A page after it that
+ * fails (a timeout, the gateway busy, the run's time limit) ends the paging:
+ * the pages read so far come back, with `partial` saying why. A page asked
+ * for past the end in the same wave does not count.
+ */
+export async function searchPages(
+  input: Omit<SearchTweetsInput, 'limit' | 'offset'>,
+  want: number,
+  limits: RunLimits,
+  from = 0,
+  concurrency = SEARCH_CONCURRENCY,
+): Promise<{
+  tweets: AgentTweet[]
+  nextOffset: number | null
+  partial?: string
+}> {
+  if (from > MAX_OFFSET) return { tweets: [], nextOffset: null }
+  const tweets: AgentTweet[] = []
+  let nextOffset: number | null = from
+  let waveSize = 1
+  let pagesRead = 0
+  let partial: string | undefined
+  while (
+    nextOffset !== null &&
+    nextOffset <= MAX_OFFSET &&
+    tweets.length < want
+  ) {
+    // Each page asks for what is still wanted, up to PAGE, and starts where
+    // the one before it ends, as the gateway's nextOffset does.
+    const wave: Array<{ offset: number; limit: number }> = []
+    let offset = nextOffset
+    let left = want - tweets.length
+    while (wave.length < waveSize && left > 0 && offset <= MAX_OFFSET) {
+      const limit = Math.min(PAGE, left)
+      wave.push({ offset, limit })
+      offset += limit
+      left -= limit
+    }
+    const results = await Promise.allSettled(
+      wave.map(({ offset, limit }) =>
+        searchTweets({ ...input, offset, limit }, limits),
+      ),
+    )
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      if (result.status === 'rejected') {
+        if (limits.abortSignal?.aborted || pagesRead === 0) throw result.reason
+        partial = errorText(result.reason)
+        nextOffset = wave[i].offset
+        break
+      }
+      pagesRead += 1
+      tweets.push(...result.value.tweets)
+      nextOffset = result.value.nextOffset
+      // An offset that does not move forward would repeat this page.
+      if (nextOffset !== null && nextOffset <= wave[i].offset) nextOffset = null
+      // A later page counts only if it starts where this one says the next
+      // begins; after a null nextOffset it is past the end, and so is any
+      // failure there.
+      if (nextOffset === null || nextOffset !== wave[i + 1]?.offset) break
+    }
+    if (partial !== undefined) break
+    waveSize = concurrency
+  }
+  const found = { tweets: tweets.slice(0, want), nextOffset }
+  return partial === undefined ? found : { ...found, partial }
+}
 const MAX_KEPT_RETURNED = 60
 const MAX_BORDERLINE_RETURNED = 20
 
@@ -127,20 +216,34 @@ export async function searchTweetsImpl(
         [input.query, ...input.anyOf].map((t) => t.trim()).filter(Boolean),
       ),
     ).slice(0, 9)
-    const pages = await Promise.all(
+    const pages = await Promise.allSettled(
       terms.map((term) =>
         searchTweets({ ...filters, query: term, limit }, limits),
       ),
     )
     const merged = new Map<string, AgentTweet>()
-    for (const page of pages)
-      for (const tweet of page.tweets) merged.set(tweet.id, tweet)
+    const failedTerms: FailedTerm[] = []
+    let firstError: unknown
+    pages.forEach((page, i) => {
+      if (page.status === 'fulfilled') {
+        for (const tweet of page.value.tweets) merged.set(tweet.id, tweet)
+      } else {
+        firstError ??= page.reason
+        failedTerms.push({ term: terms[i], error: errorText(page.reason) })
+      }
+    })
+    // Stop fails the search, even when every term answered first.
+    if (limits.abortSignal?.aborted)
+      throw limits.abortSignal.reason ?? firstError
+    // Every term failed: the search fails.
+    if (failedTerms.length === terms.length) throw firstError
     return {
       query: terms.join(' OR '),
       tweets: Array.from(merged.values())
         .sort(newestFirst)
         .slice(0, limit * 2),
       nextOffset: null,
+      ...(failedTerms.length ? { failedTerms } : {}),
     }
   }
   const page = await searchTweets(
@@ -160,21 +263,49 @@ export async function searchTweetsImpl(
   }
 }
 
+/**
+ * The text of each reply's parent. A parent already in hand (among the tweets
+ * being scored, or in `cache`, the run's fetched tweets) is not fetched
+ * again; those fetched here join the cache.
+ *
+ * A parent is context, not the thing scored: when its lookup fails, the reply
+ * is scored on its own words and `unavailable` names the parents that did not
+ * come back. Past the run's deadline it fails instead, since the scorer would
+ * not start either.
+ */
 async function parentTexts(
   tweets: AgentTweet[],
   limits: RunLimits,
-): Promise<Map<string, string>> {
-  const parentIds = Array.from(
-    new Set(
-      tweets.map((t) => t.replyToTweetId).filter((id): id is string => !!id),
-    ),
-  )
+  cache?: Map<string, AgentTweet>,
+): Promise<{
+  texts: Map<string, string>
+  unavailable: Set<string>
+  error?: string
+}> {
+  const inHand = new Map(tweets.map((tweet) => [tweet.id, tweet]))
   const texts = new Map<string, string>()
-  for (let i = 0; i < parentIds.length; i += 100) {
-    const parents = await getTweetsByIds(parentIds.slice(i, i + 100), limits)
-    for (const parent of parents) texts.set(parent.id, parent.text)
+  const missing = new Set<string>()
+  for (const tweet of tweets) {
+    const id = tweet.replyToTweetId
+    if (!id || texts.has(id)) continue
+    const parent = inHand.get(id) ?? cache?.get(id)
+    if (parent) texts.set(id, parent.text)
+    else missing.add(id)
   }
-  return texts
+  if (!missing.size) return { texts, unavailable: new Set() }
+  const found = await getTweetsByIdsSettled(Array.from(missing), limits)
+  if (found.failedIds.length && deadlinePassed(limits)) throw found.error
+  for (const parent of found.tweets) {
+    texts.set(parent.id, parent.text)
+    cache?.set(parent.id, parent)
+  }
+  return found.failedIds.length
+    ? {
+        texts,
+        unavailable: new Set(found.failedIds),
+        error: errorText(found.error),
+      }
+    : { texts, unavailable: new Set() }
 }
 
 export async function scoreWithParents(
@@ -182,26 +313,44 @@ export async function scoreWithParents(
   tweets: AgentTweet[],
   withParent: boolean,
   limits: RunLimits,
-) {
+  definitions: ScoreDefinitions = {},
+  cache?: Map<string, AgentTweet>,
+): Promise<{
+  scored: ScoredTweet[]
+  scorer: Awaited<ReturnType<typeof scoreTweets>>['scorer']
+  costUsd: number
+  /** Replies scored alone because their parent's lookup failed, and why. */
+  withoutParent?: number
+  parentError?: string
+}> {
   const parents = withParent
-    ? await parentTexts(tweets, limits)
-    : new Map<string, string>()
+    ? await parentTexts(tweets, limits, cache)
+    : { texts: new Map<string, string>(), unavailable: new Set<string>() }
   const result = await scoreTweets(
     criterion,
     tweets.map((tweet) => ({
       id: tweet.id,
       text: tweet.text,
       parentText: tweet.replyToTweetId
-        ? parents.get(tweet.replyToTweetId)
+        ? parents.texts.get(tweet.replyToTweetId)
         : null,
     })),
     limits,
+    definitions,
   )
   const scored: ScoredTweet[] = tweets
     .filter((tweet) => result.scores.has(tweet.id))
     .map((tweet) => ({ ...tweet, p: result.scores.get(tweet.id) ?? 0 }))
     .sort((a, b) => b.p - a.p)
-  return { scored, scorer: result.scorer, costUsd: result.costUsd }
+  // Replies scored without their parent because its lookup failed.
+  const withoutParent = tweets.filter(
+    (tweet) =>
+      tweet.replyToTweetId && parents.unavailable.has(tweet.replyToTweetId),
+  ).length
+  const done = { scored, scorer: result.scorer, costUsd: result.costUsd }
+  return withoutParent
+    ? { ...done, withoutParent, parentError: parents.error }
+    : done
 }
 
 /** Runs `run` over every item, `concurrency` at a time, keeping order. */
@@ -227,19 +376,37 @@ async function mapWithConcurrency<T, R>(
 /**
  * Pages through every term, SEARCH_CONCURRENCY at a time, giving each an
  * equal share of the limit, so the first term cannot use it all. Shares left
- * unused by terms that run out pass to terms that still have pages. All terms
- * finish before anything is returned, so the agent gets one combined result.
- * `capped` is true when matching posts were left unfetched.
+ * unused by terms that run out pass to terms that still have pages. Each
+ * term reads its pages one at a time, so the terms together keep at most
+ * SEARCH_CONCURRENCY searches in flight. All terms finish before anything is
+ * returned, so the agent gets one combined result. `capped` is true when
+ * matching posts were left unfetched.
+ *
+ * Every term is searched with the same filters, mode and sort. The merged
+ * result interleaves the terms' lists, so with `sort: 'likes'` each term's
+ * part is in like order but the whole is not: the top of every term's list
+ * comes first.
+ *
+ * A term that fails, or stops part-way, is not asked for again and is named
+ * in `failedTerms`; the others' tweets are kept. Only when no term answered
+ * at all, or on Stop, does the whole collection fail.
  */
 export async function collectAcrossTerms(
   terms: string[],
   max: number,
-  filters: { since?: string; until?: string; fromUser?: string },
+  filters: Omit<SearchTweetsInput, 'query' | 'limit' | 'offset'>,
   limits: RunLimits,
-) {
+): Promise<{
+  collected: Map<string, AgentTweet>
+  capped: boolean
+  failedTerms?: FailedTerm[]
+}> {
   const collected = new Map<string, AgentTweet>()
   const offsets = new Map<string, number | null>(terms.map((t) => [t, 0]))
   const open = () => terms.filter((term) => offsets.get(term) !== null)
+  const failedTerms: FailedTerm[] = []
+  let answered = false
+  let firstError: unknown
   let dropped = false
   while (collected.size < max && open().length) {
     const active = open()
@@ -248,24 +415,27 @@ export async function collectAcrossTerms(
       active,
       SEARCH_CONCURRENCY,
       async (term) => {
-        const tweets: AgentTweet[] = []
-        let offset = offsets.get(term) ?? null
-        while (offset !== null && tweets.length < share) {
-          const page: { tweets: AgentTweet[]; nextOffset: number | null } =
-            await searchTweets(
-              {
-                ...filters,
-                query: term,
-                limit: Math.min(PAGE, share - tweets.length),
-                offset,
-              },
-              limits,
-            )
-          tweets.push(...page.tweets)
-          offset = page.tweets.length ? page.nextOffset : null
+        try {
+          const { tweets, nextOffset, partial } = await searchPages(
+            { ...filters, query: term },
+            share,
+            limits,
+            offsets.get(term) ?? 0,
+            1,
+          )
+          answered = true
+          if (partial !== undefined) {
+            failedTerms.push({ term, error: partial })
+            offsets.set(term, null)
+          } else offsets.set(term, nextOffset)
+          return tweets
+        } catch (error) {
+          if (limits.abortSignal?.aborted) throw error
+          firstError ??= error
+          failedTerms.push({ term, error: errorText(error) })
+          offsets.set(term, null)
+          return []
         }
-        offsets.set(term, offset)
-        return tweets
       },
     )
     // Interleave so an overlap between terms does not favour the first one.
@@ -279,7 +449,9 @@ export async function collectAcrossTerms(
       }
     }
   }
-  return { collected, capped: dropped || open().length > 0 }
+  if (!answered) throw firstError
+  const found = { collected, capped: dropped || open().length > 0 }
+  return failedTerms.length ? { ...found, failedTerms } : found
 }
 
 export interface CollectAndScoreInput {
@@ -303,7 +475,7 @@ export async function collectAndScoreImpl(
     Math.max(input.maxTweets ?? DEFAULT_COLLECT, 1),
     MAX_COLLECT,
   )
-  const { collected, capped } = await collectAcrossTerms(
+  const { collected, capped, failedTerms } = await collectAcrossTerms(
     terms,
     max,
     {
@@ -336,6 +508,7 @@ export async function collectAndScoreImpl(
     borderline: borderline.slice(0, MAX_BORDERLINE_RETURNED),
     scorer,
     costUsd,
+    ...(failedTerms ? { failedTerms } : {}),
   }
 }
 
@@ -532,10 +705,10 @@ export async function interactionTiesImpl(
 }
 
 /** What the typed tool returns once a question has used its semantic searches. */
-export const semanticLimitReached = (query: string) => ({
+export const semanticLimitReached = (query: string, max?: number) => ({
   query,
   limitReached: true as const,
-  message: SEMANTIC_LIMIT_MESSAGE,
+  message: semanticLimitMessage(max),
   tweets: [] as [],
 })
 

@@ -14,7 +14,7 @@ import {
   MAX_CONTEXT_TURNS,
   priorRuns,
 } from './context'
-import { buildRunParts } from './history'
+import { buildRunParts, collectRefs } from './history'
 import type { AgentSearchRun, AgentTweet } from './types'
 
 const tweet = (id: string): AgentTweet =>
@@ -233,6 +233,16 @@ describe('the workspace across turns', () => {
         rows: [{ id: '11' }, { id: '12', p: 0.7 }],
       },
     })
+    // A stored command reaches the model as its summary and files, so its
+    // tweets are not fetched: the loader is asked about no shell parts, and
+    // the real loader would find no ids to look up.
+    const [asked] = loadTweets.mock.calls[0] as unknown as [AgentSearchRun[]]
+    expect(
+      asked.flatMap((r) => (r.parts as Array<{ type: string }>) ?? []),
+    ).toEqual([{ type: 'text', text: 'See [[posts: All | s1.jsonl]]' }])
+    expect(Array.from(collectRefs(asked.map((r) => r.parts)))).toEqual([])
+    // The tweets it returned can still be cited by the follow-up.
+    expect(context.priorTweetIds.sort()).toEqual(['11', '12'])
     expect(context.messages).toEqual([
       {
         type: 'json',

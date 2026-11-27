@@ -22,14 +22,15 @@ export function QuestionHandling() {
         </p>
         <ul className="list-disc space-y-1.5 pl-4 text-muted-foreground">
           <li>
-            The model that runs the search sees your question, your handle,
-            name and bio, and the tweets it finds. It is reached through
-            OpenRouter, set to keep nothing and not train on it.
+            The model that runs the search sees your question, your handle, name
+            and bio, and the tweets it finds. It is reached through OpenRouter,
+            set to keep nothing and not train on it.
           </li>
           <li>
             Searches by meaning go to the Community Archive’s embeddings
             service. Relevance checks send tweet text, with a yes-or-no question
-            written by the agent, to OpenAI.
+            written by the agent, to OpenAI. When Web search is turned on, web
+            queries the agent writes go to OpenRouter’s web search backend.
           </li>
           <li>
             Conversations are saved to your account so you can come back to

@@ -4,7 +4,9 @@ import {
   fetchAnalyticsGatewayJson,
 } from '@/lib/clickhouseGateway'
 import type { PortalMedia, PortalQuotedTweet } from '@/lib/portal/types'
-import { callTimeoutMs, type RunLimits } from './deadline'
+import { callTimeoutMs, deadlinePassed, type RunLimits } from './deadline'
+import { inSearchSlot } from './slots'
+import { traced } from './trace'
 import type { AgentTweet } from './types'
 
 // Tool backends. Every read goes through the ClickHouse gateway, which applies
@@ -31,15 +33,28 @@ export async function retryWhileBusy<T>(
         error instanceof AnalyticsGatewayError && error.status === 503
       const delay = delays[attempt]
       if (!busy || delay === undefined) throw error
-      if (
-        limits.deadlineAt !== undefined &&
-        Date.now() + delay >= limits.deadlineAt
-      ) {
-        throw error
-      }
-      await new Promise((resolve) => setTimeout(resolve, delay))
+      // No retry after the deadline or a stop, and the wait ends at once
+      // when the run is stopped during it.
+      if (deadlinePassed(limits, Date.now() + delay)) throw error
+      await pause(delay, limits.abortSignal)
     }
   }
+}
+
+/** Id lookups are 100 at a time; this many run at once. */
+const ID_BATCH = 100
+const ID_BATCH_CONCURRENCY = 4
+
+/** A gateway read, timed on the run's trace when it carries one. */
+function gatewayJson<T>(
+  limits: RunLimits,
+  path: string[],
+  params: URLSearchParams,
+  options: Parameters<typeof fetchAnalyticsGatewayJson>[2],
+): Promise<T> {
+  return traced(limits, 'gateway', path[0], () =>
+    fetchAnalyticsGatewayJson<T>(path, params, options),
+  )
 }
 
 interface GatewayMedia {
@@ -155,13 +170,17 @@ export async function searchTweets(
   if (input.since) params.set('since', input.since)
   if (input.until) params.set('until', input.until)
   if (input.sort && input.sort !== 'newest') params.set('sort', input.sort)
-  const response = await retryWhileBusy(limits, () =>
-    fetchAnalyticsGatewayJson<{
-      data: { tweets: GatewayTweet[]; nextOffset: number | null }
-    }>(['search'], params, {
-      baseUrl: clickHouseSearchGatewayBaseUrl(),
-      timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
-    }),
+  // One shell command's searches share its slots, so par cannot stack more
+  // on the gateway than a single search command would.
+  const response = await inSearchSlot(limits, () =>
+    retryWhileBusy(limits, () =>
+      gatewayJson<{
+        data: { tweets: GatewayTweet[]; nextOffset: number | null }
+      }>(limits, ['search'], params, {
+        baseUrl: clickHouseSearchGatewayBaseUrl(),
+        timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
+      }),
+    ),
   )
   if (!Array.isArray(response.data?.tweets)) {
     throw new Error('Gateway search returned an invalid payload')
@@ -178,9 +197,10 @@ export async function getTweetThread(
   limits: RunLimits = {},
 ): Promise<{ tweet: AgentTweet; conversation: AgentTweet[] } | null> {
   if (!ID.test(tweetId)) throw new Error('Invalid tweet id')
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data?: { tweet: GatewayTweet; conversationTweets: GatewayTweet[] }
   }>(
+    limits,
     ['tweet', tweetId, 'thread'],
     new URLSearchParams({ limit: String(limit) }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -202,7 +222,7 @@ export async function getQuotePosts(
   limits: RunLimits = {},
 ): Promise<{ tweets: AgentTweet[]; total: number }> {
   if (!ID.test(tweetId)) throw new Error('Invalid tweet id')
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data: Array<{
       tweetId: string
       accountId: string
@@ -217,6 +237,7 @@ export async function getQuotePosts(
     }>
     query: { total: string | number }
   }>(
+    limits,
     ['quote-posts', tweetId],
     new URLSearchParams({
       limit: String(Math.min(Math.max(limit, 1), 100)),
@@ -251,53 +272,118 @@ export async function getQuotePosts(
   }
 }
 
+/**
+ * Looks up any number of tweets by id, 100 per call with a few calls in
+ * flight, and returns what the gateway had, in no particular order.
+ */
+export async function getTweetsByIdsBatched(
+  ids: string[],
+  limits: RunLimits = {},
+): Promise<AgentTweet[]> {
+  const unique = Array.from(new Set(ids))
+  const batches: string[][] = []
+  for (let i = 0; i < unique.length; i += ID_BATCH)
+    batches.push(unique.slice(i, i + ID_BATCH))
+  const found: AgentTweet[] = []
+  for (let i = 0; i < batches.length; i += ID_BATCH_CONCURRENCY) {
+    const pages = await Promise.all(
+      batches
+        .slice(i, i + ID_BATCH_CONCURRENCY)
+        .map((batch) => getTweetsByIds(batch, limits)),
+    )
+    for (const page of pages) found.push(...page)
+  }
+  return found
+}
+
+/** What a settled lookup got, and the ids of the batches that failed. */
+export interface SettledTweets {
+  tweets: AgentTweet[]
+  /** Ids in batches that failed; empty when every batch answered. */
+  failedIds: string[]
+  /** The first failure, when there was one. */
+  error?: unknown
+}
+
+/**
+ * As getTweetsByIdsBatched, but a failed batch does not sink the others:
+ * what answered comes back with the ids of the batches that did not, so the
+ * caller can say what is missing. For reply context, the page's tweet cards
+ * and the `tweets` and `semantic` commands. Rebuilding a workspace file and
+ * scoring stay strict, so a failed batch is never taken for deleted tweets.
+ * Stop still throws.
+ */
+export async function getTweetsByIdsSettled(
+  ids: string[],
+  limits: RunLimits = {},
+): Promise<SettledTweets> {
+  const unique = Array.from(new Set(ids))
+  const batches: string[][] = []
+  for (let i = 0; i < unique.length; i += ID_BATCH)
+    batches.push(unique.slice(i, i + ID_BATCH))
+  const tweets: AgentTweet[] = []
+  const failedIds: string[] = []
+  let error: unknown
+  for (let i = 0; i < batches.length; i += ID_BATCH_CONCURRENCY) {
+    const group = batches.slice(i, i + ID_BATCH_CONCURRENCY)
+    const settled = await Promise.allSettled(
+      group.map((batch) => getTweetsByIds(batch, limits)),
+    )
+    settled.forEach((result, j) => {
+      if (result.status === 'fulfilled') tweets.push(...result.value)
+      else {
+        failedIds.push(...group[j])
+        error ??= result.reason
+      }
+    })
+    if (limits.abortSignal?.aborted) throw limits.abortSignal.reason ?? error
+  }
+  return error === undefined
+    ? { tweets, failedIds }
+    : { tweets, failedIds, error }
+}
+
+/**
+ * Tweets by id from the gateway's tweet-cards route, at most 100 per call:
+ * text, counts, media, reply-to, the quoted tweet and the conversation id.
+ * Ids the corpus lacks, and deleted or opted-out tweets, are left out
+ * (control-panel gateway contract, "Website corpus reads"). Returned in the
+ * order the ids were given. Replaced bulletin-sources, which had no counts,
+ * media or quotes and served members only.
+ */
+async function getTweetCards(
+  ids: string[],
+  limits: RunLimits,
+): Promise<AgentTweet[]> {
+  const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
+    0,
+    ID_BATCH,
+  )
+  if (valid.length === 0) return []
+  const response = await gatewayJson<{
+    data?: { tweets?: GatewayTweet[] }
+  }>(limits, ['tweet-cards'], new URLSearchParams({ ids: valid.join(',') }), {
+    timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
+  })
+  if (!Array.isArray(response.data?.tweets)) {
+    throw new Error('Gateway tweet-cards returned an invalid payload')
+  }
+  const byId = new Map(
+    response.data.tweets
+      .filter((row) => row && typeof row.tweetId === 'string')
+      .map((row) => [row.tweetId, row]),
+  )
+  return valid.flatMap((id) => {
+    const row = byId.get(id)
+    return row ? [toAgentTweet(row)] : []
+  })
+}
+
 export async function getTweetsByIds(
   ids: string[],
   limits: RunLimits = {},
 ): Promise<AgentTweet[]> {
-  const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
-    0,
-    100,
-  )
-  if (valid.length === 0) return []
-  const response = await fetchAnalyticsGatewayJson<{
-    data: Array<{
-      tweet_id: string
-      account_id: string
-      created_at: string
-      full_text: string
-      reply_to_tweet_id: string | null
-      username: string
-      display_name?: string
-      avatar_url?: string | null
-      is_tombstone?: boolean
-    }>
-  }>(
-    ['bulletin-sources'],
-    new URLSearchParams({ ids: valid.join(','), enrich: 'true' }),
-    { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
-  )
-  if (!Array.isArray(response.data)) {
-    throw new Error('Gateway bulletin-sources returned an invalid payload')
-  }
-  // A deleted tweet's latest version is a tombstone; the Bulletin worker drops
-  // these rows from the same endpoint.
-  return response.data
-    .filter((row) => !row.is_tombstone)
-    .map((row) =>
-      toAgentTweet({
-        tweetId: row.tweet_id,
-        accountId: row.account_id,
-        createdAt: row.created_at,
-        fullText: row.full_text,
-        replyToTweetId: row.reply_to_tweet_id,
-        favoriteCount: 0,
-        retweetCount: null,
-        username: row.username,
-        accountDisplayName: row.display_name ?? row.username,
-        avatarMediaUrl: row.avatar_url ?? null,
-      }),
-    )
+  return getTweetCards(ids, limits)
 }
 
 export interface AgentUser {
@@ -321,12 +407,13 @@ export async function getUser(
 ): Promise<AgentUser | null> {
   const clean = identifier.trim().replace(/^@/, '')
   if (!/^[A-Za-z0-9_]{1,80}$/.test(clean)) return null
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data?: {
       account?: Record<string, unknown>
       topTweets?: Array<Record<string, unknown>>
     }
   }>(
+    limits,
     ['user', clean],
     new URLSearchParams({ limit: '5', include_interactions: 'false' }),
     { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -359,7 +446,7 @@ export async function findMembers(
 ): Promise<
   Array<{ accountId: string | null; username: string; displayName: string }>
 > {
-  const response = await fetchAnalyticsGatewayJson<{
+  const response = await gatewayJson<{
     data: {
       users: Array<{
         accountId: string | null
@@ -368,6 +455,7 @@ export async function findMembers(
       }>
     }
   }>(
+    limits,
     ['member-directory'],
     new URLSearchParams({
       limit: String(limit),
@@ -385,37 +473,18 @@ export async function findMembers(
   }))
 }
 
-/** Full detail (counts, media, quoted tweet) for a few ids, in parallel. */
+/**
+ * Full detail (counts, media, quoted tweet) for up to 30 ids, in one
+ * tweet-cards call (it was one tweet/:id call per id).
+ */
 export async function getTweetDetails(
   ids: string[],
   limits: RunLimits = {},
 ): Promise<AgentTweet[]> {
-  const valid = Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(
-    0,
-    30,
+  return getTweetCards(
+    Array.from(new Set(ids.filter((id) => ID.test(id)))).slice(0, 30),
+    limits,
   )
-  const tweets: AgentTweet[] = []
-  for (let i = 0; i < valid.length; i += 8) {
-    const batch = await Promise.all(
-      valid.slice(i, i + 8).map(async (id) => {
-        const response = await fetchAnalyticsGatewayJson<{
-          data?: { tweet: GatewayTweet; quotedTweet: GatewayTweet | null }
-        }>(['tweet', id], new URLSearchParams(), {
-          timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
-        }).catch((error: { status?: number }) => {
-          if (error?.status === 404) return { data: undefined }
-          throw error
-        })
-        if (!response.data?.tweet) return null
-        return toAgentTweet({
-          ...response.data.tweet,
-          quotedTweet: response.data.quotedTweet,
-        })
-      }),
-    )
-    for (const tweet of batch) if (tweet) tweets.push(tweet)
-  }
-  return tweets
 }
 
 /** Distinct tweets of each kind one account sent another (a tweet counts once in tweets). */
@@ -533,7 +602,8 @@ export async function getInteractions(
     params.set('limit', String(Math.min(Math.max(input.limit, 1), 100)))
   }
   return retryWhileBusy(limits, () =>
-    fetchAnalyticsGatewayJson<InteractionPeers | InteractionPair>(
+    gatewayJson<InteractionPeers | InteractionPair>(
+      limits,
       ['interactions'],
       params,
       { timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS) },
@@ -570,8 +640,270 @@ export async function getInteractionTies(
     params.set('peers', String(Math.min(Math.max(input.peers, 0), 10)))
   }
   return retryWhileBusy(limits, () =>
-    fetchAnalyticsGatewayJson<InteractionTies>(['interaction-ties'], params, {
+    gatewayJson<InteractionTies>(limits, ['interaction-ties'], params, {
       timeoutMs: callTimeoutMs(limits, GATEWAY_TIMEOUT_MS),
     }),
   )
+}
+
+// --- Account timeline (gateway /v1) ---------------------------------------
+// One account's own tweets come from the gateway's /v1/accounts/{account}/tweets
+// route (keyset-paginated, 200 per page). Production /v1 accepts only personal
+// cak_ keys (PR #1276), with the public limits (60 a minute, two in flight per
+// account), so Ask sends COMMUNITY_ARCHIVE_API_KEY first and falls back to
+// CLICKHOUSE_ANALYTICS_API_TOKEN on a 401 or 403 (apiV1Json). An internal
+// budget for Ask on /v1 is a gateway change (control-panel).
+
+interface V1Tweet {
+  tweet_id: string
+  account_id: string
+  username: string | null
+  account_display_name: string | null
+  avatar_media_url: string | null
+  created_at: string
+  full_text: string
+  favorite_count: number
+  retweet_count: number
+  reply_to_tweet_id: string | null
+  reply_to_username: string | null
+  quoted_tweet_id: string | null
+  media?: Array<{
+    media_url: string
+    media_type: string
+    width: number | null
+    height: number | null
+  }>
+}
+
+/**
+ * The API v1 base: COMMUNITY_ARCHIVE_API_V1_URL, else /v1 on the gateway host
+ * (the search URL, or the analytics URL without its /analytics).
+ */
+export function apiV1BaseUrl(
+  env: Record<string, string | undefined> = process.env,
+) {
+  const explicit = env.COMMUNITY_ARCHIVE_API_V1_URL?.trim()
+  if (explicit) return explicit.replace(/\/$/, '')
+  const host =
+    env.CLICKHOUSE_SEARCH_API_URL?.trim() ||
+    env.CLICKHOUSE_ANALYTICS_API_URL?.trim().replace(/\/analytics\/?$/, '')
+  return host ? `${host.replace(/\/$/, '')}/v1` : undefined
+}
+
+/** An API v1 error, with the HTTP status and the API's error code. */
+export class ApiV1Error extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiV1Error'
+  }
+}
+
+/** Attempts at one API v1 request when it answers 429 or 503. */
+const V1_ATTEMPTS = 3
+/** The wait before a retry: Retry-After, at most 10 s, else 1 s. */
+const V1_MAX_RETRY_WAIT_MS = 10_000
+const V1_DEFAULT_RETRY_WAIT_MS = 1_000
+
+function retryWaitMs(retryAfter: string | null | undefined): number {
+  const value = retryAfter?.trim() ?? ''
+  // Seconds only; an HTTP date counts as missing.
+  if (!/^\d+(\.\d+)?$/.test(value)) return V1_DEFAULT_RETRY_WAIT_MS
+  return Math.min(Number(value) * 1000, V1_MAX_RETRY_WAIT_MS)
+}
+
+/**
+ * Aborts when either signal does, as in semantic.ts. `release` removes its
+ * listeners, since the run's signal outlives many calls.
+ */
+function either(a: AbortSignal, b: AbortSignal) {
+  const controller = new AbortController()
+  const releases: Array<() => void> = []
+  for (const signal of [a, b]) {
+    if (signal.aborted) controller.abort(signal.reason)
+    else {
+      const onAbort = () => controller.abort(signal.reason)
+      signal.addEventListener('abort', onAbort, { once: true })
+      releases.push(() => signal.removeEventListener('abort', onAbort))
+    }
+  }
+  return {
+    signal: controller.signal,
+    release: () => releases.forEach((release) => release()),
+  }
+}
+
+/** Waits `ms`, or rejects as soon as `signal` aborts. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason)
+      return
+    }
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(signal?.reason)
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * One API v1 read. A 429 or 503 is retried after Retry-After, up to three
+ * attempts, but never waits or retries past the run's deadline or after the
+ * run is stopped; any other failure throws an ApiV1Error at once.
+ */
+async function apiV1Json<T>(
+  label: string,
+  path: string,
+  params: URLSearchParams,
+  limits: RunLimits,
+): Promise<T> {
+  const base = apiV1BaseUrl()
+  if (!base) throw new Error('CLICKHOUSE_SEARCH_API_URL is not configured')
+  const explicitBase = process.env.COMMUNITY_ARCHIVE_API_V1_URL?.trim()
+  const siteToken = process.env.CLICKHOUSE_ANALYTICS_API_TOKEN?.trim()
+  const publicKey = process.env.COMMUNITY_ARCHIVE_API_KEY?.trim()
+  // Production /v1 accepts only personal cak_ keys (PR #1276), so the public
+  // key goes first when it is set. The internal token is the fallback: the
+  // local stand-in takes it, and so will /v1 if the gateway adds an internal
+  // bypass. A 401 or 403 moves to the next key once instead of failing the
+  // timeline. An explicit host gets one key, as before, and no fallback.
+  const tokens = (
+    explicitBase ? [publicKey || siteToken] : [publicKey, siteToken]
+  ).filter((t, i, all): t is string => !!t && all.indexOf(t) === i)
+  if (!tokens.length) {
+    throw new Error('No key for the Community Archive gateway timeline')
+  }
+  let keyIndex = 0
+  const attempt = async (timeoutMs: number) => {
+    const timeout = AbortSignal.timeout(timeoutMs)
+    const stop = limits.abortSignal
+      ? either(timeout, limits.abortSignal)
+      : undefined
+    try {
+      const response = await fetch(`${base}${path}?${params}`, {
+        headers: { Authorization: `Bearer ${tokens[keyIndex]}` },
+        signal: stop?.signal ?? timeout,
+        cache: 'no-store',
+      })
+      const body = (await response.json().catch(() => null)) as
+        | (T & { error?: { code?: string; message?: string } })
+        | null
+      return { response, body }
+    } finally {
+      stop?.release()
+    }
+  }
+  // Throws before the span when the run has no time left, like gatewayJson.
+  let timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
+  // One gateway span covers every attempt and the waits between them, so
+  // time spent rate-limited counts as archive time, not the shell's.
+  return traced(limits, 'gateway', label, async () => {
+    for (let attempts = 1; ; attempts++) {
+      const { response, body } = await attempt(timeoutMs)
+      if (response.ok && body) return body
+      // A refused key moves to the next one; that is not a retry, so it
+      // does not use up an attempt.
+      if (
+        (response.status === 401 || response.status === 403) &&
+        keyIndex < tokens.length - 1
+      ) {
+        keyIndex += 1
+        attempts -= 1
+        timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
+        continue
+      }
+      const error = new ApiV1Error(
+        response.status,
+        body?.error?.code ?? 'upstream_unavailable',
+        body?.error?.message ??
+          `Community Archive API failed (${response.status})`,
+      )
+      if (
+        (response.status !== 429 && response.status !== 503) ||
+        attempts >= V1_ATTEMPTS
+      ) {
+        throw error
+      }
+      const waitMs = retryWaitMs(response.headers.get('Retry-After'))
+      if (deadlinePassed(limits, Date.now() + waitMs)) throw error
+      await pause(waitMs, limits.abortSignal)
+      timeoutMs = callTimeoutMs(limits, GATEWAY_TIMEOUT_MS)
+    }
+  })
+}
+
+const fromV1 = (row: V1Tweet): AgentTweet =>
+  toAgentTweet({
+    tweetId: row.tweet_id,
+    accountId: row.account_id,
+    createdAt: row.created_at,
+    fullText: row.full_text,
+    replyToTweetId: row.reply_to_tweet_id,
+    replyToUsername: row.reply_to_username,
+    favoriteCount: row.favorite_count,
+    retweetCount: row.retweet_count,
+    username: row.username,
+    accountDisplayName: row.account_display_name,
+    avatarMediaUrl: row.avatar_media_url,
+    media: (row.media ?? []).map((m) => ({
+      mediaUrl: m.media_url,
+      mediaType: m.media_type,
+      width: m.width,
+      height: m.height,
+    })),
+    quoteTweetId: row.quoted_tweet_id,
+  })
+
+export interface AccountTweetsInput {
+  /** A username (with or without @) or a numeric account id. */
+  account: string
+  order?: 'asc' | 'desc'
+  since?: string
+  until?: string
+  excludeReplies?: boolean
+  excludeRetweets?: boolean
+  /** Up to 200 per page. */
+  limit?: number
+  cursor?: string
+}
+
+/** One page of an account's tweets, ordered by tweet id. */
+export async function getAccountTweets(
+  input: AccountTweetsInput,
+  limits: RunLimits = {},
+): Promise<{ tweets: AgentTweet[]; nextCursor: string | null }> {
+  const params = new URLSearchParams({
+    order: input.order ?? 'desc',
+    limit: String(Math.min(Math.max(input.limit ?? 200, 1), 200)),
+  })
+  if (input.since) params.set('since', input.since)
+  if (input.until) params.set('until', input.until)
+  if (input.excludeReplies) params.set('exclude_replies', 'true')
+  if (input.excludeRetweets) params.set('exclude_retweets', 'true')
+  if (input.cursor) params.set('cursor', input.cursor)
+  const account = input.account.trim().replace(/^@/, '')
+  // A numeric username needs an @ to be read as a username.
+  const segment =
+    /^\d+$/.test(account) && input.account.trim().startsWith('@')
+      ? `@${account}`
+      : account
+  const body = await apiV1Json<{ data: V1Tweet[]; next_cursor: string | null }>(
+    'v1-timeline',
+    `/accounts/${encodeURIComponent(segment)}/tweets`,
+    params,
+    limits,
+  )
+  if (!Array.isArray(body.data)) {
+    throw new Error('Community Archive API returned an invalid timeline')
+  }
+  return { tweets: body.data.map(fromV1), nextCursor: body.next_cursor ?? null }
 }

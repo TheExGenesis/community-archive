@@ -6,6 +6,42 @@ import {
 } from './manifest'
 
 describe('manifestFileFor', () => {
+  test('a JSON array or multi-line objects of tweets are kept as rows', () => {
+    const rows = [
+      { id: '1', p: 0.9, group: 'a', text: 'one' },
+      { id: '2', text: 'two' },
+    ]
+    const expected = {
+      kind: 'tweets',
+      rows: [{ id: '1', p: 0.9, x: { group: 'a' } }, { id: '2' }],
+    }
+    // jq -sc 'unique_by(.id)', without the [] that makes lines
+    expect(manifestFileFor(JSON.stringify(rows))).toEqual(expected)
+    // jq -s 'unique_by(.id)[]', without -c
+    expect(
+      manifestFileFor(
+        rows.map((row) => JSON.stringify(row, null, 2)).join('\n'),
+      ),
+    ).toEqual(expected)
+    // An array of ids, as jq -s '[.[].id]' writes
+    expect(manifestFileFor('["1", "2"]')).toEqual({
+      kind: 'tweets',
+      rows: [{ id: '1' }, { id: '2' }],
+    })
+  })
+
+  test('JSON that is not tweets stays text, or is not kept when long', () => {
+    expect(manifestFileFor('[{"name":"x"}]')).toEqual({
+      kind: 'text',
+      text: '[{"name":"x"}]',
+    })
+    expect(
+      manifestFileFor(
+        JSON.stringify([{ name: 'x'.repeat(MAX_TEXT_FILE_CHARS) }]),
+      ),
+    ).toBeNull()
+  })
+
   test('a tweet file keeps ids, scores and short fields, never text', () => {
     const file = manifestFileFor(
       [

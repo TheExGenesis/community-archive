@@ -74,7 +74,7 @@ describe('loadConversationTweets', () => {
     expect(limits.deadlineAt).toBeLessThanOrEqual(Date.now() + 12_000)
   })
 
-  test('full cards only for tweets the prose cites; listed tweets use the lookup', async () => {
+  test('one lookup of 100 serves cited and listed tweets alike, the cited first', async () => {
     const run = runWithTweets('ra', 3)
     const ids = Array.from(
       JSON.stringify(run.parts).matchAll(/"\$t":"(\d+)"/g),
@@ -82,13 +82,16 @@ describe('loadConversationTweets', () => {
     )
     const withAnswer = {
       ...run,
-      // All three are "cited" on the run (lists count), one in the prose.
+      // All three are "cited" on the run (lists count), the last in the prose.
       citedTweetIds: ids,
-      answer: `Said so [[t:${ids[0]}]]\n[[posts: All | ${ids.join(', ')}]]`,
+      answer: `Said so [[t:${ids[2]}]]\n[[posts: All | ${ids.join(', ')}]]`,
     } as AgentSearchRun
     await loadConversationTweets([withAnswer])
-    expect(mockDetails.mock.calls.flatMap(([batch]) => batch)).toEqual([ids[0]])
-    expect(mockLookup.mock.calls.length).toBeGreaterThan(0)
+    // Both kinds read the same tweet-cards route, so one call fetches them.
+    expect(mockDetails).not.toHaveBeenCalled()
+    expect(mockLookup.mock.calls.map(([batch]) => batch)).toEqual([
+      [ids[2], ids[0], ids[1]],
+    ])
   })
 
   test('a failed batch leaves its tweets out instead of failing the conversation', async () => {
@@ -137,7 +140,7 @@ describe('conversationTweetIds', () => {
 })
 
 describe('fetchConversationTweets', () => {
-  test('full cards for cited ids, the lookup for the rest, and names the ids whose batch failed', async () => {
+  test('batches of 100 with the cited ids first, and names the ids whose batch failed', async () => {
     mockLookup.mockClear()
     mockDetails.mockClear()
     const ids = Array.from({ length: 120 }, (_, i) => String(1000 + i))
@@ -145,18 +148,18 @@ describe('fetchConversationTweets', () => {
       throw new Error('timeout')
     })
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
-    const result = await fetchConversationTweets(
-      ids,
-      new Set(ids.slice(0, 2)),
-      { deadlineAt: Date.now() + 1000 },
-    )
+    // The last two ids are the ones the prose cites.
+    const cited = ids.slice(-2)
+    const result = await fetchConversationTweets(ids, new Set(cited), {
+      deadlineAt: Date.now() + 1000,
+    })
     warn.mockRestore()
-    // The cited pair went first, as one detail batch, and that batch failed.
-    expect(mockDetails.mock.calls.map(([batch]) => batch)).toEqual([
-      ids.slice(0, 2),
-    ])
-    expect(result.failed).toEqual(ids.slice(0, 2))
-    expect(result.tweets.size).toBe(118)
-    expect(mockLookup.mock.calls.length).toBe(3)
+    const batches = mockLookup.mock.calls.map(([batch]) => batch)
+    expect(batches.map((batch) => batch.length)).toEqual([100, 20])
+    expect(batches[0].slice(0, 2)).toEqual(cited)
+    expect(mockDetails).not.toHaveBeenCalled()
+    // The first batch failed: its ids are named, the second batch came back.
+    expect(result.failed).toEqual(batches[0])
+    expect(result.tweets.size).toBe(20)
   })
 })

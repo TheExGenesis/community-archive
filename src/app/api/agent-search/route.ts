@@ -43,6 +43,10 @@ import { agentSearchWorkflow } from '@/workflows/agentSearch'
 // Runs stream for up to a few minutes; the repo default is 15 s (vercel.json).
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
+// The ClickHouse gateway runs in Helsinki and Supabase auth in London; pinning
+// the start route to Stockholm (~10 ms to gateway, ~25 ms to auth) also pins
+// the Workflow run's storage, queue dispatch, and stream to arn1.
+export const preferredRegion = 'arn1'
 
 const noStore = { 'Cache-Control': 'private, no-store' }
 
@@ -98,7 +102,7 @@ export async function POST(request: Request) {
       { status: 400, headers: noStore },
     )
   }
-  const { conversationId, question } = parsed
+  const { conversationId, question, depth, webSearch } = parsed
 
   // A member's own OpenRouter key pays for the planner and raises their daily
   // limit. It is checked with OpenRouter before anything starts, so a bad key
@@ -193,6 +197,8 @@ export async function POST(request: Request) {
         toolMode: agentSearchToolMode(),
         promptVariant: agentSearchPromptVariant(),
         stepOptions: agentSearchPrepareStepOptions(),
+        depth,
+        ...(webSearch ? { webSearch: true } : {}),
         ...(sealedKey ? { sealedKey } : {}),
       },
     ])

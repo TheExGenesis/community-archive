@@ -9,11 +9,19 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import {
   EnvLanguageModel,
   MODEL_PRICES_USD_PER_MTOK,
+  OPENROUTER_WEB_SEARCH_TOOL,
+  REASONING_DETAILS_KEY,
+  agentSearchReasoningEffort,
+  createProviderModel,
   estimateModelCostUsd,
+  liftReasoningDetails,
+  mergeReasoningDetails,
   parseModelSpec,
+  plannerRouting,
   readModelCallUsage,
   resolveModelPrice,
   setModelUsageRecorder,
+  withStepReasoning,
 } from './model'
 import { sealOwnKey } from './ownKey'
 
@@ -183,6 +191,25 @@ describe('EnvLanguageModel usage recording', () => {
       { inputTokens: 1000, cachedInputTokens: 200, outputTokens: 50 },
       expect.objectContaining({ finishReason: 'stop', reasoningTokens: 0 }),
     )
+  })
+
+  test('times a streamed call to its first output and its first action', async () => {
+    providerStreaming([
+      { type: 'stream-start', warnings: [] },
+      { type: 'reasoning-delta', delta: 'thinking' },
+      { type: 'tool-input-start', id: 'c1', toolName: 'bash' },
+      {
+        type: 'finish',
+        usage: { inputTokens: { total: 10 }, outputTokens: { total: 5 } },
+        finishReason: 'tool-calls',
+      },
+    ])
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol', 'wrun_1')
+    await drain((await model.doStream({})).stream)
+    const detail = mockRecordModelUsage.mock.calls[0][3]
+    expect(Date.parse(detail.startedAt)).not.toBeNaN()
+    expect(detail.firstOutputMs).toEqual(expect.any(Number))
+    expect(detail.firstActionMs).toBeGreaterThanOrEqual(detail.firstOutputMs)
   })
 
   test('reads who served an OpenRouter call and what it cost, then drops the raw chunks', async () => {
@@ -370,5 +397,564 @@ describe('EnvLanguageModel on a member’s own key', () => {
       new EnvLanguageModel(SPEC, 'asr_1', sealed).doStream({}),
     ).rejects.toThrow('Using your own key is not available right now.')
     expect(createOpenAICompatible).not.toHaveBeenCalled()
+  })
+})
+
+describe('planner reasoning effort', () => {
+  test('uses the model’s entry, the env override, or nothing', () => {
+    const deepseek = 'openrouter:deepseek/deepseek-v4.1-flash'
+    expect(agentSearchReasoningEffort(deepseek, undefined)).toBe('high')
+    expect(agentSearchReasoningEffort('openai:gpt-6.1-sol', undefined)).toBe(
+      'medium',
+    )
+    expect(agentSearchReasoningEffort(deepseek, ' LOW ')).toBe('low')
+    expect(agentSearchReasoningEffort(deepseek, 'default')).toBeNull()
+    expect(agentSearchReasoningEffort('openrouter:x/unlisted', '')).toBeNull()
+    expect(() => agentSearchReasoningEffort(deepseek, 'loud')).toThrow(
+      'Invalid AGENT_SEARCH_REASONING_EFFORT',
+    )
+  })
+
+  test('a run’s own effort beats the model’s entry, and the env beats both', () => {
+    const deepseek = 'openrouter:deepseek/deepseek-v4.1-flash'
+    expect(agentSearchReasoningEffort(deepseek, undefined, 'low')).toBe('low')
+    expect(agentSearchReasoningEffort(deepseek, '', 'low')).toBe('low')
+    expect(agentSearchReasoningEffort(deepseek, undefined, null)).toBe('high')
+    expect(agentSearchReasoningEffort(deepseek, 'medium', 'low')).toBe('medium')
+    expect(agentSearchReasoningEffort(deepseek, 'default', 'low')).toBeNull()
+    expect(agentSearchReasoningEffort('openrouter:x/unlisted', '', 'low')).toBe(
+      'low',
+    )
+  })
+
+  test('a fast run’s effort reaches OpenRouter and OpenAI calls', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    process.env.OPENAI_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock)
+      .mockReset()
+      .mockReturnValue(() => ({ doGenerate: jest.fn() }))
+    const realFetch = global.fetch
+    const sent = jest.fn().mockResolvedValue(new Response('{}'))
+    global.fetch = sent as any
+    try {
+      await new EnvLanguageModel(
+        'openrouter:deepseek/deepseek-v4.1-flash',
+        null,
+        null,
+        null,
+        'low',
+      ).doGenerate({})
+      const { fetch } = (createOpenAICompatible as jest.Mock).mock.calls[0][0]
+      await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'deepseek/deepseek-v4.1-flash' }),
+      })
+      expect(JSON.parse(sent.mock.calls[0][1].body).reasoning).toEqual({
+        effort: 'low',
+      })
+      const doGenerate = jest.fn().mockResolvedValue({ content: [] })
+      ;(createOpenAI as jest.Mock).mockReset().mockReturnValue(() => ({
+        doGenerate,
+      }))
+      await new EnvLanguageModel(
+        'openai:gpt-6.1-sol',
+        null,
+        null,
+        null,
+        'low',
+      ).doGenerate({ prompt: [] })
+      expect(doGenerate.mock.calls[0][0].providerOptions).toEqual({
+        openai: { reasoningEffort: 'low' },
+      })
+    } finally {
+      global.fetch = realFetch
+      delete process.env.OPENROUTER_API_KEY
+      delete process.env.OPENAI_API_KEY
+    }
+  })
+
+  test('OpenRouter calls carry the effort in the request body', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock)
+      .mockReset()
+      .mockReturnValue(() => ({ doGenerate: jest.fn() }))
+    const realFetch = global.fetch
+    const sent = jest.fn().mockResolvedValue(new Response('{}'))
+    global.fetch = sent as any
+    try {
+      await new EnvLanguageModel(
+        'openrouter:google/gemini-4-hydrogen',
+      ).doGenerate({})
+      const { fetch } = (createOpenAICompatible as jest.Mock).mock.calls[0][0]
+      await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'google/gemini-4-hydrogen' }),
+      })
+      const body = JSON.parse(sent.mock.calls[0][1].body)
+      expect(body.reasoning).toEqual({ effort: 'medium' })
+      expect(body.provider).toEqual({
+        preferred_max_latency: { p90: 2 },
+        data_collection: 'deny',
+        zdr: true,
+      })
+    } finally {
+      global.fetch = realFetch
+      delete process.env.OPENROUTER_API_KEY
+    }
+  })
+
+  test('OpenAI calls ask for the effort unless the caller chose one', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    const doGenerate = jest.fn().mockResolvedValue({ content: [] })
+    ;(createOpenAI as jest.Mock).mockReset().mockReturnValue(() => ({
+      doGenerate,
+    }))
+    const model = new EnvLanguageModel('openai:gpt-6.1-sol')
+    await model.doGenerate({ prompt: [] })
+    await model.doGenerate({
+      providerOptions: { openai: { reasoningEffort: 'low' } },
+    })
+    expect(doGenerate.mock.calls[0][0].providerOptions).toEqual({
+      openai: { reasoningEffort: 'medium' },
+    })
+    expect(doGenerate.mock.calls[1][0].providerOptions).toEqual({
+      openai: { reasoningEffort: 'low' },
+    })
+    delete process.env.OPENAI_API_KEY
+  })
+})
+
+describe('reasoning details across tool calls', () => {
+  const SPEC = 'openrouter:google/gemini-3.5-flash-lite'
+  const encrypted = {
+    type: 'reasoning.encrypted',
+    data: 'c2lnbmF0dXJl',
+    format: 'google-gemini-v1',
+    index: 0,
+  }
+
+  beforeEach(() => {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock).mockReset()
+  })
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  test('streamed pieces of one detail join; a new index starts another', () => {
+    let details = mergeReasoningDetails(
+      [],
+      [{ type: 'reasoning.text', text: 'Let me ', index: 0, signature: null }],
+    )
+    details = mergeReasoningDetails(details, [
+      { type: 'reasoning.text', text: 'think.', index: 0, signature: 'sig' },
+      { ...encrypted, index: 1 },
+    ])
+    details = mergeReasoningDetails(details, undefined)
+    expect(details).toEqual([
+      {
+        type: 'reasoning.text',
+        text: 'Let me think.',
+        index: 0,
+        signature: 'sig',
+      },
+      { ...encrypted, index: 1 },
+    ])
+  })
+
+  test('a step’s details ride on its first tool call only', () => {
+    const parts = [
+      { type: 'text', text: 'checking' },
+      {
+        type: 'tool-call',
+        toolCallId: 'a',
+        providerMetadata: { other: { x: 1 } },
+      },
+      { type: 'tool-call', toolCallId: 'b' },
+    ]
+    const out = withStepReasoning(parts, [encrypted])
+    expect(out[0]).toBe(parts[0])
+    expect(out[1]).toEqual({
+      ...parts[1],
+      providerMetadata: {
+        other: { x: 1 },
+        [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+      },
+    })
+    expect(out[2]).toBe(parts[2])
+    expect(withStepReasoning(parts, [])).toBe(parts)
+  })
+
+  test('details on a tool call go back on its message before the next call', () => {
+    const prompt = [
+      { role: 'user', content: [{ type: 'text', text: 'q' }] },
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'a',
+            providerOptions: {
+              [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+            },
+          },
+        ],
+        providerOptions: { openaiCompatible: { name: 'x' } },
+      },
+      { role: 'tool', content: [] },
+      { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+    ]
+    const lifted = liftReasoningDetails(prompt)
+    expect(lifted[0]).toBe(prompt[0])
+    expect(lifted[1].providerOptions).toEqual({
+      openaiCompatible: { name: 'x', reasoning_details: [encrypted] },
+    })
+    expect(lifted[2]).toBe(prompt[2])
+    expect(lifted[3]).toBe(prompt[3])
+  })
+
+  test('a streamed call holds its tool calls until the end, with the reasoning streamed after them', async () => {
+    const doStream = jest.fn().mockResolvedValue({
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: 'tool-call',
+            toolCallId: 'a',
+            input: '{}',
+          })
+          controller.enqueue({
+            type: 'raw',
+            rawValue: {
+              choices: [{ delta: { reasoning_details: [encrypted] } }],
+            },
+          })
+          controller.enqueue({
+            type: 'tool-call',
+            toolCallId: 'b',
+            input: '{}',
+          })
+          controller.enqueue({
+            type: 'finish',
+            usage: { inputTokens: { total: 1 }, outputTokens: { total: 1 } },
+            finishReason: 'tool-calls',
+          })
+          controller.close()
+        },
+      }),
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({ doStream }))
+    const earlier = [
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'z',
+            providerOptions: {
+              [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+            },
+          },
+        ],
+      },
+    ]
+    const result = await new EnvLanguageModel(SPEC).doStream({
+      prompt: earlier,
+    })
+    const parts: any[] = []
+    const reader = result.stream.getReader()
+    for (let r = await reader.read(); !r.done; r = await reader.read())
+      parts.push(r.value)
+    expect(parts.map((part) => part.type)).toEqual([
+      'tool-call',
+      'tool-call',
+      'finish',
+    ])
+    expect(parts[0].providerMetadata).toEqual({
+      [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+    })
+    expect(parts[1].providerMetadata).toBeUndefined()
+    const sent = doStream.mock.calls[0][0]
+    expect(sent.includeRawChunks).toBe(true)
+    expect(sent.prompt[0].providerOptions.openaiCompatible).toEqual({
+      reasoning_details: [encrypted],
+    })
+  })
+
+  test('a generated call puts the response’s details on its first tool call', async () => {
+    const doGenerate = jest.fn().mockResolvedValue({
+      content: [{ type: 'tool-call', toolCallId: 'a', input: '{}' }],
+      response: {
+        body: { choices: [{ message: { reasoning_details: [encrypted] } }] },
+      },
+    })
+    ;(createOpenAICompatible as jest.Mock).mockReturnValue(() => ({
+      doGenerate,
+    }))
+    const result = await new EnvLanguageModel(SPEC).doGenerate({})
+    expect(result.content[0].providerMetadata).toEqual({
+      [REASONING_DETAILS_KEY]: { reasoning_details: [encrypted] },
+    })
+  })
+})
+
+describe('planner provider routing', () => {
+  const ENV_KEYS = [
+    'OPENROUTER_API_KEY',
+    'AGENT_SEARCH_PROVIDER_ONLY',
+    'AGENT_SEARCH_PROVIDER_IGNORE',
+    'AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90',
+  ]
+  afterEach(() => {
+    for (const key of ENV_KEYS) delete process.env[key]
+  })
+
+  // The body the fetch wrapper sends for a request with `provider` already set.
+  async function sentBody(
+    build: () => unknown,
+    request: Record<string, unknown> = {},
+  ) {
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    ;(createOpenAICompatible as jest.Mock)
+      .mockReset()
+      .mockReturnValue(() => ({ doGenerate: jest.fn() }))
+    const realFetch = global.fetch
+    const sent = jest.fn().mockResolvedValue(new Response('{}'))
+    global.fetch = sent as any
+    try {
+      await build()
+      const { fetch } = (createOpenAICompatible as jest.Mock).mock.calls[0][0]
+      await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'x', ...request }),
+      })
+      return JSON.parse(sent.mock.calls[0][1].body)
+    } finally {
+      global.fetch = realFetch
+    }
+  }
+
+  test('reads the session, latency preference and slugs', () => {
+    expect(plannerRouting('asr_1', {})).toEqual({
+      sessionId: 'asr_1',
+      maxLatencyP90: 2,
+    })
+    expect(
+      plannerRouting(null, {
+        AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90: ' 1.5 ',
+        AGENT_SEARCH_PROVIDER_ONLY: 'together, baseten/fast,',
+        AGENT_SEARCH_PROVIDER_IGNORE: 'decart',
+      }),
+    ).toEqual({
+      maxLatencyP90: 1.5,
+      only: ['together', 'baseten/fast'],
+      ignore: ['decart'],
+    })
+    expect(
+      plannerRouting(null, { AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90: 'OFF' }),
+    ).toEqual({ maxLatencyP90: null })
+    for (const bad of ['0', '-1', 'fast']) {
+      expect(() =>
+        plannerRouting(null, { AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90: bad }),
+      ).toThrow('Invalid AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90')
+    }
+  })
+
+  test('a run’s calls carry its id as the session and no usage flag', async () => {
+    setModelUsageRecorder(jest.fn().mockResolvedValue(undefined))
+    const body = await sentBody(() =>
+      new EnvLanguageModel(
+        'openrouter:deepseek/deepseek-v4.1-flash-1017',
+        'asr_abc',
+      ).doGenerate({}),
+    ).finally(() => setModelUsageRecorder(null))
+    expect(body.session_id).toBe('asr_abc')
+    expect(body.usage).toBeUndefined()
+    expect(body.reasoning).toEqual({ effort: 'high' })
+    expect(body.provider).toEqual({
+      preferred_max_latency: { p90: 2 },
+      data_collection: 'deny',
+      zdr: true,
+    })
+  })
+
+  test('without a run, the session id is the one given (the eval)', async () => {
+    const body = await sentBody(() =>
+      new EnvLanguageModel(
+        'openrouter:z-ai/glm-5.3-flash',
+        null,
+        null,
+        'eval-1',
+      ).doGenerate({}),
+    )
+    expect(body.session_id).toBe('eval-1')
+    expect(body.reasoning).toEqual({ effort: 'high' })
+  })
+
+  test('pins and skips hosts, and never loses the no-retention flags', async () => {
+    process.env.AGENT_SEARCH_PROVIDER_ONLY = 'baseten/fast'
+    process.env.AGENT_SEARCH_PROVIDER_IGNORE = 'decart'
+    process.env.AGENT_SEARCH_PROVIDER_MAX_LATENCY_P90 = 'off'
+    const body = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash-1017',
+        ).doGenerate({}),
+      { provider: { zdr: false, data_collection: 'allow' } },
+    )
+    expect(body.session_id).toBeUndefined()
+    expect(body.provider).toEqual({
+      only: ['baseten/fast'],
+      ignore: ['decart'],
+      data_collection: 'deny',
+      zdr: true,
+    })
+  })
+
+  test('the scorer’s calls carry only the no-retention flags', async () => {
+    process.env.AGENT_SEARCH_PROVIDER_ONLY = 'together'
+    const body = await sentBody(() =>
+      (createProviderModel('openrouter:typesafe/jev-1') as any).doGenerate({}),
+    )
+    expect(body.provider).toEqual({ data_collection: 'deny', zdr: true })
+    expect(body.session_id).toBeUndefined()
+  })
+
+  test('the session id survives the workflow step boundary', () => {
+    const SERIALIZE = Symbol.for('workflow-serialize')
+    const DESERIALIZE = Symbol.for('workflow-deserialize')
+    const model = new EnvLanguageModel('openrouter:x/y', null, null, 'eval-2')
+    const data = (EnvLanguageModel as any)[SERIALIZE](model)
+    expect(data).toEqual({ spec: 'openrouter:x/y', sessionId: 'eval-2' })
+    const back = (EnvLanguageModel as any)[DESERIALIZE](data)
+    expect(back.sessionId).toBe('eval-2')
+  })
+
+  test('a run’s effort survives the step boundary, and is absent when it has none', () => {
+    const SERIALIZE = Symbol.for('workflow-serialize')
+    const DESERIALIZE = Symbol.for('workflow-deserialize')
+    const fast = new EnvLanguageModel(
+      'openrouter:x/y',
+      'asr_1',
+      null,
+      null,
+      'low',
+    )
+    const data = (EnvLanguageModel as any)[SERIALIZE](fast)
+    expect(data).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+      reasoningEffort: 'low',
+    })
+    expect((EnvLanguageModel as any)[DESERIALIZE](data).reasoningEffort).toBe(
+      'low',
+    )
+    // A deep run serializes as every run did before depths existed.
+    const deep = new EnvLanguageModel('openrouter:x/y', 'asr_1')
+    expect((EnvLanguageModel as any)[SERIALIZE](deep)).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+    })
+    expect(
+      (EnvLanguageModel as any)[DESERIALIZE]({ spec: 'openrouter:x/y' })
+        .reasoningEffort,
+    ).toBeNull()
+  })
+
+  test('prices and efforts exist for the strict-ZDR pilot models', () => {
+    for (const spec of [
+      'openrouter:deepseek/deepseek-v4.1-flash-1017',
+      'openrouter:z-ai/glm-5.3-flash',
+    ]) {
+      expect(MODEL_PRICES_USD_PER_MTOK[spec]).toBeDefined()
+      expect(agentSearchReasoningEffort(spec, undefined)).toBe('high')
+    }
+  })
+
+  test('webSearch adds openrouter:web_search on tool-calling steps only', async () => {
+    const bashTool = {
+      type: 'function',
+      function: { name: 'bash', parameters: {} },
+    }
+    const withWeb = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+          null,
+          null,
+          null,
+          null,
+          true,
+        ).doGenerate({}),
+      { tools: [bashTool] },
+    )
+    expect(withWeb.tools).toEqual([bashTool, OPENROUTER_WEB_SEARCH_TOOL])
+
+    // Off by default.
+    const withoutWeb = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+        ).doGenerate({}),
+      { tools: [bashTool] },
+    )
+    expect(withoutWeb.tools).toEqual([bashTool])
+
+    // Never injected on answer-only steps (tool_choice: 'none' or no tools).
+    const finalStep = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+          null,
+          null,
+          null,
+          null,
+          true,
+        ).doGenerate({}),
+      { tools: [bashTool], tool_choice: 'none' },
+    )
+    expect(finalStep.tools).toEqual([bashTool])
+
+    const noTools = await sentBody(
+      () =>
+        new EnvLanguageModel(
+          'openrouter:deepseek/deepseek-v4.1-flash',
+          null,
+          null,
+          null,
+          null,
+          true,
+        ).doGenerate({}),
+      {},
+    )
+    expect(noTools.tools).toBeUndefined()
+  })
+
+  test('webSearch survives the workflow step boundary, and is omitted when off', () => {
+    const SERIALIZE = Symbol.for('workflow-serialize')
+    const DESERIALIZE = Symbol.for('workflow-deserialize')
+    const enabled = new EnvLanguageModel(
+      'openrouter:x/y',
+      'asr_1',
+      null,
+      null,
+      null,
+      true,
+    )
+    const data = (EnvLanguageModel as any)[SERIALIZE](enabled)
+    expect(data).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+      webSearch: true,
+    })
+    expect((EnvLanguageModel as any)[DESERIALIZE](data).webSearch).toBe(true)
+    const disabled = new EnvLanguageModel('openrouter:x/y', 'asr_1')
+    expect((EnvLanguageModel as any)[SERIALIZE](disabled)).toEqual({
+      spec: 'openrouter:x/y',
+      runId: 'asr_1',
+    })
+    expect(
+      (EnvLanguageModel as any)[DESERIALIZE]({ spec: 'openrouter:x/y' })
+        .webSearch,
+    ).toBe(false)
   })
 })

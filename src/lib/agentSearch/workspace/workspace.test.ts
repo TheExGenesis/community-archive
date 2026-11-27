@@ -24,6 +24,43 @@ jest.mock('../policy', () => ({
 jest.mock('../gateway', () => ({
   searchTweets: jest.fn(),
   getTweetsByIds: jest.fn(),
+  // Batched lookups go through the mocked single lookup, 100 ids at a time.
+  getTweetsByIdsBatched: jest.fn(async (ids: string[], limits: unknown) => {
+    const { getTweetsByIds } = jest.requireMock('../gateway')
+    const found: unknown[] = []
+    for (let i = 0; i < ids.length; i += 100)
+      found.push(...(await getTweetsByIds(ids.slice(i, i + 100), limits)))
+    return found
+  }),
+  // Settled lookups too: a failed batch of 100 is reported, not thrown.
+  getTweetsByIdsSettled: jest.fn(async (ids: string[], limits: unknown) => {
+    const { getTweetsByIds } = jest.requireMock('../gateway')
+    const tweets: unknown[] = []
+    const failedIds: string[] = []
+    let error: unknown
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100)
+      try {
+        tweets.push(...(await getTweetsByIds(batch, limits)))
+      } catch (caught) {
+        failedIds.push(...batch)
+        error ??= caught
+      }
+    }
+    return error === undefined
+      ? { tweets, failedIds }
+      : { tweets, failedIds, error }
+  }),
+  getAccountTweets: jest.fn(),
+  ApiV1Error: class ApiV1Error extends Error {
+    constructor(
+      readonly status: number,
+      readonly code: string,
+      message: string,
+    ) {
+      super(message)
+    }
+  },
   findMembers: jest.fn(async () => [
     { accountId: '1', username: 'visakanv', displayName: 'Visakan' },
   ]),
@@ -37,11 +74,32 @@ jest.mock('../semantic', () => ({
   semanticSearch: jest.fn(),
 }))
 
-import { getTweetDetails, getTweetsByIds, searchTweets } from '../gateway'
+import {
+  ApiV1Error,
+  getAccountTweets,
+  getQuotePosts,
+  getTweetDetails,
+  getTweetThread,
+  getTweetsByIds,
+  searchTweets,
+} from '../gateway'
 import { MAX_SEMANTIC_CALLS_PER_RUN, semanticSearch } from '../semantic'
 import { USAGE } from './commands'
 import { applyChanges, type WorkspaceManifest } from './manifest'
-import { bashModelOutput, streamedBashOutput } from './output'
+import {
+  MODEL_OUTPUT_CHARS,
+  bashModelOutput,
+  streamedBashOutput,
+} from './output'
+import { createInProcessBash } from './inProcess'
+import {
+  BoundedTweetMap,
+  MAX_CACHED_RUNS,
+  RUN_CACHE_TTL_MS,
+  clearAllRunTweetCaches,
+  clearRunTweetCache,
+  getRunTweetCache,
+} from './runCache'
 import {
   WorkspaceUnavailableError,
   idsInOutput,
@@ -68,6 +126,7 @@ let archive: Map<string, ReturnType<typeof tweet>>
 
 beforeEach(() => {
   jest.clearAllMocks()
+  clearAllRunTweetCaches()
   archive = new Map(
     ['1', '2', '3', '4'].map((id) => [
       id,
@@ -209,6 +268,106 @@ describe('the bash workspace', () => {
     expect(c1?.kind === 'tweets' && c1.rows[0]).toEqual({ id: '1', p: 0.9 })
   })
 
+  test('score passes yes and no definitions on and names the scorer', async () => {
+    const { scoreTweets } = jest.requireMock('../classifier')
+    const first = await run('search singapore > s1.jsonl')
+    const out = await run(
+      'score s1.jsonl "Does the author say they live in Singapore?" --yes-if "they say they live there now" --no-if "they visit or only mention it" > c1.jsonl',
+      applyChanges({}, first.workspace),
+    )
+    const [criterion, , , definitions] = (
+      scoreTweets as jest.Mock
+    ).mock.calls.at(-1)
+    expect(criterion).toBe('Does the author say they live in Singapore?')
+    expect(definitions).toEqual({
+      yesIf: 'they say they live there now',
+      noIf: 'they visit or only mention it',
+    })
+    expect(out.stderr).toContain('scored by decisions')
+  })
+
+  test('every search of one command line shares the same three slots', async () => {
+    await run(`par 'search "{}" > s_{}.jsonl' singapore about tweet`)
+    const slots = (searchTweets as jest.Mock).mock.calls.map(
+      (call) => call[1].searchSlots,
+    )
+    expect(slots.length).toBe(3)
+    expect(slots[0]).toBeDefined()
+    expect(new Set(slots).size).toBe(1)
+    // The next command line gets its own.
+    await run('search singapore > again.jsonl')
+    const next = (searchTweets as jest.Mock).mock.calls.at(-1)[1].searchSlots
+    expect(next).toBeDefined()
+    expect(next).not.toBe(slots[0])
+  })
+
+  test('score reads a reply’s parent from the run’s cache instead of fetching it', async () => {
+    archive.set('5', { ...tweet('5'), replyToTweetId: '1' })
+    const tweetCache = new BoundedTweetMap()
+    const first = await runBashCommand({
+      command: 'search singapore > s1.jsonl',
+      manifest: {},
+      tweetCache,
+    })
+    ;(getTweetsByIds as jest.Mock).mockClear()
+    await runBashCommand({
+      command:
+        'score s1.jsonl "Does this tweet talk about living in Singapore?" > c1.jsonl',
+      manifest: applyChanges({}, first.workspace),
+      tweetCache,
+    })
+    // Tweet 5 replies to tweet 1, which the search already fetched.
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+  })
+
+  test('the merge the prompt teaches keeps newest first, and best first for scored files', async () => {
+    // Ids whose string order is not their date order, as real ids of
+    // different lengths are.
+    archive = new Map(
+      [
+        ['9', '2024-01-05'],
+        ['30', '2026-03-01'],
+        ['100', '2026-06-01'],
+        ['20', '2025-02-01'],
+      ].map(([id, day]) => [
+        id,
+        { ...tweet(id), createdAt: `${day}T00:00:00.000Z` },
+      ]),
+    )
+    const out = await run(
+      "search singapore > a.jsonl && search about > b.jsonl && cat a.jsonl b.jsonl | jq -sc 'unique_by(.id)[]' | jq -r .id | tr '\\n' ' ' && echo && cat a.jsonl b.jsonl | jq -sc 'unique_by(.id) | sort_by(.date) | reverse[]' > all.jsonl && jq -r .id all.jsonl | tr '\\n' ' '",
+    )
+    const [byId, newestFirst] = out.stdout.trim().split('\n')
+    // unique_by alone: ids as strings, which is no order a reader wants.
+    expect(byId.trim()).toBe('100 20 30 9')
+    expect(newestFirst.trim()).toBe('100 30 20 9')
+
+    const scored = await run(
+      `printf '%s\\n' '{"id":"9","p":0.2}' '{"id":"30","p":0.9}' > c1.jsonl && printf '%s\\n' '{"id":"100","p":0.6}' '{"id":"30","p":0.9}' > c2.jsonl && cat c1.jsonl c2.jsonl | jq -sc 'unique_by(.id) | sort_by(-.p)[] | select(.p >= 0.5)' | jq -r .id | tr '\\n' ' '`,
+    )
+    expect(scored.stdout.trim()).toBe('30 100')
+  })
+
+  test('split cuts a tweet file into parts the next command can use', async () => {
+    const first = await run('search singapore > s1.jsonl')
+    const out = await run(
+      'split -l 3 s1.jsonl part_ && ls part_* && wc -l part_aa part_ab',
+      applyChanges({}, first.workspace),
+    )
+    expect(out.exitCode).toBe(0)
+    expect(out.stdout).toContain('part_aa')
+    // The parts are tweet files in the manifest, by reference like any other.
+    expect(out.files).toEqual({
+      part_aa: ['1', '2', '3'],
+      part_ab: ['4'],
+    })
+    const next = await run(
+      'jq -r .id part_ab',
+      applyChanges(applyChanges({}, first.workspace), out.workspace),
+    )
+    expect(next.stdout.trim()).toBe('4')
+  })
+
   test('agent-added fields are kept, long strings are not', async () => {
     const out = await run(
       `echo '{"id":"1","group":"expat","note":"${'x'.repeat(80)}","text":"t"}' > g.jsonl`,
@@ -268,6 +427,73 @@ describe('the bash workspace', () => {
     expect(semanticSearch).toHaveBeenCalledTimes(1)
   })
 
+  test('a run with a lower semantic cap is stopped at it, and told its own number', async () => {
+    ;(semanticSearch as jest.Mock).mockResolvedValue({
+      query: 'moving there',
+      matched: 1,
+      tweets: [{ ...tweet('3'), distance: 0.91 }],
+    })
+    const fast = (command: string, semanticUsed: number) =>
+      runBashCommand({
+        command,
+        manifest: {},
+        semanticUsed,
+        maxSemanticCalls: 2,
+      })
+    const last = await fast('semantic "moving there for work"', 1)
+    expect(last.exitCode).toBe(0)
+    expect(last.stderr).toContain('0 semantic searches left')
+    const capped = await fast('semantic "again"', 2)
+    expect(capped.exitCode).toBe(1)
+    expect(capped.stderr).toContain('has used its 2 semantic searches')
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+  })
+
+  test('commands the model starts together run one at a time, each seeing the last', async () => {
+    ;(semanticSearch as jest.Mock).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return {
+        query: 'q',
+        matched: 1,
+        tweets: [{ ...tweet('3'), distance: 0.9 }],
+      }
+    })
+    // One semantic search allowed: two started together must not both run.
+    const capped = createInProcessBash({}, {}, 1)
+    const [first, second] = await Promise.all([
+      capped.execute({ command: 'semantic "moving there"' }),
+      capped.execute({ command: 'semantic "leaving there"' }),
+    ])
+    expect(semanticSearch).toHaveBeenCalledTimes(1)
+    expect([first.exitCode, second.exitCode]).toEqual([0, 1])
+    expect(second.stderr).toContain('has used its 1 semantic search;')
+
+    // And the second reads the file the first wrote.
+    const shell = createInProcessBash()
+    const [, counted] = await Promise.all([
+      shell.execute({ command: 'search singapore > s1.jsonl' }),
+      shell.execute({ command: 'wc -l < s1.jsonl' }),
+    ])
+    expect(counted.exitCode).toBe(0)
+    expect(counted.stdout.trim()).toBe('4')
+  })
+
+  test('score says to split a file that is too large', async () => {
+    const big = Array.from({ length: 1001 }, (_, i) => ({ id: String(i + 1) }))
+    // The file's tweets, as the gateway would return them.
+    ;(getTweetsByIds as jest.Mock).mockImplementation(async (ids: string[]) =>
+      ids.map((id) => tweet(id)),
+    )
+    const out = await run(
+      'score big.jsonl "Does this tweet talk about living there?"',
+      {
+        'big.jsonl': { kind: 'tweets', rows: big },
+      },
+    )
+    expect(out.exitCode).not.toBe(0)
+    expect(out.stderr).toContain('split -l 1000 big.jsonl part_')
+  })
+
   test('a failed semantic search is not an archive outage', async () => {
     ;(semanticSearch as jest.Mock).mockRejectedValue(new Error('timeout'))
     const out = await run('semantic "anything at all"')
@@ -284,14 +510,160 @@ describe('the bash workspace', () => {
   })
 })
 
+describe('search with several words', () => {
+  const asked = () =>
+    (searchTweets as jest.Mock).mock.calls.map(([input]) => input)
+
+  test('matches every word by default, and says so', async () => {
+    const out = await run('search community archive > s1.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(asked()).toEqual([
+      expect.objectContaining({ query: 'community archive', mode: 'all' }),
+    ])
+    expect(out.stderr).toContain('search all of “community archive”: 4 tweets')
+    // The page's line is unchanged.
+    expect(out.summary).toBe('Searched “community archive” · 4 tweets')
+  })
+
+  test('--phrase asks for the exact phrase', async () => {
+    const out = await run('search "community archive" --phrase')
+    expect(out.exitCode).toBe(0)
+    expect(asked()).toEqual([
+      expect.objectContaining({ query: 'community archive', mode: 'phrase' }),
+    ])
+    expect(out.stderr).toContain(
+      'search “community archive” as a phrase: 4 tweets',
+    )
+  })
+
+  test('--all, the old default-changing flag, still parses and matches every word', async () => {
+    const out = await run('search community archive --all')
+    expect(out.exitCode).toBe(0)
+    expect(asked()[0]).toMatchObject({ mode: 'all' })
+    expect(out.stderr).toContain('search all of “community archive”')
+  })
+
+  test('one word reads as before', async () => {
+    const out = await run('search singapore')
+    expect(asked()[0]).toMatchObject({ query: 'singapore', mode: 'all' })
+    expect(out.stderr).toContain('search “singapore”: 4 tweets')
+  })
+
+  test('--or searches every alternative with the same mode, sort and reply filter', async () => {
+    const out = await run(
+      'search "community archive" --or "ca dot org",tpot --phrase --sort likes --reply-to @visakanv --from bob',
+    )
+    expect(out.exitCode).toBe(0)
+    const calls = asked()
+    expect(calls.map((input) => input.query).sort()).toEqual([
+      'ca dot org',
+      'community archive',
+      'tpot',
+    ])
+    for (const input of calls) {
+      expect(input).toMatchObject({
+        mode: 'phrase',
+        sort: 'likes',
+        replyToUser: 'visakanv',
+        fromUser: 'bob',
+      })
+    }
+    expect(out.stderr).toContain(
+      'search “community archive” or “ca dot org” or “tpot” (each as a phrase), any of them matching from @bob replying to @visakanv: 4 tweets',
+    )
+
+    jest.clearAllMocks()
+    const words = await run('search ca --or "community archive"')
+    expect(asked().map((input) => input.mode)).toEqual(['all', 'all'])
+    expect(words.stderr).toContain(
+      'search “ca” or “community archive” (all words of each), any of them matching:',
+    )
+  })
+
+  test('--with keeps the words and adds one of the others, one search per pair', async () => {
+    const out = await run(
+      'search "community archive" --with creepy,"opt out" --since 2025-01-01',
+    )
+    expect(out.exitCode).toBe(0)
+    const calls = asked()
+    expect(calls.map((input) => input.query).sort()).toEqual([
+      'community archive creepy',
+      'community archive opt out',
+    ])
+    for (const input of calls) {
+      expect(input).toMatchObject({ mode: 'all', since: '2025-01-01' })
+    }
+    expect(out.stderr).toContain(
+      'search all of “community archive” and one of “creepy”, “opt out”:',
+    )
+    expect(out.summary).toContain(
+      'Searched “community archive” with “creepy” or “opt out”',
+    )
+
+    // One --with word is one search, of the words and that word together.
+    jest.clearAllMocks()
+    await run('search notion --with slow')
+    expect(asked().map((input) => input.query)).toEqual(['notion slow'])
+
+    // --or and --with together: every alternative with every word.
+    jest.clearAllMocks()
+    await run('search notion --or @NotionHQ --with slow,offline')
+    expect(
+      asked()
+        .map((input) => input.query)
+        .sort(),
+    ).toEqual([
+      '@NotionHQ offline',
+      '@NotionHQ slow',
+      'notion offline',
+      'notion slow',
+    ])
+  })
+
+  test('--any is gone, and the error says which flag to use', async () => {
+    const out = await run('search "community archive" --any creepy,privacy')
+    expect(out.exitCode).toBe(2)
+    expect(out.stderr).toContain('there is no --any')
+    expect(out.stderr).toContain('--or a,b')
+    expect(out.stderr).toContain('--with a,b')
+    expect(asked()).toEqual([])
+  })
+
+  test('--with refuses a phrase and too many searches', async () => {
+    const phrase = await run(
+      'search "community archive" --phrase --with creepy',
+    )
+    expect(phrase.exitCode).toBe(2)
+    expect(phrase.stderr).toContain('cannot keep a phrase')
+    const many = await run('search a --or b,c,d --with e,f,g')
+    expect(many.exitCode).toBe(2)
+    expect(many.stderr).toContain('at most 9')
+  })
+
+  test('a truncated newest-first search suggests --sort likes and --until, not only raising --limit', async () => {
+    const newest = await run('search singapore --limit 2')
+    expect(newest.stderr).toContain(
+      'more exist (--sort likes for top posts, --until for earlier dates, or raise --limit, max 1000)',
+    )
+    const liked = await run('search singapore --sort likes --limit 2')
+    expect(liked.stderr).toContain(
+      'more exist (raise --limit, max 1000, or narrow with --since/--until)',
+    )
+    expect(liked.stderr).not.toContain('--sort likes for top posts')
+  })
+})
+
 describe('the tweet ids a command printed', () => {
-  test('come from rows, bare lines, and lines of fields an id leads', () => {
+  test('come from rows, bare lines, leading columns, and delimited TSV/CSV/pipe columns', () => {
     const stdout = [
       '{"id":"1111111111111111111","text":"a"}',
       '2222222222222222222',
       '3333333333333333333\t2026-10-06\tsome text',
       '"4444444444444444444",2026-10-06,"csv"',
       '5555555555555555555 2026-10-06 columns',
+      '0.97\t6666666666666666666\t@alice\tsome text',
+      '0.97,"7777777777777777777",@alice,"csv"',
+      '2026-10-06 | 8888888888888888888 | @alice',
     ].join('\n')
     expect(idsInOutput(stdout).sort()).toEqual([
       '1111111111111111111',
@@ -299,7 +671,26 @@ describe('the tweet ids a command printed', () => {
       '3333333333333333333',
       '4444444444444444444',
       '5555555555555555555',
+      '6666666666666666666',
+      '7777777777777777777',
+      '8888888888888888888',
     ])
+  })
+
+  test('ids beside a tab that jq -c printed as the two characters \\t', () => {
+    // jq -c '[.id, .author, .text] | @tsv' prints a JSON string per row.
+    const stdout = [
+      '"1111111111111111111\\t@alice\\tfirst"',
+      '"0.91\\t2222222222222222222\\t@bob"',
+      '"@carol\\t0.4\\t3333333333333333333"',
+    ].join('\n')
+    expect(idsInOutput(stdout).sort()).toEqual([
+      '1111111111111111111',
+      '2222222222222222222',
+      '3333333333333333333',
+    ])
+    // A long number in running text is still not an id.
+    expect(idsInOutput('"note\\tsaw 1234567890123456789 times"')).toEqual([])
   })
 
   test('but not a long number inside a sentence or a count', () => {
@@ -340,12 +731,443 @@ describe('the archive command names', () => {
     expect(second.stdout.trim()).toBe('@bob')
   })
 
+  test('reports where the command spent its time', async () => {
+    ;(getTweetDetails as jest.Mock).mockResolvedValue([tweet('3')])
+    const result = await run('show 3; echo done')
+    expect(result.timing).toMatchObject({
+      phases: { show: expect.any(Number) },
+      execMs: expect.any(Number),
+      pageMs: expect.any(Number),
+    })
+    expect(result.timing!.spans.map((span) => span.slice(0, 3))).toContainEqual(
+      ['phase', 'shell', 'show'],
+    )
+    // The page never receives it.
+    expect(streamedBashOutput(result, new Set()).timing).toBeUndefined()
+  })
+
+  test('a tweet read with show, and the one it quotes, can be cited', async () => {
+    ;(getTweetDetails as jest.Mock).mockResolvedValue([
+      {
+        ...tweet('3'),
+        quotedTweet: { id: '2', username: 'alice', text: 'tweet 2' },
+      },
+    ])
+    const result = await run('show 3')
+    // The text it prints carries no row for the page to read ids from.
+    expect(idsInOutput(result.stdout)).toEqual([])
+    expect(result.tweets.map((t) => t.id).sort()).toEqual(['2', '3'])
+    expect(result.summary).toBe('Read a tweet by @alice')
+    ;(getTweetDetails as jest.Mock).mockResolvedValue([])
+    const missing = await run('show 999; echo after')
+    expect(missing.summary).toBe('Tweet not found')
+    expect(missing.tweets).toEqual([])
+  })
+
   test('show prints one tweet in full', async () => {
     ;(getTweetDetails as jest.Mock).mockResolvedValue([tweet('3')])
     const result = await run('show 3')
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('@alice')
     expect(result.stdout).toContain('tweet 3 about singapore')
+  })
+})
+
+describe('timeline', () => {
+  test("reads one person's tweets page by page, newest first, without retweets", async () => {
+    ;(getAccountTweets as jest.Mock).mockImplementation(async ({ cursor }) =>
+      cursor === 'c1'
+        ? { tweets: [tweet('3')], nextCursor: null }
+        : { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' },
+    )
+    const result = await run('timeline @alice --until 2025-01-31 > a.jsonl')
+    expect(result.exitCode).toBe(0)
+    expect(result.files).toEqual({ 'a.jsonl': ['1', '2', '3'] })
+    expect(result.summary).toBe("Read @alice's tweets · 3 tweets")
+    expect((getAccountTweets as jest.Mock).mock.calls[0][0]).toMatchObject({
+      account: '@alice',
+      order: 'desc',
+      // --until is inclusive; the API's is exclusive.
+      until: '2025-02-01',
+      excludeReplies: false,
+      excludeRetweets: true,
+      limit: 200,
+    })
+    expect((getAccountTweets as jest.Mock).mock.calls[1][0].cursor).toBe('c1')
+  })
+
+  test('takes the oldest first, drops replies, keeps retweets and caps the count', async () => {
+    ;(getAccountTweets as jest.Mock).mockResolvedValue({
+      tweets: Array.from({ length: 50 }, (_, i) => tweet(String(i + 1))),
+      nextCursor: 'more',
+    })
+    const result = await run(
+      'timeline maskys_ --oldest --no-replies --retweets --limit 50',
+    )
+    expect((getAccountTweets as jest.Mock).mock.calls[0][0]).toMatchObject({
+      account: '@maskys_',
+      order: 'asc',
+      excludeReplies: true,
+      excludeRetweets: false,
+      limit: 50,
+    })
+    expect(result.stderr).toContain('more exist')
+  })
+
+  test('says when the person is not in the archive', async () => {
+    ;(getAccountTweets as jest.Mock).mockRejectedValue(
+      new ApiV1Error(404, 'not_found', 'account not found'),
+    )
+    const result = await run('timeline @nobody_here')
+    expect(result.exitCode).toBe(1)
+    expect(result.stderr).toContain('no such member')
+  })
+
+  test('an empty or short page with a cursor is not the end', async () => {
+    // The API leaves deleted tweets out of a page.
+    const pages: Record<
+      string,
+      { tweets: unknown[]; nextCursor: string | null }
+    > = {
+      start: { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' },
+      c1: { tweets: [], nextCursor: 'c2' },
+      c2: { tweets: [tweet('3')], nextCursor: null },
+    }
+    ;(getAccountTweets as jest.Mock).mockImplementation(
+      async ({ cursor }) => pages[cursor ?? 'start'],
+    )
+    const result = await run('timeline @alice > a.jsonl')
+    expect(result.exitCode).toBe(0)
+    expect(result.files).toEqual({ 'a.jsonl': ['1', '2', '3'] })
+    expect(getAccountTweets).toHaveBeenCalledTimes(3)
+    expect(result.stderr).not.toContain('more')
+  })
+
+  test('stops on a cursor it already followed, or after a bounded number of pages', async () => {
+    ;(getAccountTweets as jest.Mock).mockResolvedValue({
+      tweets: [tweet('1')],
+      nextCursor: 'same',
+    })
+    const stuck = await run('timeline @alice')
+    expect(stuck.exitCode).toBe(0)
+    expect(getAccountTweets).toHaveBeenCalledTimes(2)
+    expect(stuck.stderr).toContain('same page cursor twice; more may exist')
+
+    jest.clearAllMocks()
+    let n = 0
+    ;(getAccountTweets as jest.Mock).mockImplementation(async () => ({
+      tweets: [],
+      nextCursor: `c${++n}`,
+    }))
+    const endless = await run('timeline @alice --limit 300')
+    // ceil(300 / 200) + 10 pages.
+    expect(getAccountTweets).toHaveBeenCalledTimes(12)
+    expect(endless.stderr).toContain('stopped after 12 pages; more may exist')
+  })
+
+  test('a request too broad for the query budget prints the pages read, marked partial', async () => {
+    ;(getAccountTweets as jest.Mock).mockImplementation(async ({ cursor }) => {
+      if (cursor) {
+        throw new ApiV1Error(
+          422,
+          'query_budget_exceeded',
+          'The request is too broad',
+        )
+      }
+      return { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' }
+    })
+    const result = await run('timeline @alice > a.jsonl')
+    expect(result.exitCode).toBe(1)
+    expect(result.files).toEqual({ 'a.jsonl': ['1', '2'] })
+    expect(result.stderr).toContain(
+      "timeline @alice: too broad for the API's query budget; narrow it with --since/--until · partial results: 2 tweets",
+    )
+    expect(result.summary).toBe("Read @alice's tweets · 2 tweets, partial")
+    ;(getAccountTweets as jest.Mock).mockRejectedValue(
+      new ApiV1Error(422, 'query_budget_exceeded', 'The request is too broad'),
+    )
+    const none = await run('timeline @alice')
+    expect(none.exitCode).toBe(1)
+    expect(none.stdout).toBe('')
+    expect(none.stderr).toContain('narrow it with --since/--until')
+    expect(none.stderr).not.toContain('partial')
+  })
+})
+
+describe('expand', () => {
+  // Seed X's thread is X itself (the tweet the gateway returns with its
+  // conversation) and replies X0, X1; its quote posts are X5.
+  const conversations: Record<string, { thread: string[]; quotes: string[] }> =
+    {}
+  const conversationOf = (id: string) =>
+    conversations[id] ?? { thread: [`${id}0`, `${id}1`], quotes: [`${id}5`] }
+
+  /** A scored file, as score leaves it in the manifest. */
+  const scoredFile = (rows: Array<[string, number?]>): WorkspaceManifest => {
+    for (const [id] of rows) if (!archive.has(id)) archive.set(id, tweet(id))
+    return {
+      'c1.jsonl': {
+        kind: 'tweets',
+        rows: rows.map(([id, p]) => (p === undefined ? { id } : { id, p })),
+      },
+    }
+  }
+
+  beforeEach(() => {
+    for (const key of Object.keys(conversations)) delete conversations[key]
+    ;(getTweetThread as jest.Mock).mockImplementation(async (id: string) => ({
+      tweet: tweet(id),
+      conversation: conversationOf(id).thread.map((reply) => tweet(reply)),
+    }))
+    ;(getQuotePosts as jest.Mock).mockImplementation(async (id: string) => {
+      const quotes = conversationOf(id).quotes.map((q) => tweet(q, 'carol'))
+      return { tweets: quotes, total: quotes.length }
+    })
+  })
+
+  const threadIds = () =>
+    (getTweetThread as jest.Mock).mock.calls.map((call) => call[0])
+
+  test('expands the highest-p tweets, best first, up to --seeds', async () => {
+    const manifest = scoredFile([
+      ['1', 0.75],
+      ['2', 0.95],
+      ['3', 0.5],
+      ['4', 0.85],
+      ['5', 0.9],
+    ])
+    const out = await run('expand c1.jsonl --seeds 2 > e1.jsonl', manifest)
+    expect(out.exitCode).toBe(0)
+    expect(threadIds()).toEqual(['2', '5'])
+    expect((getQuotePosts as jest.Mock).mock.calls.map((c) => c[0])).toEqual([
+      '2',
+      '5',
+    ])
+    // Seed order, then each call's order: thread before quotes.
+    expect(out.files).toEqual({
+      'e1.jsonl': ['20', '21', '25', '50', '51', '55'],
+    })
+    // Rows carry no p, and the tweets reach the page from the cache.
+    const e1 = out.workspace['e1.jsonl']
+    expect(e1?.kind === 'tweets' && e1.rows.some((row) => 'p' in row)).toBe(
+      false,
+    )
+    expect(out.tweets.map((t) => t.id)).toEqual([
+      '20',
+      '21',
+      '25',
+      '50',
+      '51',
+      '55',
+    ])
+    expect(out.stderr).toBe(
+      'expand c1.jsonl: 2 seeds · 6 new tweets · 2 authors · 2025-01-02 to 2025-01-08\n',
+    )
+    expect(out.summary).toBe("Expanded 2 tweets' conversations · 6 tweets")
+
+    // By default, every tweet at or above 0.7, at most 15 of them.
+    jest.clearAllMocks()
+    await run('expand c1.jsonl', manifest)
+    expect(threadIds()).toEqual(['2', '5', '4', '1'])
+    jest.clearAllMocks()
+    await run('expand c1.jsonl --min-p 0.5 --seeds 99', manifest)
+    expect(threadIds()).toEqual(['2', '5', '4', '1', '3'])
+  })
+
+  test('leaves out tweets already in the file and the seeds, and prints each tweet once', async () => {
+    conversations['1'] = { thread: ['2', '4', '9'], quotes: ['1', '10'] }
+    conversations['4'] = { thread: ['1', '9', '11'], quotes: ['10', '12'] }
+    const out = await run(
+      'expand c1.jsonl',
+      scoredFile([
+        ['1', 0.9],
+        ['2', 0.2],
+        ['4', 0.8],
+      ]),
+    )
+    expect(
+      out.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line).id),
+    ).toEqual(['9', '10', '11', '12'])
+    expect(out.stderr).toContain('2 seeds · 4 new tweets')
+  })
+
+  test('--limit caps the tweets printed, and stderr says so', async () => {
+    const out = await run(
+      'expand c1.jsonl --limit 4',
+      scoredFile([
+        ['1', 0.9],
+        ['2', 0.8],
+      ]),
+    )
+    expect(
+      out.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line).id),
+    ).toEqual(['10', '11', '15', '20'])
+    expect(out.stderr).toContain(
+      '2 seeds · 4 new tweets · 2 authors · 2025-01-02 to 2025-01-07 · capped at 4 of 6 (raise --limit, max 1000)',
+    )
+  })
+
+  test('a file without scores is a usage mistake', async () => {
+    const out = await run('expand c1.jsonl', scoredFile([['1'], ['2']]))
+    expect(out.exitCode).toBe(2)
+    expect(out.stderr).toContain(
+      'c1.jsonl has no p values; score it first (score c1.jsonl',
+    )
+    expect(out.stderr).toContain(USAGE.expand)
+    expect(getTweetThread).not.toHaveBeenCalled()
+  })
+
+  test('a file with no tweet at or above --min-p prints nothing and succeeds', async () => {
+    const out = await run(
+      'expand c1.jsonl --min-p 0.95',
+      scoredFile([
+        ['1', 0.9],
+        ['2', 0.4],
+      ]),
+    )
+    expect(out.exitCode).toBe(0)
+    expect(out.stdout).toBe('')
+    expect(out.stderr).toContain('no tweet has p ≥ 0.95; nothing to expand')
+    expect(getTweetThread).not.toHaveBeenCalled()
+    expect(getQuotePosts).not.toHaveBeenCalled()
+  })
+
+  test('a failing seed is counted; every call failing reads as the archive down', async () => {
+    const manifest = scoredFile([
+      ['1', 0.9],
+      ['2', 0.8],
+    ])
+    ;(getTweetThread as jest.Mock).mockImplementation(async (id: string) => {
+      if (id === '1') throw new Error('fetch failed')
+      return { tweet: tweet(id), conversation: [tweet('20')] }
+    })
+    const some = await run('expand c1.jsonl', manifest)
+    expect(some.exitCode).toBe(0)
+    // Seed 1's quotes still count.
+    expect(
+      some.stdout
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line).id),
+    ).toEqual(['15', '20', '25'])
+    expect(some.stderr).toContain('· 1 of 2 seeds failed')
+    ;(getTweetThread as jest.Mock).mockRejectedValue(new Error('fetch failed'))
+    ;(getQuotePosts as jest.Mock).mockRejectedValue(new Error('fetch failed'))
+    // The file was rebuilt through the gateway, so the archive answered once.
+    const rebuilt = await run('expand c1.jsonl', manifest)
+    expect(rebuilt.exitCode).toBe(1)
+    expect(rebuilt.stderr).toBe('expand: fetch failed\n')
+    // Written in the same command, no call answered.
+    await expect(
+      run(`echo '{"id":"1","p":0.9}' > c2.jsonl; expand c2.jsonl`),
+    ).rejects.toBeInstanceOf(WorkspaceUnavailableError)
+    // Nor did the file's rebuild.
+    ;(getTweetsByIds as jest.Mock).mockRejectedValue(new Error('fetch failed'))
+    await expect(run('expand c1.jsonl', manifest)).rejects.toBeInstanceOf(
+      WorkspaceUnavailableError,
+    )
+  })
+
+  test('expands at most four seeds at a time', async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => String(i + 1))
+    const manifest = scoredFile(ids.map((id) => [id, 0.9]))
+    const pending = new Map<string, number>()
+    let mostSeeds = 0
+    let mostCalls = 0
+    let calls = 0
+    const slow =
+      <T>(inner: (id: string) => Promise<T>) =>
+      async (id: string) => {
+        pending.set(id, (pending.get(id) ?? 0) + 1)
+        calls += 1
+        mostSeeds = Math.max(mostSeeds, pending.size)
+        mostCalls = Math.max(mostCalls, calls)
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        calls -= 1
+        const left = pending.get(id)! - 1
+        if (left) pending.set(id, left)
+        else pending.delete(id)
+        return inner(id)
+      }
+    ;(getTweetThread as jest.Mock).mockImplementation(
+      slow((getTweetThread as jest.Mock).getMockImplementation()!),
+    )
+    ;(getQuotePosts as jest.Mock).mockImplementation(
+      slow((getQuotePosts as jest.Mock).getMockImplementation()!),
+    )
+    const out = await run('expand c1.jsonl --seeds 10', manifest)
+    expect(out.exitCode).toBe(0)
+    expect(getTweetThread).toHaveBeenCalledTimes(10)
+    expect(mostSeeds).toBe(4)
+    expect(mostCalls).toBe(8)
+  })
+})
+
+describe('par', () => {
+  test('runs archive commands at once and keeps their order', async () => {
+    const inner = (searchTweets as jest.Mock).getMockImplementation()!
+    let inFlight = 0
+    let most = 0
+    ;(searchTweets as jest.Mock).mockImplementation(async (input) => {
+      most = Math.max(most, ++inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      inFlight--
+      return inner(input)
+    })
+    const result = await run(
+      `par 'search "{}" > s_{}.jsonl' singapore about; ls`,
+    )
+    expect(result.exitCode).toBe(0)
+    expect(most).toBe(2)
+    expect(Object.keys(result.files).sort()).toEqual([
+      's_about.jsonl',
+      's_singapore.jsonl',
+    ])
+    expect(result.stderr.indexOf('“singapore”')).toBeLessThan(
+      result.stderr.indexOf('“about”'),
+    )
+  })
+
+  test('a failure inside a pipe on a par line is not hidden', async () => {
+    const piped = await run(`par 'false | cat' 'echo ok'`)
+    expect(piped.stdout).toBe('ok\n')
+    expect(piped.exitCode).toBe(1)
+    const fine = await run(`par 'echo a | cat' 'echo b'`)
+    expect(fine.exitCode).toBe(0)
+  })
+
+  test('a stopped run starts none of the lines par has yet to run', async () => {
+    const stop = new AbortController()
+    ;(searchTweets as jest.Mock).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      return { tweets: [], nextOffset: null }
+    })
+    // Eight lines, six at a time: the stop lands while the first six run.
+    const words = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].join(' ')
+    setTimeout(() => stop.abort(), 10)
+    await runBashCommand({
+      command: `par 'search word{}' ${words}`,
+      manifest: {},
+      limits: { abortSignal: stop.signal },
+    }).catch(() => undefined)
+    expect((searchTweets as jest.Mock).mock.calls.length).toBeLessThanOrEqual(6)
+  })
+
+  test('runs each argument as its own line, and refuses an empty or oversized call', async () => {
+    const both = await run(`par 'echo one' 'echo two'`)
+    expect(both.stdout).toBe('one\ntwo\n')
+    const empty = await run(`par 'search {}'`)
+    expect(empty.exitCode).toBe(2)
+    const words = Array.from({ length: 31 }, (_, i) => `w${i}`).join(' ')
+    const many = await run(`par 'echo {}' ${words}`)
+    expect(many.exitCode).toBe(2)
+    expect(many.stderr).toContain('at most 30')
   })
 })
 
@@ -370,6 +1192,38 @@ describe('what the page receives of a command', () => {
   })
 })
 
+describe('files written in another shape', () => {
+  test('a merged JSON array is kept as rows, and stderr says how it reads now', async () => {
+    const first = await run('search singapore > s1.jsonl')
+    const out = await run(
+      "jq -sc 'unique_by(.id)' s1.jsonl > pool.jsonl",
+      applyChanges({}, first.workspace),
+    )
+    expect(out.workspace['pool.jsonl']).toMatchObject({ kind: 'tweets' })
+    expect(out.stderr).toMatch(
+      /^note: pool\.jsonl was one JSON array or multi-line JSON; later commands see it as JSON Lines/,
+    )
+    const next = await run(
+      'wc -l pool.jsonl',
+      applyChanges(applyChanges({}, first.workspace), out.workspace),
+    )
+    expect(next.stdout.trim()).toBe('4 pool.jsonl')
+  })
+
+  test('a long file that is neither rows nor short text is named on stderr', async () => {
+    const out = await run(`seq 1 6000 | awk '{print "line " $1}' > notes.txt`)
+    expect(out.workspace['notes.txt']).toBeNull()
+    expect(out.stderr).toContain(
+      'note: notes.txt is not kept for later commands',
+    )
+  })
+
+  test('a JSON Lines file brings no note', async () => {
+    const out = await run('search singapore > s1.jsonl')
+    expect(out.stderr).not.toContain('note:')
+  })
+})
+
 describe('what the model sees of a command', () => {
   test('long output is cut with a note, and the summary on stderr stays', () => {
     const stdout = Array.from(
@@ -381,7 +1235,7 @@ describe('what the model sees of a command', () => {
       stderr: 'search: 500 tweets\n',
       exitCode: 0,
     })
-    expect(view.output.length).toBeLessThan(4200)
+    expect(view.output.length).toBeLessThan(MODEL_OUTPUT_CHARS + 200)
     expect(view.output).toMatch(/… \d+ more lines not shown/)
     expect(view.output).toContain('search: 500 tweets')
   })
@@ -396,5 +1250,249 @@ describe('what the model sees of a command', () => {
       output: 'Searched “x” · 2 tweets\ns1.jsonl · 2 tweets',
       exitCode: 0,
     })
+  })
+})
+
+describe('per-run tweet cache', () => {
+  test('reuses tweets fetched earlier in the same runId without calling the gateway again', async () => {
+    const first = await runBashCommand({
+      command: 'search singapore > s1.jsonl',
+      manifest: {},
+      runId: 'asr_run_1',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(first.exitCode).toBe(0)
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+
+    const manifest = applyChanges({}, first.workspace)
+    const second = await runBashCommand({
+      command: 'jq -c \'select(.author == "@alice")\' s1.jsonl | wc -l',
+      manifest,
+      runId: 'asr_run_1',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(second.exitCode).toBe(0)
+    expect(second.stdout.trim()).toBe('3')
+    // Rebuilding s1.jsonl hit the per-run cache instead of the gateway.
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+
+    // A follow-up question (new runId) fetches fresh from the gateway so opt-outs apply.
+    archive.delete('2')
+    const followUp = await runBashCommand({
+      command: 'jq -c \'select(.author == "@alice")\' s1.jsonl | wc -l',
+      manifest,
+      runId: 'asr_run_2',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(followUp.exitCode).toBe(0)
+    expect(followUp.stdout.trim()).toBe('2')
+    expect(getTweetsByIds).toHaveBeenCalledTimes(1)
+  })
+
+  test('clearRunTweetCache drops the run immediately and createInProcessBash shares one cache per run', async () => {
+    const first = await runBashCommand({
+      command: 'search singapore > s1.jsonl',
+      manifest: {},
+      runId: 'asr_clear_me',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    const manifest = applyChanges({}, first.workspace)
+    clearRunTweetCache('asr_clear_me')
+    await runBashCommand({
+      command: 'wc -l s1.jsonl',
+      manifest,
+      runId: 'asr_clear_me',
+      limits: { deadlineAt: Date.now() + 60_000 },
+    })
+    expect(getTweetsByIds).toHaveBeenCalledTimes(1)
+    ;(getTweetsByIds as jest.Mock).mockClear()
+
+    const runner = createInProcessBash({ deadlineAt: Date.now() + 60_000 })
+    await runner.execute({ command: 'search singapore > s1.jsonl' })
+    const res = await runner.execute({ command: 'wc -l < s1.jsonl' })
+    expect(res.stdout.trim()).toBe('4')
+    expect(getTweetsByIds).not.toHaveBeenCalled()
+  })
+
+  test('enforces run LRU limit, TTL expiry, and per-run tweet cap', () => {
+    const t0 = 1_000_000
+    for (let i = 0; i < MAX_CACHED_RUNS + 2; i++) {
+      getRunTweetCache(`run_${i}`, t0 + i).set('1', tweet('1'))
+    }
+    // Oldest two runs were evicted.
+    expect(getRunTweetCache('run_0', t0 + 100).size).toBe(0)
+    // TTL expiry drops stale runs.
+    const active = getRunTweetCache('run_ttl', t0)
+    active.set('1', tweet('1'))
+    expect(getRunTweetCache('run_ttl', t0 + RUN_CACHE_TTL_MS + 1).size).toBe(0)
+    // BoundedTweetMap caps entries per run.
+    const bounded = new BoundedTweetMap(2)
+    bounded.set('1', tweet('1'))
+    bounded.set('2', tweet('2'))
+    bounded.set('3', tweet('3'))
+    expect(Array.from(bounded.keys())).toEqual(['2', '3'])
+  })
+})
+
+describe('partial results', () => {
+  const fail = (message = 'gateway timeout') => {
+    throw new Error(message)
+  }
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1))
+
+  test('a search term that fails loses only its own rows, and is named', async () => {
+    ;(searchTweets as jest.Mock).mockImplementation(async ({ query }) =>
+      query === 'tpot'
+        ? fail()
+        : { tweets: Array.from(archive.values()), nextOffset: null },
+    )
+    const out = await run('search singapore --or tpot > s1.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files).toEqual({ 's1.jsonl': ['1', '2', '3', '4'] })
+    expect(out.stderr).toContain(
+      '1 of 2 searches failed (gateway timeout): “tpot”; these rows are from the others, so search only the failed ones again',
+    )
+    expect(out.summary).toBe(
+      'Searched “singapore” or “tpot” · 4 tweets, partial',
+    )
+  })
+
+  test('every term failing still reads as the archive down', async () => {
+    ;(searchTweets as jest.Mock).mockImplementation(async () => fail())
+    await expect(
+      run('search singapore --with expat,visa > s1.jsonl'),
+    ).rejects.toBeInstanceOf(WorkspaceUnavailableError)
+  })
+
+  test('a single search keeps its first page when a later one fails', async () => {
+    const first = ids(100).map((id) => tweet(id))
+    ;(searchTweets as jest.Mock).mockImplementation(async ({ offset = 0 }) =>
+      offset === 0 ? { tweets: first, nextOffset: 100 } : fail(),
+    )
+    const out = await run('search singapore --limit 250 > s1.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files['s1.jsonl']).toEqual(ids(100))
+    expect(out.stderr).toContain(
+      'stopped early when a later page failed (gateway timeout); these are the first 100',
+    )
+    expect(out.stderr).not.toContain('more exist')
+    expect(out.summary).toBe('Searched “singapore” · 100 tweets, partial')
+  })
+
+  test('timeline keeps the pages it read when a later one fails', async () => {
+    ;(getAccountTweets as jest.Mock).mockImplementation(async ({ cursor }) =>
+      cursor ? fail() : { tweets: [tweet('1'), tweet('2')], nextCursor: 'c1' },
+    )
+    const out = await run('timeline @alice > a.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files).toEqual({ 'a.jsonl': ['1', '2'] })
+    expect(out.stderr).toContain(
+      'stopped when a later page failed (gateway timeout); more may exist (narrow it with --since/--until)',
+    )
+    expect(out.summary).toBe("Read @alice's tweets · 2 tweets, partial")
+
+    // A failed first page still fails the command.
+    ;(getAccountTweets as jest.Mock).mockImplementation(async () => fail())
+    const none = await run('search singapore > s.jsonl; timeline @alice')
+    expect(none.exitCode).toBe(1)
+    expect(none.stdout).toBe('')
+    expect(none.stderr).toContain('timeline: gateway timeout')
+  })
+
+  test('score scores a reply alone when its parent cannot be fetched', async () => {
+    const { scoreTweets } = jest.requireMock('../classifier')
+    archive.set('5', { ...tweet('5'), replyToTweetId: '99' })
+    ;(getTweetsByIds as jest.Mock).mockImplementation(
+      async (asked: string[]) =>
+        asked.includes('99')
+          ? fail('parent lookup timed out')
+          : asked.flatMap((id) => (archive.has(id) ? [archive.get(id)] : [])),
+    )
+    const out = await run(
+      'search singapore > s1.jsonl && score s1.jsonl "Does this tweet talk about living in Singapore?" > c1.jsonl',
+    )
+    expect(out.exitCode).toBe(0)
+    expect(out.files['c1.jsonl']).toHaveLength(5)
+    expect(out.stderr).toContain(
+      '1 reply scored without the tweet they answer (that lookup failed: parent lookup timed out)',
+    )
+    const items = (scoreTweets as jest.Mock).mock.calls.at(-1)[1]
+    expect(
+      items.find((item: { id: string }) => item.id === '5').parentText,
+    ).toBe(undefined)
+    // What the scorer spent is still counted.
+    expect(out.costUsd).toBe(0.01)
+  })
+
+  test('tweets keeps the batches that answered, and says the rest failed', async () => {
+    for (const id of ids(150)) archive.set(id, tweet(id))
+    ;(getTweetsByIds as jest.Mock).mockImplementation(
+      async (asked: string[]) =>
+        asked.includes('1')
+          ? fail('lookup failed')
+          : asked.flatMap((id) => (archive.has(id) ? [archive.get(id)] : [])),
+    )
+    const out = await run('seq 1 150 | tweets > t.jsonl')
+    expect(out.exitCode).toBe(0)
+    expect(out.files['t.jsonl']).toEqual(ids(150).slice(100))
+    expect(out.stderr).toContain(
+      'tweets: 50 tweets of 150 found · 100 could not be fetched (lookup failed), which is not the same as not found; run tweets again for those',
+    )
+    expect(out.summary).toBe('Fetched 50 tweets, partial')
+    ;(getTweetsByIds as jest.Mock).mockImplementation(async () => fail())
+    await expect(run('seq 1 150 | tweets')).rejects.toBeInstanceOf(
+      WorkspaceUnavailableError,
+    )
+  })
+
+  test('rebuilding a workspace file stays strict: a failed batch fails the read', async () => {
+    for (const id of ids(150)) archive.set(id, tweet(id))
+    const manifest: WorkspaceManifest = {
+      'a.jsonl': { kind: 'tweets', rows: ids(150).map((id) => ({ id })) },
+    }
+    ;(getTweetsByIds as jest.Mock).mockImplementation(
+      async (asked: string[]) =>
+        asked.includes('1')
+          ? fail()
+          : asked.flatMap((id) => (archive.has(id) ? [archive.get(id)] : [])),
+    )
+    // Alone, the read is the command's only archive call: the archive is down.
+    await expect(run('cat a.jsonl | wc -l', manifest)).rejects.toBeInstanceOf(
+      WorkspaceUnavailableError,
+    )
+    // Beside a search that answered, the read fails rather than printing the
+    // 50 tweets of the batch that came back.
+    ;(searchTweets as jest.Mock).mockResolvedValue({
+      tweets: [],
+      nextOffset: null,
+    })
+    const out = await run(
+      'search singapore > s.jsonl; cat a.jsonl | wc -l',
+      manifest,
+    )
+    expect(out.exitCode).not.toBe(0)
+    expect(out.stdout.trim()).not.toBe('50')
+    expect(out.files['a.jsonl']).toBeUndefined()
+  })
+
+  test('Stop during a search of several terms returns no partial rows', async () => {
+    const stop = new AbortController()
+    ;(searchTweets as jest.Mock).mockImplementation(async ({ query }) => {
+      if (query === 'b') {
+        stop.abort(new Error('stopped'))
+        throw new Error('stopped')
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return { tweets: [tweet('1')], nextOffset: null }
+    })
+    // The search fails as a whole, so its one call counts as failed; had it
+    // kept term a's row as partial, the command would have succeeded.
+    await expect(
+      runBashCommand({
+        command: 'search a --or b',
+        manifest: {},
+        limits: { abortSignal: stop.signal },
+      }),
+    ).rejects.toBeInstanceOf(WorkspaceUnavailableError)
   })
 })

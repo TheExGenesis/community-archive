@@ -1,21 +1,27 @@
 import { Bash, type CommandName } from 'just-bash'
 import { WORKSPACE_PATH } from '../citations'
 import { boundedTimeoutMs, type RunLimits } from '../deadline'
+import { createSlots } from '../slots'
+import { SEARCH_CONCURRENCY } from '../toolImpl'
+import { inPhase, startTrace, summarizeTrace } from '../trace'
 import type { AgentTweet } from '../types'
 import {
   archiveCommands,
   createCommandState,
   fetchTweets,
+  fetchTweetsSettled,
   type CommandState,
 } from './commands'
 import {
+  MAX_TEXT_FILE_CHARS,
   manifestFileFor,
   type ManifestChanges,
   type ManifestFile,
   type WorkspaceManifest,
 } from './manifest'
 import type { BashToolOutput } from './output'
-import { formatRows, toRow, uniqueIds } from './rows'
+import { formatRows, parseRowLines, toRow, uniqueIds } from './rows'
+import { getRunTweetCache } from './runCache'
 
 /** The built-in tools the agent may use alongside the archive commands. */
 const SHELL_COMMANDS: CommandName[] = [
@@ -43,6 +49,8 @@ const SHELL_COMMANDS: CommandName[] = [
   'mv',
   'rm',
   'tee',
+  // The prompt tells the agent to split a file of over 1,000 tweets.
+  'split',
   'xargs',
   'comm',
   'join',
@@ -88,7 +96,9 @@ function lazyTweetFile(
     state.calls += 1
     let tweets: AgentTweet[]
     try {
-      tweets = await fetchTweets(state, uniqueIds(file.rows))
+      tweets = await inPhase(state.limits, 'rebuild', () =>
+        fetchTweets(state, uniqueIds(file.rows)),
+      )
     } catch (error) {
       state.failures += 1
       throw error
@@ -144,9 +154,12 @@ export function scoresInOutput(stdout: string): Record<string, number> {
 }
 
 /**
- * Tweet ids in command output: `"id":"…"` in rows, a bare id on a line, or
- * an id leading a line of fields (jq's `"\(.id)\t\(.date)…"`, CSV, columns).
- * A long number inside a sentence is not taken for one.
+ * Tweet ids in command output: `"id":"…"` in rows, a bare id on a line, an id
+ * leading a line of fields (`jq`'s `"\(.id)\t\(.date)…"`, CSV, columns), or a
+ * standalone 15–20 digit id in a tab-, comma-, or pipe-delimited column (e.g.
+ * `[.p, .id, .author, .text] | @tsv`). A tab may also be the two characters
+ * `\\t`, as `jq -c` prints a tab inside a JSON string. A long number inside a
+ * sentence is not taken for one.
  */
 export function idsInOutput(stdout: string): string[] {
   const ids = new Set<string>()
@@ -154,7 +167,14 @@ export function idsInOutput(stdout: string): string[] {
     ids.add(match[1])
   }
   for (const match of Array.from(
-    stdout.matchAll(/^\s*"?(\d{15,20})"?(?=\s*$|[\t ,|])/gm),
+    stdout.matchAll(/^\s*"?(\d{15,20})"?(?=\s*$|[\t ,|]|\\t)/gm),
+  )) {
+    ids.add(match[1])
+  }
+  for (const match of Array.from(
+    stdout.matchAll(
+      /(?:[\t,|]|\\t)\s*"?(\d{15,20})"?(?=\s*(?:$|[\t,|]|\\t))/gm,
+    ),
   )) {
     ids.add(match[1])
   }
@@ -171,14 +191,32 @@ export async function runBashCommand({
   manifest,
   limits = {},
   semanticUsed = 0,
+  maxSemanticCalls,
+  runId,
+  tweetCache,
 }: {
   command: string
   manifest: WorkspaceManifest
   limits?: RunLimits
   /** Semantic searches the question has already run. */
   semanticUsed?: number
+  /** How many it may run in all; a deep run's count when left out (depth.ts). */
+  maxSemanticCalls?: number
+  /** Active run id: reuses hydrated tweets in memory across steps of this run. */
+  runId?: string
+  /** Optional explicit per-run tweet cache (used by in-process runners/tests). */
+  tweetCache?: Map<string, AgentTweet>
 }): Promise<BashToolOutput> {
-  const state = createCommandState(limits, semanticUsed)
+  // Where this command's time goes; the caller logs it (output.timing).
+  const trace = startTrace()
+  const cache = tweetCache ?? (runId ? getRunTweetCache(runId) : undefined)
+  const state = createCommandState(
+    // Every search this command line runs, under par too, shares these slots.
+    { ...limits, trace, searchSlots: createSlots(SEARCH_CONCURRENCY) },
+    semanticUsed,
+    cache,
+    maxSemanticCalls,
+  )
   const files: Record<string, string | (() => Promise<string>)> = {}
   for (const [path, file] of Object.entries(manifest)) {
     if (!WORKSPACE_PATH.test(path)) continue
@@ -219,15 +257,20 @@ export async function runBashCommand({
   const touched = trackWrites(bash.fs)
   // pipefail: a limit or error inside a pipe exits non-zero, so the model
   // sees the failure instead of an empty result.
+  const execStarted = Date.now()
   const result = await bash.exec(`set -o pipefail; ${command}`, {
     signal: limits.abortSignal,
   })
+  const execMs = Date.now() - execStarted
 
   // Whatever the command wrote under the workspace, as manifest changes.
   const workspace: ManifestChanges = {}
   // Rows printed with a p first; a file the command wrote has the last word.
   const scores = scoresInOutput(result.stdout)
   const changedFiles: Record<string, string[]> = {}
+  // Files written in a shape the next command will not see as written; the
+  // model learns it on stderr instead of finding the file gone.
+  const notes: string[] = []
   for (const absolute of Array.from(touched)) {
     const path = relative(absolute)
     if (!path || !WORKSPACE_PATH.test(path)) continue
@@ -237,7 +280,17 @@ export async function runBashCommand({
     }
     const stat = await bash.fs.stat(absolute)
     if (!stat.isFile) continue
-    const file = manifestFileFor(await bash.fs.readFile(absolute))
+    const content = await bash.fs.readFile(absolute)
+    const file = manifestFileFor(content)
+    if (!file) {
+      notes.push(
+        `note: ${path} is not kept for later commands: it is neither tweet rows (one JSON object with an id per line, as jq -c writes) nor text under ${MAX_TEXT_FILE_CHARS.toLocaleString('en-US')} characters`,
+      )
+    } else if (file.kind === 'tweets' && !parseRowLines(content)) {
+      notes.push(
+        `note: ${path} was one JSON array or multi-line JSON; later commands see it as JSON Lines, one tweet per line (read it with jq -c '.', not '.[]')`,
+      )
+    }
     workspace[path] = file
     if (file?.kind === 'tweets') {
       changedFiles[path] = uniqueIds(file.rows)
@@ -261,10 +314,18 @@ export async function runBashCommand({
   const ids = Array.from(
     new Set([
       ...idsInOutput(result.stdout),
+      ...state.shownIds,
       ...Object.values(changedFiles).flat(),
     ]),
   ).slice(0, MAX_PAGE_TWEETS)
-  const tweets = ids.length ? await fetchTweets(state, ids).catch(() => []) : []
+  const pageStarted = Date.now()
+  // A failed lookup batch loses only its own cards, not every card.
+  const tweets = ids.length
+    ? await inPhase(state.limits, 'page', () => fetchTweetsSettled(state, ids))
+        .then((found) => found.tweets)
+        .catch(() => [])
+    : []
+  const pageMs = Date.now() - pageStarted
   const wrote = Object.entries(changedFiles).map(
     ([path, list]) =>
       `Wrote ${path} · ${list.length} ${list.length === 1 ? 'tweet' : 'tweets'}`,
@@ -276,7 +337,10 @@ export async function runBashCommand({
 
   return {
     stdout: result.stdout,
-    stderr: result.stderr,
+    // First, so the cap on what the model sees of stderr cannot hide them.
+    stderr: notes.length
+      ? `${notes.join('\n')}\n${result.stderr}`
+      : result.stderr,
     exitCode: result.exitCode,
     summary,
     files: changedFiles,
@@ -285,5 +349,10 @@ export async function runBashCommand({
     costUsd: state.costUsd,
     semanticCalls: state.semanticCalls,
     ...(Object.keys(scores).length ? { scores } : {}),
+    timing: summarizeTrace(trace, {
+      ms: Date.now() - trace.t0,
+      execMs,
+      pageMs,
+    }),
   }
 }

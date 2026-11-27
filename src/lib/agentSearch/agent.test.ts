@@ -12,6 +12,7 @@ import {
   bashInstructions,
   bashInstructionsV2,
   agentSearchToolMode,
+  createAgentSearchTools,
   ARCHIVE_UNAVAILABLE_ERROR,
   createBashAgentTools,
   FINAL_STEP_NOTE,
@@ -21,6 +22,7 @@ import {
   questionWithWorkspace,
   toolsKeepFailing,
 } from './agent'
+import { MODEL_OUTPUT_CHARS } from './workspace/output'
 
 describe('agentSearchPrepareStep', () => {
   test('the reasoning and stall flags are on unless set to off', () => {
@@ -52,6 +54,12 @@ describe('agentSearchPrepareStep', () => {
     expect(
       agentSearchPrepareStep()({ stepNumber: AGENT_SEARCH_MAX_STEPS - 1 }),
     ).toEqual({ toolChoice: 'none' })
+  })
+
+  test('a run with fewer steps must answer on its own last step', () => {
+    const prepare = agentSearchPrepareStep(undefined, undefined, {}, 8)
+    expect(prepare({ stepNumber: 6 })).toEqual({})
+    expect(prepare({ stepNumber: 7 })).toEqual({ toolChoice: 'none' })
   })
 
   test('forces a written answer once the run’s deadline has passed', () => {
@@ -202,6 +210,127 @@ describe('the v2 instructions', () => {
   })
 })
 
+describe('the fast instructions', () => {
+  const deep = agentSearchInstructions('2026-10-14', 'bash', 'v2-examples')
+  const fast = agentSearchInstructions(
+    '2026-10-14',
+    'bash',
+    'v2-examples',
+    null,
+    'fast',
+  )
+
+  test('deep is the prompt every run had before depths', () => {
+    expect(
+      agentSearchInstructions(
+        '2026-10-14',
+        'bash',
+        'v2-examples',
+        null,
+        'deep',
+      ),
+    ).toBe(deep)
+    expect(deep).toContain('You have about 20 commands')
+    expect(deep).toContain('A question gets 6,')
+    expect(deep).toContain('Then expand the strongest hits')
+  })
+
+  test('fast states its own counts and gathers once', () => {
+    expect(fast).toContain('You have about 8 commands')
+    expect(fast).toContain('A question gets 2,')
+    expect(fast).toContain('This is a quick pass')
+    expect(fast).toContain('Do not run a second round of semantic searches')
+    expect(fast).not.toContain('Then expand the strongest hits')
+    // Its survey example stops after one round.
+    expect(fast).toContain('(one round, then the answer)')
+    expect(fast).not.toContain('one semantic search for each')
+    expect(fast).not.toContain('expand scored.jsonl')
+    // The commands, the answer rules and the other examples are shared.
+    const shared = (text: string, from: string, to: string) =>
+      text.slice(text.indexOf(from), text.indexOf(to))
+    expect(shared(fast, 'How to answer:', 'Examples (')).toBe(
+      shared(deep, 'How to answer:', 'Examples ('),
+    )
+    expect(shared(fast, '- people <name', 'What the archive shows:')).toBe(
+      shared(deep, '- people <name', 'What the archive shows:'),
+    )
+    expect(fast).toContain('1. A remembered tweet')
+    expect(fast).toContain('3. A follow-up')
+  })
+
+  test('v1 and the typed tools only take the counts', () => {
+    const v1 = agentSearchInstructions('2026-10-14', 'bash', 'v1', null, 'fast')
+    expect(v1).toContain('a question gets 2,')
+    expect(v1).toContain('You have about 8 commands in all')
+    expect(v1).toContain('How to work:')
+    const typedFast = agentSearchInstructions(
+      '2026-10-14',
+      'typed',
+      'v1',
+      null,
+      'fast',
+    )
+    const typedDeep = agentSearchInstructions('2026-10-14', 'typed', 'v1')
+    expect(typedFast).toContain('at most 2 times per question')
+    expect(typedDeep).toContain('at most 6 times per question')
+    expect(typedFast.replace('at most 2 times', 'at most 6 times')).toBe(
+      typedDeep,
+    )
+  })
+
+  test('the typed semantic tool states the run’s own limit', () => {
+    const description = (tools: Record<string, any>) =>
+      tools.semantic_search.description as string
+    expect(description(createAgentSearchTools())).toContain(
+      'Limited to 6 per question',
+    )
+    expect(description(createAgentSearchTools({}, 2))).toContain(
+      'Limited to 2 per question',
+    )
+  })
+})
+
+describe('merging files', () => {
+  const prompts = {
+    v1: bashInstructions('2026-10-14'),
+    deep: bashInstructionsV2('2026-10-14', true),
+    fast: bashInstructionsV2('2026-10-14', true, 'fast'),
+  }
+
+  test('search results are merged newest first, never left in id order', () => {
+    for (const text of Object.values(prompts)) {
+      // jq's unique_by sorts by id as a string, which put the oldest first.
+      expect(text).not.toContain("unique_by(.id)[]'")
+      expect(text).toContain(
+        "(cat a b | jq -sc 'unique_by(.id) | sort_by(.date) | reverse[]' > all.jsonl;",
+      )
+    }
+    expect(prompts.fast).toContain(
+      "jq -sc 'unique_by(.id) | sort_by(.date) | reverse[]' > all.jsonl && score all.jsonl",
+    )
+  })
+
+  test('scored files are merged best first', () => {
+    for (const text of [prompts.v1, prompts.deep]) {
+      expect(text).toContain(
+        "cat c1.jsonl c2.jsonl | jq -sc 'unique_by(.id) | sort_by(-.p)[]' > scored.jsonl && expand scored.jsonl",
+      )
+      expect(text).toContain(
+        "jq -sc 'unique_by(.id) | sort_by(-.p)[] | select(.p >= 0.5)' > yes.jsonl",
+      )
+    }
+  })
+})
+
+describe('lists in the answer', () => {
+  test('hand-picked tweets go in the marker, files stay for sets a command picks', () => {
+    const text = bashInstructions('2026-10-14')
+    expect(text).toContain('[[posts: <short label> | <id>, <id>, <id>]]')
+    expect(text).toContain('[[posts: <short label> | lists/<name>.jsonl]]')
+    expect(text).not.toContain('tweets <id> <id> ... > lists/')
+  })
+})
+
 describe('finalAnswerText', () => {
   test('is the last step’s text, never earlier narration', () => {
     expect(
@@ -294,10 +423,22 @@ describe('tool modes', () => {
 
   test('each mode has its own instructions, both with semantic search', () => {
     const bash = agentSearchInstructions('2026-10-13', 'bash')
+    const bashV1 = bashInstructions('2026-10-13')
+    const bashV2 = bashInstructionsV2('2026-10-13', true)
     const typed = agentSearchInstructions('2026-10-13', 'typed')
     expect(bash).toContain('Today is 2026-10-13')
     expect(bash).toContain('[[posts:')
     expect(bash).toContain('semantic')
+    expect(bashV1).toContain('Combine fetching and inspecting in one bash call')
+    expect(bashV2).toContain('Combine fetching and inspecting in one bash call')
+    // Lookups to run together go in one call: the agent's tool calls of a
+    // turn run one after another.
+    expect(bashV2).toContain('Make one bash call per turn')
+    expect(bashV2).not.toContain('multiple bash calls in the same turn')
+    expect(bashV2).toContain('not a JSON row, so do not pipe it to jq')
+    expect(bashV2).toContain('sed, split, mkdir')
+    expect(bashV2).toContain('author includes the leading @')
+    expect(bashV2).toContain('{id,p,author,date,text:.text[:160]}')
     expect(typed).toContain('semantic_search')
     expect(typed).not.toContain('[[posts:')
   })
@@ -308,7 +449,7 @@ describe('tool modes', () => {
     expect(bash.inputSchema.safeParse({ command: '' }).success).toBe(false)
     const out = bash.toModelOutput({
       output: {
-        stdout: 'x\n'.repeat(5000),
+        stdout: 'x\n'.repeat(MODEL_OUTPUT_CHARS),
         stderr: '',
         exitCode: 0,
         summary: '',
@@ -318,7 +459,7 @@ describe('tool modes', () => {
     })
     expect(out.type).toBe('json')
     expect(Object.keys(out.value)).toEqual(['output', 'exitCode'])
-    expect(out.value.output.length).toBeLessThan(4200)
+    expect(out.value.output.length).toBeLessThan(MODEL_OUTPUT_CHARS + 200)
     expect(out.value.output).toContain('more lines not shown')
   })
 
@@ -327,5 +468,26 @@ describe('tool modes', () => {
     expect(questionWithWorkspace('Q?', ['s1.jsonl · 3 tweets'])).toBe(
       'Q?\n\n(Files in /work from earlier questions: s1.jsonl · 3 tweets)',
     )
+  })
+
+  test('web search instructions are appended only when enabled', () => {
+    const withoutWeb = agentSearchInstructions(
+      '2026-11-22',
+      'bash',
+      'v2-examples',
+      null,
+      'fast',
+    )
+    const withWeb = agentSearchInstructions(
+      '2026-11-22',
+      'bash',
+      'v2-examples',
+      null,
+      'fast',
+      true,
+    )
+    expect(withoutWeb).not.toContain('Web search is enabled')
+    expect(withWeb).toContain('Web search is enabled')
+    expect(withWeb).toContain('plain markdown links')
   })
 })

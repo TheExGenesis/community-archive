@@ -53,6 +53,22 @@ export interface ProgressLine {
    * one the page can express (no OR lists, no semantic or scoring steps).
    */
   searchHref?: string
+  /**
+   * Per-sub-search links for compound/parallel (`par`) shell steps, keyed by
+   * `<query.toLowerCase()>|<fromUser.toLowerCase()>` so expanded sub-rows link
+   * to their own exact archive search regardless of completion order.
+   */
+  searchHrefs?: Record<string, string>
+  /**
+   * True when a compound/parallel command exited non-zero but some of its
+   * sub-actions still succeeded and produced a summary.
+   */
+  partial?: boolean
+  /**
+   * Human-readable sub-actions of a failed multi-part command so even a
+   * totally failed batch can be expanded to see what it tried.
+   */
+  attempted?: string[]
 }
 
 /**
@@ -234,6 +250,11 @@ export interface TurnView {
   foundPhase: FoundPhase
   /** The steps with the model's reasoning between them, in order. */
   timeline: TimelineEntry[]
+  /**
+   * How long a saved run took (history.ts); null for a live answer, whose
+   * time the page keeps itself.
+   */
+  durationMs: number | null
   /**
    * Tweets this turn's tools returned that are not in hand (a reopened
    * conversation fetches them again): how many are still loading, failed,
@@ -508,6 +529,16 @@ function shortCommand(command: string) {
     : line || 'a command'
 }
 
+/** Options of the archive commands that take no value (workspace/commands.ts). */
+const BOOLEAN_FLAGS = new Set([
+  'phrase',
+  'all',
+  'oldest',
+  'no-replies',
+  'retweets',
+  'no-parent',
+])
+
 // The words of a shell segment, with quotes removed and options dropped.
 function commandWords(segment: string): string[] {
   const words = Array.from(segment.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)).map(
@@ -518,9 +549,11 @@ function commandWords(segment: string): string[] {
     const word = words[i]
     if (word === '>' || word === '>>') break
     if (word.startsWith('--')) {
-      // An option and its value: --limit 300, --from @x.
+      // An option and its value: --limit 300, --from @x. An option that
+      // takes none (--phrase) leaves the next word where it is.
       if (
         !word.includes('=') &&
+        !BOOLEAN_FLAGS.has(word.slice(2)) &&
         words[i + 1] &&
         !words[i + 1].startsWith('-')
       ) {
@@ -533,41 +566,140 @@ function commandWords(segment: string): string[] {
   return kept
 }
 
-const ARCHIVE_COMMANDS = new Set([
-  'search',
-  'semantic',
-  'people',
-  'score',
-  'thread',
-  'quotes',
-  'show',
-  'tweets',
-  'interactions',
-  'ties',
-])
-
-/** Archive commands that share another command's icon. */
-const COMMAND_KINDS: Record<string, StepKind> = {
+/** The archive commands (workspace/commands.ts) and the icon each shows. */
+const ARCHIVE_COMMANDS: Record<string, StepKind> = {
+  search: 'search',
+  semantic: 'semantic',
+  people: 'people',
+  timeline: 'people',
+  score: 'score',
+  thread: 'thread',
+  quotes: 'quotes',
+  expand: 'thread',
+  show: 'show',
+  tweets: 'tweets',
   interactions: 'people',
   ties: 'people',
 }
 
-/** The first archive command in a shell command line, with its words. */
+const isArchiveCommand = (name: string | undefined): name is string =>
+  Boolean(name && Object.hasOwn(ARCHIVE_COMMANDS, name))
+
+/**
+ * One command a shell line runs, as the shell would see it: a loop's body
+ * with the loop's first value, a par line, or a plain segment. `more` counts
+ * the other runs of the same line: par's other lines, which run together, or
+ * the loop's other values, which run in turn.
+ */
+interface ShellLine {
+  text: string
+  more: number
+  together: boolean
+}
+
+const SEGMENT = /;|&&|\|\||\||\n/
+const SHELL_WORD = /"([^"]*)"|'([^']*)'|(\S+)/g
+// for VAR in WORDS; do BODY; done (newlines may stand for the semicolons)
+const FOR_LOOP =
+  /\bfor\s+([A-Za-z_]\w*)\s+in\s+([^;\n]*?)\s*[;\n]\s*do\b([\s\S]*?)\bdone\b/
+const ASSIGNMENT = /^(?:export\s+)?([A-Za-z_]\w*)=(\S*|"[^"]*"|'[^']*')$/
+/** A shell variable or command substitution the line could not resolve. */
+const UNRESOLVED = /\$(?:\{?[A-Za-z_]|\()|`/
+
+const shellWords = (text: string) =>
+  Array.from(text.matchAll(SHELL_WORD)).map(
+    (match) => match[1] ?? match[2] ?? match[3],
+  )
+
+/** Puts known variables in; unknown ones stay, so they read as unresolved. */
+const substitute = (text: string, vars: Map<string, string>) =>
+  text.replace(
+    /\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)/g,
+    (match, braced, bare) => vars.get(braced ?? bare) ?? match,
+  )
+
+function segmentLines(
+  text: string,
+  vars: Map<string, string>,
+  loop?: { name: string; values: string[] },
+): ShellLine[] {
+  const lines: ShellLine[] = []
+  for (const raw of text.split(SEGMENT)) {
+    // `while read h; do timeline $h` runs timeline: drop the shell keyword.
+    const segment = raw.trim().replace(/^(?:(?:do|then|else|\{|\()\s+)+/, '')
+    if (!segment) continue
+    const assigned = ASSIGNMENT.exec(segment)
+    if (assigned && !loop) {
+      const value = shellWords(assigned[2])[0] ?? ''
+      if (UNRESOLVED.test(value)) vars.delete(assigned[1])
+      else vars.set(assigned[1], value)
+      continue
+    }
+    const scope = new Map(vars)
+    if (loop?.values[0] !== undefined) scope.set(loop.name, loop.values[0])
+    const resolved = substitute(segment, scope)
+    const [name, ...args] = shellWords(resolved)
+    if (name === 'par' && args[0]) {
+      // par 'template {}' word... or par 'line' 'line'...
+      const runs = args[0].includes('{}')
+        ? args.slice(1).map((word) => args[0].replaceAll('{}', word))
+        : args
+      for (const run of runs) {
+        lines.push({ text: run, more: runs.length - 1, together: true })
+      }
+      continue
+    }
+    lines.push({
+      text: resolved,
+      more: loop ? Math.max(0, loop.values.length - 1) : 0,
+      together: false,
+    })
+  }
+  return lines
+}
+
+/** The commands a shell command line runs, in order (see ShellLine). */
+function shellLines(command: string): ShellLine[] {
+  const vars = new Map<string, string>()
+  const lines: ShellLine[] = []
+  let rest = command
+  for (let loop = FOR_LOOP.exec(rest); loop; loop = FOR_LOOP.exec(rest)) {
+    lines.push(...segmentLines(rest.slice(0, loop.index), vars))
+    const values = shellWords(substitute(loop[2], vars))
+    // A loop over a file's lines or a glob has no values to show.
+    const known = values.every((value) => !/[*?`]|\$/.test(value))
+    lines.push(
+      ...segmentLines(loop[3], vars, {
+        name: loop[1],
+        values: known ? values : [],
+      }),
+    )
+    rest = rest.slice(loop.index + loop[0].length)
+  }
+  lines.push(...segmentLines(rest, vars))
+  return lines
+}
+
+/**
+ * The first archive command a shell command line runs, with its words, and
+ * how many more runs of it there are (par lines, or a loop's other values).
+ */
 function firstArchiveCommand(
   command: string,
-): { name: string; rest: string[] } | null {
-  for (const segment of command.split(/;|&&|\|\||\|/)) {
-    const [name, ...rest] = commandWords(segment.trim())
-    if (name && ARCHIVE_COMMANDS.has(name)) return { name, rest }
+): { name: string; rest: string[]; more: number; together: boolean } | null {
+  for (const line of shellLines(command)) {
+    const [name, ...rest] = commandWords(line.text)
+    if (isArchiveCommand(name)) {
+      return { name, rest, more: line.more, together: line.together }
+    }
   }
   return null
 }
 
 /** What a shell command did, for its icon: its first archive command. */
 export function commandKind(command: string): StepKind {
-  const name = firstArchiveCommand(command)?.name
-  if (!name) return 'files'
-  return COMMAND_KINDS[name] ?? (name as StepKind)
+  const found = firstArchiveCommand(command)
+  return found ? ARCHIVE_COMMANDS[found.name] : 'files'
 }
 
 /**
@@ -576,38 +708,53 @@ export function commandKind(command: string): StepKind {
  */
 export function describeCommand(command: string): string {
   const found = firstArchiveCommand(command)
-  if (found) {
-    const { name, rest } = found
-    const text = rest.join(' ').trim()
-    switch (name) {
-      case 'search':
-        return text ? `Searching ${quote(text)}` : 'Searching'
-      case 'semantic':
-        return text
-          ? `Searching by meaning ${quote(text)}`
-          : 'Searching by meaning'
-      case 'people':
-        return text ? `Looking up ${quote(text)}` : 'Looking up people'
-      case 'score':
-        return rest[1]
-          ? `Checking tweets against ${quote(criterionText({ criterion: rest.slice(1).join(' ') }))}`
-          : 'Checking tweets against your question'
-      case 'thread':
-        return 'Reading thread'
-      case 'quotes':
-        return 'Reading quotes'
-      case 'show':
-        return 'Reading a tweet in full'
-      case 'tweets':
-        return 'Collecting tweets'
-      case 'interactions':
-        if (!rest[0]) return 'Checking who talked with whom'
-        return rest[1]
-          ? `Checking how ${rest[0]} and ${rest[1]} talked`
-          : `Checking who ${rest[0]} talked with`
-      case 'ties':
-        return 'Checking who they were talking to'
-    }
+  if (!found) return 'Looking through the results'
+  const text = describeArchiveCommand(found.name, found.rest)
+  if (!found.more) return text
+  return found.together
+    ? `${text}, and ${found.more} more at once`
+    : `${text}, then ${found.more} more`
+}
+
+function describeArchiveCommand(name: string, words: string[]): string {
+  // A word the shell would have filled in, unknown here, is left blank rather
+  // than shown as `$q`; blanking keeps the other words in their places.
+  const rest = words.map((word) => (UNRESOLVED.test(word) ? '' : word))
+  const text = rest.filter(Boolean).join(' ').trim()
+  switch (name) {
+    case 'search':
+      return text ? `Searching ${quote(text)}` : 'Searching'
+    case 'semantic':
+      return text
+        ? `Searching by meaning ${quote(text)}`
+        : 'Searching by meaning'
+    case 'people':
+      return text ? `Looking up ${quote(text)}` : 'Looking up people'
+    case 'score':
+      return rest[1]
+        ? `Checking tweets against ${quote(criterionText({ criterion: rest.slice(1).join(' ') }))}`
+        : 'Checking tweets against your question'
+    case 'thread':
+      return 'Reading thread'
+    case 'quotes':
+      return 'Reading quotes'
+    case 'show':
+      return 'Reading a tweet in full'
+    case 'tweets':
+      return 'Collecting tweets'
+    case 'timeline':
+      return text
+        ? `Reading ${text.replace(/^@?/, '@')}'s tweets`
+        : 'Reading tweets'
+    case 'expand':
+      return 'Reading the conversations around the best matches'
+    case 'interactions':
+      if (!rest[0]) return 'Checking who talked with whom'
+      return rest[1]
+        ? `Checking how ${rest[0]} and ${rest[1]} talked`
+        : `Checking who ${rest[0]} talked with`
+    case 'ties':
+      return 'Checking who they were talking to'
   }
   return 'Looking through the results'
 }
@@ -636,6 +783,8 @@ export function archiveSearchHref(search: {
   since?: string | null
   until?: string | null
   sort?: string | null
+  /** Several words matched in any order, not as a phrase. */
+  anyOrder?: boolean
 }): string | null {
   const query = search.query?.trim()
   if (!query) return null
@@ -656,13 +805,20 @@ export function archiveSearchHref(search: {
     if (!PAGE_SORTS.has(search.sort)) return null
     params.set('sort', search.sort)
   }
+  if (search.anyOrder && /\s/.test(query)) params.set('match', 'all')
   return `/search?${params.toString()}`
 }
 
 // The workspace `search` command's options (workspace/commands.ts). --limit
-// only caps how many come back and --all matches every word, as the search
-// page does; --any (an OR list) has no equivalent there.
+// only caps how many come back; --or and --with (and --any, their old form in
+// stored runs) make several searches, which the search page has no way to
+// express. The command matches several words in any order unless it
+// passes --phrase (--all is the old name for that default), while the search
+// page reads several words as a phrase, so an any-order search links with
+// `match=all`, which asks the page for the same match.
 const SEARCH_VALUE_FLAGS = new Set([
+  'or',
+  'with',
   'any',
   'from',
   'reply-to',
@@ -672,48 +828,101 @@ const SEARCH_VALUE_FLAGS = new Set([
   'limit',
 ])
 
-/** The first `search` in a shell command the search page can express. */
-export function bashSearchHref(command: string): string | null {
-  for (const segment of command.split(/;|&&|\|\||\|/)) {
-    const words = Array.from(
-      segment.trim().matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g),
-    ).map((match) => match[1] ?? match[2] ?? match[3])
-    if (words[0] !== 'search') continue
-    const terms: string[] = []
-    const flags: Record<string, string> = {}
-    let expressible = true
-    for (let i = 1; i < words.length; i++) {
-      const word = words[i]
-      if (word === '>' || word === '>>') break
-      if (!word.startsWith('--')) {
-        terms.push(word)
-        continue
-      }
-      const [name, inline] = word.slice(2).split(/=(.*)/s, 2)
-      if (name === 'all') continue
-      if (!SEARCH_VALUE_FLAGS.has(name) || name === 'any') {
-        expressible = false
-        break
-      }
-      const value = inline ?? words[++i]
-      if (value === undefined) {
-        expressible = false
-        break
-      }
-      flags[name] = value
+const MULTI_SEARCH_FLAGS = new Set(['or', 'with', 'any'])
+
+function parseSearchLineHref(
+  lineText: string,
+): { key: string; href: string } | null {
+  const words = shellWords(lineText)
+  if (words[0] !== 'search') return null
+  if (words.some((word) => UNRESOLVED.test(word))) return null
+  const terms: string[] = []
+  const flags: Record<string, string> = {}
+  let expressible = true
+  let phrase = false
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]
+    if (word === '>' || word === '>>') break
+    if (!word.startsWith('--')) {
+      terms.push(word)
+      continue
     }
-    if (!expressible) continue
-    const href = archiveSearchHref({
-      query: terms.join(' '),
-      fromUser: flags.from,
-      replyToUser: flags['reply-to'],
-      since: flags.since,
-      until: flags.until,
-      sort: flags.sort,
-    })
-    if (href) return href
+    const [name, inline] = word.slice(2).split(/=(.*)/s, 2)
+    if (name === 'all') continue
+    if (name === 'phrase') {
+      phrase = true
+      continue
+    }
+    if (!SEARCH_VALUE_FLAGS.has(name) || MULTI_SEARCH_FLAGS.has(name)) {
+      expressible = false
+      break
+    }
+    const value = inline ?? words[++i]
+    if (value === undefined) {
+      expressible = false
+      break
+    }
+    flags[name] = value
+  }
+  const query = terms.join(' ').trim()
+  if (!expressible) return null
+  const href = archiveSearchHref({
+    query,
+    // The command matches several words in any order unless told --phrase;
+    // the page does the same when its link says so.
+    anyOrder: !phrase,
+    fromUser: flags.from,
+    replyToUser: flags['reply-to'],
+    since: flags.since,
+    until: flags.until,
+    sort: flags.sort,
+  })
+  if (!href) return null
+  const from = (flags.from ?? '').replace(/^@/, '').toLowerCase()
+  return { key: `${query.toLowerCase()}|${from}`, href }
+}
+
+/**
+ * The first `search` in a shell command the search page can express: for a
+ * loop, its first value; never a search with a word the shell fills in.
+ */
+export function bashSearchHref(command: string): string | null {
+  for (const line of shellLines(command)) {
+    const parsed = parseSearchLineHref(line.text)
+    if (parsed) return parsed.href
   }
   return null
+}
+
+/**
+ * The link for the one search a step line names: the command's first archive
+ * command, when that is a search the page can express and it runs alone. A
+ * batch (par, a loop) is named by its first command "and N more", so a single
+ * link there would open one search of several, or a different search from the
+ * one named. Its searches get their own links once the step has finished
+ * (bashSearchHrefs).
+ */
+export function stepSearchHref(command: string): string | null {
+  for (const line of shellLines(command)) {
+    const [name] = commandWords(line.text)
+    if (!isArchiveCommand(name)) continue
+    if (name !== 'search' || line.more > 0) return null
+    return parseSearchLineHref(line.text)?.href ?? null
+  }
+  return null
+}
+
+/**
+ * Every expressible `search` inside a shell command (including parallel `par`
+ * batches), keyed by `<query>|<fromUser>` for per-sub-row linking.
+ */
+export function bashSearchHrefs(command: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const line of shellLines(command)) {
+    const parsed = parseSearchLineHref(line.text)
+    if (parsed && !(parsed.key in out)) out[parsed.key] = parsed.href
+  }
+  return out
 }
 
 /** Mirrors DEFAULT_COLLECT in toolImpl: the limit when the agent sets none. */
@@ -728,6 +937,8 @@ export function progressLine(call: ToolCallView): ProgressLine {
   let finished: string
   let failure: string
   let searchHref: string | null = null
+  let searchHrefs: Record<string, string> | null = null
+  let partial = false
 
   switch (call.name) {
     case 'find_people': {
@@ -750,6 +961,7 @@ export function progressLine(call: ToolCallView): ProgressLine {
           since: asString(input.since),
           until: asString(input.until),
           sort: asString(input.sort),
+          anyOrder: asString(input.mode) === 'all',
         })
       }
       const tweets = plural(asArray(out.tweets).length, 'tweet')
@@ -855,15 +1067,36 @@ export function progressLine(call: ToolCallView): ProgressLine {
       running = doing
       finished = asString(out.summary) ?? firstLine ?? `Ran ${command}`
       failure = `Could not finish: ${doing.charAt(0).toLowerCase()}${doing.slice(1)}`
+      const rawCommand = asString(input.command) ?? ''
+      const summary = asString(out.summary)?.trim()
+      const hasUsefulSummary =
+        Boolean(summary) &&
+        summary !== 'A command failed' &&
+        summary !== 'Looked through the results'
       if (done && (asNumber(out.exitCode) ?? 0) !== 0) {
-        return {
-          id: call.id,
-          text: failure,
-          status: 'error',
-          kind: commandKind(asString(input.command) ?? ''),
+        if (!hasUsefulSummary) {
+          const attempted = shellLines(rawCommand).flatMap((line) => {
+            const [name, ...rest] = commandWords(line.text)
+            return isArchiveCommand(name)
+              ? [describeArchiveCommand(name, rest)]
+              : []
+          })
+          return {
+            id: call.id,
+            text: failure,
+            status: 'error',
+            kind: commandKind(rawCommand),
+            ...(attempted.length > 1 ? { attempted } : {}),
+          }
         }
+        // Some sub-commands in a parallel/chained batch succeeded: show what
+        // actually ran instead of masking it behind a red error on subcommand 1.
+        finished = summary!
+        partial = true
       }
-      searchHref = bashSearchHref(asString(input.command) ?? '')
+      searchHref = stepSearchHref(rawCommand)
+      const allHrefs = bashSearchHrefs(rawCommand)
+      if (Object.keys(allHrefs).length > 0) searchHrefs = allHrefs
       break
     }
     default:
@@ -881,6 +1114,8 @@ export function progressLine(call: ToolCallView): ProgressLine {
         ? commandKind(asString(input.command) ?? '')
         : (TOOL_KINDS[call.name] ?? 'other'),
     ...(searchHref ? { searchHref } : {}),
+    ...(searchHrefs ? { searchHrefs } : {}),
+    ...(partial ? { partial: true } : {}),
   }
 }
 
@@ -1663,18 +1898,17 @@ export function buildTurnView(
     foundSoFar: own.results.length,
     ...foundSoFar(calls, own),
     timeline: timelineFor(message),
+    durationMs: messageDuration(message),
     tweets,
   }
 }
 
 /** Tweets the side column shows while the answer is written. */
-const TOP_FOUND = 5
-
 /**
- * The side column's tweets while a turn runs. Before the relevance check has
- * scored anything, search order says little about quality, so the column
- * shows the latest command's matches and names the command; once scores
- * exist it shows the highest scored.
+ * The tweets found so far while a turn runs. Before the relevance check has
+ * scored anything, search order says little about quality, so the list leads
+ * with the latest command's matches and names the command; once scores exist
+ * it orders highest-scored first.
  */
 function foundSoFar(
   calls: ToolCallView[],
@@ -1691,14 +1925,12 @@ function foundSoFar(
       if (p >= KEPT_P) relevant += 1
     })
     return {
-      topFound: orderByScore(own.results, own.scores)
-        .slice(0, TOP_FOUND)
-        .map(item),
+      topFound: orderByScore(own.results, own.scores).map(item),
       foundPhase: { kind: 'relevant', relevant },
     }
   }
   // The newest call that returned tweets, in its own order; earlier
-  // results fill the column if it returned fewer.
+  // results follow.
   for (let i = calls.length - 1; i >= 0; i--) {
     const call = calls[i]
     if (call.state !== 'output-available') continue
@@ -1710,7 +1942,7 @@ function foundSoFar(
     const rest = own.results.filter((id) => !inLatest.has(id))
     const text = progressFor([call])[0]?.text ?? ''
     return {
-      topFound: [...latest, ...rest].slice(0, TOP_FOUND).map(item),
+      topFound: [...latest, ...rest].map(item),
       foundPhase: { kind: 'latest', source: text.split(' · ')[0] || null },
     }
   }
@@ -1769,6 +2001,13 @@ export function messageOutcome(message: UIMessage): TurnOutcome | null {
   return outcome === 'done' || outcome === 'stopped' || outcome === 'failed'
     ? outcome
     : null
+}
+
+/** How long a saved answer's run took, as its message says (history.ts). */
+function messageDuration(message: UIMessage): number | null {
+  const metadata = isRecord(message.metadata) ? message.metadata : {}
+  const ms = asNumber(metadata.durationMs)
+  return ms !== undefined && ms >= 0 ? ms : null
 }
 
 /** The message marked with how its turn ended. */

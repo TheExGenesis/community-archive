@@ -84,5 +84,10 @@ export function normalizeSearchParams(
   const normalized = buildSearchParams(buildSearchExpression(searchParams))
   const sort = searchParams.get('sort')
   if (sort && SEARCH_SORTS.has(sort)) normalized.set('sort', sort)
+  // Several words are read as a phrase unless the link asks for every word
+  // in any order, as Ask the archive's keyword searches match.
+  if (searchParams.get('match') === 'all' && normalized.get('q')) {
+    normalized.set('match', 'all')
+  }
   return normalized
 }

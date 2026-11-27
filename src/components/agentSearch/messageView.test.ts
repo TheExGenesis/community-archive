@@ -964,6 +964,30 @@ describe('workspace steps and the folded log line', () => {
     ).toBe('Looking through the results')
   })
 
+  test('an option that takes no value does not swallow the word after it', () => {
+    expect(describeCommand('search --phrase "coffee shop" --from @alice')).toBe(
+      'Searching “coffee shop”',
+    )
+    expect(describeCommand('search --all tea ceremony --limit 200')).toBe(
+      'Searching “tea ceremony”',
+    )
+    expect(describeCommand('timeline --no-replies @alice --limit 50')).toBe(
+      "Reading @alice's tweets",
+    )
+    expect(describeCommand('timeline --oldest --retweets @alice')).toBe(
+      "Reading @alice's tweets",
+    )
+    expect(
+      describeCommand(
+        'score --no-parent s1.jsonl "Does the author say they moved?" --yes-if "they say so" --no-if "they only visit"',
+      ),
+    ).toBe('Checking tweets against “Does the author say they moved?”')
+    // An option that does take a value still takes it.
+    expect(describeCommand('search tea --from @alice --limit 300')).toBe(
+      'Searching “tea”',
+    )
+  })
+
   test('describes interaction lookups and shows them as people steps', () => {
     expect(
       describeCommand('interactions @visakanv --since 2023-01 > p.jsonl'),
@@ -1000,6 +1024,69 @@ describe('workspace steps and the folded log line', () => {
       text: 'Checked ties of 2 accounts',
       kind: 'people',
     })
+  })
+
+  test('names timeline, expand and par steps, with the icon of what par runs', () => {
+    expect(describeCommand('timeline @maskys_ --limit 1000 > m.jsonl')).toBe(
+      "Reading @maskys_'s tweets",
+    )
+    expect(commandKind('timeline maskys_')).toBe('people')
+    expect(describeCommand('expand c1.jsonl > e1.jsonl')).toBe(
+      'Reading the conversations around the best matches',
+    )
+    expect(commandKind('expand c1.jsonl')).toBe('thread')
+    expect(
+      describeCommand(
+        `par 'semantic "{} about notion" > m_{}.jsonl' complaints warnings jokes`,
+      ),
+    ).toBe('Searching by meaning “complaints about notion”, and 2 more at once')
+    expect(
+      describeCommand(`par 'timeline @a > a.jsonl' 'search notion > s.jsonl'`),
+    ).toBe("Reading @a's tweets, and 1 more at once")
+    expect(commandKind(`par 'search {} > s_{}.jsonl' rust zig`)).toBe('search')
+    expect(describeCommand(`par 'echo one' 'echo two'`)).toBe(
+      'Looking through the results',
+    )
+  })
+
+  test('names a loop’s steps by their first value, never by the shell variable', () => {
+    const loop = `for w in sensemaking coordination "collective intelligence"; do search "$w" --from @maskys_ --sort oldest > s_$w.jsonl; done`
+    expect(describeCommand(loop)).toBe('Searching “sensemaking”, then 2 more')
+    expect(commandKind(loop)).toBe('search')
+    expect(bashSearchHref(loop)).toBe(
+      '/search?q=sensemaking&fromUser=maskys_&sort=oldest',
+    )
+    expect(
+      describeCommand(
+        'cd /work; for h in @a @b; do echo "== $h"; timeline $h --limit 50 > t.jsonl; done',
+      ),
+    ).toBe("Reading @a's tweets, then 1 more")
+    // A variable set earlier on the line is filled in.
+    expect(describeCommand(`q=roam; search "$q" --limit 200 > s.jsonl`)).toBe(
+      'Searching “roam”',
+    )
+    expect(bashSearchHref(`q=roam; search "$q" > s.jsonl`)).toBe(
+      '/search?q=roam',
+    )
+    // One the line cannot know is left out, and gets no link.
+    const fromFile =
+      'jq -r .author a.jsonl | while read h; do timeline $h > t_$h.jsonl; done'
+    expect(describeCommand(fromFile)).toBe('Reading tweets')
+    expect(commandKind(fromFile)).toBe('people')
+    expect(describeCommand('search "$q" --limit 300 > s.jsonl')).toBe(
+      'Searching',
+    )
+    expect(bashSearchHref('search "$q" --limit 300 > s.jsonl')).toBeNull()
+    expect(
+      bashSearchHref('for f in *.jsonl; do search "$f" > o.jsonl; done'),
+    ).toBeNull()
+    expect(describeCommand('score $f "Does this tweet praise Roam?"')).toBe(
+      'Checking tweets against “Does this tweet praise Roam?”',
+    )
+    // A search on a later line of a multi-line command is still found.
+    expect(describeCommand('wc -l a.jsonl\nsearch zig > z.jsonl')).toBe(
+      'Searching “zig”',
+    )
   })
 
   test('sums up steps, what the answer rests on, and what else was found', () => {
@@ -1164,7 +1251,7 @@ describe('opening a step in archive search', () => {
   test('author, reply, date and sort options become search page filters', () => {
     expect(
       bashSearchHref(
-        'search "great movie" --from @patio11 --reply-to visakanv --since 2023-01-01 --until=2023-12-31 --sort likes',
+        'search "great movie" --phrase --from @patio11 --reply-to visakanv --since 2023-01-01 --until=2023-12-31 --sort likes',
       ),
     ).toBe(
       '/search?q=great+movie&fromUser=patio11&replyToUser=visakanv&sinceDate=2023-01-01&untilDate=2023-12-31&sort=likes',
@@ -1190,6 +1277,21 @@ describe('opening a step in archive search', () => {
       bashSearchHref('score s1.jsonl "Is this about Singapore?" > c1.jsonl'),
     ).toBeNull()
     expect(bashSearchHref('people visakanv')).toBeNull()
+  })
+
+  test('several words link as the command matched them: any order unless --phrase', () => {
+    expect(bashSearchHref('search "community archive" > s1.jsonl')).toBe(
+      '/search?q=community+archive&match=all',
+    )
+    expect(bashSearchHref('search community archive --all')).toBe(
+      '/search?q=community+archive&match=all',
+    )
+    expect(bashSearchHref('search "community archive" --phrase')).toBe(
+      '/search?q=community+archive',
+    )
+    expect(bashSearchHref('search archive --phrase')).toBe('/search?q=archive')
+    expect(bashSearchHref('search notion --or @NotionHQ')).toBeNull()
+    expect(bashSearchHref('search notion --with slow,offline')).toBeNull()
   })
 
   test('a malformed date gives no link rather than a wrong one', () => {
@@ -1221,6 +1323,48 @@ describe('opening a step in archive search', () => {
       output: { tweets: [] },
     })
     expect(orList.searchHref).toBeUndefined()
+  })
+
+  test('a batch of searches carries no single link while it runs; each search gets its own once done', () => {
+    const command =
+      "par 'search \"comm archive\" > k2.jsonl' 'search exgenesis > k5.jsonl' 'search archive --with opt,consent > k3.jsonl'"
+    const running = progressLine({
+      id: 'p',
+      name: 'bash',
+      state: 'input-available',
+      input: { command },
+      output: undefined,
+    })
+    // The line names the first search "and 2 more"; a lone link would open
+    // a different search (the only one the page can express).
+    expect(running.text).toBe('Searching “comm archive”, and 2 more at once')
+    expect(running.searchHref).toBeUndefined()
+    const done = progressLine({
+      id: 'p',
+      name: 'bash',
+      state: 'output-available',
+      input: { command },
+      output: {
+        summary:
+          'Searched “exgenesis” · 400 tweets · Searched “comm archive” · 21 tweets · Searched “archive” with “opt” or “consent” · 300 tweets',
+        exitCode: 0,
+      },
+    })
+    expect(done.searchHref).toBeUndefined()
+    // The --with search is several searches, which no one page can show.
+    expect(done.searchHrefs).toEqual({
+      'comm archive|': '/search?q=comm+archive&match=all',
+      'exgenesis|': '/search?q=exgenesis',
+    })
+    // A search that runs alone keeps its link, running or done.
+    const alone = progressLine({
+      id: 's',
+      name: 'bash',
+      state: 'input-available',
+      input: { command: 'search singapore > s1.jsonl && wc -l s1.jsonl' },
+      output: undefined,
+    })
+    expect(alone.searchHref).toBe('/search?q=singapore')
   })
 })
 

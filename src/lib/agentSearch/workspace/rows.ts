@@ -63,17 +63,31 @@ export function toRow(tweet: AgentTweet, p?: number): TweetRow {
 export const formatRows = (rows: TweetRow[]) =>
   rows.map((row) => JSON.stringify(row)).join('\n') + (rows.length ? '\n' : '')
 
+type RowRefs = Array<{ id: string; row: Record<string, unknown> | null }>
+
+/** A tweet reference from one JSON value: an object with a tweet id, or an id. */
+function rowRef(value: unknown): RowRefs[number] | null {
+  if (typeof value === 'string')
+    return TWEET_ID.test(value) ? { id: value, row: null } : null
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  const id =
+    typeof record.id === 'string'
+      ? record.id
+      : typeof record.id === 'number'
+        ? String(record.id)
+        : ''
+  return TWEET_ID.test(id) ? { id, row: record } : null
+}
+
 /**
- * A file's lines as tweet references, or null when it is not a tweet file.
- * A tweet file has, on every non-empty line, either a JSON object with a
- * tweet `id` or a bare tweet id (as `jq -r .id` writes).
+ * A file as tweet references in JSON Lines: on every non-empty line, a JSON
+ * object with a tweet `id` or a bare tweet id (as `jq -r .id` writes).
  */
-export function parseRowFile(
-  content: string,
-): Array<{ id: string; row: Record<string, unknown> | null }> | null {
+export function parseRowLines(content: string): RowRefs | null {
   const lines = content.split('\n').filter((line) => line.trim())
   if (!lines.length) return null
-  const out: Array<{ id: string; row: Record<string, unknown> | null }> = []
+  const out: RowRefs = []
   for (const line of lines) {
     const trimmed = line.trim()
     if (TWEET_ID.test(trimmed)) {
@@ -82,24 +96,51 @@ export function parseRowFile(
     }
     if (!trimmed.startsWith('{')) return null
     try {
-      const value = JSON.parse(trimmed) as unknown
-      if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        return null
-      }
-      const record = value as Record<string, unknown>
-      const id =
-        typeof record.id === 'string'
-          ? record.id
-          : typeof record.id === 'number'
-            ? String(record.id)
-            : ''
-      if (!TWEET_ID.test(id)) return null
-      out.push({ id, row: record })
+      const ref = rowRef(JSON.parse(trimmed))
+      if (!ref) return null
+      out.push(ref)
     } catch {
       return null
     }
   }
   return out
+}
+
+/**
+ * The same rows written another way jq makes easy by mistake: one JSON array
+ * (`jq -sc 'unique_by(.id)'`, no `[]`) or objects printed over several lines
+ * (`jq -s '…[]'`, no `-c`). A raw newline cannot occur inside a JSON string,
+ * so a `}` and `{` on either side of a line break sit between two values.
+ */
+function parseRowJson(content: string): RowRefs | null {
+  const trimmed = content.trim()
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return null
+  let values: unknown
+  try {
+    values = JSON.parse(
+      trimmed.startsWith('[')
+        ? trimmed
+        : `[${trimmed.replace(/}\s*\n\s*{/g, '},{')}]`,
+    )
+  } catch {
+    return null
+  }
+  if (!Array.isArray(values) || !values.length) return null
+  const out: RowRefs = []
+  for (const value of values) {
+    const ref = rowRef(value)
+    if (!ref) return null
+    out.push(ref)
+  }
+  return out
+}
+
+/**
+ * A file's tweet references, or null when it is not a tweet file: JSON Lines
+ * (parseRowLines), or the same rows as one JSON array or multi-line objects.
+ */
+export function parseRowFile(content: string): RowRefs | null {
+  return parseRowLines(content) ?? parseRowJson(content)
 }
 
 /** Ids in a file's order, each once. */

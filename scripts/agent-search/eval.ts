@@ -5,11 +5,13 @@
 //     scripts/agent-search/eval.ts --only recall-future-historians
 //
 // Flags: --only id,id  --class name[,name]  --limit N  --model provider:model
-//        --tools bash|typed  --concurrency N  --timeout-ms N  --questions path
+//        --tools bash|typed  --concurrency N  --deadline-ms N  --timeout-ms N
+//        --questions path
 //        --dry-run  --no-validate-keys  --allow-remote-gateway  --traces dir
 // Env: AGENT_SEARCH_PROMPT (v1|v2|v2-examples), AGENT_SEARCH_KEEP_REASONING=on,
 //      AGENT_SEARCH_STALL_REMINDER=on.
 
+import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, join, resolve } from 'path'
@@ -46,6 +48,15 @@ interface ToolCallRecord {
   tweetIds: number
   counts: Record<string, number>
   error: string | null
+  /** Bash commands: where the command's time went (trace.ts). */
+  timing?: unknown
+}
+
+/** One model step: the model's wait and the step's whole time. */
+interface StepTiming {
+  responseMs: number
+  stepMs: number
+  toolCalls: number
 }
 
 interface QuestionResult {
@@ -65,12 +76,22 @@ interface QuestionResult {
   toolCalls: ToolCallRecord[]
   inputTokens: number
   outputTokens: number
+  /** What OpenRouter charged when every call reported it, else the estimate. */
   plannerCostUsd: number
+  /** Where plannerCostUsd comes from. */
+  plannerCostSource: 'openrouter' | 'estimate'
+  /** Tokens times the price table (model.ts), for comparison with older runs. */
+  plannerCostEstimateUsd: number
   classifierCostUsd: number
   /** Tool calls that threw or (bash) exited non-zero. */
   commandErrors: number
   semanticCalls: number
   wallMs: number
+  /** The run ended at or after its deadline. */
+  reachedDeadline: boolean
+  /** A step started after the deadline, so the deadline (not the step cap) forced the answer. */
+  answeredAtDeadline: boolean
+  stepTimings: StepTiming[]
   error: string | null
   score: Score
 }
@@ -101,6 +122,11 @@ interface Score {
 
 // ---------- arguments and environment ----------
 
+/** Time past the run's deadline for its last, tool-less answer. */
+const FINAL_ANSWER_MS = 120_000
+/** How much of each command's stdout a trace keeps. */
+const TRACE_OUTPUT_CHARS = 40_000
+
 function parseArgs(argv: string[]) {
   const args = {
     only: [] as string[],
@@ -108,8 +134,15 @@ function parseArgs(argv: string[]) {
     limit: Infinity,
     model: null as string | null,
     tools: null as 'bash' | 'typed' | null,
+    // Deep, so results stay comparable with runs from before depths existed.
+    depth: 'deep' as 'fast' | 'deep',
     concurrency: 1,
-    timeoutMs: 300_000,
+    // The run's deadline, as production sets it (AGENT_SEARCH_RUN_DEADLINE_MS):
+    // past it no tool call starts and the next step must answer. The hard
+    // timeout, which throws the run away, defaults to the deadline plus time
+    // for that last answer.
+    deadlineMs: null as number | null,
+    timeoutMs: null as number | null,
     questions: join(HERE, 'questions.json'),
     dryRun: false,
     validateKeys: true,
@@ -134,9 +167,16 @@ function parseArgs(argv: string[]) {
         throw new Error('--tools must be bash or typed')
       }
       args.tools = mode
+    } else if (flag === '--depth') {
+      const depth = value()
+      if (depth !== 'fast' && depth !== 'deep') {
+        throw new Error('--depth must be fast or deep')
+      }
+      args.depth = depth
     } else if (flag === '--concurrency')
       args.concurrency = Math.max(1, Number(value()))
     else if (flag === '--timeout-ms') args.timeoutMs = Number(value())
+    else if (flag === '--deadline-ms') args.deadlineMs = Number(value())
     else if (flag === '--questions') args.questions = resolve(value())
     else if (flag === '--dry-run') args.dryRun = true
     else if (flag === '--no-validate-keys') args.validateKeys = false
@@ -269,6 +309,8 @@ const pct = (value: number | null) =>
 type Modules = {
   agent: typeof import('@/lib/agentSearch/agent')
   citations: typeof import('@/lib/agentSearch/citations')
+  depth: typeof import('@/lib/agentSearch/depth')
+  deadline: typeof import('@/lib/agentSearch/deadline')
   model: typeof import('@/lib/agentSearch/model')
   gateway: typeof import('@/lib/agentSearch/gateway')
   classifier: typeof import('@/lib/agentSearch/classifier')
@@ -419,11 +461,13 @@ function writeTrace(
         input: call.input,
         ...(output && typeof output.stdout === 'string'
           ? {
-              stdout: clip(output.stdout, 4000),
-              stderr: clip(output.stderr ?? '', 1000),
+              // More than the model saw (MODEL_OUTPUT_CHARS, 10,000), so a
+              // reviewer can tell what a clip hid from it.
+              stdout: clip(output.stdout, TRACE_OUTPUT_CHARS),
+              stderr: clip(output.stderr ?? '', 2000),
               exitCode: output.exitCode,
             }
-          : { output: clip(output, 4000) }),
+          : { output: clip(output, TRACE_OUTPUT_CHARS) }),
         ...(part?.type === 'tool-error'
           ? { error: clip(part.error, 500) }
           : {}),
@@ -447,27 +491,45 @@ function writeTrace(
   )
 }
 
-/** The tools for a mode, with the per-question semantic search cap. */
+/**
+ * The tools for a mode, with the depth's per-question semantic search cap and
+ * the run's deadline, after which no archive or scorer call starts.
+ */
 function toolsFor(
   mods: Modules,
   mode: 'bash' | 'typed',
   abortSignal: AbortSignal,
+  deadlineAt: number,
+  maxSemanticCalls: number,
 ): ToolSet {
   if (mode === 'bash') {
     return mods.agent.createBashAgentTools(
-      mods.inProcess.createInProcessBash({ abortSignal }).execute,
+      mods.inProcess.createInProcessBash(
+        { abortSignal, deadlineAt },
+        {},
+        maxSemanticCalls,
+      ).execute,
     )
   }
   let semanticUsed = 0
-  return mods.agent.createAgentSearchTools({
-    semantic_search: async (input, options) => {
-      if (semanticUsed >= mods.semantic.MAX_SEMANTIC_CALLS_PER_RUN) {
-        return mods.toolImpl.semanticLimitReached(input.query)
-      }
-      semanticUsed += 1
-      return mods.toolImpl.semanticSearchImpl(input, options)
+  return mods.agent.createAgentSearchTools(
+    {
+      semantic_search: async (input, options) => {
+        if (semanticUsed >= maxSemanticCalls) {
+          return mods.toolImpl.semanticLimitReached(
+            input.query,
+            maxSemanticCalls,
+          )
+        }
+        semanticUsed += 1
+        return mods.toolImpl.semanticSearchImpl(input, {
+          abortSignal: options?.abortSignal,
+          deadlineAt,
+        })
+      },
     },
-  })
+    maxSemanticCalls,
+  )
 }
 
 async function runQuestion(
@@ -488,6 +550,7 @@ async function runQuestion(
   let key = question.tweetIds
   let keyDropped: string[] = []
   const toolCalls: ToolCallRecord[] = []
+  const stepTimings: StepTiming[] = []
   const outputsByCall: unknown[][] = []
   let answer = ''
   let finishReason: string | null = null
@@ -495,6 +558,16 @@ async function runQuestion(
   let usage: Partial<LanguageModelUsage> = {}
   let error: string | null = null
   const toolErrors: unknown[] = []
+  // Whether a step began after the deadline (it then answers without tools).
+  let answeredAtDeadline = false
+  // Planner calls, and those whose charge OpenRouter reported.
+  let modelCalls = 0
+  let reportedCalls = 0
+  let reportedCostUsd = 0
+  // As production: a deadline the agent answers at, and a hard stop after it.
+  const deadlineMs = args.deadlineMs ?? mods.deadline.agentSearchRunDeadlineMs()
+  const deadlineAt = started + deadlineMs
+  const timeoutMs = args.timeoutMs ?? deadlineMs + FINAL_ANSWER_MS
 
   try {
     ;({ key, dropped: keyDropped } = await validateKey(
@@ -508,16 +581,54 @@ async function runQuestion(
 
   if (!error) {
     try {
-      const abortSignal = AbortSignal.timeout(args.timeoutMs)
+      const abortSignal = AbortSignal.timeout(timeoutMs)
+      // The depth's profile, applied as the workflow applies it.
+      const profile = mods.depth.AGENT_SEARCH_PROFILES[args.depth]
+      const prepare = mods.agent.agentSearchPrepareStep(
+        deadlineAt,
+        undefined,
+        undefined,
+        profile.maxSteps,
+      )
       const agent = new mods.ai.ToolLoopAgent({
-        model: mods.model.agentSearchModel(modelSpec),
-        instructions: mods.agent.agentSearchInstructions(undefined, mode),
-        tools: toolsFor(mods, mode, abortSignal),
+        // Its own OpenRouter session, as a production run has (its run id),
+        // and each call's charge as OpenRouter reports it.
+        model: mods.model.agentSearchModel(
+          modelSpec,
+          null,
+          null,
+          `eval-${randomUUID()}`,
+          profile.reasoningEffort,
+          (detail) => {
+            modelCalls += 1
+            if (typeof detail.providerCostUsd === 'number') {
+              reportedCalls += 1
+              reportedCostUsd += detail.providerCostUsd
+            }
+          },
+        ),
+        instructions: mods.agent.agentSearchInstructions(
+          undefined,
+          mode,
+          undefined,
+          null,
+          args.depth,
+        ),
+        tools: toolsFor(
+          mods,
+          mode,
+          abortSignal,
+          deadlineAt,
+          profile.maxSemanticCalls,
+        ),
         stopWhen: [
-          mods.ai.isStepCount(mods.agent.AGENT_SEARCH_MAX_STEPS),
+          mods.ai.isStepCount(profile.maxSteps),
           mods.agent.toolsKeepFailing,
         ],
-        prepareStep: mods.agent.agentSearchPrepareStep(),
+        prepareStep: (stepArgs) => {
+          if (Date.now() >= deadlineAt) answeredAtDeadline = true
+          return prepare(stepArgs)
+        },
       })
       const result = await agent.generate({
         prompt: question.question,
@@ -533,6 +644,11 @@ async function runQuestion(
       if (args.traces) writeTrace(args.traces, question, result)
       for (const step of result.steps) {
         const toolMs = step.performance?.toolExecutionMs ?? {}
+        stepTimings.push({
+          responseMs: step.performance?.responseTimeMs ?? 0,
+          stepMs: step.performance?.stepTimeMs ?? 0,
+          toolCalls: step.toolCalls.length,
+        })
         const settled = new Map<string, { output?: unknown; error?: unknown }>()
         for (const part of step.content) {
           if (part.type === 'tool-result')
@@ -558,6 +674,9 @@ async function runQuestion(
                 : outcome.output === undefined
                   ? 'no result'
                   : null,
+            ...((outcome.output as { timing?: unknown } | undefined)?.timing
+              ? { timing: (outcome.output as { timing: unknown }).timing }
+              : {}),
           })
         }
       }
@@ -609,11 +728,24 @@ async function runQuestion(
     toolCalls,
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,
-    plannerCostUsd: plannerCost(mods, modelSpec, usage),
+    ...(() => {
+      const estimate = plannerCost(mods, modelSpec, usage)
+      const reported = modelCalls > 0 && reportedCalls === modelCalls
+      return {
+        plannerCostUsd: reported ? reportedCostUsd : estimate,
+        plannerCostSource: reported
+          ? ('openrouter' as const)
+          : ('estimate' as const),
+        plannerCostEstimateUsd: estimate,
+      }
+    })(),
     classifierCostUsd,
     commandErrors,
     semanticCalls,
     wallMs: Date.now() - started,
+    reachedDeadline: Date.now() >= deadlineAt,
+    answeredAtDeadline,
+    stepTimings,
     error,
     score: score(
       question,
@@ -638,7 +770,7 @@ function markdownReport(
   const lines: string[] = []
   lines.push(`# Agent search eval ${meta.startedAt}`, '')
   lines.push(
-    `Model \`${meta.model}\`, tools \`${meta.tools}\`, scorer \`${meta.scorerModel}\`, ${results.length} questions, ` +
+    `Model \`${meta.model}\`, depth \`${meta.depth}\` (effort \`${meta.reasoningEffort}\`, ${meta.maxSteps} steps), tools \`${meta.tools}\`, scorer \`${meta.scorerModel}\`, ${results.length} questions, ` +
       `questions file \`${meta.questions}\`.`,
     '',
   )
@@ -690,7 +822,7 @@ function markdownReport(
     '## Totals',
     '',
     `- Input tokens ${results.reduce((n, r) => n + r.inputTokens, 0)}, output tokens ${results.reduce((n, r) => n + r.outputTokens, 0)}`,
-    `- Planner cost $${results.reduce((n, r) => n + r.plannerCostUsd, 0).toFixed(4)}, scorer cost $${results.reduce((n, r) => n + r.classifierCostUsd, 0).toFixed(4)} (list prices, src/lib/agentSearch/model.ts)`,
+    `- Planner cost $${results.reduce((n, r) => n + r.plannerCostUsd, 0).toFixed(4)}, scorer cost $${results.reduce((n, r) => n + r.classifierCostUsd, 0).toFixed(4)} (planner: OpenRouter's charge for ${results.filter((r) => r.plannerCostSource === 'openrouter').length} of ${results.length} questions, else tokens at list prices; list-price estimate $${results.reduce((n, r) => n + r.plannerCostEstimateUsd, 0).toFixed(4)})`,
     `- Wall time p50 ${((quantile(wall, 0.5) ?? 0) / 1000).toFixed(1)}s, p95 ${((quantile(wall, 0.95) ?? 0) / 1000).toFixed(1)}s`,
     `- Tool calls ${results.reduce((n, r) => n + r.toolCalls.length, 0)}, failed or non-zero exits ${results.reduce((n, r) => n + r.commandErrors, 0)}, semantic searches ${results.reduce((n, r) => n + r.semanticCalls, 0)}, run errors ${results.filter((r) => r.error).length}`,
     `- Key ids dropped by gateway re-validation: ${results.reduce((n, r) => n + r.keyDropped.length, 0)}`,
@@ -716,6 +848,8 @@ async function main() {
   const mods: Modules = {
     agent: await import('@/lib/agentSearch/agent'),
     citations: await import('@/lib/agentSearch/citations'),
+    depth: await import('@/lib/agentSearch/depth'),
+    deadline: await import('@/lib/agentSearch/deadline'),
     model: await import('@/lib/agentSearch/model'),
     gateway: await import('@/lib/agentSearch/gateway'),
     classifier: await import('@/lib/agentSearch/classifier'),
@@ -751,6 +885,13 @@ async function main() {
   const meta = {
     startedAt,
     model: modelSpec,
+    depth: args.depth,
+    reasoningEffort:
+      mods.model.agentSearchReasoningEffort(
+        modelSpec,
+        undefined,
+        mods.depth.AGENT_SEARCH_PROFILES[args.depth].reasoningEffort,
+      ) ?? 'provider default',
     tools: mode,
     scorerModel:
       scorer === 'decisions'
@@ -759,7 +900,9 @@ async function main() {
           ? mods.classifier.JEV_MODEL
           : mods.model.agentSearchScorerModelSpec(),
     scorer,
-    maxSteps: mods.agent.AGENT_SEARCH_MAX_STEPS,
+    maxSteps: mods.depth.AGENT_SEARCH_PROFILES[args.depth].maxSteps,
+    maxSemanticCalls:
+      mods.depth.AGENT_SEARCH_PROFILES[args.depth].maxSemanticCalls,
     prompt: mods.agent.agentSearchPromptVariant(),
     prepareStep: mods.agent.agentSearchPrepareStepOptions(),
     traces: args.traces,

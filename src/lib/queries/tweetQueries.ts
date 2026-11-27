@@ -8,6 +8,7 @@ import { enrichSearchTweets } from '../searchTweetEnrichments'
 export interface FilterCriteria {
   searchQuery?: string // For text search in tweets (tsquery-formatted)
   rawSearchQuery?: string // Original unformatted search text, sent to ClickHouse search
+  matchAllWords?: boolean // ClickHouse text search: every word in any order, not the phrase
   fromUsername?: string // For tweets from a specific username
   replyToUsername?: string // For tweets in reply to a specific username
   startDate?: string // For tweets created after this date

@@ -38,7 +38,7 @@ const ALLOWED_ELEMENTS = [
 ]
 
 const CHIP =
-  'ml-0.5 inline-flex h-5 min-w-[1.25rem] -translate-y-px items-center justify-center rounded-full px-1.5 align-middle text-[11px] font-semibold leading-none no-underline'
+  'ml-0.5 inline-flex h-[18px] min-w-[18px] -translate-y-px items-center justify-center rounded-full px-1 align-[1px] text-[10px] font-semibold leading-none no-underline'
 
 // The chip stays 20px to read as a footnote, but takes taps over 32px of
 // height. On touch screens chips sit 6px apart so neighbours' areas don't

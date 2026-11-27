@@ -196,7 +196,7 @@ const thinking = (id: string, text: string, latest = false): TimelineEntry => ({
 })
 const step = (line: ProgressLine): TimelineEntry => ({ kind: 'step', line })
 
-test('reasoning being written shows in full; earlier reasoning is folded', () => {
+test('reasoning starts folded by default and opens on click in chronological order', () => {
   const timeline = [
     thinking('t1', 'Start with the word itself. Then widen.'),
     step(done(1)),
@@ -215,27 +215,35 @@ test('reasoning being written shows in full; earlier reasoning is folded', () =>
       onStop={jest.fn()}
     />,
   )
-  // The live line has the newest sentence; the log below it, opened, has
-  // the reasoning being written in full.
-  const header = screen.getAllByRole('button', { name: /Thinking/ })[0]
+  // The live header shows the newest sentence; inside the chronological log,
+  // both earlier and active reasoning start folded to a single quiet line.
+  const header = within(screen.getByLabelText('Search progress')).getByRole(
+    'button',
+  )
   expect(screen.getByLabelText('Search progress')).toHaveTextContent(
     'Thinking · Read the thread around it.',
   )
   const progress = document.getElementById(
     header.getAttribute('aria-controls') ?? '',
   ) as HTMLElement
+  expect(progress).toHaveTextContent('Thinking · Start with the word itself.')
+  expect(progress).not.toHaveTextContent('Then widen.')
+  expect(progress).toHaveTextContent('Thinking · Read the thread around it.')
+  expect(progress).not.toHaveTextContent('One reply looks relevant.')
+
+  // Opening an earlier thought expands it in place and keeps it open as later steps arrive.
+  const [first, second] = within(progress).getAllByRole('button', {
+    name: /Thinking/,
+  })
+  fireEvent.click(first)
+  expect(progress).toHaveTextContent('Then widen.')
+  fireEvent.click(second)
   expect(progress).toHaveTextContent(
     'One reply looks relevant. Read the thread around it.',
   )
-  // Earlier reasoning folds to its first sentence and opens on request.
-  expect(progress).toHaveTextContent('Thinking · Start with the word itself.')
-  expect(progress).not.toHaveTextContent('Then widen.')
-  const [first] = within(progress).getAllByRole('button', { name: /Thinking/ })
-  fireEvent.click(first)
-  expect(progress).toHaveTextContent('Then widen.')
 
-  // The next step starts: the latest reasoning folds by itself, and what
-  // the reader opened stays open.
+  // The next step starts: what the reader opened stays open, and the new step
+  // appends chronologically at the end.
   rerender(
     <StepLog
       mode="running"
@@ -255,9 +263,8 @@ test('reasoning being written shows in full; earlier reasoning is folded', () =>
       .querySelector('button')
       ?.getAttribute('aria-controls') ?? '',
   ) as HTMLElement
-  expect(log).toHaveTextContent('Thinking · One reply looks relevant.')
-  expect(log).not.toHaveTextContent('Read the thread around it.')
   expect(log).toHaveTextContent('Then widen.')
+  expect(log).toHaveTextContent('Searched “term 2” · 2 tweets')
 })
 
 test('the running log folds to the entry under way and its newest sentence', () => {
@@ -323,4 +330,197 @@ test('a search step can be opened in archive search, in a new tab', () => {
   expect(links[0]).toHaveAttribute('href', '/search?q=term+1')
   expect(links[0]).toHaveAttribute('target', '_blank')
   expect(links[0].getAttribute('rel')).toContain('noopener')
+})
+
+test('parallel compound searches fold into a clean summary and expand into a sub-list; consecutive result reads collapse', () => {
+  render(
+    <StepLog
+      mode="stopped"
+      steps={[
+        {
+          id: 'p1',
+          status: 'done',
+          kind: 'search',
+          text: 'Searched “architecture” from @alice · 10 tweets · Searched “architecture” from @bob · 5 tweets',
+          searchHref: '/search?q=architecture&fromUser=alice',
+          searchHrefs: {
+            'architecture|alice': '/search?q=architecture&fromUser=alice',
+            'architecture|bob': '/search?q=architecture&fromUser=bob',
+          },
+        },
+        {
+          id: 'p2',
+          status: 'done',
+          kind: 'search',
+          text: 'Searched “tssui” · 7 tweets · Searched “roark” · 20 tweets',
+        },
+        {
+          id: 'r1',
+          status: 'done',
+          kind: 'files',
+          text: 'Looked through the results',
+        },
+        {
+          id: 'r2',
+          status: 'done',
+          kind: 'files',
+          text: 'Looked through the results',
+        },
+        {
+          id: 'r3',
+          status: 'done',
+          kind: 'files',
+          text: 'Looked through the results',
+        },
+      ]}
+      elapsedMs={null}
+    />,
+  )
+  // Same-query multi-account batch summarizes cleanly and expands on click.
+  // No ambiguous "Open in search" link sits on the collapsed parent row.
+  const across = screen.getByRole('button', {
+    name: 'Searched “architecture” across 2 accounts · 15 tweets',
+  })
+  expect(across).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByText(/from @alice/)).toBeNull()
+  expect(
+    screen.queryByRole('link', { name: 'Open this search in archive search' }),
+  ).toBeNull()
+  fireEvent.click(across)
+  expect(across).toHaveAttribute('aria-expanded', 'true')
+  expect(
+    screen.getByText('Searched “architecture” from @alice'),
+  ).toBeInTheDocument()
+  expect(screen.getByText('10 tweets')).toBeInTheDocument()
+  // Each expanded sub-search gets its own exact archive search link.
+  const subLinks = screen.getAllByRole('link', {
+    name: 'Open this search in archive search',
+  })
+  expect(subLinks.map((a) => a.getAttribute('href'))).toEqual([
+    '/search?q=architecture&fromUser=alice',
+    '/search?q=architecture&fromUser=bob',
+  ])
+
+  // Mixed parallel searches summarize as a count.
+  expect(
+    screen.getByRole('button', { name: 'Ran 2 searches · 27 tweets' }),
+  ).toBeInTheDocument()
+
+  // Consecutive "Looked through the results" steps collapse to one row with 3×.
+  expect(screen.getAllByText('Looked through the results')).toHaveLength(1)
+  expect(screen.getByText('· 3×')).toBeInTheDocument()
+})
+
+test('a partially failed batch stays expandable and notes the unfinished part; a totally failed batch expands its attempted commands', () => {
+  render(
+    <StepLog
+      mode="stopped"
+      steps={[
+        {
+          id: 'partial1',
+          status: 'done',
+          kind: 'search',
+          partial: true,
+          text: 'Searched “a” · 10 tweets · Searched “b” · 5 tweets',
+        },
+        {
+          id: 'err1',
+          status: 'error',
+          kind: 'search',
+          text: 'Could not finish: searching “x”, and 1 more at once',
+          attempted: ['Searching “x”', 'Searching “y”'],
+        },
+      ]}
+      elapsedMs={null}
+    />,
+  )
+  const partialBtn = screen.getByRole('button', {
+    name: /Ran 2 searches · 15 tweets · partial/,
+  })
+  fireEvent.click(partialBtn)
+  expect(
+    screen.getByText('Another part of this batch did not finish'),
+  ).toBeInTheDocument()
+
+  const errBtn = screen.getByRole('button', {
+    name: /Could not finish: searching “x”/,
+  })
+  fireEvent.click(errBtn)
+  expect(screen.getByText('Searching “x”')).toBeInTheDocument()
+  expect(screen.getByText('Searching “y”')).toBeInTheDocument()
+})
+
+test('while the answer is written, the last reasoning reads as finished: only the pill is under way', () => {
+  const timeline = [
+    step(done(1)),
+    thinking('t1', 'First thought here. Second thought here.', true),
+  ]
+  const { rerender } = render(
+    <StepLog
+      mode="running"
+      steps={[done(1)]}
+      timeline={timeline}
+      startedAt={Date.now()}
+      onStop={jest.fn()}
+    />,
+  )
+  // Searching: the reasoning being written shows its newest sentence.
+  expect(
+    screen.getByRole('button', { name: 'Thinking · Second thought here.' }),
+  ).toBeInTheDocument()
+  // Writing: the same reasoning is over, so it folds to its first sentence
+  // as it will once the answer is done.
+  rerender(
+    <LogLine
+      summary="1 step · writing the answer"
+      steps={[done(1)]}
+      timeline={timeline}
+      onStop={jest.fn()}
+    />,
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: '1 step · writing the answer' }),
+  )
+  expect(
+    screen.getByRole('button', { name: 'Thinking · First thought here.' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Thinking · Second thought here.' }),
+  ).toBeNull()
+})
+
+test('the log line keeps the clock while the answer is written, then says what the run took', () => {
+  const { rerender } = render(
+    <LogLine
+      summary="2 steps · writing the answer"
+      steps={[done(1), done(2)]}
+      startedAt={Date.now() - 65_000}
+      onStop={jest.fn()}
+    />,
+  )
+  expect(screen.getByText('1:05')).toBeInTheDocument()
+  rerender(
+    <LogLine
+      summary="2 steps · 3 cited"
+      steps={[done(1), done(2)]}
+      durationMs={266_000}
+    />,
+  )
+  // After the pills, not inside the summary between steps and result.
+  expect(screen.getByText('4m 26s')).toBeInTheDocument()
+  expect(
+    screen.getByRole('button', { name: '2 steps · 3 cited' }),
+  ).not.toHaveTextContent('4m 26s')
+  // Under a minute it is seconds alone.
+  rerender(
+    <LogLine
+      summary="2 steps · 3 cited"
+      steps={[done(1), done(2)]}
+      durationMs={26_400}
+    />,
+  )
+  expect(screen.getByText('26s')).toBeInTheDocument()
+  // A run whose time is unknown shows none.
+  rerender(<LogLine summary="2 steps · 3 cited" steps={[done(1), done(2)]} />)
+  expect(screen.queryByText(/^\d+m? ?\d*s$/)).toBeNull()
 })

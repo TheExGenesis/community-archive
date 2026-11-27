@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai'
 const mockChat: {
   messages: UIMessage[]
   status: 'ready' | 'submitted' | 'streaming' | 'error'
+  error?: Error
   resumeStream: jest.Mock
   sendMessage: jest.Mock
   setMessages: jest.Mock
@@ -25,7 +26,7 @@ jest.mock('@ai-sdk/react', () => ({
   useChat: () => ({
     messages: mockChat.messages,
     status: mockChat.status,
-    error: undefined,
+    error: mockChat.error,
     setMessages: mockChat.setMessages,
     sendMessage: mockChat.sendMessage,
     resumeStream: mockChat.resumeStream,
@@ -46,6 +47,7 @@ jest.mock('./AnswerMarkdown', () => ({
 }))
 
 import AgentSearch, { EXAMPLE_QUESTIONS } from './AgentSearch'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { writeOwnKey } from './ownKeyStore'
 
 const quota = (remaining: number) => {
@@ -81,6 +83,7 @@ beforeAll(() => {
 beforeEach(() => {
   mockChat.messages = []
   mockChat.status = 'ready'
+  mockChat.error = undefined
   mockChat.resumeStream = jest.fn()
   mockChat.sendMessage = jest.fn()
   mockChat.setMessages = jest.fn()
@@ -94,12 +97,12 @@ test('a first visit is the heading and a composer that carries the facts', async
   ).toBeInTheDocument()
   const box = screen.getByLabelText('Your question')
   expect(box).toHaveAttribute('placeholder', 'Ask about members’ tweets')
-  // The facts sit under the box, not inside it.
+  // Privacy and scope live in the quiet subtitle above, keeping the composer unobstructed.
   const composer = box.closest('.rounded-xl') as HTMLElement
-  expect(screen.getByText('Private to you')).toBeInTheDocument()
-  expect(screen.getByText('Answers cite tweets')).toBeInTheDocument()
-  expect(composer).not.toHaveTextContent('Private to you')
-  expect(composer).not.toHaveTextContent('Answers cite tweets')
+  expect(
+    screen.getByText(/Private search across members’ archived tweets/),
+  ).toBeInTheDocument()
+  expect(composer).not.toHaveTextContent('Private search')
   expect(await screen.findByText('10 left today')).toBeInTheDocument()
   expect(screen.queryByText(/Answers are private/)).toBeNull()
   expect(screen.queryByText(/Shift\+Enter/)).toBeNull()
@@ -262,9 +265,14 @@ describe('the conversation in the URL', () => {
     render(<AgentSearch initialConversationId="c1" />)
     // A pushed entry, so the browser's Back returns to the conversation.
     const push = jest.spyOn(window.history, 'pushState')
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Back to Ask the archive' }),
-    )
+    // The title beside the caret is the same control: clicking its text goes back.
+    const back = await screen.findByRole('button', {
+      name: 'Back to Ask the archive',
+    })
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Ask the archive' }),
+    ).toContainElement(back)
+    fireEvent.click(screen.getByText('Ask the archive', { selector: 'button' }))
     expect(window.location.search).toBe('')
     expect(push).toHaveBeenCalledTimes(1)
     push.mockRestore()
@@ -407,7 +415,7 @@ describe('the member’s own OpenRouter key', () => {
     ).toBeInTheDocument()
     expect(screen.getByLabelText('On your key')).toBeInTheDocument()
     expect(prepare()).toEqual({
-      body: { id: 'conv-1234', question: 'Who?' },
+      body: { id: 'conv-1234', question: 'Who?', depth: 'fast' },
       headers: { 'x-openrouter-key': KEY },
     })
   })
@@ -715,5 +723,279 @@ describe('a shared conversation', () => {
     expect(
       await screen.findByText('Share this conversation'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('how hard a question is searched', () => {
+  const sentBody = () =>
+    (
+      mockTransport.options as unknown as {
+        prepareSendMessagesRequest: (input: {
+          id: string
+          messages: UIMessage[]
+        }) => { body: { depth?: string } }
+      }
+    ).prepareSendMessagesRequest({
+      id: 'conv-1234',
+      messages: [
+        { id: 'u', role: 'user', parts: [{ type: 'text', text: 'Who?' }] },
+      ],
+    }).body
+  const pressed = (name: string) =>
+    screen.getByRole('button', { name }).getAttribute('aria-pressed')
+
+  beforeEach(() => {
+    window.localStorage.clear()
+    jest.mocked(capturePostHogEvent).mockClear()
+  })
+  afterAll(() => window.localStorage.clear())
+
+  test('the composer starts on Fast; Deep is one press away and is remembered', async () => {
+    quota(5)
+    const { unmount } = render(<AgentSearch />)
+    expect(
+      screen.getByRole('group', { name: 'Search depth' }),
+    ).toBeInTheDocument()
+    expect(pressed('Fast')).toBe('true')
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(sentBody().depth).toBe('fast')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deep' }))
+    expect(pressed('Deep')).toBe('true')
+    // The event says a depth changed, never which question or to what.
+    expect(capturePostHogEvent).toHaveBeenCalledWith('product_action', {
+      feature: 'ask_archive',
+      action: 'depth_changed',
+    })
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(sentBody().depth).toBe('deep')
+    unmount()
+
+    // The next visit opens on the member's choice.
+    render(<AgentSearch />)
+    await waitFor(() => expect(pressed('Deep')).toBe('true'))
+  })
+
+  test('a fast answer from this visit offers a deeper search, which leaves the toggle alone', () => {
+    quota(5)
+    const { rerender } = render(<AgentSearch />)
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(mockChat.sendMessage).toHaveBeenCalledWith({ text: 'Who?' })
+    // The run streams, then ends with an answer.
+    mockChat.messages = thread
+    mockChat.status = 'streaming'
+    rerender(<AgentSearch />)
+    expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+    mockChat.status = 'ready'
+    rerender(<AgentSearch />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search deeper' }))
+    expect(mockChat.sendMessage).toHaveBeenLastCalledWith({
+      text: 'Search deeper: Who?',
+    })
+    expect(sentBody().depth).toBe('deep')
+    expect(capturePostHogEvent).toHaveBeenCalledWith('product_action', {
+      feature: 'ask_archive',
+      action: 'searched_deeper',
+    })
+    expect(pressed('Fast')).toBe('true')
+  })
+
+  /** Asks "Who?" on Fast and lets its answer stream to the end. */
+  const askFastAndFinish = () => {
+    const view = render(<AgentSearch />)
+    fireEvent.change(screen.getByLabelText('Your question'), {
+      target: { value: 'Who?' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+    mockTransport.options?.onChatSendMessage(
+      new Response(null, { headers: { 'x-workflow-run-id': 'asr_1' } }),
+      { chatId: lastConversationId },
+    )
+    mockChat.messages = thread
+    mockChat.status = 'streaming'
+    view.rerender(<AgentSearch />)
+    mockChat.status = 'ready'
+    view.rerender(<AgentSearch />)
+    return view
+  }
+
+  test('the offer survives the answer settling to the server’s copy, which has the run’s id', async () => {
+    // The server kept more than the stream delivered, so its copy takes over.
+    const stored = [
+      thread[0],
+      {
+        id: 'asr_1',
+        role: 'assistant',
+        metadata: { outcome: 'done' },
+        parts: [{ type: 'text', text: 'Them. And two more.' }],
+      },
+    ] as UIMessage[]
+    global.fetch = jest.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('/conversations/')
+          ? { messages: stored, runningRunId: null }
+          : { conversations: [], dailyLimit: 10, remainingToday: 5 },
+    })) as unknown as typeof fetch
+    const { rerender } = askFastAndFinish()
+    await waitFor(() => expect(mockChat.setMessages).toHaveBeenCalled())
+    mockChat.messages = stored
+    rerender(<AgentSearch />)
+    expect(
+      screen.getByRole('button', { name: 'Search deeper' }),
+    ).toBeInTheDocument()
+  })
+
+  test('a refused deeper search puts the plain question back, not its "Search deeper" text', () => {
+    quota(5)
+    const { rerender } = askFastAndFinish()
+    fireEvent.click(screen.getByRole('button', { name: 'Search deeper' }))
+    expect(mockChat.sendMessage).toHaveBeenLastCalledWith({
+      text: 'Search deeper: Who?',
+    })
+    // The server refuses it (a limit): the question is left with no reply.
+    mockChat.messages = [
+      ...thread,
+      {
+        id: 'u2',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Search deeper: Who?' }],
+      },
+    ]
+    mockChat.status = 'error'
+    mockChat.error = new Error('rate_limited')
+    rerender(<AgentSearch />)
+    // Sent again from the box it would run at the box's depth, so the box
+    // gets the question as the member asked it.
+    expect(screen.getByLabelText('Ask a follow-up')).toHaveValue('Who?')
+  })
+
+  test('paused, Ask again on a failed answer is disabled', () => {
+    mockChat.messages = [
+      thread[0],
+      { ...thread[1], metadata: { outcome: 'failed' } },
+    ] as UIMessage[]
+    quota(5)
+    const { unmount } = render(<AgentSearch />)
+    expect(screen.getByRole('button', { name: 'Ask again' })).toBeEnabled()
+    unmount()
+    render(<AgentSearch paused />)
+    expect(screen.getByRole('button', { name: 'Ask again' })).toBeDisabled()
+  })
+
+  test('a stored answer, whose depth the page does not know, offers none', () => {
+    mockChat.messages = thread
+    quota(5)
+    render(<AgentSearch />)
+    expect(screen.queryByRole('button', { name: 'Search deeper' })).toBeNull()
+  })
+})
+
+describe('auto-growing composer', () => {
+  test('grows with long text and folds Try asking away until shortened', () => {
+    render(<AgentSearch />)
+    const box = screen.getByLabelText('Your question') as HTMLTextAreaElement
+    const suggestions = screen
+      .getByRole('heading', { name: 'Try asking' })
+      .closest('section')!.parentElement!
+    const firstSuggestion = screen.getByRole('button', {
+      name: EXAMPLE_QUESTIONS[0],
+    })
+
+    // Resting height: Try asking stays visible and focusable.
+    expect(box.style.height).toBe('68px')
+    expect(suggestions).not.toHaveAttribute('aria-hidden')
+    expect(firstSuggestion).not.toHaveAttribute('tabindex', '-1')
+
+    // Simulate multi-line text wrapping beyond the resting height.
+    let measured = 142
+    Object.defineProperty(box, 'scrollHeight', {
+      configurable: true,
+      get: () => measured,
+    })
+    fireEvent.change(box, { target: { value: 'A long multi-line question' } })
+    expect(box.style.height).toBe('142px')
+    expect(box.style.overflowY).toBe('hidden')
+    expect(suggestions).toHaveAttribute('aria-hidden', 'true')
+    expect(firstSuggestion).toHaveAttribute('tabindex', '-1')
+
+    // Clearing restores resting height and Try asking.
+    measured = 46
+    fireEvent.change(box, { target: { value: '' } })
+    expect(box.style.height).toBe('68px')
+    expect(suggestions).not.toHaveAttribute('aria-hidden')
+    expect(firstSuggestion).not.toHaveAttribute('tabindex', '-1')
+  })
+
+  test('caps height and enables scrolling when content exceeds the max', () => {
+    render(<AgentSearch />)
+    const box = screen.getByLabelText('Your question') as HTMLTextAreaElement
+    Object.defineProperty(box, 'scrollHeight', {
+      configurable: true,
+      get: () => 900,
+    })
+    fireEvent.change(box, { target: { value: 'Very long paste' } })
+    expect(Number.parseInt(box.style.height, 10)).toBeLessThanOrEqual(360)
+    expect(box.style.overflowY).toBe('auto')
+  })
+})
+
+describe('web search toggle', () => {
+  beforeEach(() => {
+    window.localStorage.removeItem('ask-archive-web-search')
+    jest.mocked(capturePostHogEvent).mockClear()
+  })
+
+  test('starts off, remembers when turned on, and sends webSearch: true', () => {
+    const { unmount } = render(<AgentSearch />)
+    const web = screen.getByRole('button', { name: 'Web search' })
+    expect(web).toHaveAttribute('aria-pressed', 'false')
+
+    const sendBody = () =>
+      (
+        mockTransport.options as unknown as {
+          prepareSendMessagesRequest: (input: {
+            id: string
+            messages: UIMessage[]
+          }) => { body: Record<string, unknown> }
+        }
+      ).prepareSendMessagesRequest({
+        id: 'conv_web',
+        messages: [
+          {
+            id: 'u1',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Who is Eugene Tssui?' }],
+          },
+        ],
+      }).body
+
+    expect(sendBody().webSearch).toBeUndefined()
+
+    fireEvent.click(web)
+    expect(web).toHaveAttribute('aria-pressed', 'true')
+    expect(sendBody().webSearch).toBe(true)
+    expect(capturePostHogEvent).toHaveBeenCalledWith('product_action', {
+      feature: 'ask_archive',
+      action: 'web_search_toggled',
+    })
+
+    // Persists across visits.
+    unmount()
+    render(<AgentSearch />)
+    expect(screen.getByRole('button', { name: 'Web search' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   })
 })

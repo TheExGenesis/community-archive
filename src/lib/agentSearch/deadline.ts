@@ -2,11 +2,21 @@
 // tool, scorer and gateway call, so a run cannot keep spending after its time
 // is up. Plain values only: this module is also part of the workflow body.
 
+import type { Slots } from './slots'
+import type { CallTrace } from './trace'
+
 /** Tool context: the run's deadline and, in scripts, an abort signal. */
 export interface RunLimits {
   /** Epoch ms after which no new paid or gateway call starts. */
   deadlineAt?: number
   abortSignal?: AbortSignal
+  /** Times the calls of one shell command (trace.ts); never crosses a step. */
+  trace?: CallTrace
+  /**
+   * The searches one shell command may have in flight, shared by everything
+   * it runs (slots.ts); never crosses a step.
+   */
+  searchSlots?: Slots
 }
 
 export const DEFAULT_RUN_DEADLINE_MS = 300_000
@@ -16,7 +26,8 @@ export function agentSearchRunDeadlineMs(
   env: NodeJS.ProcessEnv = process.env,
 ): number {
   const value = env.AGENT_SEARCH_RUN_DEADLINE_MS
-  const parsed = value === undefined || value.trim() === '' ? NaN : Number(value)
+  const parsed =
+    value === undefined || value.trim() === '' ? NaN : Number(value)
   return Number.isFinite(parsed) && parsed > 0
     ? parsed
     : DEFAULT_RUN_DEADLINE_MS

@@ -6,6 +6,7 @@ import {
   type ModelCallUsage,
 } from './model'
 import { getAgentSearchRunStore, type RunUsageDelta } from './runStore'
+import type { BashToolOutput } from './workspace/output'
 
 // Spend is added to the run as it happens, by the step that spent it, so the
 // global cap counts runs still in progress and a Stop keeps what was spent.
@@ -39,12 +40,22 @@ export async function recordRunUsage(
   throw lastError
 }
 
+/** What OpenRouter said the call cost, when it said so plainly. */
+function reportedCostUsd(detail?: ModelCallDetail): number | null {
+  const cost = detail?.providerCostUsd
+  return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0
+    ? cost
+    : null
+}
+
 /**
- * One planner call's tokens and estimated cost, added to the run. A call on
- * the member's own key adds its tokens but no cost: the run's cost is house
- * spend, which the global cap counts. With call details, the call is also
- * appended to the store's call log, if it keeps one (the local file store
- * does), with its estimate either way.
+ * One planner call's tokens and cost, added to the run. The cost is what
+ * OpenRouter charged when the call reported it, else the price-table
+ * estimate, which is a ceiling (the listed price of the dearest endpoints).
+ * A call on the member's own key adds its tokens but no cost: the run's cost
+ * is house spend, which the global cap counts. With call details, the call is
+ * also appended to the store's call log, if it keeps one (the local file
+ * store does), with its estimate either way.
  */
 export async function recordModelUsage(
   runId: string,
@@ -56,7 +67,7 @@ export async function recordModelUsage(
   await recordRunUsage(runId, {
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
-    costUsd: detail?.ownKey ? 0 : costUsd,
+    costUsd: detail?.ownKey ? 0 : (reportedCostUsd(detail) ?? costUsd),
   })
   const store = getAgentSearchRunStore()
   if (!detail || !store.logModelCall) return
@@ -71,6 +82,30 @@ export async function recordModelUsage(
     })
     .catch((error) =>
       console.warn('[agent-search] failed to log model call', error),
+    )
+}
+
+/**
+ * One shell command's timing, appended to the store's command log if it
+ * keeps one (the local file store does). Losing a line never fails the
+ * command.
+ */
+export async function logCommandTiming(
+  runId: string,
+  command: string,
+  output: Pick<BashToolOutput, 'timing' | 'exitCode' | 'summary'>,
+): Promise<void> {
+  const store = getAgentSearchRunStore()
+  if (!output.timing || !store.logCommand) return
+  await store
+    .logCommand(runId, {
+      command: command.slice(0, 300),
+      exitCode: output.exitCode,
+      summary: output.summary,
+      ...output.timing,
+    })
+    .catch((error) =>
+      console.warn('[agent-search] failed to log command timing', error),
     )
 }
 

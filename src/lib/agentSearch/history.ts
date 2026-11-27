@@ -260,10 +260,17 @@ export function conversationMessages(
           ? FAILED_TEXT
           : null
     const closing = note && (hasText ? `\n\n${note}` : note)
+    // How long the run took, for the page to show beside a finished answer.
+    const took = run.completedAt
+      ? Date.parse(run.completedAt) - Date.parse(run.startedAt)
+      : NaN
     messages.push({
       id: run.id,
       role: 'assistant',
-      metadata: { outcome },
+      metadata: {
+        outcome,
+        ...(Number.isFinite(took) && took >= 0 ? { durationMs: took } : {}),
+      },
       parts: closing ? [...stored, { type: 'text', text: closing }] : stored,
     })
   }

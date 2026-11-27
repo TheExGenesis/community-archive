@@ -1,5 +1,7 @@
+import { AGENT_SEARCH_PROFILES } from './depth'
 import { callTimeoutMs, type RunLimits } from './deadline'
-import { findMembers, getTweetsByIds } from './gateway'
+import { findMembers, getTweetsByIdsSettled } from './gateway'
+import { traced } from './trace'
 import type { AgentTweet } from './types'
 
 // Semantic search over the archive through the project's own embeddings API
@@ -17,14 +19,15 @@ const USER_AGENT =
 // or under concurrent load (2026-10-14); allow for a slow one, within the
 // run's deadline.
 const SEMANTIC_TIMEOUT_MS = 20_000
-export const SEMANTIC_DEFAULT_K = 50
+export const SEMANTIC_DEFAULT_K = 100
 const MAX_K = 1000
 export const SEMANTIC_DEFAULT_THRESHOLD = 0.65
-/** Semantic searches one question may run. */
-// At 1–5 s each, 6 calls stay within about a tenth of the run deadline and
-// leave most of the 20 steps for keyword search, reading and scoring.
-export const MAX_SEMANTIC_CALLS_PER_RUN = 6
-export const SEMANTIC_LIMIT_MESSAGE = `This question has used its ${MAX_SEMANTIC_CALLS_PER_RUN} semantic searches; use keyword search instead.`
+/** Semantic searches a deep question may run; a fast one gets fewer (depth.ts). */
+export const MAX_SEMANTIC_CALLS_PER_RUN =
+  AGENT_SEARCH_PROFILES.deep.maxSemanticCalls
+export const semanticLimitMessage = (max = MAX_SEMANTIC_CALLS_PER_RUN) =>
+  `This question has used its ${max} semantic ${max === 1 ? 'search' : 'searches'}; use keyword search instead.`
+export const SEMANTIC_LIMIT_MESSAGE = semanticLimitMessage()
 
 const TWEET_ID = /^\d{1,20}$/
 
@@ -78,7 +81,13 @@ export async function semanticSearch(
   input: SemanticSearchInput,
   limits: RunLimits = {},
   fetchImpl: typeof fetch = fetch,
-): Promise<{ query: string; tweets: SemanticTweet[]; matched: number }> {
+): Promise<{
+  query: string
+  tweets: SemanticTweet[]
+  matched: number
+  /** Matches whose lookup failed, when any did. */
+  unfetched?: number
+}> {
   const query = input.query.trim()
   if (!query) throw new Error('Semantic search needs a query')
   const given = input.fromUser?.trim().replace(/^@/, '')
@@ -100,19 +109,24 @@ export async function semanticSearch(
   const signal = limits.abortSignal
     ? either(timeout, limits.abortSignal)
     : timeout
-  const response = await fetchImpl(semanticSearchUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
-    body: JSON.stringify(body),
-    signal,
+  const payload = await traced(limits, 'semantic', 'search', async () => {
+    const response = await fetchImpl(semanticSearchUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+    if (!response.ok) {
+      throw new Error(`Semantic search failed: HTTP ${response.status}`)
+    }
+    return (await response.json()) as {
+      success?: unknown
+      results?: Array<{ key?: unknown; distance?: unknown }>
+    }
   })
-  if (!response.ok) {
-    throw new Error(`Semantic search failed: HTTP ${response.status}`)
-  }
-  const payload = (await response.json()) as {
-    success?: unknown
-    results?: Array<{ key?: unknown; distance?: unknown }>
-  }
   if (payload.success === false || !Array.isArray(payload.results)) {
     throw new Error('Semantic search returned an invalid payload')
   }
@@ -124,16 +138,23 @@ export async function semanticSearch(
     ranked.push({ id, distance: Math.round(distance * 1000) / 1000 })
   }
   const byId = new Map<string, AgentTweet>()
-  for (let i = 0; i < ranked.length; i += 100) {
-    const batch = await getTweetsByIds(
-      ranked.slice(i, i + 100).map((r) => r.id),
-      limits,
-    )
-    for (const tweet of batch) byId.set(tweet.id, tweet)
-  }
+  // A failed lookup batch loses only its own matches, and they are counted,
+  // not taken for deleted tweets; when none came back the search fails.
+  const found = await getTweetsByIdsSettled(
+    ranked.map((r) => r.id),
+    limits,
+  )
+  if (ranked.length && found.failedIds.length === ranked.length)
+    throw found.error
+  for (const tweet of found.tweets) byId.set(tweet.id, tweet)
   const tweets = ranked.flatMap(({ id, distance }) => {
     const tweet = byId.get(id)
     return tweet ? [{ ...tweet, distance }] : []
   })
-  return { query, tweets, matched: ranked.length }
+  return {
+    query,
+    tweets,
+    matched: ranked.length,
+    ...(found.failedIds.length ? { unfetched: found.failedIds.length } : {}),
+  }
 }

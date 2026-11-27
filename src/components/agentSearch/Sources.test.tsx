@@ -30,6 +30,13 @@ const tweet = (id: number, username = `user${id}`, month = 1): PortalTweet => ({
 const many = (n: number, from = 1) =>
   Array.from({ length: n }, (_, i) => tweet(from + i))
 
+const openSources = () => {
+  const toggle = screen.getByRole('button', { name: /^Sources/ })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+}
+
 test('a row shows who, when and the first line, and opens in place', () => {
   render(
     <Sources
@@ -40,6 +47,9 @@ test('a row shows who, when and the first line, and opens in place', () => {
       citations={[]}
     />,
   )
+  // Collapsed by default behind its disclosure bar.
+  expect(screen.queryByRole('button', { name: /@user1/ })).toBeNull()
+  openSources()
   const row = screen.getByRole('button', { name: /@user1/ })
   // The date sits beside the row's button, with the citation number.
   expect(row.closest('li')).toHaveTextContent('Jan 2025')
@@ -66,6 +76,7 @@ test('sources show 25 rows, then a row that opens more in place', () => {
       citations={[]}
     />,
   )
+  openSources()
   const list = screen.getByRole('list', { name: 'Other matches' })
   expect(within(list).getAllByRole('button', { name: /@user/ })).toHaveLength(
     25,
@@ -88,6 +99,7 @@ test('tiers switch with pills, and relevant tweets not returned are counted', ()
       citations={[]}
     />,
   )
+  openSources()
   const relevant = screen.getByRole('button', { name: 'Relevant (5)' })
   expect(relevant).toHaveAttribute('aria-pressed', 'true')
   expect(
@@ -118,6 +130,7 @@ test('the people view groups tweets by author with their counts', () => {
       citations={[]}
     />,
   )
+  openSources()
   fireEvent.click(screen.getByRole('button', { name: 'People' }))
   const alice = screen.getByRole('button', { name: /@alice/ })
   expect(alice).toHaveTextContent('2 tweets')

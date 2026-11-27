@@ -4,13 +4,16 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react'
 import type { MouseEvent } from 'react'
-import { X } from 'lucide-react'
+import { ChevronRight, Plus, X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
+import { TweetAvatar } from '@/components/TweetAvatar'
+import type { PortalTweet } from '@/lib/portal/types'
 import { SIDEBAR_MEDIA, useCitationLinks } from './CitationContext'
 import type { Citation, FoundPhase, FoundTweet } from './messageView'
 import { TweetPlaceholder } from './TweetPlaceholder'
@@ -25,15 +28,16 @@ const railActive = () =>
 
 /** How long a tweet that just entered the column stays highlighted. */
 const FRESH_MS = 1600
-/** Tweets the column shows while the answer is written. */
-const FOUND_SHOWN = 5
+/** Tweets shown initially when expanding matches while a run is still searching. */
+const FOUND_FIRST = 25
+/** Additional tweets revealed on each "Show more" click. */
+const FOUND_MORE = 50
 
 /**
- * Keeps the found tweets on screen in place as the set changes: tweets
- * already shown keep their order, new ones enter at the top, and earlier
- * ones move down until pushed past the last place. A change of phase (latest
- * matches to most relevant) starts over, since the heading changes with it.
- * Returns the tweets to show and the ids that just entered.
+ * Keeps the found tweets in steady order as the set grows: tweets already
+ * seen keep their order, newcomers enter at the top, and a change of phase
+ * (latest matches to most relevant) starts over in score order.
+ * Returns the full ordered list and the ids that just entered.
  */
 function useSteadyFound(found: FoundTweet[], phase: FoundPhase['kind']) {
   const memory = useRef<{
@@ -53,14 +57,14 @@ function useSteadyFound(found: FoundTweet[], phase: FoundPhase['kind']) {
     let shown: FoundTweet[]
     let entered: string[] = []
     if (last.phase !== phase || !last.shown.length) {
-      shown = found.slice(0, FOUND_SHOWN)
+      shown = found
     } else {
       const before = new Set(last.shown.map((item) => item.tweet.id))
       const newcomers = found.filter((item) => !before.has(item.tweet.id))
       // Kept tweets take their latest score.
       const kept = last.shown.map((item) => fresh.get(item.tweet.id) ?? item)
-      shown = [...newcomers, ...kept].slice(0, FOUND_SHOWN)
-      entered = newcomers.slice(0, FOUND_SHOWN).map((item) => item.tweet.id)
+      shown = [...newcomers, ...kept]
+      entered = newcomers.slice(0, FOUND_FIRST).map((item) => item.tweet.id)
     }
     memory.current = {
       found,
@@ -188,24 +192,76 @@ function CitationItem({
   )
 }
 
+/**
+ * The pill that heads a turn's evidence: the tweets found so far while it
+ * runs, then Cited and Sources. One geometry for all three, so the slot keeps
+ * its size when the found tweets give way to the cited ones mid-answer.
+ */
+export const EVIDENCE_PILL_BASE =
+  'inline-flex min-h-[2rem] max-w-full items-center gap-2 rounded-lg bg-muted/30 px-3 py-1 text-left text-[13px]'
+export const EVIDENCE_PILL = `${EVIDENCE_PILL_BASE} group transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
+export const EVIDENCE_PILL_CHEVRON =
+  'h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:text-foreground motion-reduce:transition-none'
+
+/** Compact overlapping author avatars for collapsed evidence disclosure pills. */
+export function AvatarStack({
+  tweets,
+  limit = 4,
+}: {
+  tweets: ReadonlyArray<Pick<PortalTweet, 'id' | 'username' | 'avatar'>>
+  limit?: number
+}) {
+  const unique: Array<Pick<PortalTweet, 'id' | 'username' | 'avatar'>> = []
+  const seen = new Set<string>()
+  for (const t of tweets) {
+    const key = t.username || t.id
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(t)
+    if (unique.length >= limit) break
+  }
+  if (!unique.length) return null
+  return (
+    <span aria-hidden="true" className="flex shrink-0 items-center -space-x-1.5">
+      {unique.map((t) => (
+        <span
+          key={t.id}
+          className="inline-flex rounded-full ring-2 ring-background [&_span]:text-[8px]"
+        >
+          <TweetAvatar tweet={t} size={18} />
+        </span>
+      ))}
+    </span>
+  )
+}
+
 /** Cited tweets as compact rows that open in full, under the answer. */
 export function CitationList({
   citations,
   linkTarget = false,
+  contained = false,
 }: {
   citations: Citation[]
   /** Carries the citations' anchor ids; only one list on the page may. */
   linkTarget?: boolean
+  /** Rendered inside a rounded disclosure card: drop outer borders and margin hang. */
+  contained?: boolean
 }) {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   return (
-    <ol className="divide-y divide-border border-y border-border">
+    <ol
+      className={
+        contained
+          ? 'divide-y divide-border/60'
+          : 'divide-y divide-border border-y border-border'
+      }
+    >
       {citations.map((citation) => (
         <CitationItem
           key={citation.id}
           citation={citation}
           linkTarget={linkTarget}
-          hang
+          hang={!contained}
           expanded={opened.has(citation.anchor)}
           onToggle={() =>
             setOpened((current) => {
@@ -269,6 +325,16 @@ export const CitationRail = forwardRef<
   const holdPositionUntil = useRef(0)
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
   const [position, setPosition] = useState(1)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [foundLimit, setFoundLimit] = useState(FOUND_FIRST)
+  const foundListId = useId()
+
+  useEffect(() => {
+    setFoundLimit(FOUND_FIRST)
+  }, [foundPhase.kind])
+
+  const visibleFound = steady.shown.slice(0, foundLimit)
+  const remainingFound = steady.shown.length - visibleFound.length
 
   const setRefs = (node: HTMLElement | null) => {
     railRef.current = node
@@ -375,6 +441,102 @@ export const CitationRail = forwardRef<
       return next
     })
 
+  if (!inSidebar && showFound) {
+    const canExpand = !folded && steady.shown.length > 0
+    const expanded = canExpand && previewOpen
+    const compactDetail =
+      foundPhase.kind === 'relevant'
+        ? `of ${count(foundCount)} found`
+        : `${count(foundCount)} found`
+    const sourceDetail =
+      foundPhase.kind === 'latest' && foundPhase.source
+        ? `Newest from ${foundPhase.source.charAt(0).toLowerCase()}${foundPhase.source.slice(1)}`
+        : null
+    return (
+      <aside
+        ref={setRefs}
+        aria-label={title}
+        className="scroll-mt-24 space-y-1.5"
+      >
+        <div ref={headerRef}>
+          {canExpand ? (
+            <button
+              type="button"
+              onClick={() => setPreviewOpen((value) => !value)}
+              aria-expanded={expanded}
+              aria-controls={foundListId}
+              className={EVIDENCE_PILL}
+            >
+              <AvatarStack tweets={steady.shown.map((item) => item.tweet)} />
+              <span className="min-w-0 truncate">
+                <span className="font-medium text-foreground">{title}</span>
+                <span className="font-normal tabular-nums text-muted-foreground">
+                  {' '}
+                  · {compactDetail}
+                </span>
+              </span>
+              <ChevronRight
+                aria-hidden="true"
+                className={`${EVIDENCE_PILL_CHEVRON} ${expanded ? 'rotate-90' : ''}`}
+              />
+            </button>
+          ) : (
+            <div className={EVIDENCE_PILL_BASE}>
+              <AvatarStack tweets={steady.shown.map((item) => item.tweet)} />
+              <h3 className="min-w-0 truncate font-medium text-foreground">
+                {title}
+                <span className="font-normal tabular-nums text-muted-foreground">
+                  {' '}
+                  · {compactDetail}
+                </span>
+              </h3>
+            </div>
+          )}
+        </div>
+        {expanded && (
+          <div id={foundListId} className="pl-1">
+            {sourceDetail && (
+              <p className="truncate px-3 py-1 text-xs text-muted-foreground">
+                {sourceDetail}
+              </p>
+            )}
+            <ul className="max-h-96 overflow-y-auto overscroll-contain">
+              {visibleFound.map(({ tweet }) => (
+                <TweetRow
+                  key={tweet.id}
+                  tweet={tweet}
+                  className={`last:border-b-0 transition-colors duration-1000 motion-reduce:transition-none ${
+                    steady.highlighted.has(tweet.id) ? 'bg-brand/10' : ''
+                  }`}
+                />
+              ))}
+              {remainingFound > 0 && (
+                <li className="border-t border-border/60">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFoundLimit((current) => current + FOUND_MORE)
+                    }
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    Show more · {count(remainingFound)} remaining
+                  </button>
+                </li>
+              )}
+            </ul>
+            {remainingFound === 0 && foundCount > steady.shown.length && (
+              <p className="px-3 py-1.5 text-xs text-muted-foreground">
+                Showing {count(steady.shown.length)} of {count(foundCount)}{' '}
+                found — the rest will appear once the answer finishes.
+              </p>
+            )}
+          </div>
+        )}
+      </aside>
+    )
+  }
+
   return (
     <aside
       ref={setRefs}
@@ -438,7 +600,7 @@ export const CitationRail = forwardRef<
         // Interim evidence, drawn lighter than the answer that replaces it:
         // the list's rows, best first, without scores.
         <ul>
-          {steady.shown.map(({ tweet }) => (
+          {visibleFound.map(({ tweet }) => (
             <TweetRow
               key={tweet.id}
               tweet={tweet}
@@ -447,6 +609,18 @@ export const CitationRail = forwardRef<
               }`}
             />
           ))}
+          {remainingFound > 0 && (
+            <li className="border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setFoundLimit((current) => current + FOUND_MORE)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                Show more · {count(remainingFound)} remaining
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </aside>

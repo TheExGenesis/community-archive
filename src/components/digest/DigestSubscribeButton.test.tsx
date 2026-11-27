@@ -233,4 +233,34 @@ describe('DigestSubscribeButton', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Subscribed' }))
     expect(window.confirm).toHaveBeenCalledTimes(1)
   })
+
+  it('hides a secondary control for existing subscribers but confirms a new signup', async () => {
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(response(subscriber) as Response)
+      .mockResolvedValueOnce(response({ status: 'none' }) as Response)
+      .mockResolvedValueOnce(
+        response({
+          status: 'subscribed',
+          subscriptionId: id,
+          email: subscriber.email,
+        }) as Response,
+      )
+    const { container, unmount } = render(
+      <DigestSubscribeButton placement="home" hideWhenSubscribed />,
+    )
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(container).toBeEmptyDOMElement())
+    unmount()
+
+    render(<DigestSubscribeButton placement="home" hideWhenSubscribed />)
+    const input = await screen.findByLabelText(
+      'Email address for the daily digest',
+    )
+    fireEvent.change(input, { target: { value: 'reader@example.com' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(
+      await screen.findByRole('button', { name: 'Subscribed' }),
+    ).toBeVisible()
+  })
 })

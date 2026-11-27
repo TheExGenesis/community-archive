@@ -1774,13 +1774,12 @@ BEGIN
                 'user_name', NULLIF(NEW.raw_user_meta_data->>'user_name', '')
             ));
         END IF;
-    ELSE
-        -- Without a Twitter identity, keep the values the row was created with.
-        v_app := (v_app - 'provider_id' - 'user_name') || jsonb_strip_nulls(jsonb_build_object(
-            'provider_id', OLD.raw_app_meta_data->'provider_id',
-            'user_name', OLD.raw_app_meta_data->'user_name'
-        ));
     END IF;
+    -- An UPDATE without a Twitter identity keeps NEW.raw_app_meta_data as
+    -- written. Clients cannot write it (supabase.auth.updateUser changes
+    -- raw_user_meta_data only), so a change to it comes from the service role
+    -- or GoTrue, e.g. the app_metadata auth.admin.createUser applies after
+    -- its INSERT.
 
     NEW.raw_app_meta_data := v_app;
     RETURN NEW;

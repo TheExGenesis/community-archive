@@ -1,11 +1,13 @@
 -- Core tables (moved from prod.sql)
 
 -- Generated research is deliberately outside the exposed Data API schemas.
--- A subject may be known only by a linked Cuties ID, without an archive account.
+-- A subject must have an X account, even if its numeric archive ID is unknown.
 CREATE TABLE IF NOT EXISTS "private"."profile_intelligence_runs" (
     "subject_key" text NOT NULL,
     "cuties_user_id" uuid,
     "ca_account_id" text,
+    "x_handle" text,
+    "x_identity_evidence" jsonb NOT NULL DEFAULT '{}'::jsonb,
     "profile_run_id" text NOT NULL,
     "blurb_id" text NOT NULL,
     "long_profile" text NOT NULL,
@@ -19,7 +21,11 @@ CREATE TABLE IF NOT EXISTS "private"."profile_intelligence_runs" (
     CONSTRAINT "profile_intelligence_runs_pkey"
       PRIMARY KEY ("subject_key", "profile_run_id", "blurb_id"),
     CONSTRAINT "profile_intelligence_runs_subject_check"
-      CHECK ("cuties_user_id" IS NOT NULL OR "ca_account_id" IS NOT NULL)
+      CHECK ("cuties_user_id" IS NOT NULL OR "ca_account_id" IS NOT NULL),
+    CONSTRAINT "profile_intelligence_runs_x_identity_check"
+      CHECK ("ca_account_id" IS NOT NULL OR "x_handle" IS NOT NULL),
+    CONSTRAINT "profile_intelligence_runs_x_handle_format_check"
+      CHECK ("x_handle" IS NULL OR "x_handle" ~ '^[A-Za-z0-9_]{1,15}$')
 );
 
 -- private.logs

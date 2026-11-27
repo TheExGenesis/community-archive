@@ -12,6 +12,7 @@ export const productFeatures = [
   'cite',
   'profile_timeline',
   'search_alerts',
+  'admin_backfill',
 ] as const
 export const productActions = [
   'node_selected',
@@ -48,6 +49,7 @@ export const productActions = [
   'depth_changed',
   'searched_deeper',
   'web_search_toggled',
+  'sort_changed',
 ] as const
 export type ProductFeature = (typeof productFeatures)[number]
 export type ProductAction = (typeof productActions)[number]

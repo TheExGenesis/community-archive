@@ -14,6 +14,8 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'search',
   ]),
   'social-graph': new Set(),
+  // Admin backfill dashboard only (src/lib/backfillProgressData.ts).
+  'member-tweet-counts': new Set(),
   library: new Set(),
   'recent-neighbors': new Set(['username']),
   search: new Set([

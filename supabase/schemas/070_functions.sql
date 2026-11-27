@@ -4792,6 +4792,117 @@ $$;
 
 ALTER FUNCTION private.guard_all_account_owner_write() OWNER TO postgres;
 
+-- Replace the forecast track record with one uploaded run. Consent is applied
+-- here, at ingestion: an author who is not a current account, or whose account
+-- is blocked or opted out, is never written. Serving reads rows as stored.
+CREATE OR REPLACE FUNCTION public.replace_forecast_track_record(
+  p_as_of date,
+  p_summary jsonb,
+  p_authors jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_run_id bigint;
+  v_given integer;
+  v_kept integer;
+BEGIN
+  IF jsonb_typeof(p_summary) IS DISTINCT FROM 'object'
+     OR jsonb_typeof(p_authors) IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'p_summary must be an object and p_authors an array';
+  END IF;
+
+  -- safeupdate rejects an unqualified DELETE from API sessions.
+  DELETE FROM private.forecast_track_record_runs WHERE id IS NOT NULL;
+  INSERT INTO private.forecast_track_record_runs (as_of, summary)
+  VALUES (p_as_of, p_summary)
+  RETURNING id INTO v_run_id;
+
+  v_given := jsonb_array_length(p_authors);
+
+  INSERT INTO private.forecast_track_record_authors
+    (run_id, account_id, username, score, profile, claims)
+  SELECT DISTINCT ON (acct.account_id)
+    v_run_id, acct.account_id, acct.username,
+    NULLIF(item->'score', 'null'::jsonb),
+    NULLIF(item->'profile', 'null'::jsonb),
+    COALESCE(item->'claims', '[]'::jsonb)
+  FROM jsonb_array_elements(p_authors) AS item
+  JOIN public.all_account AS acct
+    ON lower(acct.username) = lower(BTRIM(item->>'username', ' @'))
+   AND acct.is_tombstone IS NOT TRUE
+  WHERE jsonb_typeof(COALESCE(item->'claims', '[]'::jsonb)) = 'array'
+    AND NOT public.policy_account_is_blocked(acct.account_id, acct.username)
+  ORDER BY acct.account_id;
+
+  GET DIAGNOSTICS v_kept = ROW_COUNT;
+  RETURN jsonb_build_object(
+    'run_id', v_run_id,
+    'authors_given', v_given,
+    'authors_kept', v_kept,
+    'authors_dropped', v_given - v_kept
+  );
+END;
+$$;
+ALTER FUNCTION public.replace_forecast_track_record(date, jsonb, jsonb) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.replace_forecast_track_record(date, jsonb, jsonb)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.replace_forecast_track_record(date, jsonb, jsonb)
+  TO service_role;
+
+-- The stored run for the admin page, or NULL when none was uploaded.
+CREATE OR REPLACE FUNCTION public.get_forecast_track_record()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT jsonb_build_object(
+    'as_of', run.as_of,
+    'uploaded_at', run.uploaded_at,
+    'summary', run.summary,
+    'authors', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'username', author.username,
+        'score', author.score,
+        'profile', author.profile,
+        'claims', author.claims
+      ) ORDER BY lower(author.username))
+      FROM private.forecast_track_record_authors AS author
+      WHERE author.run_id = run.id
+    ), '[]'::jsonb)
+  )
+  FROM private.forecast_track_record_runs AS run
+  ORDER BY run.uploaded_at DESC
+  LIMIT 1;
+$$;
+ALTER FUNCTION public.get_forecast_track_record() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.get_forecast_track_record()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_forecast_track_record() TO service_role;
+
+-- A policy block (explicit opt-out or admin block) removes the account's
+-- forecasts in the same transaction that records the block.
+CREATE OR REPLACE FUNCTION private.purge_forecast_track_record_on_block()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  DELETE FROM private.forecast_track_record_authors AS author
+  WHERE author.account_id = NEW.account_id
+     OR (NULLIF(BTRIM(NEW.username), '') IS NOT NULL
+         AND lower(author.username) = lower(BTRIM(NEW.username)));
+  RETURN NEW;
+END;
+$$;
+ALTER FUNCTION private.purge_forecast_track_record_on_block() OWNER TO postgres;
+REVOKE ALL ON FUNCTION private.purge_forecast_track_record_on_block()
+  FROM PUBLIC, anon, authenticated, service_role;
 
 -- At most 10 live alerts per user. The per-user advisory lock makes the count
 -- and the insert one step, so parallel creates cannot overshoot.

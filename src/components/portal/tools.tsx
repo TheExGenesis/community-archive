@@ -1,5 +1,7 @@
 import {
+  FaBullseye,
   FaFire,
+  FaHandshake,
   FaHistory,
   FaPoll,
   FaProjectDiagram,
@@ -79,5 +81,26 @@ export const PORTAL_TOOLS: PortalTool[] = [
     description: 'More projects from the community',
     link: '/tweets/1835411943735140798',
     icon: <FaUsers />,
+  },
+]
+
+/** Research tools shown only to admins on /tools. Their routes check admin
+ *  access on the server; hiding the cards is only presentation. */
+export const ADMIN_TOOLS: PortalTool[] = [
+  {
+    slug: 'warm-paths',
+    name: 'Warm paths',
+    description:
+      'Who can introduce you to whom, ranked by two-way conversations between members',
+    link: '/tools/warm-paths',
+    icon: <FaHandshake />,
+  },
+  {
+    slug: 'forecast-track-record',
+    name: 'Forecast track record',
+    description:
+      'Forecasts members made in their tweets, resolved and scored per author',
+    link: '/tools/forecast-track-record',
+    icon: <FaBullseye />,
   },
 ]

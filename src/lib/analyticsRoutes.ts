@@ -53,6 +53,8 @@ export const analyticsRoutes = {
   '/bulletin': ['opportunities', 'product'],
   '/bulletin/about': ['opportunities_about', 'information'],
   '/tools': ['tools', 'product'],
+  '/tools/warm-paths': ['warm_paths', 'admin'],
+  '/tools/forecast-track-record': ['forecast_track_record', 'admin'],
   '/explore': ['explore', 'product'],
   '/notes': ['notes', 'product'],
   '/opt-in': ['opt_in', 'product'],

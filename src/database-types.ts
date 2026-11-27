@@ -1437,6 +1437,9 @@ isOneToOne: false
 "get_bulletin_runs":
 { Args: { "before_id"?: number,"max_results"?: number }; Returns: Json
                            },
+"get_forecast_track_record":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "get_hourly_scraping_stats":
 { Args: { "p_hours_back"?: number }; Returns: {
               "period_end": string,"period_start": string,"tweet_count": number,"unique_scrapers": number
@@ -1619,6 +1622,9 @@ isOneToOne: false
                            },
 "refresh_global_activity_summary":
 { Args: Record<PropertyKey, never>; Returns: undefined
+                           },
+"replace_forecast_track_record":
+{ Args: { "p_as_of": string,"p_authors": Json,"p_summary": Json }; Returns: Json
                            },
 "request_bulletin_refresh":
 { Args: { "actor_id": string,"budget_usd": number,"expected_prompt_id": number,"request_id": string,"selection": string }; Returns: string

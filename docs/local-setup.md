@@ -184,6 +184,11 @@ Note: this process takes a bit of time because there's 100+ archives to import. 
 
 ### Sign-in in dev mode
 
+The quickest mock sign-in needs no Docker: `pnpm env:staging` once, then
+`pnpm dev:staging`, and pick a staging mock user (`xiq_dev` is the staging
+admin). See [Mock sign-in](staging.md#mock-sign-in-on-previews-and-in-local-development).
+The rest of this section is for the local Supabase stack.
+
 You might to test archive uploads in dev mode. Set these env variables to the user id and name of the user whose archive you want to upload.
 
 ```

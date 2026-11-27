@@ -25,6 +25,7 @@ export interface SnapshotRecentCrawl {
 }
 
 export interface SnapshotSearchCrawl extends SnapshotRecentCrawl {
+  complete?: boolean
   planned?: number | null
   done?: number
   with_tweets?: number
@@ -55,14 +56,28 @@ export interface SnapshotAccount {
   last_activity_at: string | null
 }
 
+export interface MonthlyPace {
+  searches_per_minute: number
+  measured_hours: number
+  requests_per_month: number
+  measured_months: number
+  measured_days: number
+  months_remaining: number
+  requests_needed: number
+  eta_days: number
+}
+
 export interface CrawlTally {
   accounts: number
   by_status: Record<string, number>
   requests: number
   tweets_gained: number
   runner_status?: string | null
-  eta_at?: string | null
-  months_remaining?: number | null
+  /** Accounts with every planned window done (the ledger audit's rule). */
+  complete?: number
+  windows_remaining?: number
+  /** Monthly only: measured search rate and cost per month, and the ETA they imply. */
+  pace?: MonthlyPace | null
 }
 
 export interface BackfillSnapshot {
@@ -99,6 +114,8 @@ export interface MemberTweetCounts {
 /** Monthly-style progress: the monthly walk, or the new-member walk. */
 export interface SearchProgress {
   status: string
+  /** Every planned window has a done row (or the runner hit its request cap). */
+  complete: boolean
   runner: 'monthly' | 'new_members' | 'weekly'
   planned: number | null
   done: number
@@ -203,6 +220,7 @@ function searchProgress(
   if (!crawl) return null
   return {
     status: crawl.status,
+    complete: crawl.complete ?? crawl.status === 'done',
     runner,
     planned: crawl.planned ?? null,
     done: num(crawl.done),
@@ -400,11 +418,11 @@ function matchesStatus(row: BackfillRow, filter: StatusFilter): boolean {
     case 'monthly_pending':
       return (
         !!row.monthly &&
-        row.monthly.status !== 'done' &&
+        !row.monthly.complete &&
         row.monthly.status !== 'excluded_consent'
       )
     case 'monthly_done':
-      return row.monthly?.status === 'done'
+      return !!row.monthly?.complete
     case 'not_in_monthly':
       return !row.monthly
     case 'recent_pending':

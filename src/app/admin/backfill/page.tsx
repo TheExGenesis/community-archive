@@ -1,7 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import type { BackfillSummary, CrawlTally } from '@/lib/backfillProgress'
+import type {
+  BackfillSummary,
+  CrawlTally,
+  MonthlyPace,
+} from '@/lib/backfillProgress'
 import {
   loadBackfillProgress,
   requireBackfillAdmin,
@@ -49,11 +53,49 @@ function Bar({ ratio, tone }: { ratio: number | null; tone: string }) {
   )
 }
 
+// Search crawls count an account as done when every planned window has a
+// done row (the 25 Nov ledger audit's rule), not by the runner's status.
+const doneCount = (tally: CrawlTally) =>
+  tally.complete ?? tally.by_status.done ?? 0
+
 function statusLine(tally: CrawlTally | undefined) {
   if (!tally) return '—'
+  if (tally.complete !== undefined) {
+    const open =
+      tally.accounts -
+      tally.complete -
+      (tally.by_status.excluded_consent ?? 0) -
+      (tally.by_status.moved_to_monthly ?? 0)
+    return `${formatCount(tally.complete)} done · ${formatCount(open)} pending`
+  }
   const done = tally.by_status.done ?? 0
   const pending = tally.by_status.pending ?? 0
   return `${formatCount(done)} done · ${formatCount(pending)} pending`
+}
+
+function PaceLine({ pace }: { pace: MonthlyPace | null | undefined }) {
+  if (!pace) {
+    return (
+      <p className="text-[11px] text-muted-foreground">
+        ETA unknown: no search rate measured in the last 24 h
+      </p>
+    )
+  }
+  const weeks = pace.eta_days / 7
+  return (
+    <p
+      className="text-[11px] tabular-nums text-muted-foreground"
+      title={`Measured: ${pace.searches_per_minute} searches/min over the last ${pace.measured_hours} h of run telemetry; ${pace.requests_per_month} requests per finished month over ${formatCount(pace.measured_months)} months in ${pace.measured_days} days (months still in flight are not counted, so this is a floor).`}
+    >
+      {formatCount(pace.months_remaining)} months left · ~
+      {weeks >= 2
+        ? `${Math.round(weeks)} weeks`
+        : `${Math.round(pace.eta_days)} days`}{' '}
+      at {pace.searches_per_minute} searches/min · ~
+      {formatCount(pace.requests_needed)} requests needed (
+      {pace.requests_per_month} per month)
+    </p>
+  )
 }
 
 function CrawlTile({
@@ -65,7 +107,7 @@ function CrawlTile({
   tally: CrawlTally | undefined
   extra?: ReactNode
 }) {
-  const done = tally?.by_status.done ?? 0
+  const done = tally ? doneCount(tally) : 0
   return (
     <Tile
       title={title}
@@ -132,10 +174,16 @@ function SummaryStrip({ summary }: { summary: BackfillSummary }) {
         title="Monthly search"
         tally={crawls.monthly}
         extra={
-          <p className="text-[11px] tabular-nums text-muted-foreground">
-            {formatCount(crawls.monthly?.months_remaining)} months left · ETA{' '}
-            {formatUtc(crawls.monthly?.eta_at) ?? '—'}
-          </p>
+          <>
+            <PaceLine pace={crawls.monthly?.pace} />
+            {crawls.monthly?.pace &&
+            quota.backfill_allowed !== null &&
+            crawls.monthly.pace.requests_needed > quota.backfill_allowed ? (
+              <p className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                Needs more than the backfill budget left before the quota resets
+              </p>
+            ) : null}
+          </>
         }
       />
       <CrawlTile title="New-member search" tally={crawls.new_members} />

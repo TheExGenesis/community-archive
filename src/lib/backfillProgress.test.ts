@@ -123,6 +123,21 @@ test('filters by text, member type and stacked statuses', () => {
   expect(
     ids(filterRows(view.rows, '', new Set<StatusFilter>(['monthly_done']))),
   ).toEqual(['2'])
+  // The audit's rule (every planned month done) wins over the runner status.
+  const reopened = buildBackfillView(
+    snapshot([
+      account('9', {
+        crawls: {
+          ...account('9').crawls,
+          monthly: { ...monthly('done', 3, 4), complete: false },
+        },
+      }),
+    ]),
+    null,
+  ).rows
+  expect(
+    ids(filterRows(reopened, '', new Set<StatusFilter>(['monthly_pending']))),
+  ).toEqual(['9'])
   expect(
     ids(filterRows(view.rows, '', new Set<StatusFilter>(['not_in_monthly']))),
   ).toEqual(['3'])
